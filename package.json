@@ -1,0 +1,27 @@
+{
+  "name": "wildlands-publishing-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Automated book publishing pipeline for The Wildlands series.",
+  "workspaces": [
+    "backend",
+    "shared",
+    "frontend"
+  ],
+  "scripts": {
+    "smoke": "yarn workspace @wildlands/backend smoke",
+    "dev:backend": "yarn workspace @wildlands/backend dev",
+    "build:backend": "yarn workspace @wildlands/backend build",
+    "typecheck": "yarn workspaces run typecheck",
+    "lint": "yarn workspaces run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3"
+  },
+  "packageManager": "yarn@1.22.22"
+}

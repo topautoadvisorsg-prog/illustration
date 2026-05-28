@@ -1,0 +1,48 @@
+import cors from '@fastify/cors';
+import sensible from '@fastify/sensible';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
+import Fastify, { type FastifyInstance } from 'fastify';
+import {
+  serializerCompiler,
+  validatorCompiler,
+  jsonSchemaTransform,
+} from 'fastify-type-provider-zod';
+import { getEnv } from './env.js';
+import { registerHealthRoutes } from './api/health.routes.js';
+import { registerProjectRoutes } from './api/projects.routes.js';
+
+export async function buildServer(): Promise<FastifyInstance> {
+  const env = getEnv();
+  const app = Fastify({
+    logger: {
+      level: env.LOG_LEVEL,
+    },
+  });
+
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
+
+  await app.register(cors, { origin: true });
+  await app.register(sensible);
+  await app.register(swagger, {
+    openapi: {
+      info: {
+        title: 'The Wildlands Publishing Platform API',
+        version: '0.1.0',
+      },
+    },
+    transform: jsonSchemaTransform,
+  });
+  await app.register(swaggerUi, { routePrefix: '/api/docs' });
+
+  await registerHealthRoutes(app);
+  await registerProjectRoutes(app);
+
+  app.get('/', async () => ({
+    service: 'wildlands-backend',
+    docs: `http://${env.HOST}:${env.PORT}/api/docs`,
+  }));
+
+  return app;
+}

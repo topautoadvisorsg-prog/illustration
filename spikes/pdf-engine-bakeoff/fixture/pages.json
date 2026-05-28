@@ -1,0 +1,1250 @@
+[
+  {
+    "manifest_id": "BAKEOFF_P001",
+    "page_number": 1,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Fungi & Mushrooms",
+    "scientific_name": "Genus species 1",
+    "layout_template": "LAYOUT_5_CHAPTER_OPENER",
+    "is_danger_page": false,
+    "word_count": 140,
+    "body_text": {
+      "title": "FUNGI & MUSHROOMS",
+      "subtitle": "Genus species 1 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Fungi & Mushrooms in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 1"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P002",
+    "page_number": 2,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Species 2",
+    "scientific_name": "Genus species 2",
+    "layout_template": "LAYOUT_1_STANDARD",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "SPECIES 2",
+      "subtitle": "Genus species 2 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Species 2 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 2"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P003",
+    "page_number": 3,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Species 3",
+    "scientific_name": "Genus species 3",
+    "layout_template": "LAYOUT_1_STANDARD",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "SPECIES 3",
+      "subtitle": "Genus species 3 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Species 3 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 3"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P004",
+    "page_number": 4,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Species 4",
+    "scientific_name": "Genus species 4",
+    "layout_template": "LAYOUT_1_STANDARD",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "SPECIES 4",
+      "subtitle": "Genus species 4 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Species 4 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 4"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P005",
+    "page_number": 5,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Species 5",
+    "scientific_name": "Genus species 5",
+    "layout_template": "LAYOUT_1_STANDARD",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "SPECIES 5",
+      "subtitle": "Genus species 5 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Species 5 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 5"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P006",
+    "page_number": 6,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Species 6",
+    "scientific_name": "Genus species 6",
+    "layout_template": "LAYOUT_1_STANDARD",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "SPECIES 6",
+      "subtitle": "Genus species 6 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Species 6 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 6"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P007",
+    "page_number": 7,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Species 7",
+    "scientific_name": "Genus species 7",
+    "layout_template": "LAYOUT_1_STANDARD",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "SPECIES 7",
+      "subtitle": "Genus species 7 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Species 7 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 7"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P008",
+    "page_number": 8,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Species 8",
+    "scientific_name": "Genus species 8",
+    "layout_template": "LAYOUT_1_STANDARD",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "SPECIES 8",
+      "subtitle": "Genus species 8 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Species 8 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 8"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P009",
+    "page_number": 9,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Species 9",
+    "scientific_name": "Genus species 9",
+    "layout_template": "LAYOUT_1_STANDARD",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "SPECIES 9",
+      "subtitle": "Genus species 9 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Species 9 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 9"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P010",
+    "page_number": 10,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Species 10",
+    "scientific_name": "Genus species 10",
+    "layout_template": "LAYOUT_1_STANDARD",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "SPECIES 10",
+      "subtitle": "Genus species 10 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Species 10 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 10"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P011",
+    "page_number": 11,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Verbose Species 11",
+    "scientific_name": "Genus species 11",
+    "layout_template": "LAYOUT_2_TEXT_HEAVY",
+    "is_danger_page": false,
+    "word_count": 610,
+    "body_text": {
+      "title": "VERBOSE SPECIES 11",
+      "subtitle": "Genus species 11 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "CAUTIONS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "FIELD NOTES",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Verbose Species 11 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 11"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P012",
+    "page_number": 12,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Verbose Species 12",
+    "scientific_name": "Genus species 12",
+    "layout_template": "LAYOUT_2_TEXT_HEAVY",
+    "is_danger_page": false,
+    "word_count": 610,
+    "body_text": {
+      "title": "VERBOSE SPECIES 12",
+      "subtitle": "Genus species 12 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "CAUTIONS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "FIELD NOTES",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Verbose Species 12 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 12"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P013",
+    "page_number": 13,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Verbose Species 13",
+    "scientific_name": "Genus species 13",
+    "layout_template": "LAYOUT_2_TEXT_HEAVY",
+    "is_danger_page": false,
+    "word_count": 610,
+    "body_text": {
+      "title": "VERBOSE SPECIES 13",
+      "subtitle": "Genus species 13 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "CAUTIONS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "FIELD NOTES",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Verbose Species 13 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 13"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P014",
+    "page_number": 14,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Verbose Species 14",
+    "scientific_name": "Genus species 14",
+    "layout_template": "LAYOUT_2_TEXT_HEAVY",
+    "is_danger_page": false,
+    "word_count": 610,
+    "body_text": {
+      "title": "VERBOSE SPECIES 14",
+      "subtitle": "Genus species 14 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "CAUTIONS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "FIELD NOTES",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Verbose Species 14 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 14"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P015",
+    "page_number": 15,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Verbose Species 15",
+    "scientific_name": "Genus species 15",
+    "layout_template": "LAYOUT_2_TEXT_HEAVY",
+    "is_danger_page": false,
+    "word_count": 610,
+    "body_text": {
+      "title": "VERBOSE SPECIES 15",
+      "subtitle": "Genus species 15 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "CAUTIONS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "FIELD NOTES",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Verbose Species 15 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 15"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P016",
+    "page_number": 16,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Toxic Species 16",
+    "scientific_name": "Genus species 16",
+    "layout_template": "LAYOUT_4_DANGER_WARNING",
+    "is_danger_page": true,
+    "word_count": 340,
+    "body_text": {
+      "title": "TOXIC SPECIES 16",
+      "subtitle": "Genus species 16 | TOXIC",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "CAUTIONS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Toxic Species 16 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 16"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P017",
+    "page_number": 17,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Toxic Species 17",
+    "scientific_name": "Genus species 17",
+    "layout_template": "LAYOUT_4_DANGER_WARNING",
+    "is_danger_page": true,
+    "word_count": 340,
+    "body_text": {
+      "title": "TOXIC SPECIES 17",
+      "subtitle": "Genus species 17 | TOXIC",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "CAUTIONS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Toxic Species 17 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 17"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P018",
+    "page_number": 18,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Toxic Species 18",
+    "scientific_name": "Genus species 18",
+    "layout_template": "LAYOUT_4_DANGER_WARNING",
+    "is_danger_page": true,
+    "word_count": 340,
+    "body_text": {
+      "title": "TOXIC SPECIES 18",
+      "subtitle": "Genus species 18 | TOXIC",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "CAUTIONS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Toxic Species 18 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 18"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P019",
+    "page_number": 19,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Striking Species 19",
+    "scientific_name": "Genus species 19",
+    "layout_template": "LAYOUT_3_ILLUSTRATION_DOMINANT",
+    "is_danger_page": false,
+    "word_count": 150,
+    "body_text": {
+      "title": "STRIKING SPECIES 19",
+      "subtitle": "Genus species 19 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Striking Species 19 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 19"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P020",
+    "page_number": 20,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Striking Species 20",
+    "scientific_name": "Genus species 20",
+    "layout_template": "LAYOUT_3_ILLUSTRATION_DOMINANT",
+    "is_danger_page": false,
+    "word_count": 150,
+    "body_text": {
+      "title": "STRIKING SPECIES 20",
+      "subtitle": "Genus species 20 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Striking Species 20 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 20"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P021",
+    "page_number": 21,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Striking Species 21",
+    "scientific_name": "Genus species 21",
+    "layout_template": "LAYOUT_3_ILLUSTRATION_DOMINANT",
+    "is_danger_page": false,
+    "word_count": 150,
+    "body_text": {
+      "title": "STRIKING SPECIES 21",
+      "subtitle": "Genus species 21 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Striking Species 21 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 21"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P022",
+    "page_number": 22,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Striking Species 22",
+    "scientific_name": "Genus species 22",
+    "layout_template": "LAYOUT_3_ILLUSTRATION_DOMINANT",
+    "is_danger_page": false,
+    "word_count": 150,
+    "body_text": {
+      "title": "STRIKING SPECIES 22",
+      "subtitle": "Genus species 22 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Striking Species 22 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 22"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P023",
+    "page_number": 23,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Tall Tree 23",
+    "scientific_name": "Genus species 23",
+    "layout_template": "LAYOUT_8_MARGIN_ILLUSTRATION",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "TALL TREE 23",
+      "subtitle": "Genus species 23 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Tall Tree 23 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 23"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P024",
+    "page_number": 24,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Tall Tree 24",
+    "scientific_name": "Genus species 24",
+    "layout_template": "LAYOUT_8_MARGIN_ILLUSTRATION",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "TALL TREE 24",
+      "subtitle": "Genus species 24 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Tall Tree 24 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 24"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P025",
+    "page_number": 25,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Tall Tree 25",
+    "scientific_name": "Genus species 25",
+    "layout_template": "LAYOUT_8_MARGIN_ILLUSTRATION",
+    "is_danger_page": false,
+    "word_count": 290,
+    "body_text": {
+      "title": "TALL TREE 25",
+      "subtitle": "Genus species 25 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "EAT?",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Tall Tree 25 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 25"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P026",
+    "page_number": 26,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Technical Subject 26",
+    "scientific_name": "Genus species 26",
+    "layout_template": "LAYOUT_9_DIAGNOSTIC_DIAGRAM",
+    "is_danger_page": false,
+    "word_count": 210,
+    "body_text": {
+      "title": "TECHNICAL SUBJECT 26",
+      "subtitle": "Genus species 26 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Technical Subject 26 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 26"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P027",
+    "page_number": 27,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Technical Subject 27",
+    "scientific_name": "Genus species 27",
+    "layout_template": "LAYOUT_9_DIAGNOSTIC_DIAGRAM",
+    "is_danger_page": false,
+    "word_count": 210,
+    "body_text": {
+      "title": "TECHNICAL SUBJECT 27",
+      "subtitle": "Genus species 27 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Technical Subject 27 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 27"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P028",
+    "page_number": 28,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Technical Subject 28",
+    "scientific_name": "Genus species 28",
+    "layout_template": "LAYOUT_9_DIAGNOSTIC_DIAGRAM",
+    "is_danger_page": false,
+    "word_count": 210,
+    "body_text": {
+      "title": "TECHNICAL SUBJECT 28",
+      "subtitle": "Genus species 28 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Technical Subject 28 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 28"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P029",
+    "page_number": 29,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Tracks Study 29",
+    "scientific_name": "Genus species 29",
+    "layout_template": "LAYOUT_7_SCATTERED_VIGNETTES",
+    "is_danger_page": false,
+    "word_count": 220,
+    "body_text": {
+      "title": "TRACKS STUDY 29",
+      "subtitle": "Genus species 29 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Tracks Study 29 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 29"
+      ]
+    }
+  },
+  {
+    "manifest_id": "BAKEOFF_P030",
+    "page_number": 30,
+    "chapter_number": 5,
+    "chapter_name": "Bake-off Chapter",
+    "entry_name": "Tracks Study 30",
+    "scientific_name": "Genus species 30",
+    "layout_template": "LAYOUT_7_SCATTERED_VIGNETTES",
+    "is_danger_page": false,
+    "word_count": 220,
+    "body_text": {
+      "title": "TRACKS STUDY 30",
+      "subtitle": "Genus species 30 | EDIBLE",
+      "intro": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists.",
+      "sections": [
+        {
+          "header": "WHAT IT IS",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "HOW TO IDENTIFY",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        },
+        {
+          "header": "WHERE & WHEN",
+          "body": "The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists. The variations across this region are documented in field notes spanning decades, gathered by hand across thousands of acres of mixed terrain and recorded with the patience of expedition naturalists."
+        }
+      ]
+    },
+    "illustration": {
+      "subject": "A representative specimen of Tracks Study 30 in its natural habitat, observed in field.",
+      "annotations": [
+        "cap detail",
+        "stem cross-section",
+        "pg. 30"
+      ]
+    }
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "name": "@wildlands/spikes",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Phase 0 throwaway spike scripts. Not part of production."
+}
