@@ -78,6 +78,31 @@ The page should read from top to bottom in a clear educational flow.
 Museum-quality wilderness field guide layout.
 Do not render final body text, page numbers, titles, labels, captions, or typography.`;
 
+const LAYOUT_2_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- Top 15% contains a clean title area.
+- Center 70% is reserved almost entirely for educational text content.
+- Small supporting illustrations appear in the outer margins.
+- Tiny scientific diagrams appear between sections.
+- Bottom 15% contains reference notes and callouts.
+
+Visual balance:
+- Left and right margins contain visual support.
+- Central column remains largely empty for future text placement.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+Prioritize readability and information density.
+Leave the central reading column clean and usable for body text.
+Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
 function defaultLayoutPromptAssets() {
   return LAYOUT_TEMPLATES.map(([id, name, description, minWords, targetWords, maxWords], index) => ({
     templateId: id,
@@ -86,17 +111,21 @@ function defaultLayoutPromptAssets() {
     layoutDescription:
       id === "LAYOUT_1_STANDARD"
         ? "Single encyclopedia page. Upper-left primary illustration, upper-right secondary study illustration, lower two-thirds reserved for educational text, small callouts, bottom-corner field-guide box, and light botanical/ecological supporting sketches."
+        : id === "LAYOUT_2_TEXT_HEAVY"
+          ? "Text-heavy encyclopedia page. Top 15% title area, center 70% reserved for dense educational text, margin support illustrations, tiny diagrams between sections, and bottom 15% reference notes/callouts."
         : `${name}: ${description}. Written agent instructions should be refined after analyzing the uploaded mockup.`,
     useCases:
       id === "LAYOUT_1_STANDARD"
         ? ["standard encyclopedia entry", "balanced educational field-guide page", "subject with one primary and one secondary study image"]
+        : id === "LAYOUT_2_TEXT_HEAVY"
+          ? ["long encyclopedia entry", "information-dense field-guide page", "page requiring maximum central reading space"]
         : [description],
     avoidWhen: ["Do not use if the manuscript text cannot pass text-fit at the configured font size."],
     textZoneDescription:
       id === "LAYOUT_1_STANDARD"
         ? "Bottom 65% of the page is a large clean educational text zone."
         : id === "LAYOUT_2_TEXT_HEAVY"
-          ? "Large text zone with a smaller supporting art slot."
+          ? "Center 70% is reserved almost entirely for dense text placement; keep this central column clean."
           : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
             ? "Compact text zone with dominant illustration space."
             : "Balanced text zone based on the uploaded mockup.",
@@ -104,7 +133,7 @@ function defaultLayoutPromptAssets() {
       id === "LAYOUT_1_STANDARD"
         ? "Top 35% illustration zone: primary illustration in upper-left quadrant, secondary study illustration in upper-right quadrant, with light supporting sketches and annotation callouts."
         : id === "LAYOUT_2_TEXT_HEAVY"
-          ? "Small supporting art slot; keep the image secondary to the text."
+          ? "Small supporting illustrations in the outer margins, tiny scientific diagrams between sections, and bottom reference callouts."
           : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
             ? "Tall margin illustration slot for trees, vines, and vertical subjects."
             : "Generated subject art replaces only the mockup image area.",
@@ -117,6 +146,8 @@ function defaultLayoutPromptAssets() {
     promptTemplate:
       id === "LAYOUT_1_STANDARD"
         ? LAYOUT_1_MASTER_PROMPT
+        : id === "LAYOUT_2_TEXT_HEAVY"
+          ? LAYOUT_2_MASTER_PROMPT
         : `{MASTER_STYLE_DNA}\n\nCreate the final illustration for ${name}. Subject: {SUBJECT}. ` +
           `Scientific/diagnostic details: {SCIENTIFIC_DETAILS}. ` +
           `Composition must match the approved mockup image slot for ${id}: ${description}. ` +
