@@ -111,6 +111,12 @@ const PlanPagesResponseSchema = z.object({
         bodyPt: z.number(),
         lineHeight: z.number(),
       }),
+      agent: z.object({
+        id: z.string(),
+        name: z.string(),
+        mission: z.string(),
+        expertFrame: z.string(),
+      }),
       textFitStatus: z.literal('PENDING_PREVIEW'),
     }),
   ),
@@ -293,6 +299,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           promptSha256: decision.promptSha256,
           reasonCodes: decision.reasonCodes,
           typography: decision.typography,
+          agent: decision.agent,
           textFitStatus: decision.textFitStatus,
         });
       }

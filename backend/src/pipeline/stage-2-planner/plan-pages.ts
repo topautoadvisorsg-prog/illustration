@@ -11,6 +11,7 @@
 
 import { createHash } from 'node:crypto';
 import type { LayoutPromptAsset, LayoutTemplateId, PageManifest, ProjectConfig } from '@wildlands/shared';
+import { getAgentContract } from '../../agents/agent-contracts.js';
 
 export interface PagePlanningDecision {
   pageKey: string;
@@ -25,6 +26,12 @@ export interface PagePlanningDecision {
     bodyFont: string;
     bodyPt: number;
     lineHeight: number;
+  };
+  agent: {
+    id: string;
+    name: string;
+    mission: string;
+    expertFrame: string;
   };
   textFitStatus: 'PENDING_PREVIEW';
 }
@@ -131,6 +138,7 @@ function scientificDetails(page: PageManifest): string {
 }
 
 export function planPage(page: PageManifest, config: ProjectConfig): PagePlanningDecision {
+  const agent = getAgentContract('PAGE_PLANNER');
   const wordCount = countPageWords(page.bodyMarkdown);
   const selected = chooseLayout(page, wordCount, config);
   const asset = assetForTemplate(config, selected.template);
@@ -163,6 +171,12 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
       bodyFont: config.typography.bodyFont,
       bodyPt: asset?.recommendedBodyPt ?? config.typography.bodyPt,
       lineHeight: asset?.recommendedLineHeight ?? config.typography.lineHeight,
+    },
+    agent: {
+      id: agent.id,
+      name: agent.name,
+      mission: agent.mission,
+      expertFrame: agent.expertFrame,
     },
     textFitStatus: 'PENDING_PREVIEW',
   };

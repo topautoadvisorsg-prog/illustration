@@ -522,7 +522,7 @@ Use this entry to prove manuscript to manifest generation.`);
                   <div className="row plan-row" key={page.pageKey}>
                     <span>{page.pageKey}</span>
                     <span>{page.layoutTemplate}</span>
-                    <span>{page.wordCount} words</span>
+                    <span>{page.wordCount} words / {page.agent?.name || "Planner"}</span>
                   </div>
                 ))}
                 {plannedPages.length === 0 && <p className="empty">No page plan yet.</p>}
