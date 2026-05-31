@@ -147,8 +147,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     {
       schema: {
         params: ProjectParamsSchema,
-        body: z.object({ markdown: z.string().min(1).optional() }).optional(),
-        response: { 200: ManifestSummaryResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
+        response: { 200: ManifestSummaryResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema, 409: ApiErrorSchema },
       },
     },
     async (request, reply) => {
@@ -156,28 +155,31 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       const project = await getProject(id);
       if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
 
-      // Manuscript text: prefer an inline body (survives Railway redeploys),
-      // otherwise read the stored file from Stage 1.
-      const body = (request.body ?? {}) as { markdown?: string };
-      let markdown = body.markdown;
-      if (!markdown) {
-        if (!project.manuscriptPath) {
-          return reply.code(400).send({
-            error: 'Bad Request',
-            message: 'No manuscript on file. Upload one first or pass { markdown } in the body.',
-            statusCode: 400,
-          });
-        }
-        const { LocalStorageService } = await import('../services/storage/local-storage.js');
-        const buf = await new LocalStorageService().readProjectFile(project.manuscriptPath);
-        markdown = buf.toString('utf8');
+      if (!project.manuscriptPath) {
+        return reply.code(400).send({
+          error: 'Bad Request',
+          message: 'No manuscript on file. Upload one first.',
+          statusCode: 400,
+        });
       }
 
-      const config = project.config as import('@wildlands/shared').ProjectConfig;
-      const summary = await generateManifests({ projectId: id, manuscriptMarkdown: markdown, config });
-      const updated = await setProjectStatus(id, 'MANIFESTED');
+      const { LocalStorageService } = await import('../services/storage/local-storage.js');
+      const buf = await new LocalStorageService().readProjectFile(project.manuscriptPath);
+      const markdown = buf.toString('utf8');
 
-      return { project: toContract(updated ?? project), summary };
+      try {
+        const config = project.config as import('@wildlands/shared').ProjectConfig;
+        const summary = await generateManifests({ projectId: id, manuscriptMarkdown: markdown, config });
+        const updated = await setProjectStatus(id, 'MANIFESTED');
+
+        return { project: toContract(updated ?? project), summary };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('already has manifests/pages')) {
+          return reply.code(409).send({ error: 'Conflict', message, statusCode: 409 });
+        }
+        throw error;
+      }
     },
   );
 

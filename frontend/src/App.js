@@ -296,7 +296,6 @@ Use this entry to prove manuscript to manifest generation.`);
     if (!projectId) throw new Error("Create or select a project first.");
     const data = await call(`/api/projects/${projectId}/manifests`, {
       method: "POST",
-      body: JSON.stringify({ markdown: manuscript }),
     });
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
     setMessage(`Manifested ${data.summary.totalPages} page(s), ${data.summary.manifestsWritten} manifest row(s).`);

@@ -1,8 +1,8 @@
 /**
  * Manifest + page persistence — writes the output of Stage 1.5.
  *
- * What it does: persist book/chapter/page manifests and seed page rows in a
- * single transaction so a project is never left half-manifested.
+ * What it does: persist locked book/chapter/page manifests and seed page rows
+ * in a single transaction so a project is never left half-manifested.
  * Input: structured manifest objects from the Stage 1.5 generator.
  * Output: counts of what was written.
  */
@@ -36,13 +36,33 @@ export interface PersistManifestsResult {
   pagesWritten: number;
 }
 
-/** Delete any prior manifests/pages for the project, then write the new set. */
+/**
+ * Write the first manifest set for a project.
+ *
+ * This is intentionally conservative until explicit manifest versioning lands:
+ * reruns are blocked instead of deleting/replacing rows that downstream stages
+ * may already reference.
+ */
 export async function persistManifests(input: PersistManifestsInput): Promise<PersistManifestsResult> {
   const db = getDb();
   return db.transaction(async (tx) => {
-    // Idempotent re-run: clear previous planning artifacts for this project.
-    await tx.delete(pages).where(eq(pages.projectId, input.projectId));
-    await tx.delete(manifests).where(eq(manifests.projectId, input.projectId));
+    const [existingManifest] = await tx
+      .select({ id: manifests.id })
+      .from(manifests)
+      .where(eq(manifests.projectId, input.projectId))
+      .limit(1);
+
+    const [existingPage] = await tx
+      .select({ id: pages.id })
+      .from(pages)
+      .where(eq(pages.projectId, input.projectId))
+      .limit(1);
+
+    if (existingManifest || existingPage) {
+      throw new Error(
+        'Project already has manifests/pages. Rerun is blocked until explicit manifest versioning is implemented.',
+      );
+    }
 
     const rows: Array<{ kind: ManifestKind; externalId: string; content: unknown }> = [
       { kind: 'BOOK', externalId: 'BOOK', content: input.book },
@@ -58,28 +78,46 @@ export async function persistManifests(input: PersistManifestsInput): Promise<Pe
       })),
     ];
 
-    await tx.insert(manifests).values(
+    const insertedManifests = await tx.insert(manifests).values(
       rows.map((r) => ({
         projectId: input.projectId,
         kind: r.kind,
         version: 1,
         externalId: r.externalId,
         content: r.content as object,
-        locked: false,
+        locked: true,
       })),
+    ).returning({
+      id: manifests.id,
+      kind: manifests.kind,
+      externalId: manifests.externalId,
+    });
+
+    const pageManifestIds = new Map(
+      insertedManifests
+        .filter((manifest) => manifest.kind === 'PAGE')
+        .map((manifest) => [manifest.externalId, manifest.id]),
     );
 
     if (input.pageSeeds.length > 0) {
       await tx.insert(pages).values(
-        input.pageSeeds.map((p) => ({
-          projectId: input.projectId,
-          pageKey: p.pageKey,
-          chapterNumber: p.chapterNumber,
-          plannedPageNumber: p.plannedPageNumber,
-          layoutTemplate: p.layoutTemplate,
-          imagePrompt: p.imagePrompt,
-          status: 'PLANNED' as const,
-        })),
+        input.pageSeeds.map((p) => {
+          const manifestId = pageManifestIds.get(p.pageKey);
+          if (!manifestId) {
+            throw new Error(`No PAGE manifest was inserted for page seed ${p.pageKey}.`);
+          }
+
+          return {
+            projectId: input.projectId,
+            manifestId,
+            pageKey: p.pageKey,
+            chapterNumber: p.chapterNumber,
+            plannedPageNumber: p.plannedPageNumber,
+            layoutTemplate: p.layoutTemplate,
+            imagePrompt: p.imagePrompt,
+            status: 'PLANNED' as const,
+          };
+        }),
       );
     }
 
