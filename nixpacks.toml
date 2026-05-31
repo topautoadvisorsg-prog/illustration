@@ -1,0 +1,8 @@
+[phases.install]
+cmds = ["yarn install --frozen-lockfile"]
+
+[phases.build]
+cmds = ["yarn workspace @wildlands/backend build"]
+
+[start]
+cmd = "yarn workspace @wildlands/backend start"
