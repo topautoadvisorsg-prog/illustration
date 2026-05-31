@@ -342,6 +342,39 @@ h3 {
   font-size: 0.86rem;
 }
 
+.layout-asset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.layout-asset-card {
+  border: 1px solid #e0d7ca;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffdf8;
+}
+
+.layout-asset-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e8dfd2;
+}
+
+.layout-asset-head span {
+  color: #6d6258;
+  font-size: 0.76rem;
+}
+
+.prompt-template {
+  min-height: 120px;
+  font-size: 0.88rem;
+}
+
 .table {
   overflow: hidden;
   border: 1px solid #e0d7ca;
@@ -385,7 +418,8 @@ h3 {
   .form-grid.compact,
   .number-row,
   .swatch-grid,
-  .output-grid {
+  .output-grid,
+  .layout-asset-grid {
     grid-template-columns: 1fr;
   }
 }

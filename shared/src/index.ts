@@ -97,6 +97,16 @@ export const LayoutPolicySchema = z.object({
   comparisonTemplate: LayoutTemplateIdSchema.default('LAYOUT_9_DIAGNOSTIC_DIAGRAM'),
 });
 
+export const LayoutPromptAssetSchema = z.object({
+  templateId: LayoutTemplateIdSchema,
+  label: z.string().min(1),
+  mockupImagePath: z.string().min(1),
+  promptTemplate: z.string().min(1),
+  placeholders: z.array(z.string().min(1)).default(['{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}']),
+  textFitRule: z.string().min(1).default('Fit manuscript text into this mockup before image generation.'),
+  imageSlotDescription: z.string().min(1).default('Replace mockup art with generated subject illustration after text fit approval.'),
+});
+
 export const OutputProfileSchema = z.object({
   printEdition: z.literal('PREMIUM').default('PREMIUM'),
   ebookEdition: z.literal('KINDLE_EPUB').default('KINDLE_EPUB'),
@@ -117,6 +127,7 @@ export const ProjectConfigSchema = z.object({
   colorPalette: ColorPaletteSchema.default({}),
   imageGeneration: ImageGenerationConfigSchema.default({}),
   layoutPolicy: LayoutPolicySchema.default({}),
+  layoutPromptAssets: z.array(LayoutPromptAssetSchema).default([]),
   outputProfile: OutputProfileSchema.default({}),
 });
 
@@ -207,6 +218,9 @@ export const LayoutReferenceSchema = z.object({
   imagePath: z.string().min(1),
   label: z.string().min(1),
   useWhen: z.array(z.string()).min(1),
+  promptTemplate: z.string().min(1).optional(),
+  placeholders: z.array(z.string().min(1)).default([]),
+  imageSlotDescription: z.string().optional(),
   minWords: z.number().int().nonnegative().optional(),
   maxWords: z.number().int().positive().optional(),
   contentTypes: z.array(z.string()).default([]),
@@ -236,3 +250,4 @@ export type CreateProjectRequest = z.infer<typeof CreateProjectRequestSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
 export type PageManifest = z.infer<typeof PageManifestSchema>;
 export type LayoutReference = z.infer<typeof LayoutReferenceSchema>;
+export type LayoutPromptAsset = z.infer<typeof LayoutPromptAssetSchema>;

@@ -15,6 +15,27 @@ const LAYOUT_TEMPLATES = [
   ["LAYOUT_9_DIAGNOSTIC_DIAGRAM", "Diagnostic", "Comparisons, diagrams, anatomy"],
 ];
 
+function defaultLayoutPromptAssets() {
+  return LAYOUT_TEMPLATES.map(([id, name, description], index) => ({
+    templateId: id,
+    label: name,
+    mockupImagePath: `layout-${String(index + 1).padStart(2, "0")}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`,
+    promptTemplate:
+      `Create the final illustration for ${name}. Subject: {SUBJECT}. ` +
+      `Scientific/diagnostic details: {SCIENTIFIC_DETAILS}. ` +
+      `Composition must match the approved mockup image slot for ${id}: ${description}. ` +
+      `Do not render page text, labels, titles, captions, or typography.`,
+    placeholders: ["{SUBJECT}", "{SCIENTIFIC_DETAILS}", "{COMPOSITION_NOTES}"],
+    textFitRule:
+      id === "LAYOUT_2_TEXT_HEAVY"
+        ? "Use this when manuscript text is long; art stays secondary and text must remain comfortable."
+        : id === "LAYOUT_9_DIAGNOSTIC_DIAGRAM"
+          ? "Use this for comparisons, anatomy, diagrams, tracks, and look-alike pages."
+          : "Fit the real manuscript text into this mockup before generating final art.",
+    imageSlotDescription: "Mockup image defines the art slot. Generated art replaces only that slot after text-fit approval.",
+  }));
+}
+
 function trimSlash(value) {
   return value.replace(/\/+$/, "");
 }
@@ -57,6 +78,7 @@ function defaultProjectConfig() {
       longTextTemplate: "LAYOUT_2_TEXT_HEAVY",
       comparisonTemplate: "LAYOUT_9_DIAGNOSTIC_DIAGRAM",
     },
+    layoutPromptAssets: defaultLayoutPromptAssets(),
     outputProfile: {
       printEdition: "PREMIUM",
       ebookEdition: "KINDLE_EPUB",
@@ -124,6 +146,14 @@ Use this entry to prove manuscript to manifest generation.`);
         target = target[path[index]];
       }
       target[path[path.length - 1]] = value;
+      return next;
+    });
+  }
+
+  function updateLayoutAsset(index, key, value) {
+    setProjectConfig((current) => {
+      const next = structuredClone(current);
+      next.layoutPromptAssets[index][key] = value;
       return next;
     });
   }
@@ -500,6 +530,64 @@ Use this entry to prove manuscript to manifest generation.`);
                 />
                 Render chapter by chapter
               </label>
+            </div>
+          </div>
+
+          <div className="config-section">
+            <h3>Layout Prompt Library</h3>
+            <p className="hint">
+              Each layout keeps its mockup image path and image prompt template together. The placeholders get filled
+              after the text-fit mockup is approved.
+            </p>
+            <div className="layout-asset-grid">
+              {projectConfig.layoutPromptAssets.map((asset, index) => (
+                <article className="layout-asset-card" key={asset.templateId}>
+                  <div className="layout-asset-head">
+                    <strong>{asset.label}</strong>
+                    <span>{asset.templateId}</span>
+                  </div>
+                  <Field label="Mockup Image Path">
+                    <input
+                      value={asset.mockupImagePath}
+                      onChange={(event) => updateLayoutAsset(index, "mockupImagePath", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Prompt Template">
+                    <textarea
+                      className="prompt-template"
+                      value={asset.promptTemplate}
+                      onChange={(event) => updateLayoutAsset(index, "promptTemplate", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Placeholders">
+                    <input
+                      value={asset.placeholders.join(", ")}
+                      onChange={(event) =>
+                        updateLayoutAsset(
+                          index,
+                          "placeholders",
+                          event.target.value
+                            .split(",")
+                            .map((item) => item.trim())
+                            .filter(Boolean),
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="Text Fit Rule">
+                    <input
+                      value={asset.textFitRule}
+                      onChange={(event) => updateLayoutAsset(index, "textFitRule", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Image Slot Rule">
+                    <input
+                      value={asset.imageSlotDescription}
+                      onChange={(event) => updateLayoutAsset(index, "imageSlotDescription", event.target.value)}
+                    />
+                  </Field>
+                </article>
+              ))}
             </div>
           </div>
         </section>

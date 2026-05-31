@@ -4,7 +4,10 @@ This folder is the source library for stakeholder-provided page layout reference
 
 ## What Goes Here
 
-The operator will provide roughly 12 reference images. These are not final book pages and they are not AI prompt outputs. They are visual examples that teach the platform what each layout family should feel like when Stage 2 chooses a page layout and Stage 6 renders the text.
+The operator will provide 9 reference/mockup images, one per production layout.
+Each reference image travels with a matching image prompt template. Together they
+define where the art goes, how much room the text gets, and what prompt should be
+filled once the text-fit mockup is approved.
 
 Each image maps to one of the 9 production layout templates:
 
@@ -22,12 +25,16 @@ Each image maps to one of the 9 production layout templates:
 
 ## Intended Workflow
 
-1. Store the reference images here.
-2. Add metadata to `manifest.json` describing which template each image belongs to and when it should be used.
-3. Stage 2 reads the page text and manifest fields, then chooses the best layout template/reference.
-4. Stage 6 renders a text-fit preview using the selected template and a placeholder/reference image.
-5. If the text fit is good, Stage 2/3 proceeds with the real image prompt for the page subject.
-6. Stage 6 replaces the placeholder/reference art with the generated/upscaled subject image.
+1. Store the 9 mockup/reference images here.
+2. Add metadata to `manifest.json` describing each layout, its mockup image path,
+   its prompt template, placeholders, text-fit rule, and image slot rule.
+3. Stage 2 reads the page text and chooses the best layout template/reference.
+4. Stage 6 renders the manuscript text into that mockup layout using the reference
+   art slot. This proves the text fits before any image API spend.
+5. Once text fit is approved, Stage 2 fills the layout's prompt template with the
+   page subject, for example `{SUBJECT}=frog`.
+6. Stage 3 generates only the real subject illustration.
+7. Stage 6 replaces the mockup/reference art slot with the generated/upscaled art.
 
 The image-generation model must create the subject illustration only. It must not bake page text into the image. Text placement, typography, page furniture, and final composition are handled by Puppeteer + Paged.js.
 
@@ -53,6 +60,9 @@ Create `manifest.json` next to the images:
     "imagePath": "layout-02-text-heavy-a.png",
     "label": "Long entry with small corner image",
     "useWhen": ["word_count > 400", "single subject", "text must dominate"],
+    "promptTemplate": "Create the final illustration for {SUBJECT}. Match the approved mockup art slot for LAYOUT_2_TEXT_HEAVY. Scientific details: {SCIENTIFIC_DETAILS}. Do not render page text.",
+    "placeholders": ["{SUBJECT}", "{SCIENTIFIC_DETAILS}", "{COMPOSITION_NOTES}"],
+    "imageSlotDescription": "Small corner illustration; text remains dominant.",
     "minWords": 400,
     "contentTypes": ["field_guide_entry"]
   }
