@@ -79,14 +79,34 @@ Create `manifest.json` next to the images:
     "imagePath": "layout-02-text-heavy-a.png",
     "label": "Long entry with small corner image",
     "useWhen": ["word_count > 400", "single subject", "text must dominate"],
+    "minWords": 400,
+    "targetWords": 560,
+    "maxWords": 720,
+    "recommendedBodyPt": 10.5,
+    "recommendedLineHeight": 1.23,
+    "capacityTestStatus": "UNTESTED",
     "promptTemplate": "Create the final illustration for {SUBJECT}. Match the approved mockup art slot for LAYOUT_2_TEXT_HEAVY. Scientific details: {SCIENTIFIC_DETAILS}. Do not render page text.",
     "placeholders": ["{SUBJECT}", "{SCIENTIFIC_DETAILS}", "{COMPOSITION_NOTES}"],
     "imageSlotDescription": "Small corner illustration; text remains dominant.",
-    "minWords": 400,
-    "contentTypes": ["field_guide_entry"]
+    "contentTypes": ["field_guide_entry"],
+    "operatorNotes": "Word range must be confirmed by rendering real manuscript text into the mockup."
   }
 ]
 ```
+
+## Word-Capacity Testing
+
+Each layout has a recommended word range and a status:
+
+- `UNTESTED` - starting estimate only
+- `TESTING` - agent is fitting real text into the mockup
+- `APPROVED` - operator has reviewed the mockup and accepted the range
+
+The agent should update `minWords`, `targetWords`, `maxWords`,
+`recommendedBodyPt`, and `recommendedLineHeight` after actual text-fit tests.
+KDP requires the final interior PDF to match the selected trim/bleed and pass
+Previewer checks for margins and embedded fonts; it does not prescribe one exact
+font size for this field-guide format.
 
 ## What Can Go Wrong
 

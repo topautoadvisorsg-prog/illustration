@@ -4,22 +4,27 @@ import "@/App.css";
 const configuredBackend = process.env.REACT_APP_BACKEND_URL || "";
 
 const LAYOUT_TEMPLATES = [
-  ["LAYOUT_1_STANDARD", "Standard", "Balanced text and illustration"],
-  ["LAYOUT_2_TEXT_HEAVY", "Text Heavy", "Long entries with smaller art"],
-  ["LAYOUT_3_ILLUSTRATION_DOMINANT", "Image Dominant", "Short text with a strong plate"],
-  ["LAYOUT_4_DANGER_WARNING", "Danger Warning", "Toxic or safety-heavy pages"],
-  ["LAYOUT_5_CHAPTER_OPENER", "Chapter Opener", "Atmospheric opening page"],
-  ["LAYOUT_6_BACK_MATTER", "Back Matter", "Tables, index, glossary"],
-  ["LAYOUT_7_SCATTERED_VIGNETTES", "Vignettes", "Several small naturalist studies"],
-  ["LAYOUT_8_MARGIN_ILLUSTRATION", "Margin Art", "Tall plant or side illustration"],
-  ["LAYOUT_9_DIAGNOSTIC_DIAGRAM", "Diagnostic", "Comparisons, diagrams, anatomy"],
+  ["LAYOUT_1_STANDARD", "Standard", "Balanced text and illustration", 220, 320, 420],
+  ["LAYOUT_2_TEXT_HEAVY", "Text Heavy", "Long entries with smaller art", 420, 560, 720],
+  ["LAYOUT_3_ILLUSTRATION_DOMINANT", "Image Dominant", "Short text with a strong plate", 90, 160, 240],
+  ["LAYOUT_4_DANGER_WARNING", "Danger Warning", "Toxic or safety-heavy pages", 240, 340, 460],
+  ["LAYOUT_5_CHAPTER_OPENER", "Chapter Opener", "Atmospheric opening page", 40, 90, 150],
+  ["LAYOUT_6_BACK_MATTER", "Back Matter", "Tables, index, glossary", 260, 420, 620],
+  ["LAYOUT_7_SCATTERED_VIGNETTES", "Vignettes", "Several small naturalist studies", 160, 240, 340],
+  ["LAYOUT_8_MARGIN_ILLUSTRATION", "Margin Art", "Tall plant or side illustration", 300, 430, 580],
+  ["LAYOUT_9_DIAGNOSTIC_DIAGRAM", "Diagnostic", "Comparisons, diagrams, anatomy", 180, 280, 400],
 ];
 
 function defaultLayoutPromptAssets() {
-  return LAYOUT_TEMPLATES.map(([id, name, description], index) => ({
+  return LAYOUT_TEMPLATES.map(([id, name, description, minWords, targetWords, maxWords], index) => ({
     templateId: id,
     label: name,
     mockupImagePath: `layout-${String(index + 1).padStart(2, "0")}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`,
+    minWords,
+    targetWords,
+    maxWords,
+    recommendedBodyPt: id === "LAYOUT_2_TEXT_HEAVY" ? 10.5 : 11,
+    recommendedLineHeight: id === "LAYOUT_2_TEXT_HEAVY" ? 1.23 : 1.28,
     promptTemplate:
       `Create the final illustration for ${name}. Subject: {SUBJECT}. ` +
       `Scientific/diagnostic details: {SCIENTIFIC_DETAILS}. ` +
@@ -33,6 +38,8 @@ function defaultLayoutPromptAssets() {
           ? "Use this for comparisons, anatomy, diagrams, tracks, and look-alike pages."
           : "Fit the real manuscript text into this mockup before generating final art.",
     imageSlotDescription: "Mockup image defines the art slot. Generated art replaces only that slot after text-fit approval.",
+    capacityTestStatus: "UNTESTED",
+    operatorNotes: "Word range is a starting recommendation; approve after real text-fit tests.",
   }));
 }
 
@@ -585,6 +592,55 @@ Use this entry to prove manuscript to manifest generation.`);
                   ) : (
                     <div className="layout-mockup-empty">No mockup uploaded</div>
                   )}
+                  <div className="capacity-grid">
+                    <Field label="Min Words">
+                      <input
+                        type="number"
+                        value={asset.minWords}
+                        onChange={(event) => updateLayoutAsset(index, "minWords", trimNumber(event.target.value))}
+                      />
+                    </Field>
+                    <Field label="Target Words">
+                      <input
+                        type="number"
+                        value={asset.targetWords}
+                        onChange={(event) => updateLayoutAsset(index, "targetWords", trimNumber(event.target.value))}
+                      />
+                    </Field>
+                    <Field label="Max Words">
+                      <input
+                        type="number"
+                        value={asset.maxWords}
+                        onChange={(event) => updateLayoutAsset(index, "maxWords", trimNumber(event.target.value))}
+                      />
+                    </Field>
+                    <Field label="Body Pt">
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={asset.recommendedBodyPt}
+                        onChange={(event) => updateLayoutAsset(index, "recommendedBodyPt", trimNumber(event.target.value))}
+                      />
+                    </Field>
+                    <Field label="Line Height">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={asset.recommendedLineHeight}
+                        onChange={(event) => updateLayoutAsset(index, "recommendedLineHeight", trimNumber(event.target.value))}
+                      />
+                    </Field>
+                    <Field label="Capacity Status">
+                      <select
+                        value={asset.capacityTestStatus}
+                        onChange={(event) => updateLayoutAsset(index, "capacityTestStatus", event.target.value)}
+                      >
+                        <option value="UNTESTED">Untested</option>
+                        <option value="TESTING">Testing</option>
+                        <option value="APPROVED">Approved</option>
+                      </select>
+                    </Field>
+                  </div>
                   <Field label="Prompt Template">
                     <textarea
                       className="prompt-template"
@@ -617,6 +673,13 @@ Use this entry to prove manuscript to manifest generation.`);
                     <input
                       value={asset.imageSlotDescription}
                       onChange={(event) => updateLayoutAsset(index, "imageSlotDescription", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Operator / Agent Notes">
+                    <textarea
+                      className="notes-field"
+                      value={asset.operatorNotes}
+                      onChange={(event) => updateLayoutAsset(index, "operatorNotes", event.target.value)}
                     />
                   </Field>
                 </article>

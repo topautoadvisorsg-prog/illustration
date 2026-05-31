@@ -102,10 +102,17 @@ export const LayoutPromptAssetSchema = z.object({
   label: z.string().min(1),
   mockupImagePath: z.string().min(1),
   mockupImageDataUrl: z.string().optional(),
+  minWords: z.number().int().nonnegative().default(0),
+  targetWords: z.number().int().nonnegative().default(250),
+  maxWords: z.number().int().positive().default(400),
+  recommendedBodyPt: z.number().positive().default(11),
+  recommendedLineHeight: z.number().positive().default(1.28),
   promptTemplate: z.string().min(1),
   placeholders: z.array(z.string().min(1)).default(['{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}']),
   textFitRule: z.string().min(1).default('Fit manuscript text into this mockup before image generation.'),
   imageSlotDescription: z.string().min(1).default('Replace mockup art with generated subject illustration after text fit approval.'),
+  capacityTestStatus: z.enum(['UNTESTED', 'TESTING', 'APPROVED']).default('UNTESTED'),
+  operatorNotes: z.string().default(''),
 });
 
 export const OutputProfileSchema = z.object({
