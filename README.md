@@ -1,130 +1,148 @@
 # The Wildlands Publishing Platform
 
-> Automated book publishing pipeline — manuscript in, print-ready PDF + Kindle EPUB out.
+Automated book publishing pipeline for The Wildlands field-guide series:
 
-**Status:** Phase 0 — Risk Spikes. No production code yet. No UI.
-
----
-
-## What This Is
-
-A web-based publishing pipeline built for *The Wildlands* series. It automates the heavy parts of book production:
-
-```
-manuscript.md → manifests → image prompts → image generation
-   → upscale → DPI gate → layout → chapter PDFs → final book PDF + EPUB
+```text
+manuscript.md -> manuscript outline -> manifests -> page plan
+  -> layout/text-fit approval -> image prompts -> generated art
+  -> upscale/DPI gate -> PDF/EPUB exports
 ```
 
-Human approval is required at: image review, layout review, final export.
+## Current Status
 
-**V1 Scope (locked):**
-- Single brand — THE_WILDLANDS
-- Adult audience only
-- Output: Premium PDF (8.5×11 full color) + Kindle EPUB
-- Local file storage, single user (Supabase Auth)
-- Cover typography overlaid by layout engine (no AI text on covers)
+Phase 1 backend foundation is now underway. This repo is no longer only Phase 0
+spikes.
 
----
+Implemented and testable:
+
+- Fastify backend with health/API routes
+- Supabase Postgres schema and migrations
+- Project creation with visible project config
+- Manuscript upload and local storage
+- Deterministic Markdown outline parser
+- Claude Stage 1.5 manifest generation
+- Locked manifest persistence
+- Page rows linked to PAGE manifests
+- Stage 2 deterministic page planner
+- Agent behavior contracts
+- Operator frontend for backend URL, project setup, manuscript upload, manifest
+  generation, page planning, layout prompt assets, and output inspection
+
+Not implemented yet:
+
+- Real Stage 3 image generation worker
+- Human image approval endpoints
+- Upscale worker
+- Text-fit preview renderer
+- Final PDF/EPUB production exports
+- Full auth enforcement
+
+## V1 Scope
+
+- Brand: `THE_WILDLANDS`
+- Audience: adult only
+- Outputs: premium 8.5 x 11 full-color PDF and Kindle EPUB
+- Storage: local file storage for v1
+- Auth: single-user Supabase Auth planned
+- No mid-tier, no economic, no large print, no kids edition in v1
+
+## Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Backend | Node.js + TypeScript + Fastify |
+| Frontend | React + TypeScript |
+| Validation | Zod |
+| Database | Supabase Postgres + Drizzle ORM |
+| Queue | BullMQ + Upstash Redis |
+| LLM | Anthropic Claude |
+| Image generation | OpenAI `gpt-image-1` |
+| Upscale | Replicate Real-ESRGAN |
+| PDF engine | Puppeteer + Paged.js |
+| EPUB | `epub-gen-memory` |
+| Logging | Pino |
 
 ## Repo Layout
 
-```
-/backend       Node.js + TypeScript + Fastify — the pipeline + API
-/frontend      React + Vite — Phase 3, DO NOT TOUCH until backend is proven
-/shared        Zod schemas + TypeScript contracts shared by backend & frontend
-/spikes        Phase 0 throwaway code — deleted after pipeline is proven
-/docs          Architecture, ADRs, runbook, API contracts, pipeline spec
-/memory        Project memory (PRD, test credentials) — agent-managed
+```text
+backend/   API, DB, pipeline stages, services, workers
+frontend/  Operator console
+shared/    Zod schemas and shared TypeScript contracts
+spikes/    Phase 0 spike/proof code
+docs/      Architecture notes and decisions
+memory/    Project memory
 ```
 
----
+## Current Testable Flow
 
-## Quickstart (Day 1 — Scaffold Only)
+1. Create a project.
+2. Upload/paste a `.md` manuscript.
+3. Stage 1 parses the manuscript locally into chapters, entries, sections,
+   word counts, source lines, and warnings.
+4. Stage 1.5 calls Claude to generate book/chapter/page manifests.
+5. Manifest output is locked and persisted.
+6. Stage 2 plans pages:
+   - counts words
+   - classifies content signals
+   - selects one of the 9 layout templates
+   - applies layout typography/capacity metadata
+   - assembles the image-only prompt
+   - stores `layout_template`, `image_prompt`, and `image_prompt_sha256`
+
+## Railway
+
+Current live backend:
+
+```text
+https://wildlandsbackend-production.up.railway.app
+```
+
+The backend requires `DATABASE_URL` to use the Supabase shared pooler URL:
+
+```text
+postgresql://postgres.<project-ref>:PASSWORD@aws-1-us-west-2.pooler.supabase.com:6543/postgres
+```
+
+The frontend uses:
+
+```text
+REACT_APP_BACKEND_URL=https://wildlandsbackend-production.up.railway.app
+```
+
+## Commands
 
 ```bash
-# 1. Install deps at the monorepo root
 yarn install
-
-# 2. Copy env placeholders
-cp .env.example .env
-# Edit .env with real API keys when provided
-
-# 3. Run API smoke tests (will fail until real keys are filled in — expected)
-yarn smoke
+yarn workspace @wildlands/shared typecheck
+yarn workspace @wildlands/backend typecheck
+yarn workspace @wildlands/backend test
+yarn workspace frontend build
 ```
 
----
+Run backend locally:
 
-## Development Philosophy (Locked)
+```bash
+yarn workspace @wildlands/backend dev
+```
 
-1. **Backend first. UI last.** No frontend code until `manuscript → PDF` works end-to-end.
-2. **API layer is the contract.** Every endpoint Zod-validated, OpenAPI-documented, curl-testable.
-3. **Documentation always.** Every module has a README answering 5 questions:
-   - What it does
-   - Input
-   - Output
-   - How to run locally
-   - What can go wrong & how to debug it
-4. **Code reads like the spec.** Folder names mirror pipeline stage names. No `utils/`, no `helpers/`, no `lib/` dumping grounds.
-5. **No decoration.** Until the pipeline produces a PDF, no UI, no animations, no nice-to-haves.
+Run frontend locally:
 
----
+```bash
+yarn workspace frontend dev
+```
 
-## Phase 0 — Risk Spikes (Current Phase)
+## Handoff Notes For Review
 
-10-day risk-reduction sprint. CLI-driven. No UI. Each spike has a pass/fail gate.
+Start with:
 
-| # | Spike | Day | Gate |
-|---|---|---|---|
-| 1 | PDF engine bake-off (Puppeteer + Paged.js vs `@react-pdf/renderer`) | D4–D6 | Clear winner on 30-page test |
-| 2 | End-to-end vertical slice (1 page through every stage) | D2–D3 | Valid print-ready PDF |
-| 3 | Image consistency drift (20 sequential images) | D8 | Visual sign-off |
-| 4 | Replicate Real-ESRGAN upscale validation | D7 | 5/5 pass DPI gate |
-| 5 | EPUB quality on Kindle Previewer + iPad | D9 | Renders cleanly |
+- `PIPELINE_ATTACK_PLAN.md`
+- `backend/src/pipeline/README.md`
+- `backend/src/agents/README.md`
+- `backend/src/pipeline/stage-1-ingestion/README.md`
+- `backend/src/pipeline/stage-1.5-manifests/README.md`
+- `backend/src/pipeline/stage-2-planner/README.md`
+- `backend/src/api/README.md`
 
-See `/docs/phase-0-plan.md` for full plan.
-
----
-
-## Tech Stack (Locked)
-
-| Layer | Choice | Why |
-|---|---|---|
-| Backend runtime | Node.js 20 + TypeScript | Type safety, ecosystem |
-| Backend framework | Fastify | Fast, native Zod hooks, OpenAPI auto-gen |
-| Validation | Zod | TS-native, runtime + static |
-| ORM / Migrations | Drizzle ORM | Lightweight, TS inference, raw SQL escape hatch |
-| Queue | BullMQ + Upstash Redis | Standard, durable, dead-letter support |
-| Logger | Pino | Fast structured JSON logs |
-| Error monitoring | Sentry | Free tier sufficient for v1 |
-| LLM | Anthropic Claude (Sonnet 4.5) | Manuscript parsing, manifest generation |
-| Image gen | OpenAI gpt-image-1 | Illustration generation |
-| Image upscale | Replicate Real-ESRGAN | 300 DPI print-ready upscaling |
-| Image ops | Sharp | DPI validation, format conversion |
-| PDF | Puppeteer + Paged.js | Winner from Spike 1 bake-off; see ADR-003a |
-| EPUB | epub-gen-memory | Clean EPUB from manifests |
-| Auth | Supabase Auth | Single user v1, multi-user ready for v2 |
-| DB | Supabase Postgres | Same vendor as auth |
-| Frontend (Phase 3) | React 18 + Vite + Tailwind | Speed + DX |
-| Package manager | Yarn workspaces | Monorepo orchestration |
-
-See `/docs/decision-log.md` for ADRs.
-
----
-
-## Where Things Live
-
-- **Pipeline stages** → `/backend/src/pipeline/stage-N-*`
-- **External service clients** → `/backend/src/services/*`
-- **Queue workers** → `/backend/src/workers/*`
-- **DB schema & migrations** → `/backend/src/db/`
-- **API routes** → `/backend/src/api/`
-- **Smoke tests** → `/backend/scripts/smoke-test.ts`
-- **Spike scripts** → `/spikes/`
-- **Shared types & Zod schemas** → `/shared/src/`
-
----
-
-## Status
-
-See `/docs/decision-log.md` and Phase 0 daily reports in `/docs/phase-0-reports/`.
+The highest-value review target is Stage 2 correctness: layout selection,
+prompt assembly, missing placeholder detection, capacity risk reporting, and
+operator-visible page planning output.

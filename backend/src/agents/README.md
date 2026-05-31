@@ -50,6 +50,16 @@ see what each agent decided and why:
 - Text-fit status
 - Approval/QA status
 
+## Current Implementation Status
+
+The contract file is implemented and tested. Stage 2 currently returns the
+`PAGE_PLANNER` contract in its route response so the operator can see which
+agent made the page-planning decision and what rules it followed.
+
+The other contracts are intentionally defined ahead of their stages. They are
+the required behavior targets for upcoming production work, but they are not all
+wired into runtime routes yet.
+
 ## How To Debug
 
 1. Check the route response first. Stage endpoints should expose agent decisions.

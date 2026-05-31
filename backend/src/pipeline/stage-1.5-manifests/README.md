@@ -1,52 +1,77 @@
-# Stage 1.5 — Manifest Generation ⭐
+# Stage 1.5 - Manifest Generation
 
-**Status:** Phase 0 — scaffold only. First production code lands in Phase 1.5; Spike 2 prototypes a hand-authored manifest to skip Claude for the vertical slice.
+## Status
 
-**What it does:** Reads the full manuscript exactly once via Claude (Sonnet 4.5) and produces three levels of manifests:
+Implemented foundation.
 
-1. **Book manifest** — full scope, chapter list, total pages, total images
-2. **Chapter manifests** — one per chapter, lists all page IDs
-3. **Page manifests** — one per page, contains everything needed for image generation and layout
+## What It Does
 
-**After this stage, the full manuscript is never loaded again.** All downstream stages read only the relevant page manifest. This is the single most important architectural decision in the pipeline — it cuts token usage by ~90% across Stages 2–8.
+Reads the stored manuscript, sends it to Claude with the deterministic Stage 1
+outline, validates Claude's returned structure against that outline, and writes
+locked book/chapter/page manifests.
 
-**Input:**
-- `project_id`
-- Canonical manuscript path (from Stage 1)
-- Project config JSON (typography, brand, layout rules)
+Implemented file:
 
-**Output:**
-- `STORAGE_ROOT/{brand}/page-plan/{book_id}/book_manifest.json`
-- `STORAGE_ROOT/{brand}/page-plan/{book_id}/chapters/CH{NN}_manifest.json` (one per chapter)
-- `STORAGE_ROOT/{brand}/page-plan/{book_id}/pages/{book_id}_P{NNN}.json` (one per page)
-- DB rows in `manifests` table linking all three levels
-- Returns: `{ total_pages, total_chapters, total_entries, total_images_needed }`
+- `generate-manifests.ts`
 
-**How to run it locally:**
+## Inputs
+
+- Project ID
+- Stored manuscript path from Stage 1
+- Project config
+- Deterministic manuscript outline
+
+## Outputs
+
+- Locked `BOOK` manifest
+- Locked `CHAPTER` manifests
+- Locked `PAGE` manifests
+- `pages` rows linked to PAGE manifests through `pages.manifest_id`
+- Project status: `MANIFESTED`
+
+## API
+
 ```bash
-# Phase 1.5
-curl -X POST http://localhost:8001/api/projects/{id}/manifests \
-  -H "Authorization: Bearer $TOKEN"
+curl -X POST http://localhost:8001/api/projects/{id}/manifests
 ```
 
-**Claude config (locked):**
-- Model: `claude-sonnet-4-5-20250929`
-- Temperature: `0`
-- Mode: tool-calling with strict JSON schema (no freeform JSON in prose)
-- Max retries: 3, exponential backoff
-- Schemas live in `@wildlands/shared/manifests/*`
+Important: this endpoint reads the stored manuscript file. It does not accept
+inline Markdown anymore, because inline text could drift from the uploaded
+manuscript SHA.
 
-**What can go wrong:**
+## Claude Behavior
+
+- Tool-calling only
+- Strict Zod validation
+- Temperature controlled in Claude service
+- Claude may enrich fields, but may not change chapter/entry structure
+
+Validation currently checks:
+
+- chapter count
+- chapter number
+- chapter title
+- entry count
+- entry title
+
+## Manifest Persistence Rules
+
+- Existing manifests/pages are not deleted.
+- Reruns are blocked until explicit manifest versioning exists.
+- Manifests are written with `locked: true`.
+- Every page row must reference a PAGE manifest.
+
+## Debugging
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Claude returns malformed JSON | Tool-call schema mismatch | Re-prompt with strict schema; cap at 3 retries then dead-letter |
-| Wrong chapter count | Manuscript headings non-standard | Manual override via API: `?force_chapters=N` |
-| Hits Claude rate limit | Concurrent project ingestion | Serialize manifest jobs in BullMQ (concurrency=1) |
-| Token budget exceeded on huge manuscripts | Manuscript > Claude context window | Chunk by chapter, but ONE call per chapter only — never re-load full text |
+| `MANIFEST_OUTLINE_MISMATCH` | Claude changed structure | Inspect manuscript headings and Claude output |
+| `Stored manuscript file is missing` | Railway/local storage lost file | Re-upload manuscript |
+| `already has manifests/pages` | Rerun blocked | Create new project or implement versioned rerun |
+| Claude context failure | Manuscript too large | Next improvement: one Claude call per chapter |
 
-**Design notes:**
-- One call per chapter is acceptable, but the full manuscript is never re-loaded after Stage 1.5 completes.
-- Page numbers are *estimated* from word count + layout heuristic. Final page numbers come out of Stage 6 (layout engine).
-- Joi → Zod: validation done with Zod schemas from `@wildlands/shared`.
-- Drift between manifest and final layout is expected; manifests are the planning artifact, not the final page count.
+## Known Gaps
+
+- Large manuscripts are still sent in one Claude call.
+- Manifest version groups are not implemented.
+- Warnings/category fields need stronger preservation for safety-critical pages.

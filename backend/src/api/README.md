@@ -1,28 +1,74 @@
-# api
+# API
 
-Fastify route handlers.
+Fastify route handlers for the Wildlands operator console and pipeline stages.
 
-**Phase 1 routes:**
-- `POST /api/projects` — create project + config
-- `GET /api/projects` — list projects
-- `GET /api/projects/{id}` — get project + status
-- `POST /api/projects/{id}/manuscript` — upload manuscript (Stage 1)
-- `POST /api/projects/{id}/manifests` — trigger Stage 1.5
-- `POST /api/projects/{id}/plan` — trigger Stage 2
-- `POST /api/projects/{id}/generate-images` — enqueue Stage 3 jobs
-- `GET  /api/projects/{id}/images` — list images by status
-- `POST /api/pages/{page_id}/images/{version}/approve` — Stage 4 approve
-- `POST /api/pages/{page_id}/images/{version}/regenerate` — Stage 4 regen
-- `POST /api/projects/{id}/export/premium-pdf` — Stage 6+7
-- `POST /api/projects/{id}/export/kindle-epub` — Stage 8
+## Current Status
 
-**Conventions:**
-- One file per route group (`projects.routes.ts`, `images.routes.ts`, ...).
-- All routes use Zod schemas from `@wildlands/shared` via `fastify-type-provider-zod`.
-- OpenAPI docs auto-published at `/api/docs` via `@fastify/swagger-ui`.
-- Auth: `preHandler` hook validates Supabase JWT.
-- No business logic in handlers — handlers call pipeline services.
+Implemented foundation routes:
 
-**Testing:**
-- Every route has a Vitest test using `fastify.inject()`.
-- Tests run against an in-memory test DB + mocked external services.
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/health` | Backend and database health check |
+| `POST` | `/api/projects` | Create a project with default Wildlands config |
+| `GET` | `/api/projects` | List projects |
+| `GET` | `/api/projects/:id` | Read one project |
+| `POST` | `/api/projects/:id/manuscript` | Store manuscript and run deterministic Stage 1 outline parsing |
+| `POST` | `/api/projects/:id/manifests` | Run Stage 1.5 Claude manifest generation and persist locked manifests |
+| `GET` | `/api/projects/:id/manifests` | Read persisted manifests |
+| `POST` | `/api/projects/:id/plan` | Run Stage 2 page planning |
+| `GET` | `/api/projects/:id/pages` | Read persisted page rows and planner output fields |
+
+Routes not implemented yet:
+
+- `POST /api/projects/:id/generate-images`
+- `GET /api/projects/:id/images`
+- image approve/reject/regenerate endpoints
+- PDF export endpoints
+- EPUB export endpoints
+- auth-protected operator sessions
+
+## Conventions
+
+- Route groups live in one file per domain.
+- Handlers validate request and response payloads with Zod schemas from
+  `@wildlands/shared`.
+- Handlers call backend services and pipeline stages; business logic should not
+  live inside route functions.
+- Route responses should expose enough state for the operator UI and reviewer
+  debugging.
+
+## Auth Status
+
+Auth is not enforced yet. V1 plans single-user auth, but current route tests and
+Railway smoke checks run without a bearer token.
+
+Do not assume these routes are production-secure until auth middleware and tests
+are added.
+
+## Debugging
+
+Health check:
+
+```bash
+curl http://localhost:8001/health
+```
+
+Create a project:
+
+```bash
+curl -X POST http://localhost:8001/api/projects \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"The Wildlands Field Guide\"}"
+```
+
+Run planner:
+
+```bash
+curl -X POST http://localhost:8001/api/projects/{projectId}/plan
+```
+
+## Tests
+
+```bash
+yarn workspace @wildlands/backend test
+```

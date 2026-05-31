@@ -1,36 +1,82 @@
-# Stage 1 — Manuscript Ingestion
+# Stage 1 - Manuscript Ingestion
 
-**Status:** Phase 0 — scaffold only. Implementation lands in Phase 1.5 after the Spike 2 vertical slice proves the end-to-end flow.
+## Status
 
-**What it does:** Accepts the manuscript `.md` upload, validates structure, normalizes encoding, stores the canonical copy on disk, and records the project in the DB.
+Implemented foundation.
 
-**Input:**
-- `project_id` (created by `POST /api/projects`)
-- Raw `.md` file bytes (multipart upload)
+## What It Does
 
-**Output:**
-- Canonical manuscript stored at `STORAGE_ROOT/{brand}/manuscripts/{book_id}_MASTER.md`
-- DB row in `projects` updated with `manuscript_path`, `status = 'DRAFT'`
-- Returns: `{ project_id, manuscript_path, chapter_headings_detected: string[], estimated_page_count: number }`
+Accepts a Markdown manuscript, verifies it has usable book structure, stores the
+canonical copy, and returns deterministic outline statistics before Claude is
+allowed to enrich anything.
 
-**How to run it locally:**
-```bash
-# Phase 1.5 — once implemented
-curl -X POST http://localhost:8001/api/projects/{id}/manuscript \
-  -H "Authorization: Bearer $TOKEN" \
-  -F "manuscript=@./TW_NEW_ENGLAND_MASTER.md"
+Implemented files:
+
+- `ingest-manuscript.ts`
+- `parse-manuscript-outline.ts`
+
+## Inputs
+
+- `projectId`
+- `.md` filename
+- Markdown text
+
+Expected manuscript structure:
+
+```markdown
+# CHAPTER 1 - Forest Floor
+
+## Chanterelle
+
+### Identification
+...
 ```
 
-**What can go wrong:**
+## Outputs
+
+- Stored manuscript file
+- SHA-256 hash
+- Chapter count
+- Entry count
+- Total word count
+- Structural warnings
+- Deterministic outline:
+  - chapters
+  - entries
+  - sections
+  - slugs
+  - source lines
+  - source offsets
+  - entry body word counts
+
+## How To Run
+
+Via API:
+
+```bash
+curl -X POST http://localhost:8001/api/projects/{id}/manuscript \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"book.md","markdown":"# CHAPTER 1 - Forest Floor\n\n## Chanterelle\n\nText"}'
+```
+
+Via tests:
+
+```bash
+yarn workspace @wildlands/backend test -- ingest-manuscript
+yarn workspace @wildlands/backend test -- parse-manuscript-outline
+```
+
+## Debugging
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| 400 `INVALID_MARKDOWN` | File is not UTF-8 / has BOM / has CRLF mismatch | Run through normalizer (NFC, LF endings, no BOM) |
-| 400 `NO_CHAPTERS_DETECTED` | Manuscript doesn't follow heading conventions | Confirm `# Chapter N — Name` heading style |
-| 413 Payload Too Large | Manuscript > 25MB | Raise multipart limit in `server.ts` or split |
-| `ENOSPC` writing to disk | Storage root full | Free disk; in v2 swap to S3 |
+| `NO_CHAPTERS_DETECTED` | Missing `#` chapter heading | Add level-1 chapter headings |
+| `NO_ENTRIES_DETECTED` | Missing `##` entry headings | Add level-2 entry headings |
+| `Manuscript must be a .md file` | Wrong filename extension | Upload `.md` |
+| Headings inside examples counted | Fenced code bug | Parser now ignores fenced code blocks |
 
-**Design notes:**
-- Validation is structural only — no semantic parsing yet. That happens in Stage 1.5.
-- We never modify the manuscript. The on-disk copy is the canonical source.
-- A SHA-256 hash of the manuscript is recorded so we can detect re-uploads and short-circuit re-processing.
+## Notes
+
+- Stage 1 never rewrites manuscript prose.
+- Stage 1 is deterministic and should remain deterministic.
+- Claude is not the source of truth for chapter/entry structure.

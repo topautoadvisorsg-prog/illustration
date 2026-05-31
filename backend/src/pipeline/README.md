@@ -1,43 +1,92 @@
 # Pipeline
 
-The 8-stage automated book-production pipeline. This is the product.
+The backend pipeline is the product. UI exists only to operate and inspect the
+pipeline.
 
-```
-Stage 1     Manuscript Ingestion        manuscript.md uploaded & validated
-Stage 1.5   Manifest Generation         book / chapter / page manifests written
-Stage 2     Scene & Page Planner        per-page layout + image prompt assembly
-Stage 3     Image Generation            gpt-image-1 illustration generation
-Stage 4     Image Preview & Review      human approves or regenerates each image
-Stage 5     Upscale                     Replicate Real-ESRGAN → 300 DPI
-Stage 6     Layout Engine               per-chapter PDF rendering
-Stage 7     Final PDF Compilation       chapter PDFs stitched + color profile embedded
-Stage 8     Ebook Export                EPUB generated from page manifests
-```
+## Stages
 
-Each stage:
-- Lives in `stage-N-name/`
-- Has its own README answering the 5 standard questions
-- Reads ONLY the data it needs (page manifests, not full manuscripts)
-- Is idempotent — re-running produces the same artifact
-- Logs every action with `stage`, `book_id`, `page_id`, `correlation_id`
-
----
-
-## Stage Dependencies
-
-```
-1 → 1.5 → 2 → 3 → 4 (human gate) → 5 → 6 → 7
-                                        ↘ 8 (parallel)
+```text
+Stage 1     Manuscript Ingestion        implemented foundation
+Stage 1.5   Manifest Generation         implemented foundation
+Stage 2     Scene & Page Planner        implemented foundation
+Stage 3     Image Generation            worker shell only
+Stage 4     Image Preview & Review      README contract only
+Stage 5     Upscale                     worker shell only
+Stage 6     Layout Engine               spike only / production pending
+Stage 7     Final PDF Compilation       README contract only
+Stage 8     Ebook Export                README contract only
 ```
 
-A page cannot move to Stage 5 without human approval at Stage 4.
-A chapter cannot start Stage 6 until all its pages have completed Stage 5.
-Stage 7 cannot start until all chapter PDFs from Stage 6 exist.
-Stage 8 reads page manifests directly and can run in parallel with Stage 6/7.
+## Implemented Flow
 
----
+1. `POST /api/projects`
+   - Creates a project and stores full project config.
+2. `POST /api/projects/:id/manuscript`
+   - Stores the Markdown manuscript.
+   - Parses deterministic outline locally.
+   - Returns chapter/entry/word totals and warnings.
+3. `POST /api/projects/:id/manifests`
+   - Reads the stored manuscript.
+   - Calls Claude with the deterministic outline.
+   - Validates Claude output against local structure.
+   - Persists locked book/chapter/page manifests.
+   - Seeds page rows linked to PAGE manifests.
+4. `POST /api/projects/:id/plan`
+   - Reads PAGE manifests.
+   - Counts words and classifies page signals.
+   - Selects one of the 9 layout templates.
+   - Applies layout typography/capacity metadata.
+   - Assembles an image-only prompt and SHA-256 hash.
+   - Saves `layout_template`, `image_prompt`, and `image_prompt_sha256`.
 
-## Status — Phase 0
+## Agent Contracts
 
-All stage folders contain README stubs only. Implementation begins in Phase 1.5
-after the vertical-slice spike (Spike 2) proves the end-to-end flow.
+Agent behavior contracts live in `backend/src/agents`.
+
+Current contracts:
+
+- `MANUSCRIPT_ANALYST`
+- `PAGE_PLANNER`
+- `LAYOUT_SELECTOR`
+- `PROMPT_ASSEMBLER`
+- `TEXT_FIT_QA`
+- `IMAGE_QA`
+
+The Stage 2 API response includes the `PAGE_PLANNER` contract metadata with
+each planned page so operators and reviewers can see which agent rule set made
+the decision.
+
+## Current Gaps
+
+- Stage 2 does not yet split long entries into multiple continuation pages.
+- Stage 2 does not yet fail when a prompt template leaves unreplaced
+  placeholders.
+- Stage 2 does not yet require `capacityTestStatus: APPROVED`.
+- Stage 6 text-fit preview is not implemented in production.
+- Stage 3 image generation is not wired to prompt approval.
+- Stage 4 human approval/version locking is not implemented.
+- Stage 5-8 workers are not production-ready.
+
+## Test Commands
+
+```bash
+yarn workspace @wildlands/backend typecheck
+yarn workspace @wildlands/backend test
+yarn workspace frontend build
+```
+
+## Debugging
+
+If Railway shows `502`, check backend logs first:
+
+```bash
+npx -y @railway/cli logs \
+  --project 9490de69-ba24-4da8-abe7-a9234457ad8d \
+  --environment production \
+  --service @wildlands/backend \
+  --latest \
+  --lines 120
+```
+
+If startup dies at `drizzle-kit migrate`, check `DATABASE_URL`. It should use
+the Supabase pooler host, not the direct `db.<project>.supabase.co:5432` host.
