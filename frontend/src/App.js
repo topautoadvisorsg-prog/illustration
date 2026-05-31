@@ -103,6 +103,30 @@ Prioritize readability and information density.
 Leave the central reading column clean and usable for body text.
 Do not render final body text, page numbers, titles, labels, captions, or typography.`;
 
+const LAYOUT_3_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- Large hero illustration occupies the entire right side of the page.
+- Educational text occupies the left vertical column.
+- Small labels and callouts connect into the artwork.
+- Supporting studies appear beneath the text column.
+
+Visual balance:
+- Right 70% artwork.
+- Left 30% clean text column.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+Leave clear negative space inside the artwork for future captions.
+Keep the right-side hero illustration dominant while preserving the left column for future educational text.
+Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
 function defaultLayoutPromptAssets() {
   return LAYOUT_TEMPLATES.map(([id, name, description, minWords, targetWords, maxWords], index) => ({
     templateId: id,
@@ -113,12 +137,16 @@ function defaultLayoutPromptAssets() {
         ? "Single encyclopedia page. Upper-left primary illustration, upper-right secondary study illustration, lower two-thirds reserved for educational text, small callouts, bottom-corner field-guide box, and light botanical/ecological supporting sketches."
         : id === "LAYOUT_2_TEXT_HEAVY"
           ? "Text-heavy encyclopedia page. Top 15% title area, center 70% reserved for dense educational text, margin support illustrations, tiny diagrams between sections, and bottom 15% reference notes/callouts."
+          : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
+            ? "Image-dominant split page. Right 70% hero artwork, left 30% vertical educational text column, callouts into the artwork, and supporting studies beneath the text column."
         : `${name}: ${description}. Written agent instructions should be refined after analyzing the uploaded mockup.`,
     useCases:
       id === "LAYOUT_1_STANDARD"
         ? ["standard encyclopedia entry", "balanced educational field-guide page", "subject with one primary and one secondary study image"]
         : id === "LAYOUT_2_TEXT_HEAVY"
           ? ["long encyclopedia entry", "information-dense field-guide page", "page requiring maximum central reading space"]
+          : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
+            ? ["short entry with strong visual subject", "hero specimen page", "subject needing large artwork presence"]
         : [description],
     avoidWhen: ["Do not use if the manuscript text cannot pass text-fit at the configured font size."],
     textZoneDescription:
@@ -127,16 +155,18 @@ function defaultLayoutPromptAssets() {
         : id === "LAYOUT_2_TEXT_HEAVY"
           ? "Center 70% is reserved almost entirely for dense text placement; keep this central column clean."
           : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
-            ? "Compact text zone with dominant illustration space."
+            ? "Left 30% vertical column is reserved for educational text, with supporting studies beneath it."
             : "Balanced text zone based on the uploaded mockup.",
     imageZoneDescription:
       id === "LAYOUT_1_STANDARD"
         ? "Top 35% illustration zone: primary illustration in upper-left quadrant, secondary study illustration in upper-right quadrant, with light supporting sketches and annotation callouts."
         : id === "LAYOUT_2_TEXT_HEAVY"
           ? "Small supporting illustrations in the outer margins, tiny scientific diagrams between sections, and bottom reference callouts."
-          : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
-            ? "Tall margin illustration slot for trees, vines, and vertical subjects."
-            : "Generated subject art replaces only the mockup image area.",
+          : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
+            ? "Right 70% of the page is a large hero illustration with clear negative space for future captions and callouts."
+            : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
+              ? "Tall margin illustration slot for trees, vines, and vertical subjects."
+              : "Generated subject art replaces only the mockup image area.",
     capacityNotes: "Update after text-fit testing with the real mockup.",
     minWords,
     targetWords,
@@ -148,15 +178,19 @@ function defaultLayoutPromptAssets() {
         ? LAYOUT_1_MASTER_PROMPT
         : id === "LAYOUT_2_TEXT_HEAVY"
           ? LAYOUT_2_MASTER_PROMPT
-        : `{MASTER_STYLE_DNA}\n\nCreate the final illustration for ${name}. Subject: {SUBJECT}. ` +
-          `Scientific/diagnostic details: {SCIENTIFIC_DETAILS}. ` +
-          `Composition must match the approved mockup image slot for ${id}: ${description}. ` +
-          `{COMPOSITION_NOTES} ` +
-          `Do not render page text, labels, titles, captions, or typography.`,
+          : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
+            ? LAYOUT_3_MASTER_PROMPT
+            : `{MASTER_STYLE_DNA}\n\nCreate the final illustration for ${name}. Subject: {SUBJECT}. ` +
+              `Scientific/diagnostic details: {SCIENTIFIC_DETAILS}. ` +
+              `Composition must match the approved mockup image slot for ${id}: ${description}. ` +
+              `{COMPOSITION_NOTES} ` +
+              `Do not render page text, labels, titles, captions, or typography.`,
     placeholders: ["{MASTER_STYLE_DNA}", "{SUBJECT}", "{SCIENTIFIC_DETAILS}", "{COMPOSITION_NOTES}"],
     textFitRule:
       id === "LAYOUT_2_TEXT_HEAVY"
         ? "Use this when manuscript text is long; art stays secondary and text must remain comfortable."
+        : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
+          ? "Use for short entries where the right-side hero artwork can dominate while the left text column remains clean."
         : id === "LAYOUT_9_DIAGNOSTIC_DIAGRAM"
           ? "Use this for comparisons, anatomy, diagrams, tracks, and look-alike pages."
           : "Fit the real manuscript text into this mockup before generating final art.",
