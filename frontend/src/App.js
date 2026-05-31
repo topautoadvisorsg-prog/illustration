@@ -118,6 +118,15 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error || new Error("Could not read manuscript file."));
+    reader.readAsText(file);
+  });
+}
+
 async function readJson(response) {
   const text = await response.text();
   const data = text ? JSON.parse(text) : {};
@@ -150,6 +159,14 @@ Use this entry to prove manuscript to manifest generation.`);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [commandInput, setCommandInput] = useState("");
+  const [operatorLog, setOperatorLog] = useState([
+    {
+      level: "system",
+      text: "Console ready. Load a manuscript, create/select a project, then run upload and manifest generation.",
+      time: "ready",
+    },
+  ]);
 
   const apiUrl = useMemo(() => trimSlash(backendUrl), [backendUrl]);
   const selectedProject = projects.find((project) => project.id === activeProjectId);
@@ -172,6 +189,17 @@ Use this entry to prove manuscript to manifest generation.`);
       next.layoutPromptAssets[index][key] = value;
       return next;
     });
+  }
+
+  function appendLog(level, text) {
+    setOperatorLog((current) => [
+      {
+        level,
+        text,
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      },
+      ...current,
+    ].slice(0, 80));
   }
 
   async function uploadLayoutMockup(index, file) {
@@ -203,10 +231,14 @@ Use this entry to prove manuscript to manifest generation.`);
     setBusy(true);
     setError("");
     setMessage(label);
+    appendLog("running", label);
     try {
       await fn();
+      appendLog("success", label.replace(/\.\.\.$/, " complete."));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      appendLog("error", errorMessage);
     } finally {
       setBusy(false);
     }
@@ -234,16 +266,19 @@ Use this entry to prove manuscript to manifest generation.`);
     setProjects((current) => [data.project, ...current.filter((project) => project.id !== data.project.id)]);
     setActiveProjectId(data.project.id);
     setMessage("Project created with the visible configuration.");
+    appendLog("success", `Project ready: ${data.project.title}`);
+    return data.project.id;
   }
 
-  async function uploadManuscript() {
-    if (!activeProjectId) throw new Error("Create or select a project first.");
-    const data = await call(`/api/projects/${activeProjectId}/manuscript`, {
+  async function uploadManuscript(projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    const data = await call(`/api/projects/${projectId}/manuscript`, {
       method: "POST",
       body: JSON.stringify({ filename: "milestone-1-test.md", markdown: manuscript }),
     });
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
     setMessage(`Manuscript uploaded: ${data.manuscript.sizeBytes} bytes.`);
+    appendLog("success", `Manuscript uploaded: ${data.manuscript.sizeBytes} bytes.`);
   }
 
   async function loadArtifacts(projectId = activeProjectId) {
@@ -257,15 +292,57 @@ Use this entry to prove manuscript to manifest generation.`);
     setMessage("Loaded manifests and pages.");
   }
 
-  async function generateManifests() {
-    if (!activeProjectId) throw new Error("Create or select a project first.");
-    const data = await call(`/api/projects/${activeProjectId}/manifests`, {
+  async function generateManifests(projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    const data = await call(`/api/projects/${projectId}/manifests`, {
       method: "POST",
       body: JSON.stringify({ markdown: manuscript }),
     });
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
     setMessage(`Manifested ${data.summary.totalPages} page(s), ${data.summary.manifestsWritten} manifest row(s).`);
-    await loadArtifacts(activeProjectId);
+    appendLog("success", `Claude manifest pass wrote ${data.summary.totalPages} page(s).`);
+    await loadArtifacts(projectId);
+  }
+
+  async function uploadManuscriptFile(file) {
+    if (!file) return;
+    const text = await readFileAsText(file);
+    setManuscript(text);
+    appendLog("success", `Loaded local manuscript file: ${file.name}`);
+  }
+
+  async function runManuscriptIntake() {
+    let projectId = activeProjectId;
+    if (!projectId) {
+      projectId = await createProject();
+    }
+    await uploadManuscript(projectId);
+    await generateManifests(projectId);
+  }
+
+  async function handleOperatorCommand(event) {
+    event.preventDefault();
+    const command = commandInput.trim();
+    if (!command) return;
+    setCommandInput("");
+    appendLog("command", command);
+
+    const normalized = command.toLowerCase();
+    if (normalized.includes("check")) {
+      await run("Checking backend...", refreshHealth);
+    } else if (normalized.includes("create")) {
+      await run("Creating project...", createProject);
+    } else if (normalized.includes("upload")) {
+      await run("Uploading manuscript...", uploadManuscript);
+    } else if (normalized.includes("manifest") || normalized.includes("claude")) {
+      await run("Generating manifests...", generateManifests);
+    } else if (normalized.includes("refresh") || normalized.includes("output")) {
+      await run("Loading output...", () => loadArtifacts());
+    } else if (normalized.includes("run") || normalized.includes("start")) {
+      await run("Running manuscript intake...", runManuscriptIntake);
+    } else {
+      appendLog("system", "Try: check backend, create project, upload manuscript, generate manifests, refresh output, or run intake.");
+    }
   }
 
   useEffect(() => {
@@ -304,6 +381,135 @@ Use this entry to prove manuscript to manifest generation.`);
       </section>
 
       {(message || error) && <section className={`notice ${error ? "error" : ""}`}>{error || message}</section>}
+
+      <section className="operator-grid">
+        <section className="panel command-panel">
+          <div className="section-head">
+            <div>
+              <h2>Operator Command Center</h2>
+              <p className="hint">Type a command or use the buttons. This is where you drive the pipeline.</p>
+            </div>
+            <span className="mode-pill">{busy ? "Running" : "Ready"}</span>
+          </div>
+          <form className="command-form" onSubmit={handleOperatorCommand}>
+            <input
+              value={commandInput}
+              onChange={(event) => setCommandInput(event.target.value)}
+              placeholder="Try: run intake, upload manuscript, generate manifests, refresh output"
+            />
+            <button disabled={busy} type="submit">Run</button>
+          </form>
+          <div className="quick-actions">
+            <button disabled={busy} onClick={() => run("Checking backend...", refreshHealth)}>Check Backend</button>
+            <button disabled={busy} onClick={() => run("Creating project...", createProject)}>Create Project</button>
+            <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
+              Upload Manuscript
+            </button>
+            <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
+              Generate Manifests
+            </button>
+            <button disabled={busy} onClick={() => run("Running manuscript intake...", runManuscriptIntake)}>
+              Run Intake
+            </button>
+          </div>
+          <div className="operator-log" aria-live="polite">
+            {operatorLog.map((entry, index) => (
+              <div className={`log-row ${entry.level}`} key={`${entry.time}-${index}`}>
+                <span>{entry.time}</span>
+                <p>{entry.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel flow-panel">
+          <h2>What Happens Next</h2>
+          <div className="flow-steps">
+            <div className={`flow-step ${activeProjectId ? "done" : "current"}`}>
+              <strong>1. Project</strong>
+              <span>{activeProjectId ? "Created or selected" : "Create/select project first"}</span>
+            </div>
+            <div className={`flow-step ${selectedProject?.manuscriptPath ? "done" : activeProjectId ? "current" : ""}`}>
+              <strong>2. Manuscript</strong>
+              <span>Paste or upload the .md manuscript, then send it to backend storage</span>
+            </div>
+            <div className={`flow-step ${pages.length > 0 ? "done" : selectedProject?.manuscriptPath ? "current" : ""}`}>
+              <strong>3. Manifest</strong>
+              <span>Claude splits chapters/pages and writes manifest rows</span>
+            </div>
+            <div className={`flow-step ${pages.length > 0 ? "current" : ""}`}>
+              <strong>4. Layout Fit</strong>
+              <span>Agent selects one of 9 layouts, fits text, waits for approval</span>
+            </div>
+            <div className="flow-step">
+              <strong>5. Images + Exports</strong>
+              <span>Approved layout prompts generate final art, then PDF/EPUB stages run</span>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section className="pipeline-grid">
+        <section className="panel">
+          <div className="section-head">
+            <h2>2. Manuscript</h2>
+            <div className="button-row">
+              <label className="file-button">
+                Load .md
+                <input
+                  type="file"
+                  accept=".md,text/markdown,text/plain"
+                  onChange={(event) => uploadManuscriptFile(event.target.files?.[0])}
+                />
+              </label>
+              <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
+                Upload
+              </button>
+              <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
+                Generate Manifests
+              </button>
+            </div>
+          </div>
+          <textarea value={manuscript} onChange={(event) => setManuscript(event.target.value)} />
+        </section>
+
+        <section className="panel">
+          <div className="section-head">
+            <h2>3. Manifest Output</h2>
+            <button disabled={busy || !activeProjectId} onClick={() => run("Loading output...", () => loadArtifacts())}>
+              Refresh
+            </button>
+          </div>
+          <div className="output-grid">
+            <div>
+              <h3>Pages</h3>
+              <div className="table">
+                {pages.map((page) => (
+                  <div className="row" key={page.id}>
+                    <span>{page.pageKey}</span>
+                    <span>{page.layoutTemplate || "No layout"}</span>
+                    <span>{page.status}</span>
+                  </div>
+                ))}
+                {pages.length === 0 && <p className="empty">No pages yet.</p>}
+              </div>
+            </div>
+            <div>
+              <h3>Manifests</h3>
+              <div className="table">
+                {manifests.map((manifest) => (
+                  <div className="row" key={manifest.id}>
+                    <span>{manifest.kind}</span>
+                    <span>{manifest.externalId}</span>
+                    <span>v{manifest.version}</span>
+                  </div>
+                ))}
+                {manifests.length === 0 && <p className="empty">No manifests yet.</p>}
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
 
       <section className="workspace-grid">
         <section className="panel setup-panel">
@@ -745,59 +951,6 @@ Use this entry to prove manuscript to manifest generation.`);
         </aside>
       </section>
 
-      <section className="pipeline-grid">
-        <section className="panel">
-          <div className="section-head">
-            <h2>2. Manuscript</h2>
-            <div className="button-row">
-              <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
-                Upload
-              </button>
-              <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
-                Generate Manifests
-              </button>
-            </div>
-          </div>
-          <textarea value={manuscript} onChange={(event) => setManuscript(event.target.value)} />
-        </section>
-
-        <section className="panel">
-          <div className="section-head">
-            <h2>3. Manifest Output</h2>
-            <button disabled={busy || !activeProjectId} onClick={() => run("Loading output...", () => loadArtifacts())}>
-              Refresh
-            </button>
-          </div>
-          <div className="output-grid">
-            <div>
-              <h3>Pages</h3>
-              <div className="table">
-                {pages.map((page) => (
-                  <div className="row" key={page.id}>
-                    <span>{page.pageKey}</span>
-                    <span>{page.layoutTemplate || "No layout"}</span>
-                    <span>{page.status}</span>
-                  </div>
-                ))}
-                {pages.length === 0 && <p className="empty">No pages yet.</p>}
-              </div>
-            </div>
-            <div>
-              <h3>Manifests</h3>
-              <div className="table">
-                {manifests.map((manifest) => (
-                  <div className="row" key={manifest.id}>
-                    <span>{manifest.kind}</span>
-                    <span>{manifest.externalId}</span>
-                    <span>v{manifest.version}</span>
-                  </div>
-                ))}
-                {manifests.length === 0 && <p className="empty">No manifests yet.</p>}
-              </div>
-            </div>
-          </div>
-        </section>
-      </section>
     </main>
   );
 }
