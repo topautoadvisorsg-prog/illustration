@@ -65,6 +65,45 @@ export const TrimSizeSchema = z.object({
   bleedIn: z.number().nonnegative(),
 });
 
+export const TypographyConfigSchema = z.object({
+  headingFont: z.string().min(1).default('EB Garamond'),
+  bodyFont: z.string().min(1).default('EB Garamond'),
+  captionFont: z.string().min(1).default('Inter'),
+  bodyPt: z.number().positive().default(11),
+  lineHeight: z.number().positive().default(1.28),
+  smallCaps: z.boolean().default(true),
+});
+
+export const ColorPaletteSchema = z.object({
+  paper: z.string().min(1).default('#f4f1ea'),
+  ink: z.string().min(1).default('#1b332d'),
+  accent: z.string().min(1).default('#2f5d50'),
+  warning: z.string().min(1).default('#9f2d20'),
+});
+
+export const ImageGenerationConfigSchema = z.object({
+  masterStyleBlockVersion: z.string().min(1).default('THE_WILDLANDS_v1'),
+  styleName: z.string().min(1).default('Cinematic Naturalist'),
+  imageModel: z.string().min(1).default('gpt-image-1'),
+  upscaleModel: z.string().min(1).default('Replicate Real-ESRGAN'),
+});
+
+export const LayoutPolicySchema = z.object({
+  layoutReferenceSet: z.string().min(1).default('wildlands-layout-references-v1'),
+  textFitFirst: z.boolean().default(true),
+  chapterByChapterRender: z.boolean().default(true),
+  defaultTemplate: LayoutTemplateIdSchema.default('LAYOUT_1_STANDARD'),
+  longTextTemplate: LayoutTemplateIdSchema.default('LAYOUT_2_TEXT_HEAVY'),
+  comparisonTemplate: LayoutTemplateIdSchema.default('LAYOUT_9_DIAGNOSTIC_DIAGRAM'),
+});
+
+export const OutputProfileSchema = z.object({
+  printEdition: z.literal('PREMIUM').default('PREMIUM'),
+  ebookEdition: z.literal('KINDLE_EPUB').default('KINDLE_EPUB'),
+  renderEngine: z.literal('PUPPETEER_PAGEDJS').default('PUPPETEER_PAGEDJS'),
+  pdfTarget: z.string().min(1).default('KDP premium color hardcover'),
+});
+
 export const ProjectConfigSchema = z.object({
   brand: BrandSchema.default('THE_WILDLANDS'),
   audience: AudienceSchema.default('ADULT'),
@@ -74,6 +113,11 @@ export const ProjectConfigSchema = z.object({
   subtitle: z.string().optional(),
   authorName: z.string().min(1),
   trimSize: TrimSizeSchema.default({ widthIn: 8.5, heightIn: 11, bleedIn: 0.125 }),
+  typography: TypographyConfigSchema.default({}),
+  colorPalette: ColorPaletteSchema.default({}),
+  imageGeneration: ImageGenerationConfigSchema.default({}),
+  layoutPolicy: LayoutPolicySchema.default({}),
+  outputProfile: OutputProfileSchema.default({}),
 });
 
 export const CreateProjectRequestSchema = z.object({

@@ -48,13 +48,23 @@ textarea {
   color: #1f2933;
 }
 
+input[type="checkbox"] {
+  width: auto;
+}
+
 textarea {
-  min-height: 240px;
+  min-height: 340px;
   resize: vertical;
   line-height: 1.45;
 }
 
-label {
+.field {
+  display: block;
+  margin: 0;
+}
+
+.field > span,
+.check-field {
   display: block;
   margin: 14px 0 6px;
   font-size: 0.86rem;
@@ -62,10 +72,17 @@ label {
   color: #4d453d;
 }
 
+.check-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+}
+
 .shell {
-  width: min(1180px, calc(100% - 32px));
+  width: min(1480px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 32px 0 48px;
+  padding: 26px 0 48px;
 }
 
 .topbar {
@@ -99,11 +116,13 @@ h1 {
 }
 
 h2 {
+  margin-bottom: 12px;
   font-size: 1.05rem;
   color: #1b332d;
 }
 
 h3 {
+  margin-bottom: 8px;
   font-size: 0.95rem;
   color: #425046;
 }
@@ -139,19 +158,54 @@ h3 {
   padding: 18px;
 }
 
-.backend-panel {
+.backend-panel,
+.notice,
+.workspace-grid,
+.pipeline-grid {
   margin-bottom: 14px;
 }
 
-.grid,
-.output-grid {
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(680px, 1fr) minmax(340px, 0.42fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.pipeline-grid {
+  display: grid;
+  grid-template-columns: minmax(520px, 0.9fr) minmax(520px, 1.1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.side-stack {
   display: grid;
   gap: 14px;
 }
 
-.grid {
-  grid-template-columns: minmax(280px, 0.8fr) minmax(360px, 1.2fr);
-  margin-bottom: 14px;
+.form-grid,
+.number-row,
+.swatch-grid,
+.output-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.form-grid {
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+}
+
+.form-grid.compact {
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+}
+
+.number-row {
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+}
+
+.swatch-grid {
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
 }
 
 .output-grid {
@@ -170,16 +224,26 @@ h3 {
   flex: 1;
 }
 
+.section-head {
+  justify-content: space-between;
+}
+
+.config-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #e4dbce;
+}
+
 .hint,
 .meta,
-.empty {
+.empty,
+.facts {
   margin: 10px 0 0;
   color: #6d6258;
   font-size: 0.9rem;
 }
 
 .notice {
-  margin-bottom: 14px;
   padding: 12px 14px;
   color: #1f6847;
 }
@@ -190,9 +254,92 @@ h3 {
   background: #fff5f2;
 }
 
-.section-head {
-  justify-content: space-between;
-  margin-bottom: 12px;
+.color-input {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.swatch {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid #a99d8f;
+  border-radius: 6px;
+}
+
+.book-preview {
+  min-height: 320px;
+  border: 1px solid #c8c0b4;
+  border-radius: 4px;
+  padding: 20px;
+}
+
+.preview-kicker {
+  margin-bottom: 8px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.book-preview h3 {
+  margin-bottom: 4px;
+  font-size: 1.65rem;
+}
+
+.preview-subtitle {
+  color: #6d6258;
+}
+
+.preview-body {
+  max-width: 30rem;
+}
+
+.mock-art {
+  display: grid;
+  min-height: 96px;
+  margin-top: 14px;
+  place-items: center;
+  border: 1px dashed #8a7f71;
+  border-radius: 4px;
+  color: #6d6258;
+  background: rgba(47, 93, 80, 0.08);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.facts span {
+  border: 1px solid #d4c8b8;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #fffdf8;
+}
+
+.template-panel {
+  max-height: 440px;
+  overflow: auto;
+}
+
+.template-row {
+  display: grid;
+  gap: 2px;
+  padding: 9px 0;
+  border-bottom: 1px solid #e8dfd2;
+}
+
+.template-row:last-child {
+  border-bottom: 0;
+}
+
+.template-row span {
+  color: #6d6258;
+  font-size: 0.86rem;
 }
 
 .table {
@@ -218,7 +365,14 @@ h3 {
   padding: 12px;
 }
 
-@media (max-width: 840px) {
+@media (max-width: 1120px) {
+  .workspace-grid,
+  .pipeline-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
   .topbar,
   .inline-form,
   .button-row,
@@ -227,7 +381,10 @@ h3 {
     flex-direction: column;
   }
 
-  .grid,
+  .form-grid,
+  .form-grid.compact,
+  .number-row,
+  .swatch-grid,
   .output-grid {
     grid-template-columns: 1fr;
   }

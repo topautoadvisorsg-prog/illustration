@@ -3,21 +3,81 @@ import "@/App.css";
 
 const configuredBackend = process.env.REACT_APP_BACKEND_URL || "";
 
+const LAYOUT_TEMPLATES = [
+  ["LAYOUT_1_STANDARD", "Standard", "Balanced text and illustration"],
+  ["LAYOUT_2_TEXT_HEAVY", "Text Heavy", "Long entries with smaller art"],
+  ["LAYOUT_3_ILLUSTRATION_DOMINANT", "Image Dominant", "Short text with a strong plate"],
+  ["LAYOUT_4_DANGER_WARNING", "Danger Warning", "Toxic or safety-heavy pages"],
+  ["LAYOUT_5_CHAPTER_OPENER", "Chapter Opener", "Atmospheric opening page"],
+  ["LAYOUT_6_BACK_MATTER", "Back Matter", "Tables, index, glossary"],
+  ["LAYOUT_7_SCATTERED_VIGNETTES", "Vignettes", "Several small naturalist studies"],
+  ["LAYOUT_8_MARGIN_ILLUSTRATION", "Margin Art", "Tall plant or side illustration"],
+  ["LAYOUT_9_DIAGNOSTIC_DIAGRAM", "Diagnostic", "Comparisons, diagrams, anatomy"],
+];
+
 function trimSlash(value) {
   return value.replace(/\/+$/, "");
 }
 
-function defaultConfig(title) {
+function defaultProjectConfig() {
   return {
     brand: "THE_WILDLANDS",
     audience: "ADULT",
     editions: ["PREMIUM", "KINDLE_EPUB"],
     volume: 1,
-    title,
-    subtitle: "Milestone 1 Test",
+    title: "The Wildlands Field Guide",
+    subtitle: "New England Volume",
     authorName: "The Wildlands",
     trimSize: { widthIn: 8.5, heightIn: 11, bleedIn: 0.125 },
+    typography: {
+      headingFont: "EB Garamond",
+      bodyFont: "EB Garamond",
+      captionFont: "Inter",
+      bodyPt: 11,
+      lineHeight: 1.28,
+      smallCaps: true,
+    },
+    colorPalette: {
+      paper: "#f4f1ea",
+      ink: "#1b332d",
+      accent: "#2f5d50",
+      warning: "#9f2d20",
+    },
+    imageGeneration: {
+      masterStyleBlockVersion: "THE_WILDLANDS_v1",
+      styleName: "Cinematic Naturalist",
+      imageModel: "gpt-image-1",
+      upscaleModel: "Replicate Real-ESRGAN",
+    },
+    layoutPolicy: {
+      layoutReferenceSet: "wildlands-layout-references-v1",
+      textFitFirst: true,
+      chapterByChapterRender: true,
+      defaultTemplate: "LAYOUT_1_STANDARD",
+      longTextTemplate: "LAYOUT_2_TEXT_HEAVY",
+      comparisonTemplate: "LAYOUT_9_DIAGNOSTIC_DIAGRAM",
+    },
+    outputProfile: {
+      printEdition: "PREMIUM",
+      ebookEdition: "KINDLE_EPUB",
+      renderEngine: "PUPPETEER_PAGEDJS",
+      pdfTarget: "KDP premium color hardcover",
+    },
   };
+}
+
+function Field({ label, children }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function trimNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 async function readJson(response) {
@@ -34,7 +94,7 @@ function App() {
   const [health, setHealth] = useState(null);
   const [projects, setProjects] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState("");
-  const [projectTitle, setProjectTitle] = useState("The Wildlands Field Guide");
+  const [projectConfig, setProjectConfig] = useState(defaultProjectConfig);
   const [manuscript, setManuscript] = useState(`# CHAPTER 1 - Forest Floor
 
 ## Chanterelle
@@ -55,6 +115,18 @@ Use this entry to prove manuscript to manifest generation.`);
 
   const apiUrl = useMemo(() => trimSlash(backendUrl), [backendUrl]);
   const selectedProject = projects.find((project) => project.id === activeProjectId);
+
+  function setConfig(path, value) {
+    setProjectConfig((current) => {
+      const next = structuredClone(current);
+      let target = next;
+      for (let index = 0; index < path.length - 1; index += 1) {
+        target = target[path[index]];
+      }
+      target[path[path.length - 1]] = value;
+      return next;
+    });
+  }
 
   async function call(path, options = {}) {
     if (!apiUrl) {
@@ -100,11 +172,11 @@ Use this entry to prove manuscript to manifest generation.`);
   async function createProject() {
     const data = await call("/api/projects", {
       method: "POST",
-      body: JSON.stringify({ config: defaultConfig(projectTitle) }),
+      body: JSON.stringify({ config: projectConfig }),
     });
     setProjects((current) => [data.project, ...current.filter((project) => project.id !== data.project.id)]);
     setActiveProjectId(data.project.id);
-    setMessage("Project created.");
+    setMessage("Project created with the visible configuration.");
   }
 
   async function uploadManuscript() {
@@ -159,93 +231,388 @@ Use this entry to prove manuscript to manifest generation.`);
       </section>
 
       <section className="panel backend-panel">
-        <label htmlFor="backend-url">Backend URL</label>
-        <div className="inline-form">
-          <input
-            id="backend-url"
-            value={backendUrl}
-            onChange={(event) => setBackendUrl(trimSlash(event.target.value))}
-            placeholder="https://wildlandsbackend-production..."
-          />
-          <button disabled={busy} onClick={() => run("Checking backend...", refreshHealth)}>
-            Check
-          </button>
-        </div>
-        <p className="hint">Set REACT_APP_BACKEND_URL on the Railway frontend service so this is baked into production.</p>
+        <Field label="Backend URL">
+          <div className="inline-form">
+            <input
+              value={backendUrl}
+              onChange={(event) => setBackendUrl(trimSlash(event.target.value))}
+              placeholder="https://wildlandsbackend-production..."
+            />
+            <button disabled={busy} onClick={() => run("Checking backend...", refreshHealth)}>
+              Check
+            </button>
+          </div>
+        </Field>
+        <p className="hint">This must be the backend API URL, not the database URL.</p>
       </section>
 
       {(message || error) && <section className={`notice ${error ? "error" : ""}`}>{error || message}</section>}
 
-      <section className="grid">
-        <div className="panel">
-          <h2>1. Project</h2>
-          <label htmlFor="project-title">Title</label>
-          <input id="project-title" value={projectTitle} onChange={(event) => setProjectTitle(event.target.value)} />
-          <button disabled={busy} onClick={() => run("Creating project...", createProject)}>
-            Create Project
-          </button>
-
-          <label htmlFor="project-select">Active Project</label>
-          <select id="project-select" value={activeProjectId} onChange={(event) => setActiveProjectId(event.target.value)}>
-            <option value="">No project selected</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.title} - {project.status}
-              </option>
-            ))}
-          </select>
-          {selectedProject && <p className="meta">Selected: {selectedProject.id}</p>}
-        </div>
-
-        <div className="panel">
-          <h2>2. Manuscript</h2>
-          <textarea value={manuscript} onChange={(event) => setManuscript(event.target.value)} />
-          <div className="button-row">
-            <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
-              Upload
-            </button>
-            <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
-              Generate Manifests
+      <section className="workspace-grid">
+        <section className="panel setup-panel">
+          <div className="section-head">
+            <h2>1. Project Setup</h2>
+            <button disabled={busy} onClick={() => run("Creating project...", createProject)}>
+              Create Project
             </button>
           </div>
-        </div>
+
+          <div className="form-grid">
+            <Field label="Title">
+              <input value={projectConfig.title} onChange={(event) => setConfig(["title"], event.target.value)} />
+            </Field>
+            <Field label="Subtitle">
+              <input value={projectConfig.subtitle} onChange={(event) => setConfig(["subtitle"], event.target.value)} />
+            </Field>
+            <Field label="Author / Imprint">
+              <input value={projectConfig.authorName} onChange={(event) => setConfig(["authorName"], event.target.value)} />
+            </Field>
+            <Field label="Volume">
+              <input
+                type="number"
+                min="1"
+                value={projectConfig.volume}
+                onChange={(event) => setConfig(["volume"], trimNumber(event.target.value))}
+              />
+            </Field>
+            <Field label="Brand">
+              <select value={projectConfig.brand} onChange={(event) => setConfig(["brand"], event.target.value)}>
+                <option value="THE_WILDLANDS">THE_WILDLANDS</option>
+              </select>
+            </Field>
+            <Field label="Audience">
+              <select value={projectConfig.audience} onChange={(event) => setConfig(["audience"], event.target.value)}>
+                <option value="ADULT">Adult</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="config-section">
+            <h3>Output Profile</h3>
+            <div className="form-grid compact">
+              <Field label="Print Edition">
+                <select
+                  value={projectConfig.outputProfile.printEdition}
+                  onChange={(event) => setConfig(["outputProfile", "printEdition"], event.target.value)}
+                >
+                  <option value="PREMIUM">Premium PDF, 8.5 x 11 full color</option>
+                </select>
+              </Field>
+              <Field label="Ebook Edition">
+                <select
+                  value={projectConfig.outputProfile.ebookEdition}
+                  onChange={(event) => setConfig(["outputProfile", "ebookEdition"], event.target.value)}
+                >
+                  <option value="KINDLE_EPUB">Kindle EPUB</option>
+                </select>
+              </Field>
+              <Field label="PDF Engine">
+                <select
+                  value={projectConfig.outputProfile.renderEngine}
+                  onChange={(event) => setConfig(["outputProfile", "renderEngine"], event.target.value)}
+                >
+                  <option value="PUPPETEER_PAGEDJS">Puppeteer + Paged.js</option>
+                </select>
+              </Field>
+              <Field label="KDP Target">
+                <input
+                  value={projectConfig.outputProfile.pdfTarget}
+                  onChange={(event) => setConfig(["outputProfile", "pdfTarget"], event.target.value)}
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="config-section">
+            <h3>Page Geometry</h3>
+            <div className="number-row">
+              <Field label="Trim Width">
+                <input
+                  type="number"
+                  step="0.125"
+                  value={projectConfig.trimSize.widthIn}
+                  onChange={(event) => setConfig(["trimSize", "widthIn"], trimNumber(event.target.value))}
+                />
+              </Field>
+              <Field label="Trim Height">
+                <input
+                  type="number"
+                  step="0.125"
+                  value={projectConfig.trimSize.heightIn}
+                  onChange={(event) => setConfig(["trimSize", "heightIn"], trimNumber(event.target.value))}
+                />
+              </Field>
+              <Field label="Bleed">
+                <input
+                  type="number"
+                  step="0.001"
+                  value={projectConfig.trimSize.bleedIn}
+                  onChange={(event) => setConfig(["trimSize", "bleedIn"], trimNumber(event.target.value))}
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="config-section">
+            <h3>Typography</h3>
+            <div className="form-grid compact">
+              <Field label="Heading Font">
+                <input
+                  value={projectConfig.typography.headingFont}
+                  onChange={(event) => setConfig(["typography", "headingFont"], event.target.value)}
+                />
+              </Field>
+              <Field label="Body Font">
+                <input
+                  value={projectConfig.typography.bodyFont}
+                  onChange={(event) => setConfig(["typography", "bodyFont"], event.target.value)}
+                />
+              </Field>
+              <Field label="Caption Font">
+                <input
+                  value={projectConfig.typography.captionFont}
+                  onChange={(event) => setConfig(["typography", "captionFont"], event.target.value)}
+                />
+              </Field>
+              <Field label="Body Size">
+                <input
+                  type="number"
+                  step="0.5"
+                  value={projectConfig.typography.bodyPt}
+                  onChange={(event) => setConfig(["typography", "bodyPt"], trimNumber(event.target.value))}
+                />
+              </Field>
+              <Field label="Line Height">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={projectConfig.typography.lineHeight}
+                  onChange={(event) => setConfig(["typography", "lineHeight"], trimNumber(event.target.value))}
+                />
+              </Field>
+              <label className="check-field">
+                <input
+                  type="checkbox"
+                  checked={projectConfig.typography.smallCaps}
+                  onChange={(event) => setConfig(["typography", "smallCaps"], event.target.checked)}
+                />
+                Small-caps section labels
+              </label>
+            </div>
+          </div>
+
+          <div className="config-section">
+            <h3>Color System</h3>
+            <div className="swatch-grid">
+              {Object.entries(projectConfig.colorPalette).map(([key, value]) => (
+                <Field key={key} label={key}>
+                  <div className="color-input">
+                    <span className="swatch" style={{ backgroundColor: value }} />
+                    <input value={value} onChange={(event) => setConfig(["colorPalette", key], event.target.value)} />
+                  </div>
+                </Field>
+              ))}
+            </div>
+          </div>
+
+          <div className="config-section">
+            <h3>Image + Style Policy</h3>
+            <div className="form-grid compact">
+              <Field label="Master Style Block">
+                <input
+                  value={projectConfig.imageGeneration.masterStyleBlockVersion}
+                  onChange={(event) => setConfig(["imageGeneration", "masterStyleBlockVersion"], event.target.value)}
+                />
+              </Field>
+              <Field label="Style Name">
+                <input
+                  value={projectConfig.imageGeneration.styleName}
+                  onChange={(event) => setConfig(["imageGeneration", "styleName"], event.target.value)}
+                />
+              </Field>
+              <Field label="Image Model">
+                <input
+                  value={projectConfig.imageGeneration.imageModel}
+                  onChange={(event) => setConfig(["imageGeneration", "imageModel"], event.target.value)}
+                />
+              </Field>
+              <Field label="Upscale Model">
+                <input
+                  value={projectConfig.imageGeneration.upscaleModel}
+                  onChange={(event) => setConfig(["imageGeneration", "upscaleModel"], event.target.value)}
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="config-section">
+            <h3>Layout Reference Policy</h3>
+            <div className="form-grid compact">
+              <Field label="Reference Set">
+                <input
+                  value={projectConfig.layoutPolicy.layoutReferenceSet}
+                  onChange={(event) => setConfig(["layoutPolicy", "layoutReferenceSet"], event.target.value)}
+                />
+              </Field>
+              <Field label="Default Template">
+                <select
+                  value={projectConfig.layoutPolicy.defaultTemplate}
+                  onChange={(event) => setConfig(["layoutPolicy", "defaultTemplate"], event.target.value)}
+                >
+                  {LAYOUT_TEMPLATES.map(([id, name]) => (
+                    <option key={id} value={id}>{`${name} - ${id}`}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Long Text Template">
+                <select
+                  value={projectConfig.layoutPolicy.longTextTemplate}
+                  onChange={(event) => setConfig(["layoutPolicy", "longTextTemplate"], event.target.value)}
+                >
+                  {LAYOUT_TEMPLATES.map(([id, name]) => (
+                    <option key={id} value={id}>{`${name} - ${id}`}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Comparison Template">
+                <select
+                  value={projectConfig.layoutPolicy.comparisonTemplate}
+                  onChange={(event) => setConfig(["layoutPolicy", "comparisonTemplate"], event.target.value)}
+                >
+                  {LAYOUT_TEMPLATES.map(([id, name]) => (
+                    <option key={id} value={id}>{`${name} - ${id}`}</option>
+                  ))}
+                </select>
+              </Field>
+              <label className="check-field">
+                <input
+                  type="checkbox"
+                  checked={projectConfig.layoutPolicy.textFitFirst}
+                  onChange={(event) => setConfig(["layoutPolicy", "textFitFirst"], event.target.checked)}
+                />
+                Text-fit preview before image spend
+              </label>
+              <label className="check-field">
+                <input
+                  type="checkbox"
+                  checked={projectConfig.layoutPolicy.chapterByChapterRender}
+                  onChange={(event) => setConfig(["layoutPolicy", "chapterByChapterRender"], event.target.checked)}
+                />
+                Render chapter by chapter
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <aside className="side-stack">
+          <section className="panel preview-panel">
+            <h2>Operator Preview</h2>
+            <div className="book-preview" style={{ backgroundColor: projectConfig.colorPalette.paper }}>
+              <p className="preview-kicker" style={{ color: projectConfig.colorPalette.accent }}>
+                {projectConfig.brand} / {projectConfig.outputProfile.printEdition}
+              </p>
+              <h3 style={{ color: projectConfig.colorPalette.ink, fontFamily: projectConfig.typography.headingFont }}>
+                {projectConfig.title}
+              </h3>
+              <p className="preview-subtitle">{projectConfig.subtitle}</p>
+              <p
+                className="preview-body"
+                style={{
+                  color: projectConfig.colorPalette.ink,
+                  fontFamily: projectConfig.typography.bodyFont,
+                  fontSize: `${projectConfig.typography.bodyPt}px`,
+                  lineHeight: projectConfig.typography.lineHeight,
+                }}
+              >
+                Chanterelle identification notes sit beside a cinematic naturalist illustration. Section labels use
+                {projectConfig.typography.smallCaps ? " small caps" : " normal caps"}.
+              </p>
+              <div className="mock-art">subject art slot</div>
+            </div>
+            <div className="facts">
+              <span>{projectConfig.trimSize.widthIn} x {projectConfig.trimSize.heightIn} in</span>
+              <span>Bleed {projectConfig.trimSize.bleedIn} in</span>
+              <span>{projectConfig.outputProfile.renderEngine}</span>
+            </div>
+          </section>
+
+          <section className="panel">
+            <h2>Active Project</h2>
+            <select value={activeProjectId} onChange={(event) => setActiveProjectId(event.target.value)}>
+              <option value="">No project selected</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.title} - {project.status}
+                </option>
+              ))}
+            </select>
+            {selectedProject && <p className="meta">Selected: {selectedProject.id}</p>}
+          </section>
+
+          <section className="panel template-panel">
+            <h2>9 Layout Templates</h2>
+            {LAYOUT_TEMPLATES.map(([id, name, description]) => (
+              <div className="template-row" key={id}>
+                <strong>{name}</strong>
+                <span>{description}</span>
+              </div>
+            ))}
+          </section>
+        </aside>
       </section>
 
-      <section className="panel">
-        <div className="section-head">
-          <h2>3. Output</h2>
-          <button disabled={busy || !activeProjectId} onClick={() => run("Loading output...", () => loadArtifacts())}>
-            Refresh
-          </button>
-        </div>
-        <div className="output-grid">
-          <div>
-            <h3>Pages</h3>
-            <div className="table">
-              {pages.map((page) => (
-                <div className="row" key={page.id}>
-                  <span>{page.pageKey}</span>
-                  <span>{page.layoutTemplate || "No layout"}</span>
-                  <span>{page.status}</span>
-                </div>
-              ))}
-              {pages.length === 0 && <p className="empty">No pages yet.</p>}
+      <section className="pipeline-grid">
+        <section className="panel">
+          <div className="section-head">
+            <h2>2. Manuscript</h2>
+            <div className="button-row">
+              <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
+                Upload
+              </button>
+              <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
+                Generate Manifests
+              </button>
             </div>
           </div>
-          <div>
-            <h3>Manifests</h3>
-            <div className="table">
-              {manifests.map((manifest) => (
-                <div className="row" key={manifest.id}>
-                  <span>{manifest.kind}</span>
-                  <span>{manifest.externalId}</span>
-                  <span>v{manifest.version}</span>
-                </div>
-              ))}
-              {manifests.length === 0 && <p className="empty">No manifests yet.</p>}
+          <textarea value={manuscript} onChange={(event) => setManuscript(event.target.value)} />
+        </section>
+
+        <section className="panel">
+          <div className="section-head">
+            <h2>3. Manifest Output</h2>
+            <button disabled={busy || !activeProjectId} onClick={() => run("Loading output...", () => loadArtifacts())}>
+              Refresh
+            </button>
+          </div>
+          <div className="output-grid">
+            <div>
+              <h3>Pages</h3>
+              <div className="table">
+                {pages.map((page) => (
+                  <div className="row" key={page.id}>
+                    <span>{page.pageKey}</span>
+                    <span>{page.layoutTemplate || "No layout"}</span>
+                    <span>{page.status}</span>
+                  </div>
+                ))}
+                {pages.length === 0 && <p className="empty">No pages yet.</p>}
+              </div>
+            </div>
+            <div>
+              <h3>Manifests</h3>
+              <div className="table">
+                {manifests.map((manifest) => (
+                  <div className="row" key={manifest.id}>
+                    <span>{manifest.kind}</span>
+                    <span>{manifest.externalId}</span>
+                    <span>v{manifest.version}</span>
+                  </div>
+                ))}
+                {manifests.length === 0 && <p className="empty">No manifests yet.</p>}
+              </div>
             </div>
           </div>
-        </div>
+        </section>
       </section>
     </main>
   );
