@@ -8,7 +8,7 @@
     "dev": "tsx watch src/index.ts",
     "prebuild": "yarn workspace @wildlands/shared build",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "start": "drizzle-kit migrate && node dist/index.js",
     "smoke": "tsx scripts/smoke-test.ts",
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "drizzle-kit migrate",
