@@ -36,7 +36,7 @@ const EnvSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_IMAGE_MODEL: z.string().default('gpt-image-1'),
 
-  REPLICATE_API_TOKEN: z.string().min(1),
+  REPLICATE_API_TOKEN: z.string().default(''),
   REPLICATE_UPSCALE_MODEL: z.string().default('nightmareai/real-esrgan'),
 
   SUPABASE_URL: z.string().min(1),
@@ -44,11 +44,11 @@ const EnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   DATABASE_URL: z.string().min(1),
 
-  UPSTASH_REDIS_URL: z.string().min(1),
-  UPSTASH_REDIS_TOKEN: z.string().min(1),
+  UPSTASH_REDIS_URL: z.string().default(''),
+  UPSTASH_REDIS_TOKEN: z.string().default(''),
 
-  SENTRY_DSN_FRONTEND: z.string().min(1),
-  SENTRY_DSN_BACKEND: z.string().min(1),
+  SENTRY_DSN_FRONTEND: z.string().default(''),
+  SENTRY_DSN_BACKEND: z.string().default(''),
 
   STORAGE_ROOT: z.string().default(path.join(REPO_ROOT, 'backend/storage')),
 });
