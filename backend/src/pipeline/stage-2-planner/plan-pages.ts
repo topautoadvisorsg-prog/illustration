@@ -19,7 +19,7 @@ import {
 } from '@wildlands/shared';
 import { getAgentContract } from '../../agents/agent-contracts.js';
 
-const REQUIRED_PROMPT_PLACEHOLDERS = ['{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'] as const;
+const REQUIRED_PROMPT_PLACEHOLDERS = ['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'] as const;
 
 export interface PagePlanningDecision {
   pageKey: string;
@@ -288,7 +288,7 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
   if (overMaxWords) warnings.push(`word_count_over_layout_max:${wordCount}>${capacity.maxWords}`);
 
   const promptTemplate = asset?.promptTemplate ?? (
-    `Create the final illustration for {SUBJECT}. Scientific details: {SCIENTIFIC_DETAILS}. ` +
+    `{MASTER_STYLE_DNA}\n\nCreate the final illustration for {SUBJECT}. Scientific details: {SCIENTIFIC_DETAILS}. ` +
     `Use composition notes: {COMPOSITION_NOTES}. Do not render page text, labels, titles, or typography.`
   );
 
@@ -301,6 +301,7 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
   }
 
   const prompt = replaceTemplatePlaceholders(promptTemplate, {
+    '{MASTER_STYLE_DNA}': config.imageGeneration.masterStyleBlockText,
     '{SUBJECT}': page.imageSubject,
     '{SCIENTIFIC_DETAILS}': scientificDetails(page),
     '{COMPOSITION_NOTES}': asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? `Art slot follows ${selected.template}.`,

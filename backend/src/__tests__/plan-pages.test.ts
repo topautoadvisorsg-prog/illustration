@@ -13,8 +13,9 @@ const baseConfig: ProjectConfig = {
   typography: { headingFont: 'EB Garamond', bodyFont: 'EB Garamond', captionFont: 'Inter', bodyPt: 11, lineHeight: 1.28, smallCaps: true },
   colorPalette: { paper: '#f4f1ea', ink: '#1b332d', accent: '#2f5d50', warning: '#9f2d20' },
   imageGeneration: {
-    masterStyleBlockVersion: 'THE_WILDLANDS_v1',
-    styleName: 'Cinematic Naturalist',
+    masterStyleBlockVersion: 'VINTAGE_NATURALIST_DNA_v1.0',
+    masterStyleBlockText: 'Vintage Naturalist master style DNA.',
+    styleName: 'Vintage Naturalist',
     imageModel: 'gpt-image-1',
     upscaleModel: 'Replicate Real-ESRGAN',
   },
@@ -42,8 +43,8 @@ const baseConfig: ProjectConfig = {
       maxWords: 400,
       recommendedBodyPt: 10.5,
       recommendedLineHeight: 1.24,
-      promptTemplate: 'Subject {SUBJECT}. Details {SCIENTIFIC_DETAILS}. Notes {COMPOSITION_NOTES}.',
-      placeholders: ['{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'],
+      promptTemplate: '{MASTER_STYLE_DNA}. Subject {SUBJECT}. Details {SCIENTIFIC_DETAILS}. Notes {COMPOSITION_NOTES}.',
+      placeholders: ['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'],
       textFitRule: 'Use for comparison pages.',
       imageSlotDescription: 'Diagnostic image slot.',
       capacityTestStatus: 'APPROVED',
@@ -90,6 +91,7 @@ describe('planPage', () => {
     expect(decision.layoutTemplate).toBe('LAYOUT_9_DIAGNOSTIC_DIAGRAM');
     expect(decision.reasonCodes).toContain('comparison_or_lookalike_signal');
     expect(decision.prompt).toContain('golden chanterelle mushroom');
+    expect(decision.prompt).toContain('Vintage Naturalist master style DNA.');
     expect(decision.prompt).not.toContain('{SUBJECT}');
     expect(decision.typography.bodyPt).toBe(10.5);
     expect(decision.promptReady).toBe(true);

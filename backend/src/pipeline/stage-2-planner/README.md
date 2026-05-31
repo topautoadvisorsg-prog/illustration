@@ -36,6 +36,7 @@ analyzed, the written metadata becomes canonical:
 - recommended body size and line height
 - capacity approval status
 - prompt template and required placeholders
+- inherited Master Style DNA through `{MASTER_STYLE_DNA}`
 
 ## Inputs
 
@@ -98,6 +99,8 @@ otherwise                     -> LAYOUT_1_STANDARD
 - It chooses a layout and prompt plan; it does not generate images.
 - Image generation remains blocked when required layout assets or placeholders
   are missing.
+- Every layout prompt must inherit the active Master Style DNA so subject/page
+  choices can change without losing the book's visual identity.
 - The image prompt must describe only the illustration subject and composition.
 - The image model must not render page text, headers, page numbers, or the full
   book layout.

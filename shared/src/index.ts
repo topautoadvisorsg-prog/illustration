@@ -82,8 +82,9 @@ export const ColorPaletteSchema = z.object({
 });
 
 export const ImageGenerationConfigSchema = z.object({
-  masterStyleBlockVersion: z.string().min(1).default('THE_WILDLANDS_v1'),
-  styleName: z.string().min(1).default('Cinematic Naturalist'),
+  masterStyleBlockVersion: z.string().min(1).default('VINTAGE_NATURALIST_DNA_v1.0'),
+  masterStyleBlockText: z.string().min(1).default('Vintage Naturalist master visual identity.'),
+  styleName: z.string().min(1).default('Vintage Naturalist'),
   imageModel: z.string().min(1).default('gpt-image-1'),
   upscaleModel: z.string().min(1).default('Replicate Real-ESRGAN'),
 });
@@ -114,7 +115,7 @@ export const LayoutPromptAssetSchema = z.object({
   recommendedBodyPt: z.number().positive().default(11),
   recommendedLineHeight: z.number().positive().default(1.28),
   promptTemplate: z.string().min(1),
-  placeholders: z.array(z.string().min(1)).default(['{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}']),
+  placeholders: z.array(z.string().min(1)).default(['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}']),
   textFitRule: z.string().min(1).default('Fit manuscript text into this mockup before image generation.'),
   imageSlotDescription: z.string().min(1).default('Replace mockup art with generated subject illustration after text fit approval.'),
   capacityTestStatus: z.enum(['UNTESTED', 'TESTING', 'APPROVED']).default('UNTESTED'),

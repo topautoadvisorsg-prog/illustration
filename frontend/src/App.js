@@ -15,26 +15,99 @@ const LAYOUT_TEMPLATES = [
   ["LAYOUT_9_DIAGNOSTIC_DIAGRAM", "Diagnostic", "Comparisons, diagrams, anatomy", 180, 280, 400],
 ];
 
+const VINTAGE_NATURALIST_DNA = `VINTAGE NATURALIST
+
+MASTER STYLE DNA v1.0
+
+This block defines the permanent visual identity of the Vintage Naturalist publishing system.
+
+All future layout instructions and subject instructions must inherit this visual language.
+
+This block defines style only.
+
+It does not define subject matter, specimen type, page structure, composition arrangement, illustration placement, typography placement, or educational purpose.
+
+Those instructions are supplied separately.
+
+Create imagery in the style of a premium collector's edition natural history atlas.
+
+The visual language should blend antique botanical illustration, historical naturalist field journals, museum specimen plates, scientific atlases, wilderness archive collections, and explorer notebooks.
+
+The artwork should feel documented, preserved, collected, and curated.
+
+Draw inspiration from historical natural history illustration traditions, antique botanical atlases, museum natural history collections, explorer field journals, scientific specimen plates, and wilderness archival documentation while remaining entirely original and never recreating copyrighted artwork, illustrations, or compositions.
+
+Rendering style: watercolor illustration, naturalist ink work, delicate linework, museum-quality specimen rendering, subtle brush textures, hand-crafted appearance, scientific elegance, archival craftsmanship.
+
+Surface characteristics: warm parchment paper, archival paper textures, subtle aging, natural paper grain, collector-edition presentation.
+
+Color characteristics: muted earth tones, restrained saturation, botanical greens, woodland browns, parchment creams, faded natural pigments, soft natural color transitions.
+
+Supporting visual language: naturalist annotations, specimen markings, field observations, scientific callouts, explorer notes, collection references, observational markings. These elements should feel archival and observational rather than modern or graphic.
+
+Avoid modern infographic aesthetics, glossy commercial design, digital poster aesthetics, contemporary UI styling, comic-book styling, fantasy aesthetics, hyper-saturated colors, and artificial visual effects.
+
+Emotional tone: timeless, scholarly, elegant, educational, exploratory, museum quality, collectible, archival.
+
+The viewer should feel they are examining a rare plate from a beautifully preserved natural history collection.`;
+
+const LAYOUT_1_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- Upper left quadrant contains the primary illustration.
+- Upper right quadrant contains a secondary study illustration.
+- Lower two-thirds of the page is reserved for educational text content.
+- Small annotation callouts connect illustrations to the text area.
+- A small field-guide information box appears near the bottom corner.
+- Botanical or ecological supporting sketches are scattered lightly around the illustrations.
+
+Visual balance:
+- Top 35% illustration zone.
+- Bottom 65% clean text zone.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+Leave large clean areas for future text placement.
+The page should read from top to bottom in a clear educational flow.
+Museum-quality wilderness field guide layout.
+Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
 function defaultLayoutPromptAssets() {
   return LAYOUT_TEMPLATES.map(([id, name, description, minWords, targetWords, maxWords], index) => ({
     templateId: id,
     label: name,
     mockupImagePath: `layout-${String(index + 1).padStart(2, "0")}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`,
-    layoutDescription: `${name}: ${description}. Written agent instructions should be refined after analyzing the uploaded mockup.`,
-    useCases: [description],
+    layoutDescription:
+      id === "LAYOUT_1_STANDARD"
+        ? "Single encyclopedia page. Upper-left primary illustration, upper-right secondary study illustration, lower two-thirds reserved for educational text, small callouts, bottom-corner field-guide box, and light botanical/ecological supporting sketches."
+        : `${name}: ${description}. Written agent instructions should be refined after analyzing the uploaded mockup.`,
+    useCases:
+      id === "LAYOUT_1_STANDARD"
+        ? ["standard encyclopedia entry", "balanced educational field-guide page", "subject with one primary and one secondary study image"]
+        : [description],
     avoidWhen: ["Do not use if the manuscript text cannot pass text-fit at the configured font size."],
     textZoneDescription:
-      id === "LAYOUT_2_TEXT_HEAVY"
-        ? "Large text zone with a smaller supporting art slot."
-        : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
-          ? "Compact text zone with dominant illustration space."
-          : "Balanced text zone based on the uploaded mockup.",
+      id === "LAYOUT_1_STANDARD"
+        ? "Bottom 65% of the page is a large clean educational text zone."
+        : id === "LAYOUT_2_TEXT_HEAVY"
+          ? "Large text zone with a smaller supporting art slot."
+          : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
+            ? "Compact text zone with dominant illustration space."
+            : "Balanced text zone based on the uploaded mockup.",
     imageZoneDescription:
-      id === "LAYOUT_2_TEXT_HEAVY"
-        ? "Small supporting art slot; keep the image secondary to the text."
-        : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
-          ? "Tall margin illustration slot for trees, vines, and vertical subjects."
-          : "Generated subject art replaces only the mockup image area.",
+      id === "LAYOUT_1_STANDARD"
+        ? "Top 35% illustration zone: primary illustration in upper-left quadrant, secondary study illustration in upper-right quadrant, with light supporting sketches and annotation callouts."
+        : id === "LAYOUT_2_TEXT_HEAVY"
+          ? "Small supporting art slot; keep the image secondary to the text."
+          : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
+            ? "Tall margin illustration slot for trees, vines, and vertical subjects."
+            : "Generated subject art replaces only the mockup image area.",
     capacityNotes: "Update after text-fit testing with the real mockup.",
     minWords,
     targetWords,
@@ -42,11 +115,14 @@ function defaultLayoutPromptAssets() {
     recommendedBodyPt: id === "LAYOUT_2_TEXT_HEAVY" ? 10.5 : 11,
     recommendedLineHeight: id === "LAYOUT_2_TEXT_HEAVY" ? 1.23 : 1.28,
     promptTemplate:
-      `Create the final illustration for ${name}. Subject: {SUBJECT}. ` +
-      `Scientific/diagnostic details: {SCIENTIFIC_DETAILS}. ` +
-      `Composition must match the approved mockup image slot for ${id}: ${description}. ` +
-      `Do not render page text, labels, titles, captions, or typography.`,
-    placeholders: ["{SUBJECT}", "{SCIENTIFIC_DETAILS}", "{COMPOSITION_NOTES}"],
+      id === "LAYOUT_1_STANDARD"
+        ? LAYOUT_1_MASTER_PROMPT
+        : `{MASTER_STYLE_DNA}\n\nCreate the final illustration for ${name}. Subject: {SUBJECT}. ` +
+          `Scientific/diagnostic details: {SCIENTIFIC_DETAILS}. ` +
+          `Composition must match the approved mockup image slot for ${id}: ${description}. ` +
+          `{COMPOSITION_NOTES} ` +
+          `Do not render page text, labels, titles, captions, or typography.`,
+    placeholders: ["{MASTER_STYLE_DNA}", "{SUBJECT}", "{SCIENTIFIC_DETAILS}", "{COMPOSITION_NOTES}"],
     textFitRule:
       id === "LAYOUT_2_TEXT_HEAVY"
         ? "Use this when manuscript text is long; art stays secondary and text must remain comfortable."
@@ -88,8 +164,9 @@ function defaultProjectConfig() {
       warning: "#9f2d20",
     },
     imageGeneration: {
-      masterStyleBlockVersion: "THE_WILDLANDS_v1",
-      styleName: "Cinematic Naturalist",
+      masterStyleBlockVersion: "VINTAGE_NATURALIST_DNA_v1.0",
+      masterStyleBlockText: VINTAGE_NATURALIST_DNA,
+      styleName: "Vintage Naturalist",
       imageModel: "gpt-image-1",
       upscaleModel: "Replicate Real-ESRGAN",
     },
@@ -790,6 +867,13 @@ Use this entry to prove manuscript to manifest generation.`);
                 <input
                   value={projectConfig.imageGeneration.styleName}
                   onChange={(event) => setConfig(["imageGeneration", "styleName"], event.target.value)}
+                />
+              </Field>
+              <Field label="Master Style DNA">
+                <textarea
+                  className="prompt-template"
+                  value={projectConfig.imageGeneration.masterStyleBlockText}
+                  onChange={(event) => setConfig(["imageGeneration", "masterStyleBlockText"], event.target.value)}
                 />
               </Field>
               <Field label="Image Model">

@@ -25,6 +25,8 @@ Implemented and testable:
 - Page rows linked to PAGE manifests
 - Stage 2 deterministic page planner
 - Stage 2 layout-library validation with written layout metadata
+- Vintage Naturalist Master Style DNA stored in project config and injected into
+  layout prompts
 - Agent behavior contracts
 - Operator frontend for backend URL, project setup, manuscript upload, manifest
   generation, page planning, layout prompt assets, and output inspection
