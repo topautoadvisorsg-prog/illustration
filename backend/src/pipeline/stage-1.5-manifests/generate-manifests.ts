@@ -25,6 +25,11 @@ import {
 import { callStructured } from '../../services/claude/claude.js';
 import { persistManifests, type PageSeed } from '../../db/repositories/manifests.repo.js';
 import { logger } from '../../lib/logger.js';
+import {
+  assertUsableManuscriptOutline,
+  parseManuscriptOutline,
+  type ManuscriptOutline,
+} from '../stage-1-ingestion/parse-manuscript-outline.js';
 
 export interface GenerateManifestsInput {
   projectId: string;
@@ -111,6 +116,45 @@ const TOOL_JSON_SCHEMA: Record<string, unknown> = {
   required: ['bookTitle', 'chapters'],
 };
 
+function outlineForPrompt(outline: ManuscriptOutline): string {
+  return outline.chapters
+    .map((chapter) => {
+      const entries = chapter.entries
+        .map((entry) => `  - ${entry.title} (${entry.wordCount} words, line ${entry.lineStart})`)
+        .join('\n');
+      return `Chapter ${chapter.chapterNumber}: ${chapter.title}\n${entries}`;
+    })
+    .join('\n\n');
+}
+
+function validateAgainstOutline(result: ManifestGenerationResult, outline: ManuscriptOutline): void {
+  if (result.chapters.length !== outline.chapters.length) {
+    throw new Error(
+      `MANIFEST_OUTLINE_MISMATCH: Claude returned ${result.chapters.length} chapters; manuscript has ${outline.chapters.length}.`,
+    );
+  }
+
+  result.chapters.forEach((chapter, index) => {
+    const expected = outline.chapters[index];
+    if (!expected) return;
+    if (chapter.entries.length !== expected.entries.length) {
+      throw new Error(
+        `MANIFEST_OUTLINE_MISMATCH: chapter ${expected.chapterNumber} expected ${expected.entries.length} entries; Claude returned ${chapter.entries.length}.`,
+      );
+    }
+
+    chapter.entries.forEach((entry, entryIndex) => {
+      const expectedEntry = expected.entries[entryIndex];
+      if (!expectedEntry) return;
+      if (entry.entryTitle.trim().toLowerCase() !== expectedEntry.title.trim().toLowerCase()) {
+        throw new Error(
+          `MANIFEST_OUTLINE_MISMATCH: chapter ${expected.chapterNumber} entry ${entryIndex + 1} expected "${expectedEntry.title}" but got "${entry.entryTitle}".`,
+        );
+      }
+    });
+  });
+}
+
 function pageKey(chapterNumber: number, pageInChapter: number): string {
   return `CH${String(chapterNumber).padStart(2, '0')}_P${String(pageInChapter).padStart(3, '0')}`;
 }
@@ -118,9 +162,15 @@ function pageKey(chapterNumber: number, pageInChapter: number): string {
 export async function generateManifests(input: GenerateManifestsInput): Promise<GenerateManifestsResult> {
   logger.info({ projectId: input.projectId }, 'Stage 1.5: generating manifests via Claude');
 
+  const outline = parseManuscriptOutline(input.manuscriptMarkdown);
+  assertUsableManuscriptOutline(outline);
+
   const result: ManifestGenerationResult = await callStructured<ManifestGenerationResult>({
     system: SYSTEM_PROMPT,
-    user: `Project: "${input.config.title}" (volume ${input.config.volume}).\n\nManuscript follows:\n\n${input.manuscriptMarkdown}`,
+    user:
+      `Project: "${input.config.title}" (volume ${input.config.volume}).\n\n` +
+      `Deterministic manuscript outline that must be preserved exactly:\n\n${outlineForPrompt(outline)}\n\n` +
+      `Manuscript follows:\n\n${input.manuscriptMarkdown}`,
     toolName: 'emit_manifest',
     toolDescription: 'Emit the structured book plan: chapters, each with its entries.',
     schema: ManifestGenerationResultSchema,
@@ -129,6 +179,8 @@ export async function generateManifests(input: GenerateManifestsInput): Promise<
     projectId: input.projectId,
     operation: 'stage-1.5-manifest',
   });
+
+  validateAgainstOutline(result, outline);
 
   // Build page manifests + seeds and the chapter/book summaries.
   const chapterManifests: ChapterManifest[] = [];

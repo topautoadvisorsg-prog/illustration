@@ -41,7 +41,15 @@ const UploadManuscriptBodySchema = z.object({
 });
 const UploadManuscriptResponseSchema = z.object({
   project: ProjectSchema,
-  manuscript: z.object({ relativePath: z.string(), sha256: z.string(), sizeBytes: z.number() }),
+  manuscript: z.object({
+    relativePath: z.string(),
+    sha256: z.string(),
+    sizeBytes: z.number(),
+    totalChapters: z.number(),
+    totalEntries: z.number(),
+    totalWords: z.number(),
+    warnings: z.array(z.string()),
+  }),
 });
 
 const ManifestSummaryResponseSchema = z.object({
@@ -128,7 +136,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       const existing = await getProject(id);
       if (!existing) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
 
-      const { manuscript } = await ingestManuscript({ projectId: id, filename: body.filename, markdown: body.markdown });
+      const { manuscript, outline } = await ingestManuscript({ projectId: id, filename: body.filename, markdown: body.markdown });
       const updated = await setManuscript(id, manuscript.relativePath, manuscript.sha256);
 
       return {
@@ -137,6 +145,10 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           relativePath: manuscript.relativePath,
           sha256: manuscript.sha256,
           sizeBytes: manuscript.sizeBytes,
+          totalChapters: outline.chapters.length,
+          totalEntries: outline.totalEntries,
+          totalWords: outline.totalWords,
+          warnings: outline.warnings,
         },
       };
     },

@@ -13,7 +13,7 @@ describe('ingestManuscript', () => {
         {
           projectId: '11111111-1111-4111-8111-111111111111',
           filename: 'chapter-1.md',
-          markdown: '# Chanterelle\n\nGolden field notes.',
+          markdown: '# CHAPTER 1 - Forest Floor\n\n## Chanterelle\n\nGolden field notes.',
         },
         new LocalStorageService(root),
       );
@@ -21,6 +21,7 @@ describe('ingestManuscript', () => {
       expect(result.manuscript.relativePath).toContain('manuscripts');
       expect(result.manuscript.sha256).toHaveLength(64);
       expect(result.manuscript.sizeBytes).toBeGreaterThan(0);
+      expect(result.outline.totalEntries).toBe(1);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -34,5 +35,15 @@ describe('ingestManuscript', () => {
         markdown: 'wrong extension',
       }),
     ).rejects.toThrow('Manuscript must be a .md file');
+  });
+
+  it('rejects markdown without a chapter and entry outline', async () => {
+    await expect(
+      ingestManuscript({
+        projectId: '11111111-1111-4111-8111-111111111111',
+        filename: 'chapter-1.md',
+        markdown: 'Loose notes without headings.',
+      }),
+    ).rejects.toThrow('NO_CHAPTERS_DETECTED');
   });
 });
