@@ -106,6 +106,57 @@ export const PageManifestSchema = z.object({
   warnings: z.array(z.string()).default([]),
 });
 
+// ── Manifest generation (Stage 1.5) ────────────────────────────────────────
+// Schema Claude returns via tool-call. Kept deliberately flat and simple so the
+// model produces it reliably; the pipeline maps it into book/chapter/page rows.
+
+export const GeneratedEntrySchema = z.object({
+  entryTitle: z.string().min(1),
+  scientificName: z.string().optional(),
+  category: z.string().optional(),
+  imageSubject: z.string().min(1),
+  layoutTemplate: LayoutTemplateIdSchema.default('LAYOUT_1_STANDARD'),
+  bodyMarkdown: z.string().min(1),
+});
+
+export const GeneratedChapterSchema = z.object({
+  chapterNumber: z.number().int().positive(),
+  chapterTitle: z.string().min(1),
+  entries: z.array(GeneratedEntrySchema).min(1),
+});
+
+export const ManifestGenerationResultSchema = z.object({
+  bookTitle: z.string().min(1),
+  chapters: z.array(GeneratedChapterSchema).min(1),
+});
+
+export const BookManifestSchema = z.object({
+  bookTitle: z.string().min(1),
+  totalChapters: z.number().int().nonnegative(),
+  totalEntries: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+  totalImagesNeeded: z.number().int().nonnegative(),
+  chapters: z.array(
+    z.object({
+      chapterNumber: z.number().int().positive(),
+      chapterTitle: z.string().min(1),
+      entryCount: z.number().int().nonnegative(),
+    }),
+  ),
+});
+
+export const ChapterManifestSchema = z.object({
+  chapterNumber: z.number().int().positive(),
+  chapterTitle: z.string().min(1),
+  pageKeys: z.array(z.string().min(1)),
+});
+
+export type GeneratedEntry = z.infer<typeof GeneratedEntrySchema>;
+export type GeneratedChapter = z.infer<typeof GeneratedChapterSchema>;
+export type ManifestGenerationResult = z.infer<typeof ManifestGenerationResultSchema>;
+export type BookManifest = z.infer<typeof BookManifestSchema>;
+export type ChapterManifest = z.infer<typeof ChapterManifestSchema>;
+
 export const LayoutReferenceSchema = z.object({
   id: z.string().min(1),
   templateId: LayoutTemplateIdSchema,

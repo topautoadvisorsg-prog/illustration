@@ -3,75 +3,112 @@ import {
   ApiErrorSchema,
   CreateProjectRequestSchema,
   ProjectSchema,
-  ProjectStatusSchema,
 } from '@wildlands/shared';
-import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import {
+  createProject,
+  getProject,
+  listProjects,
+  setManuscript,
+  setProjectStatus,
+  type ProjectRow,
+} from '../db/repositories/projects.repo.js';
+import { listManifests, listPages } from '../db/repositories/manifests.repo.js';
+import { ingestManuscript } from '../pipeline/stage-1-ingestion/ingest-manuscript.js';
+import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
 
-const ProjectParamsSchema = z.object({
-  id: z.string().uuid(),
-});
+const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 
-const ProjectListResponseSchema = z.object({
-  projects: z.array(ProjectSchema),
-});
-
-const CreatedProjectResponseSchema = z.object({
-  project: ProjectSchema,
-  note: z.string(),
-});
-
-const PipelineActionResponseSchema = z.object({
-  projectId: z.string().uuid(),
-  accepted: z.boolean(),
-  status: ProjectStatusSchema,
-  note: z.string(),
-});
-
-function notImplemented(note: string) {
+function toContract(row: ProjectRow) {
   return {
-    accepted: false,
-    status: 'DRAFT' as const,
-    note,
+    id: row.id,
+    brand: row.brand,
+    audience: row.audience,
+    title: row.title,
+    status: row.status,
+    manuscriptPath: row.manuscriptPath,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
+
+const ProjectListResponseSchema = z.object({ projects: z.array(ProjectSchema) });
+const CreatedProjectResponseSchema = z.object({ project: ProjectSchema });
+
+const UploadManuscriptBodySchema = z.object({
+  filename: z.string().min(1),
+  markdown: z.string().min(1),
+});
+const UploadManuscriptResponseSchema = z.object({
+  project: ProjectSchema,
+  manuscript: z.object({ relativePath: z.string(), sha256: z.string(), sizeBytes: z.number() }),
+});
+
+const ManifestSummaryResponseSchema = z.object({
+  project: ProjectSchema,
+  summary: z.object({
+    totalChapters: z.number(),
+    totalEntries: z.number(),
+    totalPages: z.number(),
+    totalImagesNeeded: z.number(),
+    manifestsWritten: z.number(),
+    pagesWritten: z.number(),
+  }),
+});
+
+const ManifestsListResponseSchema = z.object({
+  manifests: z.array(
+    z.object({
+      id: z.string(),
+      kind: z.string(),
+      externalId: z.string(),
+      version: z.number(),
+      content: z.unknown(),
+    }),
+  ),
+});
+
+const PagesListResponseSchema = z.object({
+  pages: z.array(
+    z.object({
+      id: z.string(),
+      pageKey: z.string(),
+      chapterNumber: z.number(),
+      plannedPageNumber: z.number(),
+      layoutTemplate: z.string().nullable(),
+      status: z.string(),
+    }),
+  ),
+});
 
 export async function registerProjectRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/api/projects',
-    {
-      schema: {
-        response: { 200: ProjectListResponseSchema },
-      },
+    { schema: { response: { 200: ProjectListResponseSchema } } },
+    async () => {
+      const rows = await listProjects();
+      return { projects: rows.map(toContract) };
     },
-    async () => ({ projects: [] }),
   );
 
   app.post(
     '/api/projects',
-    {
-      schema: {
-        body: CreateProjectRequestSchema,
-        response: { 202: CreatedProjectResponseSchema, 501: ApiErrorSchema },
-      },
-    },
+    { schema: { body: CreateProjectRequestSchema, response: { 201: CreatedProjectResponseSchema } } },
     async (request, reply) => {
-      const parsed = CreateProjectRequestSchema.parse(request.body);
-      const now = new Date().toISOString();
-      const project = {
-        id: randomUUID(),
-        brand: parsed.config.brand,
-        audience: parsed.config.audience,
-        title: parsed.config.title,
-        status: 'DRAFT' as const,
-        manuscriptPath: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      return reply.code(202).send({
-        project,
-        note: 'Project contract accepted. Persistence is wired next when DATABASE_URL is configured.',
-      });
+      const body = CreateProjectRequestSchema.parse(request.body);
+      const row = await createProject({ config: body.config });
+      return reply.code(201).send({ project: toContract(row) });
+    },
+  );
+
+  app.get(
+    '/api/projects/:id',
+    { schema: { params: ProjectParamsSchema, response: { 200: CreatedProjectResponseSchema, 404: ApiErrorSchema } } },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const row = await getProject(id);
+      if (!row) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      return { project: toContract(row) };
     },
   );
 
@@ -80,15 +117,28 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     {
       schema: {
         params: ProjectParamsSchema,
-        response: { 202: PipelineActionResponseSchema },
+        body: UploadManuscriptBodySchema,
+        response: { 200: UploadManuscriptResponseSchema, 404: ApiErrorSchema },
       },
     },
     async (request, reply) => {
       const { id } = ProjectParamsSchema.parse(request.params);
-      return reply.code(202).send({
-        projectId: id,
-        ...notImplemented('Stage 1 ingestion endpoint reserved; local ingestion primitive exists for the worker path.'),
-      });
+      const body = UploadManuscriptBodySchema.parse(request.body);
+
+      const existing = await getProject(id);
+      if (!existing) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+
+      const { manuscript } = await ingestManuscript({ projectId: id, filename: body.filename, markdown: body.markdown });
+      const updated = await setManuscript(id, manuscript.relativePath, manuscript.sha256);
+
+      return {
+        project: toContract(updated ?? existing),
+        manuscript: {
+          relativePath: manuscript.relativePath,
+          sha256: manuscript.sha256,
+          sizeBytes: manuscript.sizeBytes,
+        },
+      };
     },
   );
 
@@ -97,15 +147,74 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     {
       schema: {
         params: ProjectParamsSchema,
-        response: { 202: PipelineActionResponseSchema },
+        body: z.object({ markdown: z.string().min(1).optional() }).optional(),
+        response: { 200: ManifestSummaryResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
       },
     },
     async (request, reply) => {
       const { id } = ProjectParamsSchema.parse(request.params);
-      return reply.code(202).send({
-        projectId: id,
-        ...notImplemented('Stage 1.5 will call Claude when ANTHROPIC_API_KEY is configured.'),
-      });
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+
+      // Manuscript text: prefer an inline body (survives Railway redeploys),
+      // otherwise read the stored file from Stage 1.
+      const body = (request.body ?? {}) as { markdown?: string };
+      let markdown = body.markdown;
+      if (!markdown) {
+        if (!project.manuscriptPath) {
+          return reply.code(400).send({
+            error: 'Bad Request',
+            message: 'No manuscript on file. Upload one first or pass { markdown } in the body.',
+            statusCode: 400,
+          });
+        }
+        const { LocalStorageService } = await import('../services/storage/local-storage.js');
+        const buf = await new LocalStorageService().readProjectFile(project.manuscriptPath);
+        markdown = buf.toString('utf8');
+      }
+
+      const config = project.config as import('@wildlands/shared').ProjectConfig;
+      const summary = await generateManifests({ projectId: id, manuscriptMarkdown: markdown, config });
+      const updated = await setProjectStatus(id, 'MANIFESTED');
+
+      return { project: toContract(updated ?? project), summary };
+    },
+  );
+
+  app.get(
+    '/api/projects/:id/manifests',
+    { schema: { params: ProjectParamsSchema, response: { 200: ManifestsListResponseSchema } } },
+    async (request) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const rows = await listManifests(id);
+      return {
+        manifests: rows.map((r) => ({
+          id: r.id,
+          kind: r.kind,
+          externalId: r.externalId,
+          version: r.version,
+          content: r.content,
+        })),
+      };
+    },
+  );
+
+  app.get(
+    '/api/projects/:id/pages',
+    { schema: { params: ProjectParamsSchema, response: { 200: PagesListResponseSchema } } },
+    async (request) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const rows = await listPages(id);
+      return {
+        pages: rows.map((p) => ({
+          id: p.id,
+          pageKey: p.pageKey,
+          chapterNumber: p.chapterNumber,
+          plannedPageNumber: p.plannedPageNumber,
+          layoutTemplate: p.layoutTemplate,
+          status: p.status,
+        })),
+      };
     },
   );
 }
