@@ -2,14 +2,9 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "../",
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["src/*"],
-      "@wildlands/shared": ["../shared/src/index.ts"],
-      "@wildlands/shared/*": ["../shared/src/*"]
-    }
+    "rootDir": "./src",
+    "baseUrl": "./"
   },
-  "include": ["src/**/*", "scripts/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
