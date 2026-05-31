@@ -48,6 +48,25 @@ layout-02-text-heavy-a.png
 layout-09-diagnostic-comparison-a.png
 ```
 
+Recommended canonical set:
+
+```text
+layout-01-standard.png
+layout-02-text-heavy.png
+layout-03-illustration-dominant.png
+layout-04-danger-warning.png
+layout-05-chapter-opener.png
+layout-06-back-matter.png
+layout-07-scattered-vignettes.png
+layout-08-margin-illustration.png
+layout-09-diagnostic-diagram.png
+```
+
+The UI also accepts direct image uploads per layout card. For the current
+Milestone 1 test build, uploaded mockups are stored in the project config as data
+URLs so they stay attached to the project record. Later, this should move to
+Supabase Storage or another object-storage backend before large production files.
+
 ## Metadata
 
 Create `manifest.json` next to the images:

@@ -52,6 +52,10 @@ input[type="checkbox"] {
   width: auto;
 }
 
+input[type="file"] {
+  padding: 8px;
+}
+
 textarea {
   min-height: 340px;
   resize: vertical;
@@ -368,6 +372,33 @@ h3 {
 .layout-asset-head span {
   color: #6d6258;
   font-size: 0.76rem;
+}
+
+.filename-hint {
+  margin: 7px 0 8px;
+  color: #6d6258;
+  font-size: 0.82rem;
+}
+
+.layout-mockup-preview,
+.layout-mockup-empty {
+  width: 100%;
+  aspect-ratio: 8.5 / 11;
+  border: 1px solid #d4c8b8;
+  border-radius: 6px;
+  background: #f4f1ea;
+}
+
+.layout-mockup-preview {
+  display: block;
+  object-fit: contain;
+}
+
+.layout-mockup-empty {
+  display: grid;
+  place-items: center;
+  color: #6d6258;
+  font-size: 0.85rem;
 }
 
 .prompt-template {

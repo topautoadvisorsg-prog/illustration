@@ -101,6 +101,7 @@ export const LayoutPromptAssetSchema = z.object({
   templateId: LayoutTemplateIdSchema,
   label: z.string().min(1),
   mockupImagePath: z.string().min(1),
+  mockupImageDataUrl: z.string().optional(),
   promptTemplate: z.string().min(1),
   placeholders: z.array(z.string().min(1)).default(['{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}']),
   textFitRule: z.string().min(1).default('Fit manuscript text into this mockup before image generation.'),

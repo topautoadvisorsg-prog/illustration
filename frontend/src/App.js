@@ -102,6 +102,15 @@ function trimNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error || new Error("Could not read image file."));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function readJson(response) {
   const text = await response.text();
   const data = text ? JSON.parse(text) : {};
@@ -154,6 +163,17 @@ Use this entry to prove manuscript to manifest generation.`);
     setProjectConfig((current) => {
       const next = structuredClone(current);
       next.layoutPromptAssets[index][key] = value;
+      return next;
+    });
+  }
+
+  async function uploadLayoutMockup(index, file) {
+    if (!file) return;
+    const dataUrl = await readFileAsDataUrl(file);
+    setProjectConfig((current) => {
+      const next = structuredClone(current);
+      next.layoutPromptAssets[index].mockupImagePath = file.name;
+      next.layoutPromptAssets[index].mockupImageDataUrl = dataUrl;
       return next;
     });
   }
@@ -552,6 +572,19 @@ Use this entry to prove manuscript to manifest generation.`);
                       onChange={(event) => updateLayoutAsset(index, "mockupImagePath", event.target.value)}
                     />
                   </Field>
+                  <Field label="Upload Mockup Image">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(event) => uploadLayoutMockup(index, event.target.files?.[0])}
+                    />
+                  </Field>
+                  <p className="filename-hint">Recommended name: {asset.mockupImagePath}</p>
+                  {asset.mockupImageDataUrl ? (
+                    <img className="layout-mockup-preview" src={asset.mockupImageDataUrl} alt={`${asset.label} mockup`} />
+                  ) : (
+                    <div className="layout-mockup-empty">No mockup uploaded</div>
+                  )}
                   <Field label="Prompt Template">
                     <textarea
                       className="prompt-template"
