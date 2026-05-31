@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { isNativeError } from 'node:util/types';
 import {
   ApiErrorSchema,
   CreateProjectRequestSchema,
@@ -176,7 +177,19 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       }
 
       const { LocalStorageService } = await import('../services/storage/local-storage.js');
-      const buf = await new LocalStorageService().readProjectFile(project.manuscriptPath);
+      let buf: Buffer;
+      try {
+        buf = await new LocalStorageService().readProjectFile(project.manuscriptPath);
+      } catch (error) {
+        if (isNativeError(error) && 'code' in error && error.code === 'ENOENT') {
+          return reply.code(404).send({
+            error: 'Not Found',
+            message: 'Stored manuscript file is missing. Re-upload the manuscript before generating manifests.',
+            statusCode: 404,
+          });
+        }
+        throw error;
+      }
       const markdown = buf.toString('utf8');
 
       try {

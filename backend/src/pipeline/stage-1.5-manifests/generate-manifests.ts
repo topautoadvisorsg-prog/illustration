@@ -28,6 +28,7 @@ import { logger } from '../../lib/logger.js';
 import {
   assertUsableManuscriptOutline,
   parseManuscriptOutline,
+  validateGeneratedChaptersAgainstOutline,
   type ManuscriptOutline,
 } from '../stage-1-ingestion/parse-manuscript-outline.js';
 
@@ -127,34 +128,6 @@ function outlineForPrompt(outline: ManuscriptOutline): string {
     .join('\n\n');
 }
 
-function validateAgainstOutline(result: ManifestGenerationResult, outline: ManuscriptOutline): void {
-  if (result.chapters.length !== outline.chapters.length) {
-    throw new Error(
-      `MANIFEST_OUTLINE_MISMATCH: Claude returned ${result.chapters.length} chapters; manuscript has ${outline.chapters.length}.`,
-    );
-  }
-
-  result.chapters.forEach((chapter, index) => {
-    const expected = outline.chapters[index];
-    if (!expected) return;
-    if (chapter.entries.length !== expected.entries.length) {
-      throw new Error(
-        `MANIFEST_OUTLINE_MISMATCH: chapter ${expected.chapterNumber} expected ${expected.entries.length} entries; Claude returned ${chapter.entries.length}.`,
-      );
-    }
-
-    chapter.entries.forEach((entry, entryIndex) => {
-      const expectedEntry = expected.entries[entryIndex];
-      if (!expectedEntry) return;
-      if (entry.entryTitle.trim().toLowerCase() !== expectedEntry.title.trim().toLowerCase()) {
-        throw new Error(
-          `MANIFEST_OUTLINE_MISMATCH: chapter ${expected.chapterNumber} entry ${entryIndex + 1} expected "${expectedEntry.title}" but got "${entry.entryTitle}".`,
-        );
-      }
-    });
-  });
-}
-
 function pageKey(chapterNumber: number, pageInChapter: number): string {
   return `CH${String(chapterNumber).padStart(2, '0')}_P${String(pageInChapter).padStart(3, '0')}`;
 }
@@ -180,7 +153,7 @@ export async function generateManifests(input: GenerateManifestsInput): Promise<
     operation: 'stage-1.5-manifest',
   });
 
-  validateAgainstOutline(result, outline);
+  validateGeneratedChaptersAgainstOutline(result.chapters, outline);
 
   // Build page manifests + seeds and the chapter/book summaries.
   const chapterManifests: ChapterManifest[] = [];

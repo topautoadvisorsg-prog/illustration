@@ -48,6 +48,16 @@ interface Heading {
   offset: number;
 }
 
+export interface GeneratedOutlineEntry {
+  entryTitle: string;
+}
+
+export interface GeneratedOutlineChapter {
+  chapterNumber: number;
+  chapterTitle: string;
+  entries: GeneratedOutlineEntry[];
+}
+
 function slugify(value: string): string {
   const slug = value
     .toLowerCase()
@@ -79,9 +89,21 @@ function parseChapterNumber(title: string, fallback: number): number {
 function collectHeadings(markdown: string): Heading[] {
   const headings: Heading[] = [];
   let offset = 0;
+  let inFence = false;
   const lines = markdown.split(/\n/);
 
   lines.forEach((line, index) => {
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      offset += line.length + 1;
+      return;
+    }
+
+    if (inFence) {
+      offset += line.length + 1;
+      return;
+    }
+
     const match = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
     if (match) {
       const marker = match[1];
@@ -184,4 +206,52 @@ export function assertUsableManuscriptOutline(outline: ManuscriptOutline): void 
   if (outline.totalEntries === 0) {
     throw new Error('NO_ENTRIES_DETECTED: manuscript must include at least one ## entry heading.');
   }
+}
+
+function normalizeTitle(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+export function validateGeneratedChaptersAgainstOutline(
+  generatedChapters: GeneratedOutlineChapter[],
+  outline: ManuscriptOutline,
+): void {
+  if (generatedChapters.length !== outline.chapters.length) {
+    throw new Error(
+      `MANIFEST_OUTLINE_MISMATCH: Claude returned ${generatedChapters.length} chapters; manuscript has ${outline.chapters.length}.`,
+    );
+  }
+
+  generatedChapters.forEach((chapter, index) => {
+    const expected = outline.chapters[index];
+    if (!expected) return;
+
+    if (chapter.chapterNumber !== expected.chapterNumber) {
+      throw new Error(
+        `MANIFEST_OUTLINE_MISMATCH: chapter ${index + 1} expected number ${expected.chapterNumber}; Claude returned ${chapter.chapterNumber}.`,
+      );
+    }
+
+    if (normalizeTitle(chapter.chapterTitle) !== normalizeTitle(expected.title)) {
+      throw new Error(
+        `MANIFEST_OUTLINE_MISMATCH: chapter ${expected.chapterNumber} expected title "${expected.title}" but got "${chapter.chapterTitle}".`,
+      );
+    }
+
+    if (chapter.entries.length !== expected.entries.length) {
+      throw new Error(
+        `MANIFEST_OUTLINE_MISMATCH: chapter ${expected.chapterNumber} expected ${expected.entries.length} entries; Claude returned ${chapter.entries.length}.`,
+      );
+    }
+
+    chapter.entries.forEach((entry, entryIndex) => {
+      const expectedEntry = expected.entries[entryIndex];
+      if (!expectedEntry) return;
+      if (normalizeTitle(entry.entryTitle) !== normalizeTitle(expectedEntry.title)) {
+        throw new Error(
+          `MANIFEST_OUTLINE_MISMATCH: chapter ${expected.chapterNumber} entry ${entryIndex + 1} expected "${expectedEntry.title}" but got "${entry.entryTitle}".`,
+        );
+      }
+    });
+  });
 }

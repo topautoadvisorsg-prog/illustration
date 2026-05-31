@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertUsableManuscriptOutline,
   parseManuscriptOutline,
+  validateGeneratedChaptersAgainstOutline,
 } from '../pipeline/stage-1-ingestion/parse-manuscript-outline.js';
 
 describe('parseManuscriptOutline', () => {
@@ -46,5 +47,56 @@ Tall marsh plant with edible shoots.`);
   it('fails manuscripts with no usable chapter/entry structure', () => {
     const outline = parseManuscriptOutline('## Loose Entry\n\nNo chapter.');
     expect(() => assertUsableManuscriptOutline(outline)).toThrow('NO_CHAPTERS_DETECTED');
+  });
+
+  it('ignores headings inside fenced code blocks', () => {
+    const outline = parseManuscriptOutline(`# CHAPTER 1 - Forest Floor
+
+\`\`\`markdown
+# Fake Chapter
+## Fake Entry
+\`\`\`
+
+## Chanterelle
+
+Real entry body.`);
+
+    expect(outline.chapters).toHaveLength(1);
+    expect(outline.totalEntries).toBe(1);
+    expect(outline.chapters[0]?.entries[0]?.title).toBe('Chanterelle');
+  });
+
+  it('rejects generated manifests that change chapter metadata', () => {
+    const outline = parseManuscriptOutline(`# CHAPTER 1 - Forest Floor
+
+## Chanterelle
+
+Real entry body.`);
+
+    expect(() =>
+      validateGeneratedChaptersAgainstOutline(
+        [
+          {
+            chapterNumber: 2,
+            chapterTitle: 'CHAPTER 1 - Forest Floor',
+            entries: [{ entryTitle: 'Chanterelle' }],
+          },
+        ],
+        outline,
+      ),
+    ).toThrow('expected number 1');
+
+    expect(() =>
+      validateGeneratedChaptersAgainstOutline(
+        [
+          {
+            chapterNumber: 1,
+            chapterTitle: 'Wrong Forest',
+            entries: [{ entryTitle: 'Chanterelle' }],
+          },
+        ],
+        outline,
+      ),
+    ).toThrow('expected title');
   });
 });
