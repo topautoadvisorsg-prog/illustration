@@ -1,54 +1,64 @@
 # Stage 2 - Page Planner
 
-**Status:** Implemented foundation.
+**Status:** Implemented foundation with layout-library validation.
 
-Stage 2 is the first production planning step after Claude manifests. It turns
-locked PAGE manifests into operator-visible page plans. It does not spend image
-API money yet.
+Stage 2 turns locked PAGE manifests into operator-visible page plans. It does
+not spend image API money yet.
 
 ## What It Does
 
 For every persisted PAGE manifest, Stage 2:
 
+- validates the 9-layout prompt/reference library
 - calculates text word count
 - classifies content signals
 - chooses one of the 9 layout templates
-- applies brand typography and rough capacity metadata
+- uses written layout metadata as the main decision input
+- applies typography and capacity metadata
 - assembles an image-only prompt from the selected layout prompt asset
 - hashes the prompt with SHA-256
+- reports blockers, warnings, and prompt readiness
 - updates the `pages` row with `layout_template`, `image_prompt`, and
   `image_prompt_sha256`
-- returns agent metadata and decision reason codes to the frontend
+
+## Layout Library Model
+
+The uploaded layout image is the visual source of truth during setup, but the
+planner should not need to inspect the image every time. After the mockup is
+analyzed, the written metadata becomes canonical:
+
+- layout description
+- use cases
+- avoid rules
+- text zone description
+- image zone description
+- min/target/max word capacity
+- recommended body size and line height
+- capacity approval status
+- prompt template and required placeholders
 
 ## Inputs
 
 - Project ID
 - Locked PAGE manifests in the database
 - Page rows linked to those manifests through `pages.manifest_id`
-- Project config:
-  - typography defaults
-  - layout prompt assets
-  - brand/output profile
+- Project config with layout prompt assets
 - Agent behavior contracts from `backend/src/agents/agent-contracts.ts`
 
 ## Outputs
 
 The route response includes:
 
-- `pageId`
-- `manifestId`
-- `title`
-- `wordCount`
-- `contentSignals`
-- `layoutTemplate`
-- `layoutName`
-- `typography`
-- `capacity`
-- `reasonCodes`
-- `imagePrompt`
-- `imagePromptSha256`
-- `status: PENDING_PREVIEW`
-- `agent`
+- `layoutLibrary`
+- `plannedPages`
+- page word count
+- selected layout
+- layout instructions
+- capacity status
+- prompt hash
+- prompt readiness
+- blockers and warnings
+- PAGE_PLANNER agent metadata
 
 The database page row is updated with:
 
@@ -62,8 +72,9 @@ The database page row is updated with:
 curl -X POST http://localhost:8001/api/projects/{projectId}/plan
 ```
 
-The frontend uses this endpoint through the `Plan Pages` button and through the
-larger `Run Intake` workflow after manuscript upload and manifest generation.
+The frontend saves the visible project config through
+`PATCH /api/projects/{projectId}/config` before planning, so Stage 2 uses the
+current layout library values.
 
 ## Layout Selection
 
@@ -85,6 +96,8 @@ otherwise                     -> LAYOUT_1_STANDARD
 
 - Stage 2 is deterministic in v1. It does not call Claude.
 - It chooses a layout and prompt plan; it does not generate images.
+- Image generation remains blocked when required layout assets or placeholders
+  are missing.
 - The image prompt must describe only the illustration subject and composition.
 - The image model must not render page text, headers, page numbers, or the full
   book layout.
@@ -92,11 +105,9 @@ otherwise                     -> LAYOUT_1_STANDARD
 
 ## Current Limitations
 
-These are known gaps for the next reviewer to check:
-
-- Layout reference images are not uploaded into a canonical library yet.
-- Layout capacity is based on default metadata, not measured approved mockups.
-- Prompt placeholder enforcement is not yet a hard blocker.
+- Layout reference images are captured in project config, but not yet stored as
+  durable standalone layout-library records.
+- Measured capacity still needs to be filled in from real mockup tests.
 - Stage 6 text-fit preview is not implemented yet.
 - Continuation-page splitting for overflow text is not implemented yet.
 - Human approval locks are not implemented yet.
@@ -117,7 +128,10 @@ curl -X POST http://localhost:8001/api/projects/{projectId}/plan
 ```
 
 3. Inspect the response:
+   - `layoutLibrary.issues` explains missing/incomplete layout metadata.
    - `reasonCodes` explains why the layout was selected.
+   - `blockers` explains why a page cannot move toward image spend yet.
+   - `warnings` shows capacity/text-fit risks.
    - `agent` shows the PAGE_PLANNER behavior contract.
    - `imagePromptSha256` confirms prompt hashing.
 

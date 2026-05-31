@@ -20,6 +20,22 @@ function defaultLayoutPromptAssets() {
     templateId: id,
     label: name,
     mockupImagePath: `layout-${String(index + 1).padStart(2, "0")}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`,
+    layoutDescription: `${name}: ${description}. Written agent instructions should be refined after analyzing the uploaded mockup.`,
+    useCases: [description],
+    avoidWhen: ["Do not use if the manuscript text cannot pass text-fit at the configured font size."],
+    textZoneDescription:
+      id === "LAYOUT_2_TEXT_HEAVY"
+        ? "Large text zone with a smaller supporting art slot."
+        : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
+          ? "Compact text zone with dominant illustration space."
+          : "Balanced text zone based on the uploaded mockup.",
+    imageZoneDescription:
+      id === "LAYOUT_2_TEXT_HEAVY"
+        ? "Small supporting art slot; keep the image secondary to the text."
+        : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
+          ? "Tall margin illustration slot for trees, vines, and vertical subjects."
+          : "Generated subject art replaces only the mockup image area.",
+    capacityNotes: "Update after text-fit testing with the real mockup.",
     minWords,
     targetWords,
     maxWords,
@@ -157,6 +173,7 @@ Use this entry to prove manuscript to manifest generation.`);
   const [manifests, setManifests] = useState([]);
   const [pages, setPages] = useState([]);
   const [plannedPages, setPlannedPages] = useState([]);
+  const [layoutLibraryReport, setLayoutLibraryReport] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -271,6 +288,17 @@ Use this entry to prove manuscript to manifest generation.`);
     return data.project.id;
   }
 
+  async function saveProjectConfig(projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    const data = await call(`/api/projects/${projectId}/config`, {
+      method: "PATCH",
+      body: JSON.stringify({ config: projectConfig }),
+    });
+    setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
+    setMessage("Project configuration saved.");
+    appendLog("success", "Project configuration saved.");
+  }
+
   async function uploadManuscript(projectId = activeProjectId) {
     if (!projectId) throw new Error("Create or select a project first.");
     const data = await call(`/api/projects/${projectId}/manuscript`, {
@@ -306,13 +334,16 @@ Use this entry to prove manuscript to manifest generation.`);
 
   async function planPages(projectId = activeProjectId) {
     if (!projectId) throw new Error("Create or select a project first.");
+    await saveProjectConfig(projectId);
     const data = await call(`/api/projects/${projectId}/plan`, {
       method: "POST",
     });
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
     setPlannedPages(data.plannedPages || []);
-    setMessage(`Planned ${data.plannedPages?.length || 0} page(s) with layout choices and image prompts.`);
-    appendLog("success", `Stage 2 planned ${data.plannedPages?.length || 0} page(s).`);
+    setLayoutLibraryReport(data.layoutLibrary || null);
+    const blockers = data.plannedPages?.reduce((total, page) => total + (page.blockers?.length || 0), 0) || 0;
+    setMessage(`Planned ${data.plannedPages?.length || 0} page(s). Layout blockers: ${blockers}.`);
+    appendLog(blockers > 0 ? "error" : "success", `Stage 2 planned ${data.plannedPages?.length || 0} page(s); ${blockers} blocker(s).`);
     await loadArtifacts(projectId);
   }
 
@@ -417,6 +448,9 @@ Use this entry to prove manuscript to manifest generation.`);
           <div className="quick-actions">
             <button disabled={busy} onClick={() => run("Checking backend...", refreshHealth)}>Check Backend</button>
             <button disabled={busy} onClick={() => run("Creating project...", createProject)}>Create Project</button>
+            <button disabled={busy || !activeProjectId} onClick={() => run("Saving project configuration...", saveProjectConfig)}>
+              Save Config
+            </button>
             <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
               Upload Manuscript
             </button>
@@ -501,7 +535,30 @@ Use this entry to prove manuscript to manifest generation.`);
               Refresh
             </button>
           </div>
-          <div className="output-grid">
+            <div className="output-grid">
+            <div>
+              <h3>Layout Library</h3>
+              <div className="table">
+                {layoutLibraryReport ? (
+                  <>
+                    <div className="row plan-row">
+                      <span>{layoutLibraryReport.approvedTemplates}/{layoutLibraryReport.totalTemplates} approved</span>
+                      <span>{layoutLibraryReport.readyForProduction ? "Production ready" : "Needs review"}</span>
+                      <span>{layoutLibraryReport.issues?.length || 0} issue(s)</span>
+                    </div>
+                    {(layoutLibraryReport.issues || []).slice(0, 8).map((issue, index) => (
+                      <div className={`row issue-row ${issue.severity.toLowerCase()}`} key={`${issue.templateId}-${issue.code}-${index}`}>
+                        <span>{issue.templateId}</span>
+                        <span>{issue.code}</span>
+                        <span>{issue.severity}</span>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <p className="empty">No layout validation run yet.</p>
+                )}
+              </div>
+            </div>
             <div>
               <h3>Pages</h3>
               <div className="table">
@@ -522,7 +579,10 @@ Use this entry to prove manuscript to manifest generation.`);
                   <div className="row plan-row" key={page.pageKey}>
                     <span>{page.pageKey}</span>
                     <span>{page.layoutTemplate}</span>
-                    <span>{page.wordCount} words / {page.agent?.name || "Planner"}</span>
+                    <span>{page.wordCount} words / {page.textFitStatus}</span>
+                    <span>{page.capacity?.status || "capacity?"}</span>
+                    <span>{page.blockers?.length || 0} blockers</span>
+                    <span>{page.layoutInstructions?.textZone || "No text-zone note"}</span>
                   </div>
                 ))}
                 {plannedPages.length === 0 && <p className="empty">No page plan yet.</p>}
@@ -549,9 +609,14 @@ Use this entry to prove manuscript to manifest generation.`);
         <section className="panel setup-panel">
           <div className="section-head">
             <h2>1. Project Setup</h2>
-            <button disabled={busy} onClick={() => run("Creating project...", createProject)}>
-              Create Project
-            </button>
+            <div className="button-row">
+              <button disabled={busy} onClick={() => run("Creating project...", createProject)}>
+                Create Project
+              </button>
+              <button disabled={busy || !activeProjectId} onClick={() => run("Saving project configuration...", saveProjectConfig)}>
+                Save Config
+              </button>
+            </div>
           </div>
 
           <div className="form-grid">
@@ -832,6 +897,53 @@ Use this entry to prove manuscript to manifest generation.`);
                   ) : (
                     <div className="layout-mockup-empty">No mockup uploaded</div>
                   )}
+                  <Field label="Written Layout Description">
+                    <textarea
+                      className="notes-field"
+                      value={asset.layoutDescription || ""}
+                      onChange={(event) => updateLayoutAsset(index, "layoutDescription", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Use Cases">
+                    <textarea
+                      className="notes-field"
+                      value={(asset.useCases || []).join("\n")}
+                      onChange={(event) =>
+                        updateLayoutAsset(
+                          index,
+                          "useCases",
+                          event.target.value.split("\n").map((item) => item.trim()).filter(Boolean),
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="Avoid When">
+                    <textarea
+                      className="notes-field"
+                      value={(asset.avoidWhen || []).join("\n")}
+                      onChange={(event) =>
+                        updateLayoutAsset(
+                          index,
+                          "avoidWhen",
+                          event.target.value.split("\n").map((item) => item.trim()).filter(Boolean),
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="Text Zone Description">
+                    <textarea
+                      className="notes-field"
+                      value={asset.textZoneDescription || ""}
+                      onChange={(event) => updateLayoutAsset(index, "textZoneDescription", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Image Zone Description">
+                    <textarea
+                      className="notes-field"
+                      value={asset.imageZoneDescription || ""}
+                      onChange={(event) => updateLayoutAsset(index, "imageZoneDescription", event.target.value)}
+                    />
+                  </Field>
                   <div className="capacity-grid">
                     <Field label="Min Words">
                       <input
@@ -913,6 +1025,13 @@ Use this entry to prove manuscript to manifest generation.`);
                     <input
                       value={asset.imageSlotDescription}
                       onChange={(event) => updateLayoutAsset(index, "imageSlotDescription", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Capacity Notes">
+                    <textarea
+                      className="notes-field"
+                      value={asset.capacityNotes || ""}
+                      onChange={(event) => updateLayoutAsset(index, "capacityNotes", event.target.value)}
                     />
                   </Field>
                   <Field label="Operator / Agent Notes">

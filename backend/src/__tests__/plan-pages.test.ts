@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PageManifest, ProjectConfig } from '@wildlands/shared';
-import { countPageWords, planPage } from '../pipeline/stage-2-planner/plan-pages.js';
+import { countPageWords, planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 
 const baseConfig: ProjectConfig = {
   brand: 'THE_WILDLANDS',
@@ -31,6 +31,12 @@ const baseConfig: ProjectConfig = {
       templateId: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
       label: 'Diagnostic',
       mockupImagePath: 'layout-09-diagnostic.png',
+      layoutDescription: 'Diagnostic layout with comparison art and compact supporting text zones.',
+      useCases: ['look-alike species', 'diagnostic anatomy', 'comparison pages'],
+      avoidWhen: ['simple short entry without comparison need'],
+      textZoneDescription: 'Two compact text blocks beside or below the diagnostic art.',
+      imageZoneDescription: 'Central comparison/diagram image zone only; never render page text.',
+      capacityNotes: 'Measured against 10.5 pt body type.',
       minWords: 180,
       targetWords: 280,
       maxWords: 400,
@@ -86,5 +92,28 @@ describe('planPage', () => {
     expect(decision.prompt).toContain('golden chanterelle mushroom');
     expect(decision.prompt).not.toContain('{SUBJECT}');
     expect(decision.typography.bodyPt).toBe(10.5);
+    expect(decision.promptReady).toBe(true);
+    expect(decision.layoutInstructions.useCases).toContain('look-alike species');
+  });
+
+  it('reports missing layout assets and unapproved capacity in the layout library', () => {
+    const report = validateLayoutLibrary(baseConfig);
+
+    expect(report.readyForProduction).toBe(false);
+    expect(report.missingTemplates).toContain('LAYOUT_1_STANDARD');
+    expect(report.issues.some((issue) => issue.code === 'missing_layout_asset')).toBe(true);
+  });
+
+  it('blocks a page plan when the selected layout asset is missing', () => {
+    const decision = planPage(
+      page({
+        bodyMarkdown: 'Plain short entry with habitat notes and seasonal field details.',
+      }),
+      baseConfig,
+    );
+
+    expect(decision.layoutTemplate).toBe('LAYOUT_3_ILLUSTRATION_DOMINANT');
+    expect(decision.textFitStatus).toBe('BLOCKED_LAYOUT_LIBRARY');
+    expect(decision.blockers).toContain('missing_layout_asset:LAYOUT_3_ILLUSTRATION_DOMINANT');
   });
 });

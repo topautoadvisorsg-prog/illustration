@@ -24,6 +24,7 @@ Implemented and testable:
 - Locked manifest persistence
 - Page rows linked to PAGE manifests
 - Stage 2 deterministic page planner
+- Stage 2 layout-library validation with written layout metadata
 - Agent behavior contracts
 - Operator frontend for backend URL, project setup, manuscript upload, manifest
   generation, page planning, layout prompt assets, and output inspection
@@ -85,8 +86,10 @@ memory/    Project memory
    - counts words
    - classifies content signals
    - selects one of the 9 layout templates
+   - validates the written layout library metadata
    - applies layout typography/capacity metadata
    - assembles the image-only prompt
+   - reports blockers/warnings before image spend
    - stores `layout_template`, `image_prompt`, and `image_prompt_sha256`
 
 ## Railway

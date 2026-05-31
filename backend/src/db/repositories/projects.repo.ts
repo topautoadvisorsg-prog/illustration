@@ -76,3 +76,22 @@ export async function setProjectStatus(id: string, status: ProjectStatus): Promi
     .returning();
   return row ?? null;
 }
+
+export async function updateProjectConfig(id: string, config: ProjectConfig): Promise<ProjectRow | null> {
+  const db = getDb();
+  const [row] = await db
+    .update(projects)
+    .set({
+      brand: config.brand,
+      audience: config.audience,
+      volume: config.volume,
+      title: config.title,
+      subtitle: config.subtitle ?? null,
+      authorName: config.authorName,
+      config,
+      updatedAt: new Date(),
+    })
+    .where(eq(projects.id, id))
+    .returning();
+  return row ?? null;
+}

@@ -37,9 +37,11 @@ initial layout/prompt planning. It is not yet a full book-production pipeline.
    - Calculates word count.
    - Classifies content signals.
    - Selects one of the 9 layout templates.
+   - Uses written layout metadata from the mockup library.
    - Builds image-only prompts from layout prompt assets.
    - Stores prompt hashes.
-   - Returns decision reason codes and agent metadata.
+   - Returns decision reason codes, blockers, warnings, capacity state, layout
+     instructions, and agent metadata.
 
 5. Agent contracts
    - Backend-owned behavior contracts now exist for manuscript analysis, page
@@ -49,15 +51,14 @@ initial layout/prompt planning. It is not yet a full book-production pipeline.
 ## Highest-Risk Gaps Still Open
 
 1. Canonical 9-layout library
-   - Need upload/storage for the 9 mockup layout images.
-   - Need manifest metadata for image slots, text zones, word ranges,
-     typography ranges, and prompt placeholders.
-   - Production selection should require approved capacity metadata.
+   - Project config now stores the written metadata and uploaded mockup data URL.
+   - Need durable standalone records/files for the 9 mockups.
+   - Need measured capacity approval from real text-fit tests.
 
 2. Prompt placeholder enforcement
-   - Stage 2 assembles prompts and hashes them.
-   - It still needs a hard fail if placeholders remain or required subject
-     fields are empty.
+   - Stage 2 now reports blockers for missing required placeholders and
+     unresolved placeholders.
+   - Next step is preventing Stage 3 enqueue whenever any blocker exists.
 
 3. Text-fit preview before image spend
    - Stage 6 preview renderer is not production yet.

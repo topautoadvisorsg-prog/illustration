@@ -8,7 +8,7 @@ pipeline.
 ```text
 Stage 1     Manuscript Ingestion        implemented foundation
 Stage 1.5   Manifest Generation         implemented foundation
-Stage 2     Scene & Page Planner        implemented foundation
+Stage 2     Scene & Page Planner        implemented foundation + layout validation
 Stage 3     Image Generation            worker shell only
 Stage 4     Image Preview & Review      README contract only
 Stage 5     Upscale                     worker shell only
@@ -52,16 +52,17 @@ Current contracts:
 - `TEXT_FIT_QA`
 - `IMAGE_QA`
 
-The Stage 2 API response includes the `PAGE_PLANNER` contract metadata with
-each planned page so operators and reviewers can see which agent rule set made
-the decision.
+The Stage 2 API response includes the `PAGE_PLANNER` contract metadata plus
+layout-library issues, written layout instructions, capacity status, blockers,
+warnings, and prompt hashes.
 
 ## Current Gaps
 
 - Stage 2 does not yet split long entries into multiple continuation pages.
-- Stage 2 does not yet fail when a prompt template leaves unreplaced
-  placeholders.
-- Stage 2 does not yet require `capacityTestStatus: APPROVED`.
+- Stage 2 reports prompt/capacity blockers, but Stage 3 is not wired yet to
+  enforce those blockers.
+- Layout mockups are still stored inside project config rather than durable
+  standalone layout-library records.
 - Stage 6 text-fit preview is not implemented in production.
 - Stage 3 image generation is not wired to prompt approval.
 - Stage 4 human approval/version locking is not implemented.

@@ -12,6 +12,7 @@ Implemented foundation routes:
 | `POST` | `/api/projects` | Create a project with default Wildlands config |
 | `GET` | `/api/projects` | List projects |
 | `GET` | `/api/projects/:id` | Read one project |
+| `PATCH` | `/api/projects/:id/config` | Save visible operator config, including layout library metadata |
 | `POST` | `/api/projects/:id/manuscript` | Store manuscript and run deterministic Stage 1 outline parsing |
 | `POST` | `/api/projects/:id/manifests` | Run Stage 1.5 Claude manifest generation and persist locked manifests |
 | `GET` | `/api/projects/:id/manifests` | Read persisted manifests |
@@ -65,6 +66,14 @@ Run planner:
 
 ```bash
 curl -X POST http://localhost:8001/api/projects/{projectId}/plan
+```
+
+Save project config before planning:
+
+```bash
+curl -X PATCH http://localhost:8001/api/projects/{projectId}/config \
+  -H "Content-Type: application/json" \
+  -d "{\"config\":{...}}"
 ```
 
 ## Tests

@@ -10,8 +10,16 @@
  */
 
 import { createHash } from 'node:crypto';
-import type { LayoutPromptAsset, LayoutTemplateId, PageManifest, ProjectConfig } from '@wildlands/shared';
+import {
+  LayoutPromptAssetSchema,
+  type LayoutPromptAsset,
+  type LayoutTemplateId,
+  type PageManifest,
+  type ProjectConfig,
+} from '@wildlands/shared';
 import { getAgentContract } from '../../agents/agent-contracts.js';
+
+const REQUIRED_PROMPT_PLACEHOLDERS = ['{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'] as const;
 
 export interface PagePlanningDecision {
   pageKey: string;
@@ -19,9 +27,28 @@ export interface PagePlanningDecision {
   wordCount: number;
   layoutTemplate: LayoutTemplateId;
   layoutReferenceLabel: string;
+  layoutInstructions: {
+    description: string;
+    useCases: string[];
+    avoidWhen: string[];
+    textZone: string;
+    imageZone: string;
+    textFitRule: string;
+  };
   prompt: string;
   promptSha256: string;
+  promptReady: boolean;
   reasonCodes: string[];
+  blockers: string[];
+  warnings: string[];
+  capacity: {
+    minWords: number;
+    targetWords: number;
+    maxWords: number;
+    status: LayoutPromptAsset['capacityTestStatus'] | 'DEFAULT_UNTESTED';
+    overMaxWords: boolean;
+    underMinWords: boolean;
+  };
   typography: {
     bodyFont: string;
     bodyPt: number;
@@ -33,7 +60,7 @@ export interface PagePlanningDecision {
     mission: string;
     expertFrame: string;
   };
-  textFitStatus: 'PENDING_PREVIEW';
+  textFitStatus: 'PENDING_PREVIEW' | 'BLOCKED_LAYOUT_LIBRARY';
 }
 
 const DEFAULT_LAYOUT_CAPACITY: Record<LayoutTemplateId, { minWords: number; targetWords: number; maxWords: number }> = {
@@ -47,6 +74,23 @@ const DEFAULT_LAYOUT_CAPACITY: Record<LayoutTemplateId, { minWords: number; targ
   LAYOUT_8_MARGIN_ILLUSTRATION: { minWords: 300, targetWords: 430, maxWords: 580 },
   LAYOUT_9_DIAGNOSTIC_DIAGRAM: { minWords: 180, targetWords: 280, maxWords: 400 },
 };
+
+const REQUIRED_LAYOUT_TEMPLATES = Object.keys(DEFAULT_LAYOUT_CAPACITY) as LayoutTemplateId[];
+
+export interface LayoutLibraryIssue {
+  templateId: LayoutTemplateId;
+  severity: 'BLOCKER' | 'WARNING';
+  code: string;
+  message: string;
+}
+
+export interface LayoutLibraryValidation {
+  totalTemplates: number;
+  approvedTemplates: number;
+  missingTemplates: LayoutTemplateId[];
+  issues: LayoutLibraryIssue[];
+  readyForProduction: boolean;
+}
 
 function stripMarkdown(markdown: string): string {
   return markdown
@@ -120,6 +164,91 @@ function assetForTemplate(config: ProjectConfig, template: LayoutTemplateId): La
   return config.layoutPromptAssets.find((asset) => asset.templateId === template);
 }
 
+function uniqueAssets(config: ProjectConfig): LayoutPromptAsset[] {
+  const seen = new Set<LayoutTemplateId>();
+  const assets: LayoutPromptAsset[] = [];
+  for (const rawAsset of config.layoutPromptAssets) {
+    const asset = LayoutPromptAssetSchema.parse(rawAsset);
+    if (seen.has(asset.templateId)) continue;
+    seen.add(asset.templateId);
+    assets.push(asset);
+  }
+  return assets;
+}
+
+export function validateLayoutLibrary(config: ProjectConfig): LayoutLibraryValidation {
+  const assets = uniqueAssets(config);
+  const byTemplate = new Map(assets.map((asset) => [asset.templateId, asset]));
+  const issues: LayoutLibraryIssue[] = [];
+  const missingTemplates = REQUIRED_LAYOUT_TEMPLATES.filter((templateId) => !byTemplate.has(templateId));
+
+  for (const templateId of missingTemplates) {
+    issues.push({
+      templateId,
+      severity: 'BLOCKER',
+      code: 'missing_layout_asset',
+      message: `Missing layout prompt asset for ${templateId}.`,
+    });
+  }
+
+  for (const asset of assets) {
+    if (asset.minWords > asset.targetWords || asset.targetWords > asset.maxWords) {
+      issues.push({
+        templateId: asset.templateId,
+        severity: 'BLOCKER',
+        code: 'invalid_capacity_range',
+        message: `${asset.templateId} must satisfy minWords <= targetWords <= maxWords.`,
+      });
+    }
+
+    for (const placeholder of REQUIRED_PROMPT_PLACEHOLDERS) {
+      if (!asset.placeholders.includes(placeholder) || !asset.promptTemplate.includes(placeholder)) {
+        issues.push({
+          templateId: asset.templateId,
+          severity: 'BLOCKER',
+          code: 'missing_required_placeholder',
+          message: `${asset.templateId} prompt template must include ${placeholder}.`,
+        });
+      }
+    }
+
+    if (asset.capacityTestStatus !== 'APPROVED') {
+      issues.push({
+        templateId: asset.templateId,
+        severity: 'WARNING',
+        code: 'capacity_not_approved',
+        message: `${asset.templateId} capacity is ${asset.capacityTestStatus}; text-fit must approve before image spend.`,
+      });
+    }
+
+    if (asset.layoutDescription.startsWith('Written description')) {
+      issues.push({
+        templateId: asset.templateId,
+        severity: 'WARNING',
+        code: 'generic_layout_description',
+        message: `${asset.templateId} needs a written layout description from the mockup analysis.`,
+      });
+    }
+
+    if (asset.useCases.length === 0) {
+      issues.push({
+        templateId: asset.templateId,
+        severity: 'WARNING',
+        code: 'missing_use_cases',
+        message: `${asset.templateId} should list written use cases for the planner agent.`,
+      });
+    }
+  }
+
+  return {
+    totalTemplates: assets.length,
+    approvedTemplates: assets.filter((asset) => asset.capacityTestStatus === 'APPROVED').length,
+    missingTemplates,
+    issues,
+    readyForProduction: issues.every((issue) => issue.severity !== 'BLOCKER'),
+  };
+}
+
 function promptHash(prompt: string): string {
   return createHash('sha256').update(prompt, 'utf8').digest('hex');
 }
@@ -141,17 +270,45 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
   const agent = getAgentContract('PAGE_PLANNER');
   const wordCount = countPageWords(page.bodyMarkdown);
   const selected = chooseLayout(page, wordCount, config);
-  const asset = assetForTemplate(config, selected.template);
+  const rawAsset = assetForTemplate(config, selected.template);
+  const asset = rawAsset ? LayoutPromptAssetSchema.parse(rawAsset) : undefined;
   const capacity = asset ?? DEFAULT_LAYOUT_CAPACITY[selected.template];
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+
+  if (!asset) {
+    blockers.push(`missing_layout_asset:${selected.template}`);
+  } else if (asset.capacityTestStatus !== 'APPROVED') {
+    warnings.push(`capacity_not_approved:${asset.capacityTestStatus}`);
+  }
+
+  const underMinWords = wordCount < capacity.minWords;
+  const overMaxWords = wordCount > capacity.maxWords;
+  if (underMinWords) warnings.push(`word_count_under_layout_min:${wordCount}<${capacity.minWords}`);
+  if (overMaxWords) warnings.push(`word_count_over_layout_max:${wordCount}>${capacity.maxWords}`);
+
   const promptTemplate = asset?.promptTemplate ?? (
     `Create the final illustration for {SUBJECT}. Scientific details: {SCIENTIFIC_DETAILS}. ` +
     `Use composition notes: {COMPOSITION_NOTES}. Do not render page text, labels, titles, or typography.`
   );
+
+  if (asset) {
+    for (const placeholder of REQUIRED_PROMPT_PLACEHOLDERS) {
+      if (!asset.placeholders.includes(placeholder) || !promptTemplate.includes(placeholder)) {
+        blockers.push(`missing_required_placeholder:${placeholder}`);
+      }
+    }
+  }
+
   const prompt = replaceTemplatePlaceholders(promptTemplate, {
     '{SUBJECT}': page.imageSubject,
     '{SCIENTIFIC_DETAILS}': scientificDetails(page),
-    '{COMPOSITION_NOTES}': asset?.imageSlotDescription ?? `Art slot follows ${selected.template}.`,
+    '{COMPOSITION_NOTES}': asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? `Art slot follows ${selected.template}.`,
   });
+  const unresolved = prompt.match(/\{[A-Z0-9_]+\}/g) ?? [];
+  for (const placeholder of unresolved) {
+    blockers.push(`unresolved_prompt_placeholder:${placeholder}`);
+  }
 
   const capacityReasons = [
     `word_count_${wordCount}`,
@@ -164,9 +321,28 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
     wordCount,
     layoutTemplate: selected.template,
     layoutReferenceLabel: asset?.label ?? selected.template,
+    layoutInstructions: {
+      description: asset?.layoutDescription ?? `Fallback instructions for ${selected.template}; written mockup analysis is missing.`,
+      useCases: asset?.useCases ?? [],
+      avoidWhen: asset?.avoidWhen ?? [],
+      textZone: asset?.textZoneDescription ?? 'Text zone has not been analyzed yet.',
+      imageZone: asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? 'Image zone has not been analyzed yet.',
+      textFitRule: asset?.textFitRule ?? 'Run text-fit preview before image generation.',
+    },
     prompt,
     promptSha256: promptHash(prompt),
+    promptReady: blockers.length === 0,
     reasonCodes: [...selected.reasons, ...capacityReasons],
+    blockers,
+    warnings,
+    capacity: {
+      minWords: capacity.minWords,
+      targetWords: capacity.targetWords,
+      maxWords: capacity.maxWords,
+      status: asset?.capacityTestStatus ?? 'DEFAULT_UNTESTED',
+      overMaxWords,
+      underMinWords,
+    },
     typography: {
       bodyFont: config.typography.bodyFont,
       bodyPt: asset?.recommendedBodyPt ?? config.typography.bodyPt,
@@ -178,6 +354,6 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
       mission: agent.mission,
       expertFrame: agent.expertFrame,
     },
-    textFitStatus: 'PENDING_PREVIEW',
+    textFitStatus: blockers.length > 0 ? 'BLOCKED_LAYOUT_LIBRARY' : 'PENDING_PREVIEW',
   };
 }

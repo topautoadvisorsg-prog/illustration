@@ -4,6 +4,7 @@ import {
   ApiErrorSchema,
   CreateProjectRequestSchema,
   PageManifestSchema,
+  ProjectConfigSchema,
   ProjectSchema,
 } from '@wildlands/shared';
 import { z } from 'zod';
@@ -13,13 +14,14 @@ import {
   listProjects,
   setManuscript,
   setProjectStatus,
+  updateProjectConfig,
   type ProjectRow,
 } from '../db/repositories/projects.repo.js';
 import { listManifests, listPages } from '../db/repositories/manifests.repo.js';
 import { updatePagePlanning } from '../db/repositories/manifests.repo.js';
 import { ingestManuscript } from '../pipeline/stage-1-ingestion/ingest-manuscript.js';
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
-import { planPage } from '../pipeline/stage-2-planner/plan-pages.js';
+import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 
@@ -38,6 +40,7 @@ function toContract(row: ProjectRow) {
 
 const ProjectListResponseSchema = z.object({ projects: z.array(ProjectSchema) });
 const CreatedProjectResponseSchema = z.object({ project: ProjectSchema });
+const UpdateProjectConfigBodySchema = z.object({ config: ProjectConfigSchema });
 
 const UploadManuscriptBodySchema = z.object({
   filename: z.string().min(1),
@@ -97,6 +100,20 @@ const PagesListResponseSchema = z.object({
 
 const PlanPagesResponseSchema = z.object({
   project: ProjectSchema,
+  layoutLibrary: z.object({
+    totalTemplates: z.number(),
+    approvedTemplates: z.number(),
+    missingTemplates: z.array(z.string()),
+    readyForProduction: z.boolean(),
+    issues: z.array(
+      z.object({
+        templateId: z.string(),
+        severity: z.enum(['BLOCKER', 'WARNING']),
+        code: z.string(),
+        message: z.string(),
+      }),
+    ),
+  }),
   plannedPages: z.array(
     z.object({
       pageKey: z.string(),
@@ -105,7 +122,26 @@ const PlanPagesResponseSchema = z.object({
       layoutTemplate: z.string(),
       layoutReferenceLabel: z.string(),
       promptSha256: z.string(),
+      promptReady: z.boolean(),
       reasonCodes: z.array(z.string()),
+      blockers: z.array(z.string()),
+      warnings: z.array(z.string()),
+      layoutInstructions: z.object({
+        description: z.string(),
+        useCases: z.array(z.string()),
+        avoidWhen: z.array(z.string()),
+        textZone: z.string(),
+        imageZone: z.string(),
+        textFitRule: z.string(),
+      }),
+      capacity: z.object({
+        minWords: z.number(),
+        targetWords: z.number(),
+        maxWords: z.number(),
+        status: z.string(),
+        overMaxWords: z.boolean(),
+        underMinWords: z.boolean(),
+      }),
       typography: z.object({
         bodyFont: z.string(),
         bodyPt: z.number(),
@@ -117,7 +153,7 @@ const PlanPagesResponseSchema = z.object({
         mission: z.string(),
         expertFrame: z.string(),
       }),
-      textFitStatus: z.literal('PENDING_PREVIEW'),
+      textFitStatus: z.enum(['PENDING_PREVIEW', 'BLOCKED_LAYOUT_LIBRARY']),
     }),
   ),
 });
@@ -148,6 +184,24 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     async (request, reply) => {
       const { id } = ProjectParamsSchema.parse(request.params);
       const row = await getProject(id);
+      if (!row) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      return { project: toContract(row) };
+    },
+  );
+
+  app.patch(
+    '/api/projects/:id/config',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        body: UpdateProjectConfigBodySchema,
+        response: { 200: CreatedProjectResponseSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const body = UpdateProjectConfigBodySchema.parse(request.body);
+      const row = await updateProjectConfig(id, body.config);
       if (!row) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
       return { project: toContract(row) };
     },
@@ -281,6 +335,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       }
 
       const config = project.config as import('@wildlands/shared').ProjectConfig;
+      const layoutLibrary = validateLayoutLibrary(config);
       const plannedPages = [];
       for (const row of rows) {
         const page = PageManifestSchema.parse(row.content);
@@ -297,7 +352,12 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           layoutTemplate: decision.layoutTemplate,
           layoutReferenceLabel: decision.layoutReferenceLabel,
           promptSha256: decision.promptSha256,
+          promptReady: decision.promptReady,
           reasonCodes: decision.reasonCodes,
+          blockers: decision.blockers,
+          warnings: decision.warnings,
+          layoutInstructions: decision.layoutInstructions,
+          capacity: decision.capacity,
           typography: decision.typography,
           agent: decision.agent,
           textFitStatus: decision.textFitStatus,
@@ -305,7 +365,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       }
 
       const updated = await setProjectStatus(id, 'PLANNED');
-      return { project: toContract(updated ?? project), plannedPages };
+      return { project: toContract(updated ?? project), layoutLibrary, plannedPages };
     },
   );
 

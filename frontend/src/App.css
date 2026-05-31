@@ -237,7 +237,7 @@ h3 {
 }
 
 .output-grid {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(260px, 1fr));
 }
 
 .inline-form,
@@ -554,6 +554,24 @@ h3 {
   padding: 10px 12px;
   border-bottom: 1px solid #e8dfd2;
   font-size: 0.9rem;
+}
+
+.plan-row {
+  grid-template-columns: 0.8fr 1fr 1fr 0.8fr 0.8fr 1.4fr;
+}
+
+.issue-row {
+  grid-template-columns: 1fr 1fr 0.7fr;
+}
+
+.issue-row.blocker {
+  color: #9f2d20;
+  background: #fff5f2;
+}
+
+.issue-row.warning {
+  color: #7b5a18;
+  background: #fff8e8;
 }
 
 .row:last-child {
