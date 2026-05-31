@@ -137,3 +137,27 @@ export async function listPages(projectId: string): Promise<PageRow[]> {
   const db = getDb();
   return db.select().from(pages).where(eq(pages.projectId, projectId)).orderBy(pages.plannedPageNumber);
 }
+
+export async function updatePagePlanning(
+  projectId: string,
+  pageKey: string,
+  planning: {
+    layoutTemplate: string;
+    imagePrompt: string;
+    imagePromptSha256: string;
+  },
+): Promise<PageRow | undefined> {
+  const db = getDb();
+  const [row] = await db
+    .update(pages)
+    .set({
+      layoutTemplate: planning.layoutTemplate,
+      imagePrompt: planning.imagePrompt,
+      imagePromptSha256: planning.imagePromptSha256,
+      status: 'PLANNED',
+      updatedAt: new Date(),
+    })
+    .where(and(eq(pages.projectId, projectId), eq(pages.pageKey, pageKey)))
+    .returning();
+  return row;
+}

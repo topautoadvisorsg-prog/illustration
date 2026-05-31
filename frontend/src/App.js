@@ -156,6 +156,7 @@ Found near hardwoods after summer rain.
 Use this entry to prove manuscript to manifest generation.`);
   const [manifests, setManifests] = useState([]);
   const [pages, setPages] = useState([]);
+  const [plannedPages, setPlannedPages] = useState([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -303,6 +304,18 @@ Use this entry to prove manuscript to manifest generation.`);
     await loadArtifacts(projectId);
   }
 
+  async function planPages(projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    const data = await call(`/api/projects/${projectId}/plan`, {
+      method: "POST",
+    });
+    setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
+    setPlannedPages(data.plannedPages || []);
+    setMessage(`Planned ${data.plannedPages?.length || 0} page(s) with layout choices and image prompts.`);
+    appendLog("success", `Stage 2 planned ${data.plannedPages?.length || 0} page(s).`);
+    await loadArtifacts(projectId);
+  }
+
   async function uploadManuscriptFile(file) {
     if (!file) return;
     const text = await readFileAsText(file);
@@ -317,6 +330,7 @@ Use this entry to prove manuscript to manifest generation.`);
     }
     await uploadManuscript(projectId);
     await generateManifests(projectId);
+    await planPages(projectId);
   }
 
   async function handleOperatorCommand(event) {
@@ -335,6 +349,8 @@ Use this entry to prove manuscript to manifest generation.`);
       await run("Uploading manuscript...", uploadManuscript);
     } else if (normalized.includes("manifest") || normalized.includes("claude")) {
       await run("Generating manifests...", generateManifests);
+    } else if (normalized.includes("plan") || normalized.includes("layout")) {
+      await run("Planning pages...", planPages);
     } else if (normalized.includes("refresh") || normalized.includes("output")) {
       await run("Loading output...", () => loadArtifacts());
     } else if (normalized.includes("run") || normalized.includes("start")) {
@@ -407,6 +423,9 @@ Use this entry to prove manuscript to manifest generation.`);
             <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
               Generate Manifests
             </button>
+            <button disabled={busy || !activeProjectId} onClick={() => run("Planning pages...", planPages)}>
+              Plan Pages
+            </button>
             <button disabled={busy} onClick={() => run("Running manuscript intake...", runManuscriptIntake)}>
               Run Intake
             </button>
@@ -436,9 +455,9 @@ Use this entry to prove manuscript to manifest generation.`);
               <strong>3. Manifest</strong>
               <span>Claude splits chapters/pages and writes manifest rows</span>
             </div>
-            <div className={`flow-step ${pages.length > 0 ? "current" : ""}`}>
+            <div className={`flow-step ${plannedPages.length > 0 ? "done" : pages.length > 0 ? "current" : ""}`}>
               <strong>4. Layout Fit</strong>
-              <span>Agent selects one of 9 layouts, fits text, waits for approval</span>
+              <span>Agent selects one of 9 layouts, assembles prompts, then waits for text-fit approval</span>
             </div>
             <div className="flow-step">
               <strong>5. Images + Exports</strong>
@@ -467,6 +486,9 @@ Use this entry to prove manuscript to manifest generation.`);
               <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
                 Generate Manifests
               </button>
+              <button disabled={busy || !activeProjectId} onClick={() => run("Planning pages...", planPages)}>
+                Plan Pages
+              </button>
             </div>
           </div>
           <textarea value={manuscript} onChange={(event) => setManuscript(event.target.value)} />
@@ -491,6 +513,19 @@ Use this entry to prove manuscript to manifest generation.`);
                   </div>
                 ))}
                 {pages.length === 0 && <p className="empty">No pages yet.</p>}
+              </div>
+            </div>
+            <div>
+              <h3>Page Plan</h3>
+              <div className="table">
+                {plannedPages.map((page) => (
+                  <div className="row plan-row" key={page.pageKey}>
+                    <span>{page.pageKey}</span>
+                    <span>{page.layoutTemplate}</span>
+                    <span>{page.wordCount} words</span>
+                  </div>
+                ))}
+                {plannedPages.length === 0 && <p className="empty">No page plan yet.</p>}
               </div>
             </div>
             <div>

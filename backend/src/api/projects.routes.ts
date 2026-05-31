@@ -3,6 +3,7 @@ import { isNativeError } from 'node:util/types';
 import {
   ApiErrorSchema,
   CreateProjectRequestSchema,
+  PageManifestSchema,
   ProjectSchema,
 } from '@wildlands/shared';
 import { z } from 'zod';
@@ -15,8 +16,10 @@ import {
   type ProjectRow,
 } from '../db/repositories/projects.repo.js';
 import { listManifests, listPages } from '../db/repositories/manifests.repo.js';
+import { updatePagePlanning } from '../db/repositories/manifests.repo.js';
 import { ingestManuscript } from '../pipeline/stage-1-ingestion/ingest-manuscript.js';
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
+import { planPage } from '../pipeline/stage-2-planner/plan-pages.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 
@@ -85,7 +88,30 @@ const PagesListResponseSchema = z.object({
       chapterNumber: z.number(),
       plannedPageNumber: z.number(),
       layoutTemplate: z.string().nullable(),
+      imagePrompt: z.string().nullable(),
+      imagePromptSha256: z.string().nullable(),
       status: z.string(),
+    }),
+  ),
+});
+
+const PlanPagesResponseSchema = z.object({
+  project: ProjectSchema,
+  plannedPages: z.array(
+    z.object({
+      pageKey: z.string(),
+      entryTitle: z.string(),
+      wordCount: z.number(),
+      layoutTemplate: z.string(),
+      layoutReferenceLabel: z.string(),
+      promptSha256: z.string(),
+      reasonCodes: z.array(z.string()),
+      typography: z.object({
+        bodyFont: z.string(),
+        bodyPt: z.number(),
+        lineHeight: z.number(),
+      }),
+      textFitStatus: z.literal('PENDING_PREVIEW'),
     }),
   ),
 });
@@ -226,6 +252,56 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     },
   );
 
+  app.post(
+    '/api/projects/:id/plan',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        response: { 200: PlanPagesResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+
+      const rows = await listManifests(id, 'PAGE');
+      if (rows.length === 0) {
+        return reply.code(400).send({
+          error: 'Bad Request',
+          message: 'No page manifests found. Generate manifests before planning pages.',
+          statusCode: 400,
+        });
+      }
+
+      const config = project.config as import('@wildlands/shared').ProjectConfig;
+      const plannedPages = [];
+      for (const row of rows) {
+        const page = PageManifestSchema.parse(row.content);
+        const decision = planPage(page, config);
+        await updatePagePlanning(id, decision.pageKey, {
+          layoutTemplate: decision.layoutTemplate,
+          imagePrompt: decision.prompt,
+          imagePromptSha256: decision.promptSha256,
+        });
+        plannedPages.push({
+          pageKey: decision.pageKey,
+          entryTitle: decision.entryTitle,
+          wordCount: decision.wordCount,
+          layoutTemplate: decision.layoutTemplate,
+          layoutReferenceLabel: decision.layoutReferenceLabel,
+          promptSha256: decision.promptSha256,
+          reasonCodes: decision.reasonCodes,
+          typography: decision.typography,
+          textFitStatus: decision.textFitStatus,
+        });
+      }
+
+      const updated = await setProjectStatus(id, 'PLANNED');
+      return { project: toContract(updated ?? project), plannedPages };
+    },
+  );
+
   app.get(
     '/api/projects/:id/pages',
     { schema: { params: ProjectParamsSchema, response: { 200: PagesListResponseSchema } } },
@@ -239,6 +315,8 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           chapterNumber: p.chapterNumber,
           plannedPageNumber: p.plannedPageNumber,
           layoutTemplate: p.layoutTemplate,
+          imagePrompt: p.imagePrompt,
+          imagePromptSha256: p.imagePromptSha256,
           status: p.status,
         })),
       };
