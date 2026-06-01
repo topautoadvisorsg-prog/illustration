@@ -10,6 +10,7 @@ import {
   rejectPageImage,
   setActivePageImage,
 } from '../pipeline/stage-4-review/review-image.js';
+import { UpscaleBlockedError, upscalePageImage } from '../pipeline/stage-5-upscale/upscale-image.js';
 
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
 const ImageVersionParamsSchema = z.object({ pageId: z.string().uuid(), version: z.coerce.number().int().positive() });
@@ -166,6 +167,36 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
       } catch (error) {
         if (error instanceof GenerationBlockedError) {
           const status = error.code === 'not_found' ? 404 : 409;
+          return reply.code(status).send({ error: status === 404 ? 'Not Found' : 'Conflict', message: error.message, statusCode: status });
+        }
+        throw error;
+      }
+    },
+  );
+
+  // Stage 5 — upscale the approved image and run the 300 DPI print gate.
+  const UpscaleResponseSchema = z.object({
+    pageId: z.string(),
+    version: z.number(),
+    passed: z.boolean(),
+    dpiW: z.number(),
+    dpiH: z.number(),
+    minDpi: z.number(),
+    widthPx: z.number(),
+    heightPx: z.number(),
+    upscaledPath: z.string().nullable(),
+    pageStatus: z.enum(['PRINT_READY', 'FAILED_DPI']),
+  });
+  app.post(
+    '/api/pages/:pageId/upscale',
+    { schema: { params: PageParamsSchema, response: { 200: UpscaleResponseSchema, 404: ApiErrorSchema, 409: ApiErrorSchema } } },
+    async (request, reply) => {
+      const { pageId } = PageParamsSchema.parse(request.params);
+      try {
+        return await upscalePageImage({ pageId });
+      } catch (error) {
+        if (error instanceof UpscaleBlockedError) {
+          const status = error.code === 'not_found' || error.code === 'project_not_found' ? 404 : 409;
           return reply.code(status).send({ error: status === 404 ? 'Not Found' : 'Conflict', message: error.message, statusCode: status });
         }
         throw error;

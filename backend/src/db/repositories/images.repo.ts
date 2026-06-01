@@ -29,6 +29,43 @@ export async function listImagesForPage(pageId: string): Promise<ImageRow[]> {
   return db.select().from(images).where(eq(images.pageId, pageId)).orderBy(images.version);
 }
 
+export async function getActiveImage(pageId: string): Promise<ImageRow | undefined> {
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(images)
+    .where(and(eq(images.pageId, pageId), eq(images.active, true)))
+    .limit(1);
+  return row;
+}
+
+export interface UpscaleResultInput {
+  upscaledPath: string;
+  dpiW: number;
+  dpiH: number;
+  status: ImageStatus;
+}
+
+export async function setUpscaleResult(
+  pageId: string,
+  version: number,
+  result: UpscaleResultInput,
+): Promise<ImageRow | undefined> {
+  const db = getDb();
+  const [row] = await db
+    .update(images)
+    .set({
+      upscaledPath: result.upscaledPath,
+      dpiW: result.dpiW,
+      dpiH: result.dpiH,
+      status: result.status,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(images.pageId, pageId), eq(images.version, version)))
+    .returning();
+  return row;
+}
+
 export async function getImageVersion(pageId: string, version: number): Promise<ImageRow | undefined> {
   const db = getDb();
   const [row] = await db
