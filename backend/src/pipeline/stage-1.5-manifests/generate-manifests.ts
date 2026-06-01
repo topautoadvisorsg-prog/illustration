@@ -59,6 +59,12 @@ For every entry produce:
 - entryTitle: the entry's display name (e.g. "Chanterelle").
 - scientificName: the italicised binomial if present, else omit.
 - category: a short tag if the heading carries one (e.g. "EDIBLE", "TOXIC"), else omit.
+- contentType: the educational page type, one of: SPECIES_PROFILE, ANIMAL_PROFILE,
+  COMPARISON, MULTI_SPECIES_COMPARISON, IDENTIFICATION_GUIDE, DIAGNOSTIC_DIAGRAM,
+  CHAPTER_OPENER, HABITAT_OVERVIEW, PROGRESSION_STUDY, CUTAWAY_ILLUSTRATION,
+  SIDEBAR_FEATURE, REFERENCE_PAGE, WARNING_PAGE, BOTANICAL_PLATE, TERRAIN_ANALYSIS,
+  FIELD_NOTES_PAGE, ENCYCLOPEDIA_ENTRY. Use SPECIES_PROFILE/ANIMAL_PROFILE for a normal
+  single-organism entry; WARNING_PAGE only when the subject itself is toxic/dangerous.
 - imageSubject: a concise, literal description of what the single illustration for this
   page should depict — the organism/subject only, no style words. One sentence.
 - bodyMarkdown: the full body text of the entry, preserving its section headings.
@@ -102,6 +108,15 @@ const TOOL_JSON_SCHEMA: Record<string, unknown> = {
                 entryTitle: { type: 'string' },
                 scientificName: { type: 'string' },
                 category: { type: 'string' },
+                contentType: {
+                  type: 'string',
+                  enum: [
+                    'SPECIES_PROFILE', 'ANIMAL_PROFILE', 'COMPARISON', 'MULTI_SPECIES_COMPARISON',
+                    'IDENTIFICATION_GUIDE', 'DIAGNOSTIC_DIAGRAM', 'CHAPTER_OPENER', 'HABITAT_OVERVIEW',
+                    'PROGRESSION_STUDY', 'CUTAWAY_ILLUSTRATION', 'SIDEBAR_FEATURE', 'REFERENCE_PAGE',
+                    'WARNING_PAGE', 'BOTANICAL_PLATE', 'TERRAIN_ANALYSIS', 'FIELD_NOTES_PAGE', 'ENCYCLOPEDIA_ENTRY',
+                  ],
+                },
                 imageSubject: { type: 'string' },
                 layoutTemplate: { type: 'string', enum: LAYOUT_TEMPLATES },
                 bodyMarkdown: { type: 'string' },
@@ -180,6 +195,7 @@ export async function generateManifests(input: GenerateManifestsInput): Promise<
         entryTitle: entry.entryTitle,
         scientificName: entry.scientificName,
         category: entry.category,
+        contentType: entry.contentType,
         layoutTemplate: entry.layoutTemplate,
         imageSubject: entry.imageSubject,
         bodyMarkdown: entry.bodyMarkdown,

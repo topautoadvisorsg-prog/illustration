@@ -11,6 +11,8 @@
 
 import type { LayoutTemplateId } from '@wildlands/shared';
 
+// Mirrors the shared Architecture enum so a composed layout's architecture maps
+// 1:1 to a render art slot.
 export type ArtSlot =
   | 'FLOAT_LEFT'
   | 'FLOAT_RIGHT'
@@ -18,7 +20,8 @@ export type ArtSlot =
   | 'BOTTOM_BAND'
   | 'FULL_PAGE'
   | 'SIDEBAR_RIGHT'
-  | 'SCATTERED';
+  | 'SCATTERED'
+  | 'CENTER_WRAP';
 
 export interface LayoutProfile {
   /** Fraction of the text frame available to body copy after the art slot (0-1). */

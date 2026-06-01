@@ -90,6 +90,10 @@ describe('planPage', () => {
 
     expect(decision.layoutTemplate).toBe('LAYOUT_4_DANGER_WARNING');
     expect(decision.reasonCodes).toContain('comparison_or_lookalike_signal');
+    // Layered model surfaced without changing template selection.
+    expect(decision.contentType).toBe('COMPARISON');
+    expect(decision.architecture).toBe('FLOAT_LEFT'); // LAYOUT_4's render art slot
+    expect(typeof decision.coverage).toBe('number');
     expect(decision.prompt).toContain('golden chanterelle mushroom');
     expect(decision.prompt).toContain('Vintage Naturalist master style DNA.');
     expect(decision.prompt).toContain('LAYOUT SYSTEM RULES');

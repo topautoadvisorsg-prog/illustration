@@ -12,12 +12,17 @@
 import { createHash } from 'node:crypto';
 import {
   LayoutPromptAssetSchema,
+  type Architecture,
+  type ContentType,
+  type Coverage,
   type LayoutPromptAsset,
   type LayoutTemplateId,
   type PageManifest,
   type ProjectConfig,
 } from '@wildlands/shared';
 import { getAgentContract } from '../../agents/agent-contracts.js';
+import { includesAny, isDangerPage, signalText } from './content-signals.js';
+import { classifyContentType, decomposeTemplate } from './layered-layout.js';
 
 const REQUIRED_PROMPT_PLACEHOLDERS = ['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'] as const;
 
@@ -45,6 +50,10 @@ export interface PagePlanningDecision {
   pageKey: string;
   entryTitle: string;
   wordCount: number;
+  /** Layered model (Phase 1): the page's purpose + its image-area axes. */
+  contentType: ContentType;
+  coverage: Coverage;
+  architecture: Architecture;
   layoutTemplate: LayoutTemplateId;
   layoutReferenceLabel: string;
   layoutInstructions: {
@@ -135,34 +144,12 @@ export function countPageWords(markdown: string): number {
   return text.split(/\s+/).filter(Boolean).length;
 }
 
-function normalizeText(value: string): string {
-  return value.toLowerCase();
-}
-
-function includesAny(text: string, needles: string[]): boolean {
-  return needles.some((needle) => text.includes(needle));
-}
-
-/**
- * Is this page about a genuinely dangerous subject? Driven by the entry's
- * identity (warnings, category, title/subject), NOT incidental body prose — a
- * normal edible entry that merely contains a "look-alike warning" subsection is
- * not a danger page.
- */
-function isDangerPage(page: PageManifest): boolean {
-  if (page.warnings.length > 0) return true;
-  const category = normalizeText(page.category ?? '');
-  if (includesAny(category, ['toxic', 'poison', 'deadly', 'danger', 'venom'])) return true;
-  const identity = normalizeText(`${page.entryTitle}\n${page.imageSubject}`);
-  return includesAny(identity, ['toxic', 'poison', 'poisonous', 'deadly', 'venomous', 'do not eat']);
-}
-
 function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConfig): { template: LayoutTemplateId; reasons: string[] } {
   // Layout intent comes from what the page IS (title + image subject), not from
   // incidental vocabulary in the body prose. This prevents a single word like
   // "diagnostic" or a "look-alike warning" subsection from forcing a long entry
   // into a low-capacity special layout that the text then overflows.
-  const signal = normalizeText(`${page.entryTitle}\n${page.imageSubject}`);
+  const signal = signalText(page);
   const reasons: string[] = [];
 
   if (isDangerPage(page)) {
@@ -347,6 +334,11 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
   const agent = getAgentContract('PAGE_PLANNER');
   const wordCount = countPageWords(page.bodyMarkdown);
   const selected = chooseLayout(page, wordCount, config);
+  // Layered model: classify the page's purpose (first-class), and decompose the
+  // chosen render template into its coverage + architecture axes so the operator
+  // sees what actually renders. Rendering still flows through `selected.template`.
+  const contentType = classifyContentType(page).contentType;
+  const composition = decomposeTemplate(selected.template);
   const rawAsset = assetForTemplate(config, selected.template);
   const asset = rawAsset ? LayoutPromptAssetSchema.parse(rawAsset) : undefined;
   const capacity = asset ?? DEFAULT_LAYOUT_CAPACITY[selected.template];
@@ -400,6 +392,9 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
     pageKey: page.pageId,
     entryTitle: page.entryTitle,
     wordCount,
+    contentType,
+    coverage: composition.coverage,
+    architecture: composition.architecture,
     layoutTemplate: selected.template,
     layoutReferenceLabel: asset?.label ?? selected.template,
     layoutInstructions: {

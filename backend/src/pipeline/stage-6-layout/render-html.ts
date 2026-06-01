@@ -112,6 +112,8 @@ function artSlotCss(slot: ArtSlot): string {
       return '.art-slot{float:right;width:32%;height:6.5in;margin:0 0 10pt 18pt;}';
     case 'SCATTERED':
       return '.art-slot{float:left;width:30%;margin:0 14pt 8pt 0;}';
+    case 'CENTER_WRAP':
+      return '.art-slot{display:block;width:60%;margin:0 auto 10pt auto;}';
     default:
       return '.art-slot{float:left;width:45%;margin:0 18pt 10pt 0;}';
   }

@@ -67,6 +67,60 @@ export const LayoutTemplateIdSchema = z.enum([
   'LAYOUT_16_CUTAWAY_FEATURE',
 ]);
 
+// ── Layered layout model (Phase 1) ─────────────────────────────────────────
+// Content Type -> Coverage -> Architecture -> Master Style -> Subject.
+// These axes are orthogonal: a content type has default coverage + architecture,
+// but each can be overridden independently. They sit ABOVE the 15 named layout
+// templates (which remain the render authority) and resolve down to them.
+
+/** What KIND of educational page this is (defines its purpose). */
+export const ContentTypeSchema = z.enum([
+  'SPECIES_PROFILE',
+  'ANIMAL_PROFILE',
+  'COMPARISON',
+  'MULTI_SPECIES_COMPARISON',
+  'IDENTIFICATION_GUIDE',
+  'DIAGNOSTIC_DIAGRAM',
+  'CHAPTER_OPENER',
+  'HABITAT_OVERVIEW',
+  'PROGRESSION_STUDY',
+  'CUTAWAY_ILLUSTRATION',
+  'SIDEBAR_FEATURE',
+  'REFERENCE_PAGE',
+  'WARNING_PAGE',
+  'BOTANICAL_PLATE',
+  'TERRAIN_ANALYSIS',
+  'FIELD_NOTES_PAGE',
+  'ENCYCLOPEDIA_ENTRY',
+]);
+
+/** How MUCH of the page the imagery occupies (percent buckets). */
+export const CoverageSchema = z.union([
+  z.literal(15),
+  z.literal(25),
+  z.literal(40),
+  z.literal(50),
+  z.literal(60),
+  z.literal(75),
+  z.literal(100),
+]);
+
+/** How the image space is ARRANGED on the page (independent of coverage). */
+export const ArchitectureSchema = z.enum([
+  'FLOAT_LEFT',
+  'FLOAT_RIGHT',
+  'TOP_BAND',
+  'BOTTOM_BAND',
+  'FULL_PAGE',
+  'SIDEBAR_RIGHT',
+  'SCATTERED',
+  'CENTER_WRAP',
+]);
+
+export type ContentType = z.infer<typeof ContentTypeSchema>;
+export type Coverage = z.infer<typeof CoverageSchema>;
+export type Architecture = z.infer<typeof ArchitectureSchema>;
+
 export const TrimSizeSchema = z.object({
   widthIn: z.number().positive(),
   heightIn: z.number().positive(),
@@ -179,6 +233,8 @@ export const PageManifestSchema = z.object({
   scientificName: z.string().optional(),
   /** Entry classification from Stage 1.5 (e.g. EDIBLE, TOXIC) — drives danger layout. */
   category: z.string().optional(),
+  /** First-class educational page type (Phase 1 layered model). */
+  contentType: ContentTypeSchema.optional(),
   layoutTemplate: LayoutTemplateIdSchema,
   layoutReferenceId: z.string().min(1).optional(),
   imageSubject: z.string().min(1),
@@ -195,6 +251,7 @@ export const GeneratedEntrySchema = z.object({
   entryTitle: z.string().min(1),
   scientificName: z.string().optional(),
   category: z.string().optional(),
+  contentType: ContentTypeSchema.optional(),
   imageSubject: z.string().min(1),
   layoutTemplate: LayoutTemplateIdSchema.default('LAYOUT_1_STANDARD'),
   bodyMarkdown: z.string().min(1),
