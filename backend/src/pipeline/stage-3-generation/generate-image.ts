@@ -10,6 +10,7 @@
  * prompt. The image function is injectable so tests never hit the paid API.
  */
 
+import { createHash } from 'node:crypto';
 import {
   generateImage as defaultGenerateImage,
   type GenerateImageInput,
@@ -18,6 +19,7 @@ import {
 import { getPageById, setPageStatus } from '../../db/repositories/manifests.repo.js';
 import { insertImage, listImagesForPage } from '../../db/repositories/images.repo.js';
 import { recordUsage } from '../../db/repositories/usage.repo.js';
+import { recordImageEvent } from '../../db/repositories/image-events.repo.js';
 import { LocalStorageService } from '../../services/storage/local-storage.js';
 import { logger } from '../../lib/logger.js';
 
@@ -60,15 +62,25 @@ export function nextImageVersion(existing: Array<{ version: number }>): number {
   return existing.reduce((max, img) => Math.max(max, img.version), 0) + 1;
 }
 
+/** Build the exact prompt + hash for a version (a regeneration addendum is appended). */
+export function finalizePrompt(basePrompt: string, addendum?: string): { prompt: string; sha256: string } {
+  const trimmed = addendum?.trim();
+  const prompt = trimmed ? `${basePrompt}\n\n${trimmed}` : basePrompt;
+  return { prompt, sha256: createHash('sha256').update(prompt, 'utf8').digest('hex') };
+}
+
 export interface GeneratePageImageOptions {
   pageId: string;
   /** Injectable for tests; defaults to the real OpenAI call. */
   generator?: ImageGenerator;
   storage?: LocalStorageService;
+  /** Optional operator tweak appended to the locked prompt on regeneration. */
+  promptAddendum?: string;
 }
 
 export interface GeneratePageImageResult {
   pageId: string;
+  imageId: string;
   version: number;
   generatedPath: string;
   widthPx: number;
@@ -88,9 +100,13 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
   const generator = opts.generator ?? defaultGenerateImage;
   const storage = opts.storage ?? new LocalStorageService();
 
+  // Each version stores its own exact prompt + hash (a regeneration tweak makes
+  // this differ from the page's planned prompt) so generations stay auditable.
+  const { prompt: finalPrompt, sha256: promptSha256 } = finalizePrompt(page.imagePrompt!, opts.promptAddendum);
+
   logger.info({ pageId: page.id, pageKey: page.pageKey, version }, 'Stage 3: generating image');
 
-  const image = await generator({ prompt: page.imagePrompt! });
+  const image = await generator({ prompt: finalPrompt });
 
   const stored = await storage.writeProjectFile(
     page.projectId,
@@ -98,11 +114,11 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
     image.pngBuffer,
   );
 
-  await insertImage({
+  const imageRow = await insertImage({
     pageId: page.id,
     version,
-    prompt: page.imagePrompt!,
-    promptSha256: page.imagePromptSha256!,
+    prompt: finalPrompt,
+    promptSha256,
     generatedPath: stored.relativePath,
     widthPx: image.widthPx,
     heightPx: image.heightPx,
@@ -119,9 +135,17 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
     operation: 'stage-3-image',
     imageCount: 1,
   });
+  await recordImageEvent({
+    imageId: imageRow.id,
+    pageId: page.id,
+    eventType: 'generated',
+    note: opts.promptAddendum?.trim() ?? null,
+    metadata: { version },
+  });
 
   return {
     pageId: page.id,
+    imageId: imageRow.id,
     version,
     generatedPath: stored.relativePath,
     widthPx: image.widthPx,

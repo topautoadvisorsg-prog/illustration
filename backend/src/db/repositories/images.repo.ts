@@ -29,6 +29,40 @@ export async function listImagesForPage(pageId: string): Promise<ImageRow[]> {
   return db.select().from(images).where(eq(images.pageId, pageId)).orderBy(images.version);
 }
 
+export async function getImageVersion(pageId: string, version: number): Promise<ImageRow | undefined> {
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(images)
+    .where(and(eq(images.pageId, pageId), eq(images.version, version)))
+    .limit(1);
+  return row;
+}
+
+export async function setImageStatus(pageId: string, version: number, status: ImageStatus): Promise<ImageRow | undefined> {
+  const db = getDb();
+  const [row] = await db
+    .update(images)
+    .set({ status, updatedAt: new Date() })
+    .where(and(eq(images.pageId, pageId), eq(images.version, version)))
+    .returning();
+  return row;
+}
+
+/** Approve a version: it becomes the sole active version with APPROVED status. */
+export async function approveImageVersion(pageId: string, version: number): Promise<ImageRow | undefined> {
+  const db = getDb();
+  return db.transaction(async (tx) => {
+    await tx.update(images).set({ active: false }).where(eq(images.pageId, pageId));
+    const [row] = await tx
+      .update(images)
+      .set({ active: true, status: 'APPROVED', updatedAt: new Date() })
+      .where(and(eq(images.pageId, pageId), eq(images.version, version)))
+      .returning();
+    return row;
+  });
+}
+
 export async function insertImage(input: NewImageInput): Promise<ImageRow> {
   const db = getDb();
   return db.transaction(async (tx) => {
