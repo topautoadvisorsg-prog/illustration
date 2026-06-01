@@ -25,28 +25,28 @@ const baseConfig: ProjectConfig = {
     chapterByChapterRender: true,
     defaultTemplate: 'LAYOUT_1_STANDARD',
     longTextTemplate: 'LAYOUT_2_TEXT_HEAVY',
-    comparisonTemplate: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
+    comparisonTemplate: 'LAYOUT_4_DANGER_WARNING',
   },
   layoutPromptAssets: [
     {
-      templateId: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
-      label: 'Diagnostic',
-      mockupImagePath: 'layout-09-diagnostic.png',
-      layoutDescription: 'Diagnostic layout with comparison art and compact supporting text zones.',
-      useCases: ['look-alike species', 'diagnostic anatomy', 'comparison pages'],
+      templateId: 'LAYOUT_4_DANGER_WARNING',
+      label: 'Comparison Recognition',
+      mockupImagePath: 'layout-04-comparison-recognition.png',
+      layoutDescription: 'Comparison layout with two subject illustrations and a protected lower text zone.',
+      useCases: ['look-alike species', 'comparison pages', 'quick recognition'],
       avoidWhen: ['simple short entry without comparison need'],
-      textZoneDescription: 'Two compact text blocks beside or below the diagnostic art.',
-      imageZoneDescription: 'Central comparison/diagram image zone only; never render page text.',
+      textZoneDescription: 'Lower text zone remains clear for educational content.',
+      imageZoneDescription: 'Upper comparison image zone only; never render page text.',
       capacityNotes: 'Measured against 10.5 pt body type.',
-      minWords: 180,
-      targetWords: 280,
-      maxWords: 400,
+      minWords: 240,
+      targetWords: 340,
+      maxWords: 460,
       recommendedBodyPt: 10.5,
       recommendedLineHeight: 1.24,
       promptTemplate: '{MASTER_STYLE_DNA}. Subject {SUBJECT}. Details {SCIENTIFIC_DETAILS}. Notes {COMPOSITION_NOTES}.',
       placeholders: ['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'],
       textFitRule: 'Use for comparison pages.',
-      imageSlotDescription: 'Diagnostic image slot.',
+      imageSlotDescription: 'Comparison image slot.',
       capacityTestStatus: 'APPROVED',
       operatorNotes: '',
     },
@@ -79,7 +79,7 @@ describe('planPage', () => {
     expect(countPageWords('### ID\nGolden **yellow** mushroom near [oak](x).')).toBe(6);
   });
 
-  it('selects diagnostic layout and assembles prompt from layout asset', () => {
+  it('selects comparison layout and assembles prompt from layout asset', () => {
     const decision = planPage(
       page({
         entryTitle: 'Chanterelle vs False Chanterelle',
@@ -88,10 +88,12 @@ describe('planPage', () => {
       baseConfig,
     );
 
-    expect(decision.layoutTemplate).toBe('LAYOUT_9_DIAGNOSTIC_DIAGRAM');
+    expect(decision.layoutTemplate).toBe('LAYOUT_4_DANGER_WARNING');
     expect(decision.reasonCodes).toContain('comparison_or_lookalike_signal');
     expect(decision.prompt).toContain('golden chanterelle mushroom');
     expect(decision.prompt).toContain('Vintage Naturalist master style DNA.');
+    expect(decision.prompt).toContain('LAYOUT SYSTEM RULES');
+    expect(decision.prompt).toContain('Do not generate readable text anywhere in the image.');
     expect(decision.prompt).not.toContain('{SUBJECT}');
     expect(decision.typography.bodyPt).toBe(10.5);
     expect(decision.promptReady).toBe(true);

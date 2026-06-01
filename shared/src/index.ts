@@ -57,6 +57,13 @@ export const LayoutTemplateIdSchema = z.enum([
   'LAYOUT_7_SCATTERED_VIGNETTES',
   'LAYOUT_8_MARGIN_ILLUSTRATION',
   'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
+  'LAYOUT_10_FULL_PAGE_PLATE',
+  'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD',
+  'LAYOUT_12_DIAGNOSTIC_DIAGRAM',
+  'LAYOUT_13_FEATURE_BANNER',
+  'LAYOUT_14_SIDEBAR_FEATURE',
+  'LAYOUT_15_PROGRESSION_STUDY',
+  'LAYOUT_16_CUTAWAY_FEATURE',
 ]);
 
 export const TrimSizeSchema = z.object({
@@ -95,7 +102,7 @@ export const LayoutPolicySchema = z.object({
   chapterByChapterRender: z.boolean().default(true),
   defaultTemplate: LayoutTemplateIdSchema.default('LAYOUT_1_STANDARD'),
   longTextTemplate: LayoutTemplateIdSchema.default('LAYOUT_2_TEXT_HEAVY'),
-  comparisonTemplate: LayoutTemplateIdSchema.default('LAYOUT_9_DIAGNOSTIC_DIAGRAM'),
+  comparisonTemplate: LayoutTemplateIdSchema.default('LAYOUT_4_DANGER_WARNING'),
 });
 
 export const LayoutPromptAssetSchema = z.object({

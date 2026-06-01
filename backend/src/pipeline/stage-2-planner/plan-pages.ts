@@ -2,7 +2,7 @@
  * Stage 2 - deterministic page planner.
  *
  * What it does: reads page manifests, calculates text signals, selects one of
- * the 9 layout templates, and assembles the image-only prompt for the subject
+ * the configured layout templates, and assembles the image-only prompt for the subject
  * art. No image API spend happens here.
  * Input: page manifests + project config layout prompt assets.
  * Output: page planning rows with layout template, prompt, prompt hash, and
@@ -20,6 +20,26 @@ import {
 import { getAgentContract } from '../../agents/agent-contracts.js';
 
 const REQUIRED_PROMPT_PLACEHOLDERS = ['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'] as const;
+
+const IMAGE_PROMPT_SAFETY_RULES = `LAYOUT SYSTEM RULES
+
+Treat the selected layout as a strong reference template, not a rigid rule. Minor composition adjustments are allowed when they improve readability, subject presentation, or overall page quality.
+
+Preserve future text areas above all else. Do not allow illustrations, background elements, diagrams, labels, decorative details, or environmental elements to consume areas intended for written educational content. When in doubt, leave more negative space.
+
+Do not generate readable text anywhere in the image. Do not render paragraphs, article text, captions, educational content, fake encyclopedia text, page numbers, headers, labels, or typography.
+
+Use minimal annotation only when structurally necessary. Limit callouts to 0-2 major, obvious educational features per subject. Avoid dense labeling systems, technical breakdowns, scientific poster layouts, and small-detail callouts.
+
+Layouts define image placement, negative space, reading flow, content zones, and visual hierarchy. They do not define subject matter, article content, or detailed scientific analysis.
+
+Prioritize readability over visual density. A simpler image with protected text placement is preferred over a beautiful image that consumes the content area.
+
+Subject-specific flexibility is allowed for wilderness subjects as long as the intended text zones remain clear.
+
+Negative space is intentional. Do not fill empty areas simply because space is available.
+
+Final rule: the educational knowledge belongs primarily in the written article. The illustration supports the lesson; it does not replace it.`;
 
 export interface PagePlanningDecision {
   pageKey: string;
@@ -73,6 +93,13 @@ const DEFAULT_LAYOUT_CAPACITY: Record<LayoutTemplateId, { minWords: number; targ
   LAYOUT_7_SCATTERED_VIGNETTES: { minWords: 160, targetWords: 240, maxWords: 340 },
   LAYOUT_8_MARGIN_ILLUSTRATION: { minWords: 300, targetWords: 430, maxWords: 580 },
   LAYOUT_9_DIAGNOSTIC_DIAGRAM: { minWords: 180, targetWords: 280, maxWords: 400 },
+  LAYOUT_10_FULL_PAGE_PLATE: { minWords: 0, targetWords: 40, maxWords: 90 },
+  LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD: { minWords: 0, targetWords: 60, maxWords: 140 },
+  LAYOUT_12_DIAGNOSTIC_DIAGRAM: { minWords: 180, targetWords: 280, maxWords: 400 },
+  LAYOUT_13_FEATURE_BANNER: { minWords: 260, targetWords: 420, maxWords: 620 },
+  LAYOUT_14_SIDEBAR_FEATURE: { minWords: 300, targetWords: 460, maxWords: 640 },
+  LAYOUT_15_PROGRESSION_STUDY: { minWords: 220, targetWords: 340, maxWords: 500 },
+  LAYOUT_16_CUTAWAY_FEATURE: { minWords: 180, targetWords: 300, maxWords: 440 },
 };
 
 const REQUIRED_LAYOUT_TEMPLATES = Object.keys(DEFAULT_LAYOUT_CAPACITY) as LayoutTemplateId[];
@@ -123,7 +150,22 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
 
   if (page.warnings.length > 0 || includesAny(text, ['toxic', 'poison', 'deadly', 'danger', 'warning', 'do not eat'])) {
     reasons.push('danger_or_warning_signal');
-    return { template: 'LAYOUT_4_DANGER_WARNING', reasons };
+    return { template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM', reasons };
+  }
+
+  if (includesAny(text, ['chapter opener', 'chapter introduction', 'section introduction', 'opening page', 'opener'])) {
+    reasons.push('chapter_opener_signal');
+    return { template: 'LAYOUT_5_CHAPTER_OPENER', reasons };
+  }
+
+  if (includesAny(text, ['life cycle', 'lifecycle', 'growth stage', 'growth stages', 'stage sequence', 'progression', 'development over time', 'seedling', 'sapling', 'mature stage', 'seasonal sequence'])) {
+    reasons.push('progression_or_lifecycle_signal');
+    return { template: 'LAYOUT_15_PROGRESSION_STUDY', reasons };
+  }
+
+  if (includesAny(text, ['cutaway', 'cut away', 'cross-section', 'cross section', 'layered', 'layers', 'internal structure', 'hidden relationship', 'root layer', 'soil layer', 'strata', 'stratum', 'groundwater zone'])) {
+    reasons.push('cutaway_or_layer_signal');
+    return { template: 'LAYOUT_16_CUTAWAY_FEATURE', reasons };
   }
 
   if (includesAny(text, ['compare', 'comparison', 'look-alike', 'look alike', 'versus', ' vs ', 'similar species'])) {
@@ -131,9 +173,14 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
     return { template: config.layoutPolicy.comparisonTemplate, reasons };
   }
 
-  if (includesAny(text, ['diagram', 'anatomy', 'diagnostic', 'parts', 'cross-section', 'cross section'])) {
+  if (includesAny(text, ['diagram', 'anatomy', 'diagnostic', 'parts', 'major features', 'identifying features'])) {
     reasons.push('diagnostic_diagram_signal');
-    return { template: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM', reasons };
+    return { template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM', reasons };
+  }
+
+  if (includesAny(text, ['overview', 'region overview', 'feature banner', 'visual header', 'mountain range', 'river system', 'watershed', 'landscape context'])) {
+    reasons.push('feature_banner_signal');
+    return { template: 'LAYOUT_13_FEATURE_BANNER', reasons };
   }
 
   if (includesAny(text, ['track', 'tracks', 'habitat scene', 'signs', 'scat', 'trail'])) {
@@ -143,7 +190,7 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
 
   if (includesAny(text, ['tree', 'sapling', 'tall plant', 'vine', 'trunk', 'bark'])) {
     reasons.push('tall_subject_signal');
-    return { template: 'LAYOUT_8_MARGIN_ILLUSTRATION', reasons };
+    return { template: wordCount >= 300 ? 'LAYOUT_14_SIDEBAR_FEATURE' : 'LAYOUT_8_MARGIN_ILLUSTRATION', reasons };
   }
 
   if (wordCount < 200) {
@@ -257,6 +304,11 @@ function replaceTemplatePlaceholders(template: string, values: Record<string, st
   return Object.entries(values).reduce((current, [key, value]) => current.replaceAll(key, value), template);
 }
 
+function appendPromptSafetyRules(promptTemplate: string): string {
+  if (promptTemplate.includes('LAYOUT SYSTEM RULES')) return promptTemplate;
+  return `${promptTemplate}\n\n${IMAGE_PROMPT_SAFETY_RULES}`;
+}
+
 function scientificDetails(page: PageManifest): string {
   const pieces = [
     page.scientificName ? `Scientific name: ${page.scientificName}.` : '',
@@ -300,7 +352,7 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
     }
   }
 
-  const prompt = replaceTemplatePlaceholders(promptTemplate, {
+  const prompt = replaceTemplatePlaceholders(appendPromptSafetyRules(promptTemplate), {
     '{MASTER_STYLE_DNA}': config.imageGeneration.masterStyleBlockText,
     '{SUBJECT}': page.imageSubject,
     '{SCIENTIFIC_DETAILS}': scientificDetails(page),

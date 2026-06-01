@@ -7,12 +7,19 @@ const LAYOUT_TEMPLATES = [
   ["LAYOUT_1_STANDARD", "Standard", "Balanced text and illustration", 220, 320, 420],
   ["LAYOUT_2_TEXT_HEAVY", "Text Heavy", "Long entries with smaller art", 420, 560, 720],
   ["LAYOUT_3_ILLUSTRATION_DOMINANT", "Image Dominant", "Short text with a strong plate", 90, 160, 240],
-  ["LAYOUT_4_DANGER_WARNING", "Danger Warning", "Toxic or safety-heavy pages", 240, 340, 460],
+  ["LAYOUT_4_DANGER_WARNING", "Comparison Recognition", "Two related subjects compared for quick visual recognition", 240, 340, 460],
   ["LAYOUT_5_CHAPTER_OPENER", "Chapter Opener", "Atmospheric opening page", 40, 90, 150],
-  ["LAYOUT_6_BACK_MATTER", "Back Matter", "Tables, index, glossary", 260, 420, 620],
-  ["LAYOUT_7_SCATTERED_VIGNETTES", "Vignettes", "Several small naturalist studies", 160, 240, 340],
+  ["LAYOUT_6_BACK_MATTER", "Reference Grid", "Three specimen studies with open educational text space", 260, 420, 620],
+  ["LAYOUT_7_SCATTERED_VIGNETTES", "Reference Studies", "Three staggered specimen studies with text flow", 160, 240, 340],
   ["LAYOUT_8_MARGIN_ILLUSTRATION", "Margin Art", "Tall plant or side illustration", 300, 430, 580],
-  ["LAYOUT_9_DIAGNOSTIC_DIAGRAM", "Diagnostic", "Comparisons, diagrams, anatomy", 180, 280, 400],
+  ["LAYOUT_9_DIAGNOSTIC_DIAGRAM", "Scattered Studies", "Central primary study with supporting studies around it", 180, 280, 400],
+  ["LAYOUT_10_FULL_PAGE_PLATE", "Full Page Plate", "Nearly full-page museum plate illustration", 0, 40, 90],
+  ["LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD", "Continuous Landscape Spread", "Two-page environmental landscape spread", 0, 60, 140],
+  ["LAYOUT_12_DIAGNOSTIC_DIAGRAM", "Diagnostic Diagram", "Central subject diagram with restrained callouts", 180, 280, 400],
+  ["LAYOUT_13_FEATURE_BANNER", "Feature Banner", "Wide horizontal feature illustration over educational text area", 260, 420, 620],
+  ["LAYOUT_14_SIDEBAR_FEATURE", "Sidebar Feature", "Large left-side vertical illustration with open right text area", 300, 460, 640],
+  ["LAYOUT_15_PROGRESSION_STUDY", "Progression Study", "Sequential stages over an open educational text area", 220, 340, 500],
+  ["LAYOUT_16_CUTAWAY_FEATURE", "Cutaway Feature", "Layered cutaway illustration over an open educational text area", 180, 300, 440],
 ];
 
 const VINTAGE_NATURALIST_DNA = `VINTAGE NATURALIST
@@ -50,6 +57,30 @@ Avoid modern infographic aesthetics, glossy commercial design, digital poster ae
 Emotional tone: timeless, scholarly, elegant, educational, exploratory, museum quality, collectible, archival.
 
 The viewer should feel they are examining a rare plate from a beautifully preserved natural history collection.`;
+
+const LAYOUT_SYSTEM_RULES = `LAYOUT SYSTEM RULES
+
+Treat the selected layout as a strong reference template, not a rigid rule. Minor composition adjustments are allowed when they improve readability, subject presentation, or overall page quality.
+
+Preserve future text areas above all else. Do not allow illustrations, background elements, diagrams, labels, decorative details, or environmental elements to consume areas intended for written educational content. When in doubt, leave more negative space.
+
+Do not generate readable text anywhere in the image. Do not render paragraphs, article text, captions, educational content, fake encyclopedia text, page numbers, headers, labels, or typography.
+
+Use minimal annotation only when structurally necessary. Limit callouts to 0-2 major, obvious educational features per subject. Avoid dense labeling systems, technical breakdowns, scientific poster layouts, and small-detail callouts.
+
+Layouts define image placement, negative space, reading flow, content zones, and visual hierarchy. They do not define subject matter, article content, or detailed scientific analysis.
+
+Prioritize readability over visual density. A simpler image with protected text placement is preferred over a beautiful image that consumes the content area.
+
+Subject-specific flexibility is allowed for mountains, rivers, mushrooms, trees, animal tracks, ecosystems, and other wilderness subjects, as long as the intended text zones remain clear.
+
+Negative space is intentional. Do not fill empty areas simply because space is available.
+
+Final rule: the educational knowledge belongs primarily in the written article. The illustration supports the lesson; it does not replace it.`;
+
+function withLayoutSystemRules(prompt) {
+  return `${prompt}\n\n${LAYOUT_SYSTEM_RULES}`;
+}
 
 const LAYOUT_1_MASTER_PROMPT = `{MASTER_STYLE_DNA}
 
@@ -111,34 +142,443 @@ Subject and scientific context:
 {SCIENTIFIC_DETAILS}
 
 Page structure:
-- Large hero illustration occupies the entire right side of the page.
-- Educational text occupies the left vertical column.
-- Small labels and callouts connect into the artwork.
-- Supporting studies appear beneath the text column.
+- A large hero illustration occupies the upper right portion of the page.
+- The hero illustration serves as the primary visual focal point.
+- A large open content area remains on the left side and lower portion of the page.
+- Small educational callouts may connect to the illustration.
+- One or two supporting studies may appear near the hero illustration if helpful.
 
 Visual balance:
-- Right 70% artwork.
-- Left 30% clean text column.
+- Approximately 60% of the page contains illustration elements.
+- Approximately 40% remains clear for educational text placement.
+- Preserve substantial blank space within the composition.
+- Avoid allowing the illustration to fill the entire page.
+- Maintain a strong distinction between visual and content areas.
 
 Composition notes:
 {COMPOSITION_NOTES}
 
-Leave clear negative space inside the artwork for future captions.
-Keep the right-side hero illustration dominant while preserving the left column for future educational text.
+The page should showcase a dramatic primary illustration while preserving ample space for educational content.
+Museum-quality natural history encyclopedia presentation.
 Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
+const LAYOUT_4_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page comparing {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- Upper section contains two side-by-side comparison illustrations.
+- Left side contains Subject A.
+- Right side contains Subject B.
+- Simple comparison callouts highlight only the most important distinguishing features.
+- Avoid excessive labels, arrows, or technical breakdowns.
+- Focus on quick visual recognition rather than detailed analysis.
+
+Visual balance:
+- Top 60% contains the comparison area.
+- Bottom 40% remains largely clear for educational text placement.
+- Leave generous negative space in the lower section.
+- Maintain a clean and organized layout.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+The page should help readers quickly understand the major differences between two related subjects while preserving substantial space for educational content.
+Museum-quality wilderness field guide presentation.
+Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
+const LAYOUT_5_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a cinematic chapter-opening page for a premium wilderness encyclopedia.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- A large atmospheric environmental illustration occupies the upper 60% of the page.
+- The lower 40% remains intentionally clear and largely empty.
+- Do not place paragraphs, captions, labels, annotations, callouts, or educational content in the lower section.
+- Do not generate readable text anywhere on the page.
+- The lower section should function as reserved space for future chapter content.
+- Maintain a clean transition between the illustration and the open content area.
+
+Visual flow:
+- Upper 60% contains the primary environmental artwork.
+- Lower 40% remains mostly blank with generous negative space.
+- Avoid clutter, diagrams, specimen studies, or supporting illustrations.
+- Preserve a premium editorial presentation.
+
+Include:
+- cinematic wilderness scene
+- environmental storytelling
+- atmospheric depth
+- strong sense of scale
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+The page should feel immersive, inspirational, and expansive while preserving a large open area for future chapter content.
+Museum-quality natural history encyclopedia presentation.
+Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
+const LAYOUT_6_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- Upper 60% contains three educational specimen studies.
+- One study is positioned in the upper left.
+- One study is positioned in the upper center.
+- One study is positioned in the upper right.
+- Each study includes a small label and minimal scientific annotation.
+- Maintain generous spacing between studies.
+
+Visual balance:
+- Top 60% serves as the reference illustration area.
+- Bottom 40% remains largely clear for educational text placement.
+- Avoid dense grids or crowded collections.
+- Avoid excessive labels and callouts.
+- Preserve strong negative space throughout the page.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+The page should function as a quick-reference educational overview rather than a complete identification chart.
+Museum-quality natural history encyclopedia presentation.
+Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
+const LAYOUT_7_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- Three educational specimen studies distributed vertically throughout the page.
+- One study is positioned near the upper left area.
+- One study is positioned near the center right area.
+- One study is positioned near the lower left area.
+- Each study includes a small label and minimal scientific annotation.
+- Avoid dense grids or collection-box layouts.
+
+Visual balance:
+- Studies should alternate positions to create visual flow.
+- Maintain generous negative space between studies.
+- Preserve a large continuous area for educational text.
+- Allow text to naturally flow around the specimen studies.
+- Avoid overcrowding any section of the page.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+The page should feel like an educational encyclopedia spread rather than a scientific catalog.
+Museum-quality natural history encyclopedia presentation.
+Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
+const LAYOUT_8_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- Rightmost 25% contains one tall vertical illustration.
+- Left 75% remains reserved for educational text.
+- Small annotations extend from the illustration into the text area.
+
+Visual balance:
+- Keep the right illustration tall, elegant, and vertically composed.
+- Preserve the left text area as the dominant readable zone.
+- Use a strong editorial magazine layout with refined natural history styling.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+Strong editorial magazine layout.
+Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
+const LAYOUT_9_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- One primary illustration positioned near the center of the page.
+- Three smaller supporting studies distributed around the primary illustration.
+- Supporting studies should vary in size and placement.
+- Small labels and minimal annotations accompany each study.
+
+Visual balance:
+- The primary illustration serves as the focal point.
+- Secondary studies create visual interest without forming a rigid grid.
+- Maintain generous negative space throughout the page.
+- Preserve substantial areas for educational text placement.
+- Allow text to flow naturally between visual elements.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+The page should feel dynamic, educational, and visually engaging while remaining highly readable.
+Museum-quality natural history encyclopedia presentation.
+Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
+const LAYOUT_10_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a full-page illustration.
+
+Subject:
+Fog Rolling Through a Pine Forest
+
+Page structure:
+- The illustration occupies nearly the entire page.
+- Only minimal labels.
+- No large text areas.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+Museum plate presentation.
+Preserve the Vintage Naturalist identity while making the page feel like a collectible full-page natural history plate.
+Do not render final body text, page numbers, titles, captions, or typography.`;
+
+const LAYOUT_11_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a two-page encyclopedia landscape spread for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- Landscape extends continuously across both pages.
+- Small callouts are placed along the lower edge.
+- Upper portion remains visually uninterrupted.
+- Emphasize environmental scale.
+
+Visual balance:
+- Preserve the upper landscape as a broad, uninterrupted atmospheric field.
+- Keep callouts restrained and low on the page.
+- Use the full spread to communicate wilderness scale and habitat context.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+Museum-quality natural history landscape spread.
+Do not render final body text, page numbers, titles, captions, or typography.`;
+
+const LAYOUT_12_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- A large central subject occupies the upper portion of the page.
+- Simple callout lines identify only the most important features.
+- Limit annotations to major educational points.
+- Avoid excessive labels, arrows, or technical breakdowns.
+- Supporting diagrams may appear in corners if helpful, but should remain secondary.
+
+Visual balance:
+- Upper 60% contains the primary diagram and callouts.
+- Lower 40% remains largely clear for educational text placement.
+- Maintain generous negative space.
+- Preserve a clean and organized presentation.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+The page should help readers quickly identify and understand the most important characteristics of the subject without overwhelming them with detail.
+Museum-quality natural history encyclopedia presentation.
+Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
+const LAYOUT_13_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- A wide horizontal illustration spans the upper portion of the page.
+- The illustration acts as a visual header for the topic.
+- Minimal callouts may appear within the illustration.
+- The lower portion of the page remains primarily reserved for educational content.
+
+Visual balance:
+- Upper 35-40% contains the feature illustration.
+- Lower 60-65% remains largely clear for text placement.
+- Maintain strong separation between image and content areas.
+- Preserve generous reading space.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+The page should provide immediate visual context before transitioning into educational content.
+Museum-quality natural history encyclopedia presentation.
+Do not render final body text, page numbers, titles, labels, captions, or typography.`;
+
+const LAYOUT_14_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- A large vertical illustration occupies the left side of the page.
+- The illustration should remain contained to approximately one-third of the page width.
+- The remaining two-thirds of the page should remain largely clear and open.
+- Do not fill the open area with additional illustrations, diagrams, labels, annotations, maps, or decorative elements.
+- Do not generate readable text anywhere on the page.
+- The open area should function as reserved space for future educational content.
+
+Visual balance:
+- Left 35% contains the primary illustration.
+- Right 65% remains mostly empty.
+- Maintain a strong visual separation between the illustration area and the content area.
+- Preserve generous negative space throughout the open area.
+- Avoid background elements spilling into the content area.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+The page should showcase a strong supporting illustration while preserving a large uninterrupted area for future text placement.
+Museum-quality natural history encyclopedia presentation.
+Do not render final body text, page numbers, titles, labels, captions, annotations, maps, diagrams, or typography.`;
+
+const LAYOUT_15_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- Three to five educational studies arranged in a clear sequence.
+- Each study represents a stage, progression, or development.
+- Simple labels identify each stage.
+- Visual flow should guide the reader naturally through the sequence.
+
+Visual balance:
+- Upper 50-60% contains the progression studies.
+- Lower 40-50% remains available for educational text.
+- Avoid excessive callouts or technical breakdowns.
+- Maintain generous spacing between stages.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+The page should clearly communicate change, development, or progression over time.
+Museum-quality natural history encyclopedia presentation.
+Do not render final body text, page numbers, titles, captions, or typography.`;
+
+const LAYOUT_16_MASTER_PROMPT = `{MASTER_STYLE_DNA}
+
+Create a single encyclopedia page for {SUBJECT}.
+
+Subject and scientific context:
+{SCIENTIFIC_DETAILS}
+
+Page structure:
+- A large cutaway or layered illustration occupies the upper portion of the page.
+- Simple callouts identify major layers or zones.
+- Limit annotations to the most important educational points.
+- Supporting studies may appear in corners if helpful.
+
+Visual balance:
+- Upper 60% contains the cutaway illustration.
+- Lower 40% remains largely clear for educational text placement.
+- Maintain clean organization and strong negative space.
+
+Composition notes:
+{COMPOSITION_NOTES}
+
+The page should help readers understand internal structure, layers, or hidden relationships within the subject.
+Museum-quality natural history encyclopedia presentation.
+Do not render final body text, page numbers, titles, captions, or typography.`;
 
 function defaultLayoutPromptAssets() {
   return LAYOUT_TEMPLATES.map(([id, name, description, minWords, targetWords, maxWords], index) => ({
     templateId: id,
     label: name,
-    mockupImagePath: `layout-${String(index + 1).padStart(2, "0")}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`,
+    mockupImagePath:
+      id === "LAYOUT_1_STANDARD"
+        ? "/layout-references/layout-01-standard.png"
+        : id === "LAYOUT_2_TEXT_HEAVY"
+          ? "/layout-references/layout-02-text-heavy.png"
+          : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
+            ? "/layout-references/layout-03-illustration-dominant.png"
+            : id === "LAYOUT_4_DANGER_WARNING"
+              ? "/layout-references/layout-04-comparison-recognition.png"
+              : id === "LAYOUT_5_CHAPTER_OPENER"
+                ? "/layout-references/layout-05-chapter-opener.png"
+                : id === "LAYOUT_6_BACK_MATTER"
+                  ? "/layout-references/layout-06-reference-grid.png"
+                  : id === "LAYOUT_7_SCATTERED_VIGNETTES"
+                    ? "/layout-references/layout-07-reference-studies.png"
+                    : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
+                      ? "/layout-references/layout-08-margin-illustration.png"
+                      : id === "LAYOUT_9_DIAGNOSTIC_DIAGRAM"
+                        ? "/layout-references/layout-09-scattered-studies.png"
+                        : id === "LAYOUT_10_FULL_PAGE_PLATE"
+                          ? "/layout-references/layout-10-full-page-plate.png"
+                          : id === "LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD"
+                            ? "/layout-references/layout-11-continuous-landscape-spread.png"
+                            : id === "LAYOUT_12_DIAGNOSTIC_DIAGRAM"
+                              ? "/layout-references/layout-12-diagnostic-diagram.png"
+                              : id === "LAYOUT_13_FEATURE_BANNER"
+                                ? "/layout-references/layout-13-feature-banner.png"
+                                : id === "LAYOUT_14_SIDEBAR_FEATURE"
+                                  ? "/layout-references/layout-14-sidebar-feature.png"
+                                  : id === "LAYOUT_15_PROGRESSION_STUDY"
+                                    ? "/layout-references/layout-15-progression-study.png"
+                                    : id === "LAYOUT_16_CUTAWAY_FEATURE"
+                                      ? "/layout-references/layout-16-cutaway-feature.png"
+        : `layout-${String(index + 1).padStart(2, "0")}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`,
     layoutDescription:
       id === "LAYOUT_1_STANDARD"
         ? "Single encyclopedia page. Upper-left primary illustration, upper-right secondary study illustration, lower two-thirds reserved for educational text, small callouts, bottom-corner field-guide box, and light botanical/ecological supporting sketches."
         : id === "LAYOUT_2_TEXT_HEAVY"
           ? "Text-heavy encyclopedia page. Top 15% title area, center 70% reserved for dense educational text, margin support illustrations, tiny diagrams between sections, and bottom 15% reference notes/callouts."
           : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
-            ? "Image-dominant split page. Right 70% hero artwork, left 30% vertical educational text column, callouts into the artwork, and supporting studies beneath the text column."
+            ? "Illustration-dominant encyclopedia page. Upper-right hero illustration is the focal point, while the left side and lower portion preserve open educational content space."
+            : id === "LAYOUT_4_DANGER_WARNING"
+              ? "Comparison recognition page. Top 60% contains two side-by-side subject illustrations with restrained distinguishing callouts; bottom 40% remains open for educational text."
+              : id === "LAYOUT_5_CHAPTER_OPENER"
+                ? "Chapter-opening page. Upper 60% atmospheric environmental artwork, lower 40% intentionally blank for future chapter content, no readable text, labels, callouts, diagrams, or supporting studies."
+                : id === "LAYOUT_6_BACK_MATTER"
+                  ? "Reference grid page. Upper 60% contains three spaced educational specimen studies across left, center, and right; bottom 40% remains open for educational text."
+                  : id === "LAYOUT_7_SCATTERED_VIGNETTES"
+                    ? "Reference studies page. Three educational specimen studies alternate vertically at upper-left, center-right, and lower-left while preserving a large continuous text flow area."
+                    : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
+                      ? "Editorial margin illustration page. Rightmost 25% contains one tall vertical illustration; left 75% stays reserved for educational text with small annotations extending inward."
+                      : id === "LAYOUT_9_DIAGNOSTIC_DIAGRAM"
+                        ? "Scattered studies page. One primary illustration sits near center with three varied supporting studies arranged around it, preserving readable negative space."
+                        : id === "LAYOUT_10_FULL_PAGE_PLATE"
+                          ? "Full-page museum plate. Illustration occupies nearly the entire page, with only minimal labels and no large text areas."
+                          : id === "LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD"
+                            ? "Continuous two-page landscape spread. Landscape extends across both pages, upper portion uninterrupted, with small lower-edge callouts emphasizing environmental scale."
+                            : id === "LAYOUT_12_DIAGNOSTIC_DIAGRAM"
+                              ? "Diagnostic diagram page. Upper 60% contains a large central subject with restrained major-feature callouts; lower 40% remains clear for educational text."
+                              : id === "LAYOUT_13_FEATURE_BANNER"
+                                ? "Feature banner page. Upper 35-40% contains a wide horizontal topic illustration; lower 60-65% remains open for educational text with strong separation between image and content."
+                                : id === "LAYOUT_14_SIDEBAR_FEATURE"
+                                  ? "Sidebar feature page. Left 35% contains one large vertical illustration; right 65% remains empty and uninterrupted for educational text."
+                                  : id === "LAYOUT_15_PROGRESSION_STUDY"
+                                    ? "Progression study page. Upper 50-60% contains three to five sequential studies; lower 40-50% remains open for educational text."
+                                    : id === "LAYOUT_16_CUTAWAY_FEATURE"
+                                      ? "Cutaway feature page. Upper 60% contains a layered or internal-structure illustration with restrained major-zone callouts; lower 40% remains clear for educational text."
         : `${name}: ${description}. Written agent instructions should be refined after analyzing the uploaded mockup.`,
     useCases:
       id === "LAYOUT_1_STANDARD"
@@ -147,6 +587,32 @@ function defaultLayoutPromptAssets() {
           ? ["long encyclopedia entry", "information-dense field-guide page", "page requiring maximum central reading space"]
           : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
             ? ["short entry with strong visual subject", "hero specimen page", "subject needing large artwork presence"]
+            : id === "LAYOUT_4_DANGER_WARNING"
+              ? ["quick comparison", "look-alike subjects", "related species recognition", "major visual differences"]
+              : id === "LAYOUT_5_CHAPTER_OPENER"
+                ? ["chapter opener", "section introduction", "landscape-led opening page", "atmospheric transition into content"]
+                : id === "LAYOUT_6_BACK_MATTER"
+                  ? ["quick-reference overview", "three related specimen studies", "educational reference page", "non-crowded visual summary"]
+                  : id === "LAYOUT_7_SCATTERED_VIGNETTES"
+                    ? ["reference studies", "flowing encyclopedia spread", "three specimen studies", "text wrapping around studies"]
+                    : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
+                      ? ["tall vertical subject", "editorial magazine layout", "margin illustration", "large text-heavy educational page"]
+                      : id === "LAYOUT_9_DIAGNOSTIC_DIAGRAM"
+                        ? ["scattered studies", "central focal subject", "dynamic educational page", "multiple supporting studies"]
+                        : id === "LAYOUT_10_FULL_PAGE_PLATE"
+                          ? ["full-page illustration", "museum plate", "chapter atmosphere plate", "minimal text page"]
+                          : id === "LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD"
+                            ? ["two-page spread", "environmental scale", "landscape habitat", "chapter atmosphere spread"]
+                            : id === "LAYOUT_12_DIAGNOSTIC_DIAGRAM"
+                              ? ["diagnostic diagram", "major feature callouts", "identification teaching page", "clean educational breakdown"]
+                              : id === "LAYOUT_13_FEATURE_BANNER"
+                                ? ["feature banner", "topic opener", "visual header", "medium-to-long educational page"]
+                                : id === "LAYOUT_14_SIDEBAR_FEATURE"
+                                  ? ["sidebar feature", "tall specimen or habitat subject", "large uninterrupted text area", "supporting illustration page"]
+                                  : id === "LAYOUT_15_PROGRESSION_STUDY"
+                                    ? ["life cycle", "growth stages", "seasonal sequence", "development over time", "step-by-step educational study"]
+                                    : id === "LAYOUT_16_CUTAWAY_FEATURE"
+                                      ? ["cutaway feature", "internal structure", "layers or zones", "hidden relationships", "ecosystem cross-section"]
         : [description],
     avoidWhen: ["Do not use if the manuscript text cannot pass text-fit at the configured font size."],
     textZoneDescription:
@@ -155,7 +621,33 @@ function defaultLayoutPromptAssets() {
         : id === "LAYOUT_2_TEXT_HEAVY"
           ? "Center 70% is reserved almost entirely for dense text placement; keep this central column clean."
           : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
-            ? "Left 30% vertical column is reserved for educational text, with supporting studies beneath it."
+            ? "Approximately 40% of the page remains clear for educational text, mainly in the left side and lower portion."
+            : id === "LAYOUT_4_DANGER_WARNING"
+              ? "Bottom 40% remains largely clear for educational text placement, with generous negative space."
+              : id === "LAYOUT_5_CHAPTER_OPENER"
+                ? "Lower 40% remains intentionally blank and reserved for future chapter content."
+                : id === "LAYOUT_6_BACK_MATTER"
+                  ? "Bottom 40% remains largely clear for educational text placement."
+                  : id === "LAYOUT_7_SCATTERED_VIGNETTES"
+                    ? "Preserve a large continuous educational text area that can flow naturally around the staggered studies."
+                    : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
+                      ? "Left 75% remains reserved for educational text."
+                      : id === "LAYOUT_9_DIAGNOSTIC_DIAGRAM"
+                        ? "Substantial educational text areas are preserved between and around the scattered visual elements."
+                        : id === "LAYOUT_10_FULL_PAGE_PLATE"
+                          ? "No large text areas; only minimal labels are expected."
+                          : id === "LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD"
+                            ? "No large body text area; only small lower-edge callouts are expected."
+                            : id === "LAYOUT_12_DIAGNOSTIC_DIAGRAM"
+                              ? "Lower 40% remains largely clear for educational text placement."
+                              : id === "LAYOUT_13_FEATURE_BANNER"
+                                ? "Lower 60-65% remains largely clear for educational text placement."
+                                : id === "LAYOUT_14_SIDEBAR_FEATURE"
+                                  ? "Right 65% remains mostly empty and reserved for future educational content."
+                                  : id === "LAYOUT_15_PROGRESSION_STUDY"
+                                    ? "Lower 40-50% remains available for educational text."
+                                    : id === "LAYOUT_16_CUTAWAY_FEATURE"
+                                      ? "Lower 40% remains largely clear for educational text placement."
             : "Balanced text zone based on the uploaded mockup.",
     imageZoneDescription:
       id === "LAYOUT_1_STANDARD"
@@ -163,9 +655,33 @@ function defaultLayoutPromptAssets() {
         : id === "LAYOUT_2_TEXT_HEAVY"
           ? "Small supporting illustrations in the outer margins, tiny scientific diagrams between sections, and bottom reference callouts."
           : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
-            ? "Right 70% of the page is a large hero illustration with clear negative space for future captions and callouts."
-            : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
-              ? "Tall margin illustration slot for trees, vines, and vertical subjects."
+            ? "Approximately 60% of the page contains illustration elements, led by an upper-right hero illustration plus optional nearby supporting studies."
+            : id === "LAYOUT_4_DANGER_WARNING"
+              ? "Top 60% comparison zone with Subject A on the left and Subject B on the right; use only essential distinguishing callouts."
+              : id === "LAYOUT_5_CHAPTER_OPENER"
+                ? "Upper 60% contains cinematic environmental artwork with atmospheric depth and strong sense of scale."
+                : id === "LAYOUT_6_BACK_MATTER"
+                  ? "Upper 60% contains three generously spaced specimen studies positioned upper-left, upper-center, and upper-right with minimal labels."
+                  : id === "LAYOUT_7_SCATTERED_VIGNETTES"
+                    ? "Three specimen studies alternate vertically: upper-left, center-right, lower-left, each with minimal label/annotation and generous negative space."
+                    : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
+                      ? "Rightmost 25% contains one tall vertical illustration with small annotations extending into the left text area."
+                      : id === "LAYOUT_9_DIAGNOSTIC_DIAGRAM"
+                        ? "Primary illustration near center with three smaller supporting studies distributed around it in varied sizes and positions."
+                        : id === "LAYOUT_10_FULL_PAGE_PLATE"
+                          ? "Nearly the entire page is one atmospheric museum plate illustration."
+                          : id === "LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD"
+                            ? "Continuous landscape spans both pages with an uninterrupted upper field and restrained lower-edge callouts."
+                            : id === "LAYOUT_12_DIAGNOSTIC_DIAGRAM"
+                              ? "Upper 60% contains the large central diagnostic subject with simple callout lines and optional secondary corner diagrams."
+                              : id === "LAYOUT_13_FEATURE_BANNER"
+                                ? "Upper 35-40% contains one wide horizontal feature illustration with minimal callouts."
+                                : id === "LAYOUT_14_SIDEBAR_FEATURE"
+                                  ? "Left 35% contains one contained vertical illustration; avoid spillover into the right content zone."
+                                  : id === "LAYOUT_15_PROGRESSION_STUDY"
+                                    ? "Upper 50-60% contains three to five sequential educational studies with generous spacing."
+                                    : id === "LAYOUT_16_CUTAWAY_FEATURE"
+                                      ? "Upper 60% contains one large cutaway or layered illustration with simple major-zone callouts and optional corner studies."
               : "Generated subject art replaces only the mockup image area.",
     capacityNotes: "Update after text-fit testing with the real mockup.",
     minWords,
@@ -173,30 +689,113 @@ function defaultLayoutPromptAssets() {
     maxWords,
     recommendedBodyPt: id === "LAYOUT_2_TEXT_HEAVY" ? 10.5 : 11,
     recommendedLineHeight: id === "LAYOUT_2_TEXT_HEAVY" ? 1.23 : 1.28,
-    promptTemplate:
+    promptTemplate: withLayoutSystemRules(
       id === "LAYOUT_1_STANDARD"
         ? LAYOUT_1_MASTER_PROMPT
         : id === "LAYOUT_2_TEXT_HEAVY"
           ? LAYOUT_2_MASTER_PROMPT
           : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
             ? LAYOUT_3_MASTER_PROMPT
+            : id === "LAYOUT_4_DANGER_WARNING"
+              ? LAYOUT_4_MASTER_PROMPT
+              : id === "LAYOUT_5_CHAPTER_OPENER"
+                ? LAYOUT_5_MASTER_PROMPT
+                : id === "LAYOUT_6_BACK_MATTER"
+                  ? LAYOUT_6_MASTER_PROMPT
+                  : id === "LAYOUT_7_SCATTERED_VIGNETTES"
+                    ? LAYOUT_7_MASTER_PROMPT
+                    : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
+                      ? LAYOUT_8_MASTER_PROMPT
+                      : id === "LAYOUT_9_DIAGNOSTIC_DIAGRAM"
+                        ? LAYOUT_9_MASTER_PROMPT
+                        : id === "LAYOUT_10_FULL_PAGE_PLATE"
+                          ? LAYOUT_10_MASTER_PROMPT
+                          : id === "LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD"
+                            ? LAYOUT_11_MASTER_PROMPT
+                            : id === "LAYOUT_12_DIAGNOSTIC_DIAGRAM"
+                              ? LAYOUT_12_MASTER_PROMPT
+                              : id === "LAYOUT_13_FEATURE_BANNER"
+                                ? LAYOUT_13_MASTER_PROMPT
+                                : id === "LAYOUT_14_SIDEBAR_FEATURE"
+                                  ? LAYOUT_14_MASTER_PROMPT
+                                  : id === "LAYOUT_15_PROGRESSION_STUDY"
+                                    ? LAYOUT_15_MASTER_PROMPT
+                                    : id === "LAYOUT_16_CUTAWAY_FEATURE"
+                                      ? LAYOUT_16_MASTER_PROMPT
             : `{MASTER_STYLE_DNA}\n\nCreate the final illustration for ${name}. Subject: {SUBJECT}. ` +
               `Scientific/diagnostic details: {SCIENTIFIC_DETAILS}. ` +
               `Composition must match the approved mockup image slot for ${id}: ${description}. ` +
               `{COMPOSITION_NOTES} ` +
-              `Do not render page text, labels, titles, captions, or typography.`,
+              `Do not render page text, labels, titles, captions, or typography.`),
     placeholders: ["{MASTER_STYLE_DNA}", "{SUBJECT}", "{SCIENTIFIC_DETAILS}", "{COMPOSITION_NOTES}"],
     textFitRule:
       id === "LAYOUT_2_TEXT_HEAVY"
         ? "Use this when manuscript text is long; art stays secondary and text must remain comfortable."
         : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
-          ? "Use for short entries where the right-side hero artwork can dominate while the left text column remains clean."
+          ? "Use when a dramatic upper-right hero illustration should dominate while preserving open left/lower educational content space."
+        : id === "LAYOUT_4_DANGER_WARNING"
+          ? "Use for quick recognition pages comparing two related subjects; keep labels restrained and preserve the lower text zone."
+        : id === "LAYOUT_5_CHAPTER_OPENER"
+          ? "Use for chapter openers only; image generation must leave the lower 40% blank and avoid all readable text, labels, callouts, diagrams, or supporting studies."
+        : id === "LAYOUT_6_BACK_MATTER"
+          ? "Use for quick-reference overview pages with three specimen studies; avoid crowded chart behavior."
+        : id === "LAYOUT_7_SCATTERED_VIGNETTES"
+          ? "Use for encyclopedia pages where three staggered specimen studies should create flow while text wraps around them."
+        : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
+          ? "Use for tall vertical subjects or editorial pages where a right-side illustration strip supports a large left text area."
         : id === "LAYOUT_9_DIAGNOSTIC_DIAGRAM"
-          ? "Use this for comparisons, anatomy, diagrams, tracks, and look-alike pages."
+          ? "Use for dynamic educational pages with one central focal illustration and three varied supporting studies."
+        : id === "LAYOUT_10_FULL_PAGE_PLATE"
+          ? "Use for full-page museum plate illustrations with minimal labels and no large text area."
+        : id === "LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD"
+          ? "Use for two-page environmental landscape spreads where scale and uninterrupted atmosphere matter more than text density."
+        : id === "LAYOUT_12_DIAGNOSTIC_DIAGRAM"
+          ? "Use for clean diagnostic pages that teach only the most important identifying features."
+        : id === "LAYOUT_13_FEATURE_BANNER"
+          ? "Use when a wide visual header should establish the subject before a generous educational text area."
+        : id === "LAYOUT_14_SIDEBAR_FEATURE"
+          ? "Use when a strong left-side vertical illustration should support a large clean right-side educational text area."
+        : id === "LAYOUT_15_PROGRESSION_STUDY"
+          ? "Use when the page needs to explain stages, growth, seasonal change, or development over time."
+        : id === "LAYOUT_16_CUTAWAY_FEATURE"
+          ? "Use when the page needs to explain layers, internal structure, zones, or hidden relationships."
           : "Fit the real manuscript text into this mockup before generating final art.",
     imageSlotDescription: "Mockup image defines the art slot. Generated art replaces only that slot after text-fit approval.",
-    capacityTestStatus: "UNTESTED",
-    operatorNotes: "Word range is a starting recommendation; approve after real text-fit tests.",
+    capacityTestStatus: ["LAYOUT_1_STANDARD", "LAYOUT_2_TEXT_HEAVY", "LAYOUT_3_ILLUSTRATION_DOMINANT", "LAYOUT_4_DANGER_WARNING", "LAYOUT_5_CHAPTER_OPENER", "LAYOUT_6_BACK_MATTER", "LAYOUT_7_SCATTERED_VIGNETTES", "LAYOUT_8_MARGIN_ILLUSTRATION", "LAYOUT_9_DIAGNOSTIC_DIAGRAM", "LAYOUT_10_FULL_PAGE_PLATE", "LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD", "LAYOUT_12_DIAGNOSTIC_DIAGRAM", "LAYOUT_13_FEATURE_BANNER", "LAYOUT_14_SIDEBAR_FEATURE", "LAYOUT_15_PROGRESSION_STUDY", "LAYOUT_16_CUTAWAY_FEATURE"].includes(id) ? "TESTING" : "UNTESTED",
+    operatorNotes:
+      id === "LAYOUT_1_STANDARD"
+        ? "Mockup attached from layout 1 reference image. Capacity still needs real text-fit approval."
+        : id === "LAYOUT_2_TEXT_HEAVY"
+          ? "Mockup attached from layout 2 reference image. Capacity still needs real text-fit approval."
+          : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
+            ? "Mockup attached from layout 3 reference image. Capacity still needs real text-fit approval."
+            : id === "LAYOUT_4_DANGER_WARNING"
+              ? "Mockup attached from layout 4 reference image. Capacity still needs real text-fit approval."
+              : id === "LAYOUT_5_CHAPTER_OPENER"
+                ? "Mockup attached from layout 5 reference image. Capacity still needs real text-fit approval. Prompt remains strict: no readable generated text."
+                : id === "LAYOUT_6_BACK_MATTER"
+                  ? "Mockup attached from layout 6 reference image. Capacity still needs real text-fit approval."
+                  : id === "LAYOUT_7_SCATTERED_VIGNETTES"
+                    ? "Mockup attached from layout 7 reference image. Capacity still needs real text-fit approval."
+                    : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
+                      ? "Mockup attached from layout 8 reference image. Capacity still needs real text-fit approval."
+                      : id === "LAYOUT_9_DIAGNOSTIC_DIAGRAM"
+                        ? "Mockup attached from layout 9 reference image. Capacity still needs real text-fit approval."
+                        : id === "LAYOUT_10_FULL_PAGE_PLATE"
+                          ? "Mockup attached from layout 10 reference image. Capacity still needs real text-fit approval."
+                          : id === "LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD"
+                            ? "Mockup attached from layout 11 reference image. Capacity still needs spread/text-fit approval."
+                            : id === "LAYOUT_12_DIAGNOSTIC_DIAGRAM"
+                              ? "Mockup attached from layout 12 reference image. Capacity still needs real text-fit approval."
+                              : id === "LAYOUT_13_FEATURE_BANNER"
+                                ? "Mockup attached from layout 13 reference image. Capacity still needs real text-fit approval."
+                                : id === "LAYOUT_14_SIDEBAR_FEATURE"
+                                  ? "Mockup attached from layout 14 reference image. Capacity still needs real text-fit approval."
+                                  : id === "LAYOUT_15_PROGRESSION_STUDY"
+                                    ? "Mockup attached from layout 15 reference image. Capacity still needs real text-fit approval."
+                                    : id === "LAYOUT_16_CUTAWAY_FEATURE"
+                                      ? "Mockup attached from layout 16 reference image. Capacity still needs real text-fit approval."
+        : "Word range is a starting recommendation; approve after real text-fit tests.",
   }));
 }
 
@@ -241,7 +840,7 @@ function defaultProjectConfig() {
       chapterByChapterRender: true,
       defaultTemplate: "LAYOUT_1_STANDARD",
       longTextTemplate: "LAYOUT_2_TEXT_HEAVY",
-      comparisonTemplate: "LAYOUT_9_DIAGNOSTIC_DIAGRAM",
+      comparisonTemplate: "LAYOUT_4_DANGER_WARNING",
     },
     layoutPromptAssets: defaultLayoutPromptAssets(),
     outputProfile: {

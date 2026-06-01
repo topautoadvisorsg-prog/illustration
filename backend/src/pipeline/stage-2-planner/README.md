@@ -9,10 +9,10 @@ not spend image API money yet.
 
 For every persisted PAGE manifest, Stage 2:
 
-- validates the 9-layout prompt/reference library
+- validates the configured layout prompt/reference library
 - calculates text word count
 - classifies content signals
-- chooses one of the 9 layout templates
+- chooses one of the configured layout templates
 - uses written layout metadata as the main decision input
 - applies typography and capacity metadata
 - assembles an image-only prompt from the selected layout prompt asset
@@ -37,6 +37,15 @@ analyzed, the written metadata becomes canonical:
 - capacity approval status
 - prompt template and required placeholders
 - inherited Master Style DNA through `{MASTER_STYLE_DNA}`
+
+Layouts are strong reference templates, not rigid cages. They provide image
+placement, negative space, reading flow, content zones, and hierarchy. They do
+not provide article text or detailed educational analysis.
+
+The core invariant is text-area preservation: future educational content zones
+must remain clear. The planner appends layout-system safety rules to every
+image prompt so generated images do not consume reserved text areas or create
+readable fake text.
 
 ## Inputs
 
@@ -82,12 +91,16 @@ current layout library values.
 Current deterministic first pass:
 
 ```text
-danger signal                 -> LAYOUT_4_DANGER_WARNING
+danger signal                 -> LAYOUT_12_DIAGNOSTIC_DIAGRAM
 chapter opener                -> LAYOUT_5_CHAPTER_OPENER
-back matter                   -> LAYOUT_6_BACK_MATTER
-comparison or diagnostic      -> LAYOUT_9_DIAGNOSTIC_DIAGRAM
+progression or life cycle     -> LAYOUT_15_PROGRESSION_STUDY
+cutaway or layered subject    -> LAYOUT_16_CUTAWAY_FEATURE
+comparison or look-alike      -> LAYOUT_4_DANGER_WARNING
+diagnostic diagram            -> LAYOUT_12_DIAGNOSTIC_DIAGRAM
+feature/banner overview       -> LAYOUT_13_FEATURE_BANNER
 track, habitat, or vignette   -> LAYOUT_7_SCATTERED_VIGNETTES
-tree or tall plant            -> LAYOUT_8_MARGIN_ILLUSTRATION
+tree or tall plant, short     -> LAYOUT_8_MARGIN_ILLUSTRATION
+tree or tall plant, longer    -> LAYOUT_14_SIDEBAR_FEATURE
 word count < 200              -> LAYOUT_3_ILLUSTRATION_DOMINANT
 word count > 400              -> LAYOUT_2_TEXT_HEAVY
 otherwise                     -> LAYOUT_1_STANDARD
@@ -101,9 +114,17 @@ otherwise                     -> LAYOUT_1_STANDARD
   are missing.
 - Every layout prompt must inherit the active Master Style DNA so subject/page
   choices can change without losing the book's visual identity.
-- The image prompt must describe only the illustration subject and composition.
-- The image model must not render page text, headers, page numbers, or the full
-  book layout.
+- The image prompt must describe only illustration subject, composition, and
+  reserved content zones.
+- Layouts are allowed minor subject-specific composition adjustments when they
+  improve readability or page quality.
+- Text areas win over visual density. When in doubt, preserve more negative
+  space.
+- The image model must not render paragraphs, article text, captions,
+  educational content, fake encyclopedia text, page numbers, headers, labels,
+  or typography.
+- Annotations should be minimal: 0-2 major, obvious educational features per
+  subject, never dense scientific poster labeling.
 - Final text placement belongs to Stage 6.
 
 ## Current Limitations
