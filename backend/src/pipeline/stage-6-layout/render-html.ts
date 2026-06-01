@@ -141,6 +141,9 @@ export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: R
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(page.entryTitle)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
   @page {
     size: ${geometry.pageWidthIn}in ${geometry.pageHeightIn}in;

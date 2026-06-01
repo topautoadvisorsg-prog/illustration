@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+.git
+frontend/build
+backend/storage
+spikes/output
+*.log
+*.tgz
+.env
+.env.local

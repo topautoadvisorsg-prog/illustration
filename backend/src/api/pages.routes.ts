@@ -11,6 +11,7 @@ import {
   setActivePageImage,
 } from '../pipeline/stage-4-review/review-image.js';
 import { UpscaleBlockedError, upscalePageImage } from '../pipeline/stage-5-upscale/upscale-image.js';
+import { isChromiumAvailable, renderSamplePagePdf } from '../pipeline/stage-6-layout/render-check.js';
 
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
 const ImageVersionParamsSchema = z.object({ pageId: z.string().uuid(), version: z.coerce.number().int().positive() });
@@ -203,4 +204,30 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
       }
     },
   );
+
+  // Stage 6 — render smoke test: produce a real sample PDF via Paged.js to confirm
+  // Chromium works in production. No DB dependency. ?format=json returns metadata.
+  app.get('/api/render-check', async (request, reply) => {
+    if (!isChromiumAvailable()) {
+      return reply.code(503).send({
+        error: 'Service Unavailable',
+        message: 'Chromium is not available on this host. PDF rendering is disabled.',
+        statusCode: 503,
+      });
+    }
+    try {
+      const { pdf, totalPages, bytes } = await renderSamplePagePdf();
+      const wantsJson = (request.query as { format?: string } | undefined)?.format === 'json';
+      if (wantsJson) {
+        return reply.send({ ok: true, totalPages, bytes });
+      }
+      reply.header('content-type', 'application/pdf');
+      reply.header('content-disposition', 'inline; filename="wildlands-render-check.pdf"');
+      reply.header('x-total-pages', String(totalPages));
+      return reply.send(pdf);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return reply.code(500).send({ error: 'Render Failed', message, statusCode: 500 });
+    }
+  });
 }
