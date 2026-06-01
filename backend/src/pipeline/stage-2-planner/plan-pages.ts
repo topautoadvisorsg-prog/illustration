@@ -118,7 +118,7 @@ export interface LayoutLibraryValidation {
   readyForProduction: boolean;
 }
 
-function stripMarkdown(markdown: string): string {
+export function stripMarkdown(markdown: string): string {
   return markdown
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]*`/g, ' ')

@@ -22,6 +22,7 @@ import { updatePagePlanning } from '../db/repositories/manifests.repo.js';
 import { ingestManuscript } from '../pipeline/stage-1-ingestion/ingest-manuscript.js';
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
+import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 
@@ -154,6 +155,43 @@ const PlanPagesResponseSchema = z.object({
         expertFrame: z.string(),
       }),
       textFitStatus: z.enum(['PENDING_PREVIEW', 'BLOCKED_LAYOUT_LIBRARY']),
+    }),
+  ),
+});
+
+const TextFitPreviewResponseSchema = z.object({
+  geometry: z.object({
+    pageWidthIn: z.number(),
+    pageHeightIn: z.number(),
+    textWidthIn: z.number(),
+    textHeightIn: z.number(),
+  }),
+  totals: z.object({
+    pages: z.number(),
+    fits: z.number(),
+    tight: z.number(),
+    overflow: z.number(),
+    underfilled: z.number(),
+  }),
+  readyForImageSpend: z.boolean(),
+  pages: z.array(
+    z.object({
+      pageKey: z.string(),
+      entryTitle: z.string(),
+      layoutTemplate: z.string(),
+      layoutReasonCodes: z.array(z.string()),
+      promptReady: z.boolean(),
+      blockers: z.array(z.string()),
+      fit: z.object({
+        status: z.enum(['FITS', 'TIGHT', 'OVERFLOW', 'UNDERFILLED']),
+        fits: z.boolean(),
+        charCount: z.number(),
+        capacityChars: z.number(),
+        fillRatio: z.number(),
+        estimatedLines: z.number(),
+        usableLines: z.number(),
+        notes: z.array(z.string()),
+      }),
     }),
   ),
 });
@@ -387,6 +425,30 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           status: p.status,
         })),
       };
+    },
+  );
+
+  app.post(
+    '/api/projects/:id/text-fit-preview',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        response: { 200: TextFitPreviewResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const rows = await listManifests(id, 'PAGE');
+      if (rows.length === 0) {
+        const project = await getProject(id);
+        if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+        return reply.code(400).send({
+          error: 'Bad Request',
+          message: 'No page manifests found. Generate manifests before running a text-fit preview.',
+          statusCode: 400,
+        });
+      }
+      return previewProjectTextFit(id);
     },
   );
 }

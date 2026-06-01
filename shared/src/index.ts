@@ -269,6 +269,7 @@ export type JobStatus = z.infer<typeof JobStatusSchema>;
 export type ExportKind = z.infer<typeof ExportKindSchema>;
 export type ExportStatus = z.infer<typeof ExportStatusSchema>;
 export type LayoutTemplateId = z.infer<typeof LayoutTemplateIdSchema>;
+export type TrimSize = z.infer<typeof TrimSizeSchema>;
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type CreateProjectRequest = z.infer<typeof CreateProjectRequestSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
