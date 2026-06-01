@@ -39,10 +39,27 @@ export function isChromiumAvailable(): boolean {
   return resolveChromiumPath() !== null;
 }
 
+/**
+ * Locate the Paged.js polyfill on disk. pagedjs's package `exports` map does NOT
+ * expose the dist subpath, so require.resolve('pagedjs/dist/...') throws
+ * ERR_PACKAGE_PATH_NOT_EXPORTED. Resolve the package entry instead and walk up to
+ * the package root to find the minified polyfill bundle.
+ */
+export function resolvePolyfillPath(): string {
+  let dir = path.dirname(require.resolve('pagedjs'));
+  for (let i = 0; i < 6; i += 1) {
+    const candidate = path.join(dir, 'dist', 'paged.polyfill.min.js');
+    if (existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new Error('Could not locate pagedjs/dist/paged.polyfill.min.js in node_modules.');
+}
+
 /** Load the Paged.js polyfill source from node_modules. */
 export async function loadPagedPolyfill(): Promise<string> {
-  const polyfillPath = require.resolve('pagedjs/dist/paged.polyfill.min.js');
-  return readFile(polyfillPath, 'utf8');
+  return readFile(resolvePolyfillPath(), 'utf8');
 }
 
 export interface RenderPdfResult {

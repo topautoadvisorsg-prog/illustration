@@ -31,19 +31,69 @@ export function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Render the entry body markdown into simple HTML (headings + paragraphs). */
+/** Minimal inline markdown -> HTML, applied AFTER escaping (so tags are safe). */
+export function inlineMarkdown(escaped: string): string {
+  return escaped
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    .replace(/`([^`]+)`/g, '<span class="mono">$1</span>');
+}
+
+function fmt(text: string): string {
+  return inlineMarkdown(escapeHtml(text.trim()));
+}
+
+/**
+ * Render entry body markdown into book-quality HTML: section headings, bullet
+ * ID-checklists (core to field guides), and paragraphs, with inline bold/italic.
+ * Processed line-by-line so a heading immediately followed by a list is handled.
+ */
 function bodyToHtml(markdown: string): string {
-  const blocks = markdown.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
-  return blocks
-    .map((block) => {
-      const heading = block.match(/^(#{2,6})\s+(.*)$/);
-      if (heading) {
-        return `<h3 class="section-header">${escapeHtml(heading[2]!.trim())}</h3>`;
-      }
-      const text = block.replace(/^#{1}\s+/, '');
-      return `<p class="section-body">${escapeHtml(text.replace(/\s+/g, ' ').trim())}</p>`;
-    })
-    .join('\n');
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  const out: string[] = [];
+  let listItems: string[] = [];
+  let paragraph: string[] = [];
+
+  const flushList = () => {
+    if (listItems.length) {
+      out.push(`<ul class="id-list">${listItems.map((li) => `<li>${fmt(li)}</li>`).join('')}</ul>`);
+      listItems = [];
+    }
+  };
+  const flushParagraph = () => {
+    if (paragraph.length) {
+      out.push(`<p class="section-body">${fmt(paragraph.join(' '))}</p>`);
+      paragraph = [];
+    }
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) {
+      flushList();
+      flushParagraph();
+      continue;
+    }
+    const heading = line.match(/^(#{2,6})\s+(.*)$/);
+    if (heading) {
+      flushList();
+      flushParagraph();
+      out.push(`<h3 class="section-header">${fmt(heading[2]!)}</h3>`);
+      continue;
+    }
+    const bullet = line.match(/^[-*]\s+(.*)$/);
+    if (bullet) {
+      flushParagraph();
+      listItems.push(bullet[1]!);
+      continue;
+    }
+    // A level-1 heading (entry title) is rendered separately; strip the marker.
+    flushList();
+    paragraph.push(line.replace(/^#\s+/, ''));
+  }
+  flushList();
+  flushParagraph();
+  return out.join('\n');
 }
 
 function artSlotCss(slot: ArtSlot): string {
@@ -109,6 +159,9 @@ export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: R
   .art-slot img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); }
   .section-header { ${t.smallCaps ? 'font-variant: small-caps;' : ''} font-weight: 600; font-size: ${t.bodyPt}pt; letter-spacing: 0.08em; margin: 8pt 0 2pt 0; color: ${c.ink}; }
   .section-body { margin: 0 0 6pt 0; text-align: justify; hyphens: auto; }
+  .id-list { margin: 4pt 0 6pt 0; padding-left: 14pt; }
+  .id-list li { margin: 0 0 2pt 0; text-align: left; }
+  .mono { font-family: 'Courier New', monospace; font-size: 0.92em; }
   ${page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? `.entry-title{color:${c.warning};} body{border-left:4pt solid ${c.warning};padding-left:10pt;}` : ''}
 </style>
 </head>

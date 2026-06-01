@@ -1,18 +1,26 @@
 # Wildlands Pipeline Attack Plan
 
-Last updated: 2026-05-31
+Last updated: 2026-06-01
 
 ## Current Reality
 
-The production backend now proves the no-image-cost intake spine:
+The backend now implements the full per-page production chain (each stage gated;
+paid APIs are dependency-injected so they never run in tests):
 
 ```text
 project -> stored manuscript -> deterministic outline -> Claude manifests
-  -> locked manifest persistence -> PAGE rows -> deterministic page plans
+  -> locked manifest persistence -> PAGE rows -> deterministic page plans (Stage 2)
+  -> text-fit preview gate (Stage 6, browser-free analysis)
+  -> image generation (Stage 3, gpt-image-1, spend-gated)
+  -> human review: approve/reject/regenerate/set-active (Stage 4)
+  -> upscale + 300 DPI print gate (Stage 5, Real-ESRGAN)
 ```
 
-This is enough to test manuscript intake, manifest quality, page breakdown, and
-initial layout/prompt planning. It is not yet a full book-production pipeline.
+Remaining to produce a finished book: Stage 6 final render + Stage 7 stitch/
+preflight (both need a Chromium binary on the host) and Stage 8 EPUB (no browser).
+
+All P0 audit consistency fixes are done: master style block wired, color unified,
+layouts deduped to 15, clean-art prompt rule enforced.
 
 ## Completed Since The Review
 

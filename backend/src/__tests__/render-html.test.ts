@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema, type PageManifest } from '@wildlands/shared';
-import { buildPageHtml } from '../pipeline/stage-6-layout/render-html.js';
+import { buildPageHtml, inlineMarkdown } from '../pipeline/stage-6-layout/render-html.js';
 import { computePageGeometry } from '../pipeline/stage-6-layout/page-geometry.js';
 
 const config = ProjectConfigSchema.parse({ volume: 1, title: 'The Wildlands', authorName: 'The Wildlands' });
@@ -63,5 +63,37 @@ describe('buildPageHtml', () => {
   it('applies the warning accent on danger layouts', () => {
     const html = buildPageHtml(page({ layoutTemplate: 'LAYOUT_4_DANGER_WARNING' }), config, { geometry });
     expect(html).toContain('#8B2020');
+  });
+
+  it('renders bullet identification checklists as a list', () => {
+    const html = buildPageHtml(
+      page({ bodyMarkdown: '### How to identify\n- **Cap:** golden, wavy\n- **Stem:** solid, tapering' }),
+      config,
+      { geometry },
+    );
+    expect(html).toContain('<ul class="id-list">');
+    expect(html).toContain('<li><strong>Cap:</strong> golden, wavy</li>');
+    expect(html).toContain('<li><strong>Stem:</strong> solid, tapering</li>');
+  });
+
+  it('renders section headings and paragraphs distinctly', () => {
+    const html = buildPageHtml(
+      page({ bodyMarkdown: '### What it is\nA prized edible.\n\n### Where\nMixed forests.' }),
+      config,
+      { geometry },
+    );
+    expect(html).toContain('<h3 class="section-header">What it is</h3>');
+    expect(html).toContain('<p class="section-body">A prized edible.</p>');
+    expect(html).toContain('<h3 class="section-header">Where</h3>');
+  });
+});
+
+describe('inlineMarkdown', () => {
+  it('converts bold and italic', () => {
+    expect(inlineMarkdown('a **bold** and *italic* word')).toBe('a <strong>bold</strong> and <em>italic</em> word');
+  });
+
+  it('leaves plain text untouched', () => {
+    expect(inlineMarkdown('nothing to format here')).toBe('nothing to format here');
   });
 });
