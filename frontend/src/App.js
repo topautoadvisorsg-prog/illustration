@@ -64,7 +64,7 @@ Treat the selected layout as a strong reference template, not a rigid rule. Mino
 
 Preserve future text areas above all else. Do not allow illustrations, background elements, diagrams, labels, decorative details, or environmental elements to consume areas intended for written educational content. When in doubt, leave more negative space.
 
-Do not generate readable text anywhere in the image. Do not render paragraphs, article text, captions, educational content, fake encyclopedia text, page numbers, headers, labels, or typography.
+Do not generate readable text by default. The only permitted image text is an explicit subject-name label supplied by the prompt. If a label is used, render exactly the supplied label text, large and legible, with no extra words. Do not render paragraphs, article text, captions, educational content, fake encyclopedia text, page numbers, headers, reference notes, or unrequested labels.
 
 Use minimal annotation only when structurally necessary. Limit callouts to 0-2 major, obvious educational features per subject. Avoid dense labeling systems, technical breakdowns, scientific poster layouts, and small-detail callouts.
 

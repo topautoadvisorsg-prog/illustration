@@ -81,6 +81,39 @@ function countWords(markdown: string): number {
   return text.split(/\s+/).filter(Boolean).length;
 }
 
+function isChapterHeading(title: string): boolean {
+  return /^chapter\s+\d+\b/i.test(title.trim());
+}
+
+function isCategoryHeading(title: string): boolean {
+  const normalized = title
+    .toUpperCase()
+    .replace(/[—–-].*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return (
+    /^SECTION\s+\d+\b/.test(normalized) ||
+    /^PART\s+\w+\b/.test(normalized) ||
+    normalized.includes('HAZARDS') ||
+    [
+      'MAMMALS',
+      'BIRDS',
+      'REPTILES & AMPHIBIANS',
+      'INSECTS & ARACHNIDS',
+      'EDIBLE PLANTS',
+      'MEDICINAL PLANTS',
+      'TOXIC & DANGEROUS PLANTS',
+      'EDIBLE',
+      'DEADLY',
+      'SURVIVAL TOPICS',
+      'MOST LIKELY EMERGENCIES IN NEW ENGLAND',
+      'WILDERNESS FIRST AID ESSENTIALS',
+      'DECISION FRAMEWORK',
+    ].some((category) => normalized === category || normalized.startsWith(`${category} `))
+  );
+}
+
 function parseChapterNumber(title: string, fallback: number): number {
   const match = title.match(/\bchapter\s+(\d+)\b/i) ?? title.match(/^(\d+)\b/);
   return match ? Number(match[1]) : fallback;
@@ -125,7 +158,10 @@ function collectHeadings(markdown: string): Heading[] {
 export function parseManuscriptOutline(markdown: string): ManuscriptOutline {
   const headings = collectHeadings(markdown);
   const warnings: string[] = [];
-  const chapterHeadings = headings.filter((heading) => heading.level === 1);
+  const explicitChapterHeadings = headings.filter((heading) => heading.level === 1 && isChapterHeading(heading.title));
+  const chapterHeadings = explicitChapterHeadings.length > 0
+    ? explicitChapterHeadings
+    : headings.filter((heading) => heading.level === 1);
   const chapters: ManuscriptChapterOutline[] = [];
 
   if (chapterHeadings.length === 0) {
@@ -139,28 +175,59 @@ export function parseManuscriptOutline(markdown: string): ManuscriptOutline {
     });
 
   chapterHeadings.forEach((chapterHeading, chapterIndex) => {
-    const nextChapter = chapterHeadings[chapterIndex + 1];
-    const chapterEndOffset = nextChapter ? nextChapter.offset - 1 : markdown.length;
-    const chapterEndLine = nextChapter ? nextChapter.line - 1 : markdown.split(/\n/).length;
+    const nextTopLevelHeading = headings.find((heading) => heading.level === 1 && heading.offset > chapterHeading.offset);
+    const chapterEndOffset = nextTopLevelHeading ? nextTopLevelHeading.offset - 1 : markdown.length;
+    const chapterEndLine = nextTopLevelHeading ? nextTopLevelHeading.line - 1 : markdown.split(/\n/).length;
     const chapterNumber = parseChapterNumber(chapterHeading.title, chapterIndex + 1);
     const chapterScopedHeadings = headings.filter(
       (heading) => heading.offset > chapterHeading.offset && heading.offset < chapterEndOffset,
     );
-    const entryHeadings = chapterScopedHeadings.filter((heading) => heading.level === 2);
+    const h2Headings = chapterScopedHeadings.filter((heading) => heading.level === 2);
+    const h3Headings = chapterScopedHeadings.filter((heading) => heading.level === 3);
+    const directH3Headings = h3Headings.filter((heading) => {
+      const parentH2 = [...h2Headings].reverse().find((h2) => h2.offset < heading.offset);
+      return !parentH2 || parentH2.offset < chapterHeading.offset;
+    });
+    const entryHeadings = [
+      ...h2Headings.flatMap((h2) => {
+        const nextH2 = h2Headings.find((candidate) => candidate.offset > h2.offset);
+        const h2EndOffset = nextH2 ? nextH2.offset - 1 : chapterEndOffset;
+        const childH3s = h3Headings.filter((h3) => h3.offset > h2.offset && h3.offset < h2EndOffset);
+        const firstChild = childH3s[0];
+        const h2Line = markdown.slice(h2.offset).split('\n', 1)[0] ?? '';
+        const directBodyStart = h2.offset + h2Line.length + 1;
+        const directBodyEnd = firstChild ? firstChild.offset - 1 : h2EndOffset;
+        const directBody = markdown.slice(directBodyStart, directBodyEnd).trim();
+        const hasDirectBody = countWords(directBody) >= 30;
+        const category = isCategoryHeading(h2.title);
+
+        return [
+          ...(category ? (hasDirectBody ? [h2] : []) : [h2]),
+          ...(category ? childH3s : []),
+        ];
+      }),
+      ...directH3Headings,
+    ].filter((heading, index, all) => all.findIndex((candidate) => candidate.offset === heading.offset) === index);
 
     if (entryHeadings.length === 0) {
-      warnings.push(`CHAPTER_WITHOUT_ENTRIES: chapter ${chapterNumber} has no level-2 entries.`);
+      warnings.push(`CHAPTER_WITHOUT_ENTRIES: chapter ${chapterNumber} has no usable entry headings.`);
     }
 
     const entries = entryHeadings.map((entryHeading, entryIndex): ManuscriptEntryOutline => {
-      const nextEntry = entryHeadings[entryIndex + 1];
+      const nextEntry = entryHeadings.find((candidate, candidateIndex) => candidateIndex > entryIndex && candidate.offset > entryHeading.offset);
+      const scopedEndHeading = chapterScopedHeadings.find((heading) => {
+        if (heading.offset <= entryHeading.offset) return false;
+        if (nextEntry && heading.offset >= nextEntry.offset) return false;
+        return heading.level <= entryHeading.level;
+      });
       const entryEndOffset = nextEntry ? nextEntry.offset - 1 : chapterEndOffset;
+      const bodyEndOffset = scopedEndHeading ? scopedEndHeading.offset - 1 : entryEndOffset;
       const entryEndLine = nextEntry ? nextEntry.line - 1 : chapterEndLine;
       const entryHeadingLine = markdown.slice(entryHeading.offset).split('\n', 1)[0] ?? '';
       const bodyStart = entryHeading.offset + entryHeadingLine.length + 1;
-      const bodyMarkdown = markdown.slice(bodyStart, entryEndOffset).trim();
+      const bodyMarkdown = markdown.slice(bodyStart, bodyEndOffset).trim();
       const sections = chapterScopedHeadings
-        .filter((heading) => heading.level === 3 && heading.offset > entryHeading.offset && heading.offset < entryEndOffset)
+        .filter((heading) => heading.level === entryHeading.level + 1 && heading.offset > entryHeading.offset && heading.offset < bodyEndOffset)
         .map((heading) => ({ title: heading.title, lineStart: heading.line }));
 
       if (!bodyMarkdown) {

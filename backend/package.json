@@ -10,6 +10,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "drizzle-kit migrate && node dist/index.js",
     "smoke": "tsx scripts/smoke-test.ts",
+    "audit:manuscript": "tsx scripts/audit-manuscript.ts",
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "drizzle-kit migrate",
     "worker:image-generation": "tsx src/workers/image-generation.worker.ts",

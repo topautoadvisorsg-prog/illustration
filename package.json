@@ -10,6 +10,8 @@
   ],
   "scripts": {
     "smoke": "yarn workspace @wildlands/backend smoke",
+    "audit:layouts": "node scripts/audit-layout-library.mjs",
+    "verify:pipeline": "node scripts/verify-pipeline.mjs",
     "dev:backend": "yarn workspace @wildlands/backend dev",
     "build:backend": "yarn workspace @wildlands/backend build",
     "typecheck": "yarn workspaces run typecheck",

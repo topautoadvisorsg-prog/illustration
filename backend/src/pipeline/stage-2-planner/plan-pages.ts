@@ -27,7 +27,7 @@ Treat the selected layout as a strong reference template, not a rigid rule. Mino
 
 Preserve future text areas above all else. Do not allow illustrations, background elements, diagrams, labels, decorative details, or environmental elements to consume areas intended for written educational content. When in doubt, leave more negative space.
 
-Do not generate readable text anywhere in the image. Do not render paragraphs, article text, captions, educational content, fake encyclopedia text, page numbers, headers, labels, or typography.
+Do not generate readable text by default. The only permitted image text is an explicit subject-name label supplied by the prompt. If a label is used, render exactly the supplied label text, large and legible, with no extra words. Do not render paragraphs, article text, captions, educational content, fake encyclopedia text, page numbers, headers, reference notes, or unrequested labels.
 
 Use minimal annotation only when structurally necessary. Limit callouts to 0-2 major, obvious educational features per subject. Avoid dense labeling systems, technical breakdowns, scientific poster layouts, and small-detail callouts.
 
@@ -318,6 +318,16 @@ function scientificDetails(page: PageManifest): string {
   return pieces.join(' ');
 }
 
+function labelTextRules(page: PageManifest): string {
+  const exactLabel = page.entryTitle.trim();
+  return [
+    `Exact optional subject-name label: "${exactLabel}".`,
+    'Use this label only if the approved layout calls for a visible subject name/title.',
+    'If used, it must be the only readable text in the generated image, set large and clear.',
+    'Do not invent captions, notes, measurements, reference blurbs, article text, or additional labels.',
+  ].join(' ');
+}
+
 export function planPage(page: PageManifest, config: ProjectConfig): PagePlanningDecision {
   const agent = getAgentContract('PAGE_PLANNER');
   const wordCount = countPageWords(page.bodyMarkdown);
@@ -356,7 +366,10 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
     '{MASTER_STYLE_DNA}': config.imageGeneration.masterStyleBlockText,
     '{SUBJECT}': page.imageSubject,
     '{SCIENTIFIC_DETAILS}': scientificDetails(page),
-    '{COMPOSITION_NOTES}': asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? `Art slot follows ${selected.template}.`,
+    '{COMPOSITION_NOTES}': [
+      asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? `Art slot follows ${selected.template}.`,
+      labelTextRules(page),
+    ].join('\n'),
   });
   const unresolved = prompt.match(/\{[A-Z0-9_]+\}/g) ?? [];
   for (const placeholder of unresolved) {

@@ -25,6 +25,8 @@ Implemented and testable:
 - Page rows linked to PAGE manifests
 - Stage 2 deterministic page planner
 - Stage 2 layout-library validation with written layout metadata
+- 16 Vintage Naturalist layout reference templates with local mockup images
+- Autonomous pipeline verifier for build/test/layout-library self-audit
 - Vintage Naturalist Master Style DNA stored in project config and injected into
   layout prompts
 - Agent behavior contracts
@@ -87,7 +89,7 @@ memory/    Project memory
 6. Stage 2 plans pages:
    - counts words
    - classifies content signals
-   - selects one of the 9 layout templates
+   - selects one of the configured layout templates
    - validates the written layout library metadata
    - applies layout typography/capacity metadata
    - assembles the image-only prompt
@@ -118,11 +120,17 @@ REACT_APP_BACKEND_URL=https://wildlandsbackend-production.up.railway.app
 
 ```bash
 yarn install
+yarn verify:pipeline
+yarn audit:layouts
 yarn workspace @wildlands/shared typecheck
 yarn workspace @wildlands/backend typecheck
 yarn workspace @wildlands/backend test
 yarn workspace frontend build
 ```
+
+`yarn verify:pipeline` is the main pre-review command. It builds shared
+contracts, typechecks the backend, runs the backend test suite, builds the
+frontend, and audits every layout reference template/image/prompt safety rule.
 
 Run backend locally:
 

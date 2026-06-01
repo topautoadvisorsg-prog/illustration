@@ -32,6 +32,25 @@ Expected manuscript structure:
 ...
 ```
 
+The parser also supports the current master-manuscript shape:
+
+```markdown
+# CHAPTER 2 - Animals
+
+## MAMMALS
+
+### 1. Black Bear
+...
+
+### 2. Moose
+...
+```
+
+When explicit `# CHAPTER n` headings exist, planning/front-matter headings
+before the real chapters are ignored. Category headings such as `## MAMMALS`,
+`## EDIBLE PLANTS`, and `## SECTION 1 - READING THE LAND` organize entries but
+do not become page entries unless they contain substantial direct body text.
+
 ## Outputs
 
 - Stored manuscript file
@@ -66,12 +85,18 @@ yarn workspace @wildlands/backend test -- ingest-manuscript
 yarn workspace @wildlands/backend test -- parse-manuscript-outline
 ```
 
+Via manuscript audit:
+
+```bash
+yarn workspace @wildlands/backend audit:manuscript "C:/path/to/book.md"
+```
+
 ## Debugging
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | `NO_CHAPTERS_DETECTED` | Missing `#` chapter heading | Add level-1 chapter headings |
-| `NO_ENTRIES_DETECTED` | Missing `##` entry headings | Add level-2 entry headings |
+| `NO_ENTRIES_DETECTED` | Missing usable entry headings | Add `##` entries or category `##` headings with `###` child entries |
 | `Manuscript must be a .md file` | Wrong filename extension | Upload `.md` |
 | Headings inside examples counted | Fenced code bug | Parser now ignores fenced code blocks |
 

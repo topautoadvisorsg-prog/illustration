@@ -121,8 +121,11 @@ otherwise                     -> LAYOUT_1_STANDARD
 - Text areas win over visual density. When in doubt, preserve more negative
   space.
 - The image model must not render paragraphs, article text, captions,
-  educational content, fake encyclopedia text, page numbers, headers, labels,
-  or typography.
+  educational content, fake encyclopedia text, page numbers, headers, reference
+  notes, or unrequested labels.
+- If the approved layout needs visible image text, it must be an exact
+  subject-name label supplied by the prompt. It should be large, legible, and
+  the only readable text in the generated image.
 - Annotations should be minimal: 0-2 major, obvious educational features per
   subject, never dense scientific poster labeling.
 - Final text placement belongs to Stage 6.
