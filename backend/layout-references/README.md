@@ -4,12 +4,14 @@ This folder is the source library for stakeholder-provided page layout reference
 
 ## What Goes Here
 
-The operator will provide 9 reference/mockup images, one per production layout.
-Each reference image travels with a matching image prompt template. Together they
-define where the art goes, how much room the text gets, and what prompt should be
-filled once the text-fit mockup is approved.
+The operator provides one reference/mockup image per production layout. The canonical
+set is **15 templates** (numbering runs 1–11 and 13–16; LAYOUT_12 was removed as a
+duplicate of LAYOUT_9, so there is an intentional gap at 12). Each reference image
+travels with a matching image prompt template. Together they define where the art goes,
+how much room the text gets, and what prompt should be filled once the text-fit mockup
+is approved.
 
-Each image maps to one of the 9 production layout templates:
+Each image maps to one of the 15 production layout templates:
 
 | Template | Purpose |
 |---|---|
@@ -20,8 +22,17 @@ Each image maps to one of the 9 production layout templates:
 | `LAYOUT_5_CHAPTER_OPENER` | Atmospheric chapter opening spread/page |
 | `LAYOUT_6_BACK_MATTER` | Tables, indexes, glossary, look-alike lists |
 | `LAYOUT_7_SCATTERED_VIGNETTES` | Multiple small naturalist vignettes |
-| `LAYOUT_8_MARGIN_ILLUSTRATION` | Tall subject or small margin illustration |
-| `LAYOUT_9_DIAGNOSTIC_DIAGRAM` | Comparison, anatomy, tracks, diagrams |
+| `LAYOUT_8_MARGIN_ILLUSTRATION` | Small margin illustration beside text |
+| `LAYOUT_9_DIAGNOSTIC_DIAGRAM` | Anatomy, parts, identifying features, diagrams |
+| `LAYOUT_10_FULL_PAGE_PLATE` | Full-page showcase illustration, minimal text |
+| `LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD` | Habitat / scenery landscape spread |
+| `LAYOUT_13_FEATURE_BANNER` | Region/overview banner (watershed, range, landscape) |
+| `LAYOUT_14_SIDEBAR_FEATURE` | Tall subject with a text sidebar (≥300 words) |
+| `LAYOUT_15_PROGRESSION_STUDY` | Life cycle / growth stages / seasonal progression |
+| `LAYOUT_16_CUTAWAY_FEATURE` | Cutaway, cross-section, layered/internal structure |
+
+> Comparison / look-alike pages route to a configurable template via
+> `layoutPolicy.comparisonTemplate` (default `LAYOUT_4_DANGER_WARNING`).
 
 ## Intended Workflow
 

@@ -93,9 +93,8 @@ describe('planPage', () => {
     expect(decision.prompt).toContain('golden chanterelle mushroom');
     expect(decision.prompt).toContain('Vintage Naturalist master style DNA.');
     expect(decision.prompt).toContain('LAYOUT SYSTEM RULES');
-    expect(decision.prompt).toContain('Do not generate readable text by default.');
-    expect(decision.prompt).toContain('Exact optional subject-name label: "Chanterelle vs False Chanterelle".');
-    expect(decision.prompt).toContain('it must be the only readable text in the generated image');
+    expect(decision.prompt).toContain('Generate clean artwork only.');
+    expect(decision.prompt).toContain('Render NO text of any kind in the image');
     expect(decision.prompt).not.toContain('{SUBJECT}');
     expect(decision.typography.bodyPt).toBe(10.5);
     expect(decision.promptReady).toBe(true);

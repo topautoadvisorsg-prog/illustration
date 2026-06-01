@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm';
 import type { ProjectConfig, ProjectStatus } from '@wildlands/shared';
 import { getDb } from '../client.js';
 import { projects } from '../schema/index.js';
+import { getMasterStyleBlock, MIN_REAL_STYLE_BLOCK_CHARS } from '../../services/style/master-style-blocks.js';
 
 export interface NewProjectInput {
   config: ProjectConfig;
@@ -17,9 +18,28 @@ export interface NewProjectInput {
 
 export type ProjectRow = typeof projects.$inferSelect;
 
+/**
+ * Inject the brand's canonical master style block whenever the incoming config
+ * still carries the short placeholder/stub. This guarantees image prompts are
+ * anchored to the real visual DNA instead of a 5-word stub.
+ */
+function resolveConfig(config: ProjectConfig): ProjectConfig {
+  const current = config.imageGeneration.masterStyleBlockText ?? '';
+  if (current.trim().length >= MIN_REAL_STYLE_BLOCK_CHARS) return config;
+  const block = getMasterStyleBlock(config.brand);
+  return {
+    ...config,
+    imageGeneration: {
+      ...config.imageGeneration,
+      masterStyleBlockVersion: block.version,
+      masterStyleBlockText: block.text,
+    },
+  };
+}
+
 export async function createProject(input: NewProjectInput): Promise<ProjectRow> {
   const db = getDb();
-  const { config } = input;
+  const config = resolveConfig(input.config);
   const [row] = await db
     .insert(projects)
     .values({
@@ -77,8 +97,9 @@ export async function setProjectStatus(id: string, status: ProjectStatus): Promi
   return row ?? null;
 }
 
-export async function updateProjectConfig(id: string, config: ProjectConfig): Promise<ProjectRow | null> {
+export async function updateProjectConfig(id: string, rawConfig: ProjectConfig): Promise<ProjectRow | null> {
   const db = getDb();
+  const config = resolveConfig(rawConfig);
   const [row] = await db
     .update(projects)
     .set({

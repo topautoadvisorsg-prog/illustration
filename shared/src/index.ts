@@ -59,7 +59,8 @@ export const LayoutTemplateIdSchema = z.enum([
   'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
   'LAYOUT_10_FULL_PAGE_PLATE',
   'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD',
-  'LAYOUT_12_DIAGNOSTIC_DIAGRAM',
+  // LAYOUT_12 removed: was a duplicate of LAYOUT_9_DIAGNOSTIC_DIAGRAM. Numbering 13-16
+  // kept stable to avoid churn in tests/stored rows (intentional gap at 12).
   'LAYOUT_13_FEATURE_BANNER',
   'LAYOUT_14_SIDEBAR_FEATURE',
   'LAYOUT_15_PROGRESSION_STUDY',
@@ -81,11 +82,12 @@ export const TypographyConfigSchema = z.object({
   smallCaps: z.boolean().default(true),
 });
 
+// Defaults match the THE_WILDLANDS master style block (single source of truth for color).
 export const ColorPaletteSchema = z.object({
-  paper: z.string().min(1).default('#f4f1ea'),
-  ink: z.string().min(1).default('#1b332d'),
-  accent: z.string().min(1).default('#2f5d50'),
-  warning: z.string().min(1).default('#9f2d20'),
+  paper: z.string().min(1).default('#F5EDD6'),
+  ink: z.string().min(1).default('#2C1A0E'),
+  accent: z.string().min(1).default('#3A5C3A'),
+  warning: z.string().min(1).default('#8B2020'),
 });
 
 export const ImageGenerationConfigSchema = z.object({

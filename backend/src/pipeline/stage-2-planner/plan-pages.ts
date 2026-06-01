@@ -27,9 +27,9 @@ Treat the selected layout as a strong reference template, not a rigid rule. Mino
 
 Preserve future text areas above all else. Do not allow illustrations, background elements, diagrams, labels, decorative details, or environmental elements to consume areas intended for written educational content. When in doubt, leave more negative space.
 
-Do not generate readable text by default. The only permitted image text is an explicit subject-name label supplied by the prompt. If a label is used, render exactly the supplied label text, large and legible, with no extra words. Do not render paragraphs, article text, captions, educational content, fake encyclopedia text, page numbers, headers, reference notes, or unrequested labels.
+Generate clean artwork only. The illustration must contain ZERO readable text of any kind: no subject names, labels, captions, titles, headings, paragraphs, article text, fake encyclopedia text, page numbers, headers, reference notes, measurements, callouts, or annotations. Do not draw arrows, leader lines, or pointer marks with text. All labels, names, annotations, arrows, and typography are added later by the layout/composition system — never by the image model.
 
-Use minimal annotation only when structurally necessary. Limit callouts to 0-2 major, obvious educational features per subject. Avoid dense labeling systems, technical breakdowns, scientific poster layouts, and small-detail callouts.
+Do not build scientific-poster layouts, dense labeling systems, or technical breakdowns. The image is pure subject artwork; the educational markup is overlaid afterward.
 
 Layouts define image placement, negative space, reading flow, content zones, and visual hierarchy. They do not define subject matter, article content, or detailed scientific analysis.
 
@@ -95,7 +95,6 @@ const DEFAULT_LAYOUT_CAPACITY: Record<LayoutTemplateId, { minWords: number; targ
   LAYOUT_9_DIAGNOSTIC_DIAGRAM: { minWords: 180, targetWords: 280, maxWords: 400 },
   LAYOUT_10_FULL_PAGE_PLATE: { minWords: 0, targetWords: 40, maxWords: 90 },
   LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD: { minWords: 0, targetWords: 60, maxWords: 140 },
-  LAYOUT_12_DIAGNOSTIC_DIAGRAM: { minWords: 180, targetWords: 280, maxWords: 400 },
   LAYOUT_13_FEATURE_BANNER: { minWords: 260, targetWords: 420, maxWords: 620 },
   LAYOUT_14_SIDEBAR_FEATURE: { minWords: 300, targetWords: 460, maxWords: 640 },
   LAYOUT_15_PROGRESSION_STUDY: { minWords: 220, targetWords: 340, maxWords: 500 },
@@ -150,7 +149,7 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
 
   if (page.warnings.length > 0 || includesAny(text, ['toxic', 'poison', 'deadly', 'danger', 'warning', 'do not eat'])) {
     reasons.push('danger_or_warning_signal');
-    return { template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM', reasons };
+    return { template: 'LAYOUT_4_DANGER_WARNING', reasons };
   }
 
   if (includesAny(text, ['chapter opener', 'chapter introduction', 'section introduction', 'opening page', 'opener'])) {
@@ -175,7 +174,7 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
 
   if (includesAny(text, ['diagram', 'anatomy', 'diagnostic', 'parts', 'major features', 'identifying features'])) {
     reasons.push('diagnostic_diagram_signal');
-    return { template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM', reasons };
+    return { template: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM', reasons };
   }
 
   if (includesAny(text, ['overview', 'region overview', 'feature banner', 'visual header', 'mountain range', 'river system', 'watershed', 'landscape context'])) {
@@ -318,13 +317,11 @@ function scientificDetails(page: PageManifest): string {
   return pieces.join(' ');
 }
 
-function labelTextRules(page: PageManifest): string {
-  const exactLabel = page.entryTitle.trim();
+function labelTextRules(_page: PageManifest): string {
   return [
-    `Exact optional subject-name label: "${exactLabel}".`,
-    'Use this label only if the approved layout calls for a visible subject name/title.',
-    'If used, it must be the only readable text in the generated image, set large and clear.',
-    'Do not invent captions, notes, measurements, reference blurbs, article text, or additional labels.',
+    'Render NO text of any kind in the image — not even the subject name.',
+    `The subject "${_page.entryTitle.trim()}" and all labels/annotations are typeset later by the layout system, never drawn by the image model.`,
+    'Do not invent captions, names, notes, measurements, reference blurbs, article text, arrows, or labels.',
   ].join(' ');
 }
 

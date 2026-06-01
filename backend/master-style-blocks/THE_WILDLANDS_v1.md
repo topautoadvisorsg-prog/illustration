@@ -28,18 +28,16 @@ Drift mitigations (per spec, layered):
 Stage 2 (Scene & Page Planner) assembles each image prompt as:
 
 ```
-{MASTER_STYLE_BLOCK}
+{MASTER_STYLE_DNA}   (visual DNA + negative rules; injected verbatim)
 
-SUBJECT: {page_manifest.illustration.subject}
-
-ANNOTATIONS ON IMAGE: {page_manifest.illustration.annotations joined}
-(Annotations are subtle hand-lettered field-notes near the subject, never replacing the illustration.)
-
-LAYOUT: {layout_template_hint}
-WARNINGS: {warning_elements or "none"}
-
-{NEGATIVE_RULES}
+SUBJECT: {page_manifest.imageSubject}
+SCIENTIFIC_DETAILS: {scientific name + key ID details}
+COMPOSITION_NOTES: {layout image-zone + "render NO text of any kind"}
 ```
+
+> **v1.1 clean-art rule:** the image model renders ZERO text. Labels, annotations,
+> arrows, callouts, captions, and titles are added later by the layout/composition
+> system (Stage 6), never baked into the generated image.
 
 Total assembled prompt must stay under 4000 characters (gpt-image-1 cap). The Master
 Style Block below is ~1900 chars to leave room for subject + annotations.
@@ -96,7 +94,7 @@ DO NOT include any of the following:
 - Hard borders, frames, rectangles, ovals, badges, banners, or any geometric containers around the subject.
 - Symmetrical, grid-locked, or centered subject placement.
 - Pure white backgrounds, plain paper, or screen-white. The background must be the warm parchment described above.
-- Text blocks, headlines, paragraphs, captions, titles, or scientific names rendered IN the image. Annotations are short hand-lettered field notes only, two to five words, placed unobtrusively next to the subject.
+- ANY text whatsoever rendered IN the image: no labels, names, captions, titles, headings, paragraphs, scientific names, annotations, hand-lettered field notes, callouts, arrows-with-text, numbers, or page furniture. The illustration must be 100% text-free. All labels, annotations, and typography are added later by the layout/composition system (Stage 6) — never by the image model. (v1.1 clean-art rule.)
 - Watermarks, signatures, logos, page numbers, or stock-art tags.
 - Multiple unrelated subjects unless the layout explicitly calls for vignettes.
 - Anthropomorphized animals, cartoon expressions, or whimsical fantasy elements.
