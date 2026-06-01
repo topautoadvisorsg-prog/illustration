@@ -138,6 +138,22 @@ export async function listPages(projectId: string): Promise<PageRow[]> {
   return db.select().from(pages).where(eq(pages.projectId, projectId)).orderBy(pages.plannedPageNumber);
 }
 
+export async function getPageById(id: string): Promise<PageRow | undefined> {
+  const db = getDb();
+  const [row] = await db.select().from(pages).where(eq(pages.id, id)).limit(1);
+  return row;
+}
+
+export async function setPageStatus(id: string, status: PageRow['status']): Promise<PageRow | undefined> {
+  const db = getDb();
+  const [row] = await db
+    .update(pages)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(pages.id, id))
+    .returning();
+  return row;
+}
+
 export async function updatePagePlanning(
   projectId: string,
   pageKey: string,
