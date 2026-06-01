@@ -143,51 +143,69 @@ function includesAny(text: string, needles: string[]): boolean {
   return needles.some((needle) => text.includes(needle));
 }
 
+/**
+ * Is this page about a genuinely dangerous subject? Driven by the entry's
+ * identity (warnings, category, title/subject), NOT incidental body prose — a
+ * normal edible entry that merely contains a "look-alike warning" subsection is
+ * not a danger page.
+ */
+function isDangerPage(page: PageManifest): boolean {
+  if (page.warnings.length > 0) return true;
+  const category = normalizeText(page.category ?? '');
+  if (includesAny(category, ['toxic', 'poison', 'deadly', 'danger', 'venom'])) return true;
+  const identity = normalizeText(`${page.entryTitle}\n${page.imageSubject}`);
+  return includesAny(identity, ['toxic', 'poison', 'poisonous', 'deadly', 'venomous', 'do not eat']);
+}
+
 function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConfig): { template: LayoutTemplateId; reasons: string[] } {
-  const text = normalizeText(`${page.entryTitle}\n${page.imageSubject}\n${page.bodyMarkdown}\n${page.warnings.join('\n')}`);
+  // Layout intent comes from what the page IS (title + image subject), not from
+  // incidental vocabulary in the body prose. This prevents a single word like
+  // "diagnostic" or a "look-alike warning" subsection from forcing a long entry
+  // into a low-capacity special layout that the text then overflows.
+  const signal = normalizeText(`${page.entryTitle}\n${page.imageSubject}`);
   const reasons: string[] = [];
 
-  if (page.warnings.length > 0 || includesAny(text, ['toxic', 'poison', 'deadly', 'danger', 'warning', 'do not eat'])) {
+  if (isDangerPage(page)) {
     reasons.push('danger_or_warning_signal');
     return { template: 'LAYOUT_4_DANGER_WARNING', reasons };
   }
 
-  if (includesAny(text, ['chapter opener', 'chapter introduction', 'section introduction', 'opening page', 'opener'])) {
+  if (includesAny(signal, ['chapter opener', 'chapter introduction', 'section introduction', 'opening page', 'opener'])) {
     reasons.push('chapter_opener_signal');
     return { template: 'LAYOUT_5_CHAPTER_OPENER', reasons };
   }
 
-  if (includesAny(text, ['life cycle', 'lifecycle', 'growth stage', 'growth stages', 'stage sequence', 'progression', 'development over time', 'seedling', 'sapling', 'mature stage', 'seasonal sequence'])) {
+  if (includesAny(signal, ['life cycle', 'lifecycle', 'growth stage', 'growth stages', 'stage sequence', 'progression', 'development over time', 'seedling', 'sapling', 'mature stage', 'seasonal sequence'])) {
     reasons.push('progression_or_lifecycle_signal');
     return { template: 'LAYOUT_15_PROGRESSION_STUDY', reasons };
   }
 
-  if (includesAny(text, ['cutaway', 'cut away', 'cross-section', 'cross section', 'layered', 'layers', 'internal structure', 'hidden relationship', 'root layer', 'soil layer', 'strata', 'stratum', 'groundwater zone'])) {
+  if (includesAny(signal, ['cutaway', 'cut away', 'cross-section', 'cross section', 'layered', 'layers', 'internal structure', 'hidden relationship', 'root layer', 'soil layer', 'strata', 'stratum', 'groundwater zone'])) {
     reasons.push('cutaway_or_layer_signal');
     return { template: 'LAYOUT_16_CUTAWAY_FEATURE', reasons };
   }
 
-  if (includesAny(text, ['compare', 'comparison', 'look-alike', 'look alike', 'versus', ' vs ', 'similar species'])) {
+  if (includesAny(signal, ['compare', 'comparison', 'look-alike', 'look alike', 'versus', ' vs ', 'similar species'])) {
     reasons.push('comparison_or_lookalike_signal');
     return { template: config.layoutPolicy.comparisonTemplate, reasons };
   }
 
-  if (includesAny(text, ['diagram', 'anatomy', 'diagnostic', 'parts', 'major features', 'identifying features'])) {
+  if (includesAny(signal, ['diagram', 'anatomy', 'diagnostic', 'parts', 'major features', 'identifying features'])) {
     reasons.push('diagnostic_diagram_signal');
     return { template: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM', reasons };
   }
 
-  if (includesAny(text, ['overview', 'region overview', 'feature banner', 'visual header', 'mountain range', 'river system', 'watershed', 'landscape context'])) {
+  if (includesAny(signal, ['overview', 'region overview', 'feature banner', 'visual header', 'mountain range', 'river system', 'watershed', 'landscape context'])) {
     reasons.push('feature_banner_signal');
     return { template: 'LAYOUT_13_FEATURE_BANNER', reasons };
   }
 
-  if (includesAny(text, ['track', 'tracks', 'habitat scene', 'signs', 'scat', 'trail'])) {
+  if (includesAny(signal, ['track', 'tracks', 'habitat scene', 'signs', 'scat', 'trail'])) {
     reasons.push('track_or_habitat_signal');
     return { template: 'LAYOUT_7_SCATTERED_VIGNETTES', reasons };
   }
 
-  if (includesAny(text, ['tree', 'sapling', 'tall plant', 'vine', 'trunk', 'bark'])) {
+  if (includesAny(signal, ['tree', 'sapling', 'tall plant', 'vine', 'trunk', 'bark'])) {
     reasons.push('tall_subject_signal');
     return { template: wordCount >= 300 ? 'LAYOUT_14_SIDEBAR_FEATURE' : 'LAYOUT_8_MARGIN_ILLUSTRATION', reasons };
   }

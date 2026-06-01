@@ -12,13 +12,13 @@ function fit(body: string, layoutTemplate: LayoutTemplateId = 'LAYOUT_1_STANDARD
 describe('analyzeTextFit', () => {
   it('derives a deterministic character grid for the standard layout', () => {
     const r = fit('x'.repeat(1500));
-    // 459pt / (0.5 * 11pt) = 83 chars/line
-    expect(r.charsPerLine).toBe(83);
+    // 459pt / (0.45 * 11pt) = floor(92.7) = 92 chars/line
+    expect(r.charsPerLine).toBe(92);
     // floor(666 / (11 * 1.28)) = floor(47.3) = 47 total lines
     expect(r.totalLines).toBe(47);
-    // (47 - 4 overhead) * 0.8 factor -> floor(34.4) = 34 usable lines
-    expect(r.usableLines).toBe(34);
-    expect(r.capacityChars).toBe(83 * 34);
+    // (47 - 3 overhead) * 0.8 factor -> floor(35.2) = 35 usable lines
+    expect(r.usableLines).toBe(35);
+    expect(r.capacityChars).toBe(92 * 35);
   });
 
   it('classifies a comfortably-fitting page as FITS', () => {
@@ -36,8 +36,8 @@ describe('analyzeTextFit', () => {
   });
 
   it('flags a nearly-full page as TIGHT', () => {
-    // capacity = 83*34 = 2822; ~96% fill
-    const r = fit('x'.repeat(2700));
+    // capacity = 92*35 = 3220; ~95% fill
+    const r = fit('x'.repeat(3050));
     expect(r.status).toBe('TIGHT');
     expect(r.fits).toBe(true);
   });

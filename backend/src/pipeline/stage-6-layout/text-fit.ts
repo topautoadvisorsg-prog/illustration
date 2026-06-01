@@ -18,12 +18,15 @@ import { stripMarkdown } from '../stage-2-planner/plan-pages.js';
 import type { PageGeometry } from './page-geometry.js';
 import { getLayoutProfile } from './layout-profiles.js';
 
-/** Average glyph advance for a serif body face (EB Garamond), in ems. */
-export const AVG_CHAR_WIDTH_EM = 0.5;
+// Calibrated so the geometric estimate agrees with the planner's per-layout word
+// ranges (e.g. ~720-word entries sit near LAYOUT_2_TEXT_HEAVY capacity) — the two
+// signals must not contradict each other. The real Paged.js render is authoritative.
+/** Average glyph advance for justified serif body text (EB Garamond), in ems. */
+export const AVG_CHAR_WIDTH_EM = 0.45;
 /** Lines consumed by the entry title + scientific name + spacing. */
-export const TITLE_OVERHEAD_LINES = 4;
-/** Extra lines consumed per section header (header line + spacing). */
-export const LINES_PER_SECTION_HEADER = 2;
+export const TITLE_OVERHEAD_LINES = 3;
+/** Extra lines consumed per section header. */
+export const LINES_PER_SECTION_HEADER = 1;
 
 export type TextFitStatus = 'FITS' | 'TIGHT' | 'OVERFLOW' | 'UNDERFILLED';
 

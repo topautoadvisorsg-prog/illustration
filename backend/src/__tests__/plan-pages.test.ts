@@ -121,4 +121,34 @@ describe('planPage', () => {
     expect(decision.textFitStatus).toBe('BLOCKED_LAYOUT_LIBRARY');
     expect(decision.blockers).toContain('missing_layout_asset:LAYOUT_3_ILLUSTRATION_DOMINANT');
   });
+
+  it('does not route an edible entry with a look-alike-warning subsection to the danger layout', () => {
+    const decision = planPage(
+      page({
+        entryTitle: 'Chanterelle',
+        imageSubject: 'golden chanterelle mushroom',
+        category: 'EDIBLE',
+        bodyMarkdown: `### How to identify\n${Array(450).fill('golden').join(' ')}\n\n### Look-alike warning\nThe jack-o-lantern is toxic; do not eat it.`,
+      }),
+      baseConfig,
+    );
+
+    expect(decision.layoutTemplate).not.toBe('LAYOUT_4_DANGER_WARNING');
+    expect(decision.reasonCodes).not.toContain('danger_or_warning_signal');
+  });
+
+  it('routes a genuinely toxic entry (by category) to the danger layout', () => {
+    const decision = planPage(
+      page({
+        entryTitle: 'Death Cap',
+        imageSubject: 'death cap mushroom',
+        category: 'TOXIC',
+        bodyMarkdown: 'A deadly poisonous mushroom responsible for most fatal mushroom poisonings.',
+      }),
+      baseConfig,
+    );
+
+    expect(decision.layoutTemplate).toBe('LAYOUT_4_DANGER_WARNING');
+    expect(decision.reasonCodes).toContain('danger_or_warning_signal');
+  });
 });

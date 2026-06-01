@@ -177,6 +177,8 @@ export const PageManifestSchema = z.object({
   pageNumber: z.number().int().positive(),
   entryTitle: z.string().min(1),
   scientificName: z.string().optional(),
+  /** Entry classification from Stage 1.5 (e.g. EDIBLE, TOXIC) — drives danger layout. */
+  category: z.string().optional(),
   layoutTemplate: LayoutTemplateIdSchema,
   layoutReferenceId: z.string().min(1).optional(),
   imageSubject: z.string().min(1),

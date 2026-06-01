@@ -179,6 +179,7 @@ export async function generateManifests(input: GenerateManifestsInput): Promise<
         pageNumber: runningPageNumber,
         entryTitle: entry.entryTitle,
         scientificName: entry.scientificName,
+        category: entry.category,
         layoutTemplate: entry.layoutTemplate,
         imageSubject: entry.imageSubject,
         bodyMarkdown: entry.bodyMarkdown,
