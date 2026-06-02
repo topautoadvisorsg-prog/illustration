@@ -24,6 +24,8 @@ import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-mani
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
 import { RenderBlockedError, renderBookPdf, renderChapterPdf } from '../pipeline/stage-6-layout/render-chapter.js';
+import { countImagesForProject } from '../db/repositories/images.repo.js';
+import { estimateCost } from '../services/cost/estimate.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 
@@ -462,6 +464,22 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         });
       }
       return previewProjectTextFit(id);
+    },
+  );
+
+  // Simple cost estimate: images generated x flat average $/image.
+  const CostEstimateResponseSchema = z.object({
+    imageCount: z.number(),
+    avgCostPerImageUsd: z.number(),
+    estimatedCostUsd: z.number(),
+  });
+  app.get(
+    '/api/projects/:id/cost-estimate',
+    { schema: { params: ProjectParamsSchema, response: { 200: CostEstimateResponseSchema } } },
+    async (request) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const imageCount = await countImagesForProject(id);
+      return estimateCost(imageCount);
     },
   );
 

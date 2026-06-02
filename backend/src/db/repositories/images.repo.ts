@@ -5,10 +5,21 @@
  * which version is "active". Generations are never overwritten (audit + rollback).
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { ImageStatus } from '@wildlands/shared';
 import { getDb } from '../client.js';
-import { images } from '../schema/index.js';
+import { images, pages } from '../schema/index.js';
+
+/** Total images generated for a project (every version counts as a generation). */
+export async function countImagesForProject(projectId: string): Promise<number> {
+  const db = getDb();
+  const [row] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(images)
+    .innerJoin(pages, eq(images.pageId, pages.id))
+    .where(eq(pages.projectId, projectId));
+  return Number(row?.count ?? 0);
+}
 
 export type ImageRow = typeof images.$inferSelect;
 
