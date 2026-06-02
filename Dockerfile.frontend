@@ -1,0 +1,24 @@
+# Frontend (CRA/craco) build + static serve.
+# Separate from Dockerfile.backend so the two Railway services never share one
+# root Dockerfile. The frontend service points here via RAILWAY_DOCKERFILE_PATH.
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare yarn@1.22.22 --activate \
+ && npm install -g serve@14
+
+# Monorepo install (frontend is a yarn workspace).
+COPY package.json yarn.lock ./
+COPY shared/package.json ./shared/
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
+COPY spikes/package.json ./spikes/
+RUN yarn install --frozen-lockfile --production=false
+
+# Build the React app.
+COPY . .
+RUN yarn workspace frontend build
+
+# Railway injects PORT. Serve the SPA build with index.html fallback for all routes.
+CMD ["sh", "-c", "serve -s frontend/build -l tcp://0.0.0.0:${PORT:-3000}"]
