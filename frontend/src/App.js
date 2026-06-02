@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import "@/App.css";
 
-const configuredBackend = process.env.REACT_APP_BACKEND_URL || "";
+// Pre-fill the live backend so the admin page is ready to test without hunting for
+// the URL. REACT_APP_BACKEND_URL (set in Railway) overrides this when present.
+const DEFAULT_BACKEND_URL = "https://wildlandsbackend-production.up.railway.app";
+const configuredBackend = process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND_URL;
 
 const LAYOUT_TEMPLATES = [
   ["LAYOUT_1_STANDARD", "Standard", "Balanced text and illustration", 220, 320, 420],
