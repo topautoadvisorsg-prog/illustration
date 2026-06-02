@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "@/App.css";
 
 // Pre-fill the live backend so the admin page is ready to test without hunting for
@@ -1041,6 +1041,8 @@ Found near hardwoods after summer rain.
 ### Notes
 Use this entry to prove manuscript to manifest generation.`);
   const [manuscriptName, setManuscriptName] = useState("manuscript.md");
+  const [isDragging, setIsDragging] = useState(false);
+  const manuscriptInputRef = useRef(null);
   const [manifests, setManifests] = useState([]);
   const [pages, setPages] = useState([]);
   const [plannedPages, setPlannedPages] = useState([]);
@@ -1483,6 +1485,17 @@ Use this entry to prove manuscript to manifest generation.`);
     setManuscript(text);
     setManuscriptName(file.name || "manuscript.md");
     appendLog("success", `Loaded local manuscript file: ${file.name} (${text.length.toLocaleString()} chars)`);
+  }
+
+  function openManuscriptPicker() {
+    if (manuscriptInputRef.current) manuscriptInputRef.current.click();
+  }
+
+  function handleManuscriptDrop(event) {
+    event.preventDefault();
+    setIsDragging(false);
+    const file = event.dataTransfer?.files?.[0];
+    if (file) uploadManuscriptFile(file);
   }
 
   async function runManuscriptIntake() {
@@ -1955,14 +1968,19 @@ Use this entry to prove manuscript to manifest generation.`);
           <div className="section-head">
             <h2>2. Manuscript</h2>
             <div className="button-row">
-              <label className="file-button">
+              <button type="button" className="file-button" onClick={openManuscriptPicker}>
                 Choose file
-                <input
-                  type="file"
-                  accept=".md,.markdown,.txt,text/markdown,text/plain"
-                  onChange={(event) => uploadManuscriptFile(event.target.files?.[0])}
-                />
-              </label>
+              </button>
+              <input
+                ref={manuscriptInputRef}
+                type="file"
+                accept=".md,.markdown,.txt,text/markdown,text/plain"
+                style={{ display: "none" }}
+                onChange={(event) => {
+                  uploadManuscriptFile(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
               <span className="file-name" title={manuscriptName}>{manuscriptName}</span>
               <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
                 Upload
@@ -1975,7 +1993,22 @@ Use this entry to prove manuscript to manifest generation.`);
               </button>
             </div>
           </div>
-          <textarea value={manuscript} onChange={(event) => setManuscript(event.target.value)} />
+          <div
+            className={isDragging ? "dropzone dragging" : "dropzone"}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleManuscriptDrop}
+          >
+            <textarea
+              value={manuscript}
+              onChange={(event) => setManuscript(event.target.value)}
+              placeholder="Paste your manuscript here, drop a .md/.txt file, or use Choose file."
+            />
+            {isDragging && <div className="drop-hint">Drop your manuscript file</div>}
+          </div>
         </section>
 
         <section className="panel">
