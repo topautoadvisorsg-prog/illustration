@@ -96,27 +96,50 @@ function bodyToHtml(markdown: string): string {
   return out.join('\n');
 }
 
-function artSlotCss(slot: ArtSlot): string {
+/** Positioning only (float direction / block / margins) — size comes from coverage. */
+function artSlotPositionCss(slot: ArtSlot): string {
   switch (slot) {
     case 'FLOAT_LEFT':
-      return '.art-slot{float:left;width:45%;margin:0 18pt 10pt 0;}';
+      return 'float:left;margin:0 18pt 10pt 0;';
     case 'FLOAT_RIGHT':
-      return '.art-slot{float:right;width:48%;margin:0 0 10pt 18pt;}';
+      return 'float:right;margin:0 0 10pt 18pt;';
     case 'TOP_BAND':
-      return '.art-slot{display:block;width:100%;height:3.4in;margin:0 0 14pt 0;}';
+      return 'display:block;margin:0 0 14pt 0;';
     case 'BOTTOM_BAND':
-      return '.art-slot{display:block;width:100%;height:3.4in;margin:14pt 0 0 0;}';
+      return 'display:block;margin:14pt 0 0 0;';
     case 'FULL_PAGE':
-      return '.art-slot{display:block;width:100%;height:9in;margin:0;}';
+      return 'display:block;margin:0;';
     case 'SIDEBAR_RIGHT':
-      return '.art-slot{float:right;width:32%;height:6.5in;margin:0 0 10pt 18pt;}';
+      return 'float:right;margin:0 0 10pt 18pt;';
     case 'SCATTERED':
-      return '.art-slot{float:left;width:30%;margin:0 14pt 8pt 0;}';
+      return 'float:left;margin:0 14pt 8pt 0;';
     case 'CENTER_WRAP':
-      return '.art-slot{display:block;width:60%;margin:0 auto 10pt auto;}';
+      return 'display:block;margin:0 auto 10pt auto;';
     default:
-      return '.art-slot{float:left;width:45%;margin:0 18pt 10pt 0;}';
+      return 'float:left;margin:0 18pt 10pt 0;';
   }
+}
+
+/**
+ * Inline size for the art slot, scaled to the layout's COVERAGE (image share of
+ * the page) so the reserved zone matches the final proportions even before any
+ * illustration exists.
+ *   - full-width bands/plate: width 100%, height = coverage x text-frame height.
+ *   - tall sidebar: width = coverage of the column over near-full height.
+ *   - floats / scattered / centered: a balanced box whose area ~= coverage.
+ */
+function artSlotSizeStyle(slot: ArtSlot, coverage: number, frameHeightIn: number): string {
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  if (slot === 'TOP_BAND' || slot === 'BOTTOM_BAND' || slot === 'FULL_PAGE') {
+    return `width:100%;height:${Math.max(0.8, round2(coverage * frameHeightIn))}in;`;
+  }
+  if (slot === 'SIDEBAR_RIGHT') {
+    const widthPct = Math.min(60, Math.max(18, Math.round((coverage / 0.95) * 100)));
+    return `width:${widthPct}%;height:${round2(frameHeightIn * 0.95)}in;`;
+  }
+  // floats / scattered / center-wrap: balanced rectangle with area ~= coverage.
+  const frac = Math.sqrt(Math.max(0.01, coverage));
+  return `width:${Math.round(frac * 100)}%;height:${round2(frac * frameHeightIn)}in;`;
 }
 
 /** Build the standalone HTML document for one page. */
@@ -158,8 +181,7 @@ export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: R
   body { font-family: '${t.bodyFont}', serif; color: ${c.ink}; font-size: ${t.bodyPt}pt; line-height: ${t.lineHeight}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .entry-title { font-family: '${t.headingFont}', serif; font-weight: 700; font-size: 24pt; text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 4pt 0; color: ${c.ink}; }
   .scientific-name { font-style: italic; font-size: 13pt; color: ${c.accent}; margin: 0 0 16pt 0; }
-  ${artSlotCss(profile.artSlot)}
-  .art-slot { page-break-inside: avoid; }
+  .art-slot { ${artSlotPositionCss(profile.artSlot)} page-break-inside: avoid; }
   .art-placeholder { width: 100%; height: 100%; min-height: 2.4in; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #E8D9B0; outline: 1px dashed ${c.accent}; outline-offset: -4px; font-style: italic; font-size: 8pt; color: ${c.accent}; }
   .art-slot img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); }
   .section-header { ${t.smallCaps ? 'font-variant: small-caps;' : ''} font-weight: 600; font-size: ${t.bodyPt}pt; letter-spacing: 0.08em; margin: 8pt 0 2pt 0; color: ${c.ink}; }
@@ -173,7 +195,7 @@ export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: R
 <body>
   <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
   ${scientific}
-  <figure class="art-slot">${art}</figure>
+  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry.textHeightIn)}">${art}</figure>
   ${bodyToHtml(page.bodyMarkdown)}
   ${polyfill}
 </body>
@@ -201,7 +223,7 @@ export interface ChapterHtmlOptions {
 
 /** Per-architecture art-slot CSS, scoped to a `.arch-<NAME>` page wrapper. */
 function scopedArtSlotCss(slot: ArtSlot): string {
-  return `.arch-${slot} ${artSlotCss(slot)}`;
+  return `.arch-${slot} .art-slot{ ${artSlotPositionCss(slot)} }`;
 }
 
 /**
@@ -242,7 +264,7 @@ export function buildChapterHtml(
       return `<article class="book-page arch-${profile.artSlot}${danger}">
   <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
   ${scientific}
-  <figure class="art-slot">${art}</figure>
+  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry.textHeightIn)}">${art}</figure>
   ${bodyToHtml(page.bodyMarkdown)}
 </article>`;
     })

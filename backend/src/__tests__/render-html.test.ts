@@ -86,6 +86,22 @@ describe('buildPageHtml', () => {
     expect(html).toContain('<p class="section-body">A prized edible.</p>');
     expect(html).toContain('<h3 class="section-header">Where</h3>');
   });
+
+  it('sizes the reserved art slot to the layout coverage (text-frame height 9.25in)', () => {
+    // Full-page plate: 95% coverage, full width -> height = 0.95 * 9.25 = 8.79in.
+    const plate = buildPageHtml(page({ layoutTemplate: 'LAYOUT_10_FULL_PAGE_PLATE' }), config, { geometry });
+    expect(plate).toContain('width:100%;height:8.79in;');
+    // Text-heavy float: 14% coverage -> balanced box sqrt(0.14) ~= 37% width.
+    const textHeavy = buildPageHtml(page({ layoutTemplate: 'LAYOUT_2_TEXT_HEAVY' }), config, { geometry });
+    expect(textHeavy).toMatch(/<figure class="art-slot" style="width:37%;height:3\.46in;"/);
+  });
+
+  it('makes a higher-coverage top band taller than a lower-coverage one', () => {
+    const opener = buildPageHtml(page({ layoutTemplate: 'LAYOUT_5_CHAPTER_OPENER' }), config, { geometry }); // 55%
+    const banner = buildPageHtml(page({ layoutTemplate: 'LAYOUT_13_FEATURE_BANNER' }), config, { geometry }); // 40%
+    expect(opener).toContain('height:5.09in;'); // 0.55 * 9.25
+    expect(banner).toContain('height:3.7in;'); // 0.40 * 9.25
+  });
 });
 
 describe('inlineMarkdown', () => {
