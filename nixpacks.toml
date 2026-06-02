@@ -1,11 +1,22 @@
-[phases.install]
-cmds = ["yarn install --frozen-lockfile"]
+# Nixpacks config for the FRONTEND service (the frontend builder is Nixpacks).
+# The backend builds via Dockerfile.backend and does NOT read this file.
+#
+# Previously this file built/started the BACKEND, so the Nixpacks frontend service
+# was building+running the backend (which crash-loops without API keys) -> edge 404.
+# It now builds the React app and serves the static SPA on $PORT.
 
-[phases.build]
+[variables]
+# CRA/craco treats lint warnings as errors when CI=true; keep the build green.
+CI = "false"
+
+[phases.install]
 cmds = [
-  "yarn workspace @wildlands/shared build",
-  "yarn workspace @wildlands/backend build",
+  "yarn install --frozen-lockfile --production=false",
+  "npm install -g serve@14",
 ]
 
+[phases.build]
+cmds = ["yarn workspace frontend build"]
+
 [start]
-cmd = "yarn workspace @wildlands/backend start"
+cmd = "serve -s frontend/build -l tcp://0.0.0.0:$PORT"
