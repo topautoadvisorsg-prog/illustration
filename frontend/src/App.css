@@ -72,6 +72,16 @@ label.file-button input {
   display: none;
 }
 
+.file-name {
+  align-self: center;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: #9fc6b8;
+}
+
 textarea {
   min-height: 340px;
   resize: vertical;

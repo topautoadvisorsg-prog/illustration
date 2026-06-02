@@ -1956,13 +1956,14 @@ Use this entry to prove manuscript to manifest generation.`);
             <h2>2. Manuscript</h2>
             <div className="button-row">
               <label className="file-button">
-                Load .md
+                Choose file
                 <input
                   type="file"
                   accept=".md,.markdown,.txt,text/markdown,text/plain"
                   onChange={(event) => uploadManuscriptFile(event.target.files?.[0])}
                 />
               </label>
+              <span className="file-name" title={manuscriptName}>{manuscriptName}</span>
               <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
                 Upload
               </button>
