@@ -11,7 +11,7 @@ import {
   setActivePageImage,
 } from '../pipeline/stage-4-review/review-image.js';
 import { UpscaleBlockedError, upscalePageImage } from '../pipeline/stage-5-upscale/upscale-image.js';
-import { isChromiumAvailable, renderSamplePagePdf } from '../pipeline/stage-6-layout/render-check.js';
+import { isChromiumAvailable, renderSampleChapterPdf, renderSamplePagePdf } from '../pipeline/stage-6-layout/render-check.js';
 import { getContentTypeGuide } from '../pipeline/stage-2-planner/layered-layout.js';
 
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
@@ -245,6 +245,27 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
       }
       reply.header('content-type', 'application/pdf');
       reply.header('content-disposition', 'inline; filename="wildlands-render-check.pdf"');
+      reply.header('x-total-pages', String(totalPages));
+      return reply.send(pdf);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return reply.code(500).send({ error: 'Render Failed', message, statusCode: 500 });
+    }
+  });
+
+  // Stage 6 — multi-page sample CHAPTER render (no DB). Proves chapter pagination
+  // + per-page layouts work in production before real manuscripts/images exist.
+  app.get('/api/render-check-chapter', async (request, reply) => {
+    if (!isChromiumAvailable()) {
+      return reply.code(503).send({ error: 'Service Unavailable', message: 'Chromium is not available on this host.', statusCode: 503 });
+    }
+    try {
+      const { pdf, totalPages, bytes } = await renderSampleChapterPdf();
+      if ((request.query as { format?: string } | undefined)?.format === 'json') {
+        return reply.send({ ok: true, totalPages, bytes });
+      }
+      reply.header('content-type', 'application/pdf');
+      reply.header('content-disposition', 'inline; filename="wildlands-sample-chapter.pdf"');
       reply.header('x-total-pages', String(totalPages));
       return reply.send(pdf);
     } catch (error) {

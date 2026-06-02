@@ -23,6 +23,7 @@ import { ingestManuscript } from '../pipeline/stage-1-ingestion/ingest-manuscrip
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
+import { RenderBlockedError, renderBookPdf, renderChapterPdf } from '../pipeline/stage-6-layout/render-chapter.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 
@@ -463,4 +464,62 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       return previewProjectTextFit(id);
     },
   );
+
+  function renderErrorStatus(code: string): 404 | 409 | 503 {
+    if (code === 'not_found') return 404;
+    if (code === 'no_chromium') return 503;
+    return 409;
+  }
+
+  // Stage 6 — render one chapter to a PDF (uses approved/upscaled art, else clean
+  // placeholders so it works before images exist). Returns the PDF binary.
+  const RenderChapterParamsSchema = z.object({ id: z.string().uuid(), chapterNumber: z.coerce.number().int().positive() });
+  app.post('/api/projects/:id/chapters/:chapterNumber/render', async (request, reply) => {
+    const { id, chapterNumber } = RenderChapterParamsSchema.parse(request.params);
+    try {
+      const { pdf, totalPages } = await renderChapterPdf(id, chapterNumber);
+      if ((request.query as { format?: string } | undefined)?.format === 'json') {
+        return reply.send({ ok: true, chapterNumber, totalPages, bytes: pdf.byteLength });
+      }
+      reply.header('content-type', 'application/pdf');
+      reply.header('content-disposition', `inline; filename="chapter-${chapterNumber}.pdf"`);
+      reply.header('x-total-pages', String(totalPages));
+      return reply.send(pdf);
+    } catch (error) {
+      if (error instanceof RenderBlockedError) {
+        const status = renderErrorStatus(error.code);
+        return reply.code(status).send({ error: 'Render Blocked', message: error.message, statusCode: status });
+      }
+      throw error;
+    }
+  });
+
+  // Stage 7 — render every chapter, stitch into the interior book PDF, run KDP
+  // preflight, store it, record the export. ?format=json returns the preflight report.
+  app.post('/api/projects/:id/render-book', async (request, reply) => {
+    const { id } = ProjectParamsSchema.parse(request.params);
+    try {
+      const result = await renderBookPdf(id);
+      if ((request.query as { format?: string } | undefined)?.format === 'json') {
+        return reply.send({
+          ok: result.preflight.passed,
+          pageCount: result.pageCount,
+          chaptersRendered: result.chaptersRendered,
+          storedPath: result.storedPath,
+          preflight: result.preflight,
+        });
+      }
+      reply.header('content-type', 'application/pdf');
+      reply.header('content-disposition', 'inline; filename="wildlands-book.pdf"');
+      reply.header('x-page-count', String(result.pageCount));
+      reply.header('x-preflight-passed', String(result.preflight.passed));
+      return reply.send(result.pdf);
+    } catch (error) {
+      if (error instanceof RenderBlockedError) {
+        const status = renderErrorStatus(error.code);
+        return reply.code(status).send({ error: 'Render Blocked', message: error.message, statusCode: status });
+      }
+      throw error;
+    }
+  });
 }

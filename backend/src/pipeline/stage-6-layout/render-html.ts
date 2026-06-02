@@ -9,9 +9,9 @@
  * engine — never baked into the generated image.
  */
 
-import type { PageManifest, ProjectConfig } from '@wildlands/shared';
+import type { LayoutTemplateId, PageManifest, ProjectConfig } from '@wildlands/shared';
 import type { PageGeometry } from './page-geometry.js';
-import { getLayoutProfile, type ArtSlot } from './layout-profiles.js';
+import { LAYOUT_PROFILES, getLayoutProfile, type ArtSlot } from './layout-profiles.js';
 
 export interface RenderHtmlOptions {
   geometry: PageGeometry;
@@ -176,6 +176,118 @@ export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: R
   <figure class="art-slot">${art}</figure>
   ${bodyToHtml(page.bodyMarkdown)}
   ${polyfill}
+</body>
+</html>`;
+}
+
+export interface ChapterPageRender {
+  entryTitle: string;
+  scientificName?: string;
+  bodyMarkdown: string;
+  layoutTemplate: LayoutTemplateId;
+  /** Data URI of the approved/upscaled art; omit for a clean placeholder slot. */
+  imageDataUri?: string;
+}
+
+export interface ChapterRenderInfo {
+  chapterNumber: number;
+  chapterTitle: string;
+}
+
+export interface ChapterHtmlOptions {
+  geometry: PageGeometry;
+  polyfillJs?: string;
+}
+
+/** Per-architecture art-slot CSS, scoped to a `.arch-<NAME>` page wrapper. */
+function scopedArtSlotCss(slot: ArtSlot): string {
+  return `.arch-${slot} ${artSlotCss(slot)}`;
+}
+
+/**
+ * Build ONE HTML document containing every page of a chapter, so Paged.js
+ * paginates the whole chapter in a single render pass (chapter-by-chapter keeps
+ * memory bounded on long books). Each page carries its own architecture via an
+ * `.arch-*` wrapper class. Pages with no image get the clean placeholder slot, so
+ * a chapter renders today even before real illustrations exist.
+ */
+export function buildChapterHtml(
+  pages: ChapterPageRender[],
+  config: ProjectConfig,
+  chapter: ChapterRenderInfo,
+  opts: ChapterHtmlOptions,
+): string {
+  const { geometry } = opts;
+  const t = config.typography;
+  const c = config.colorPalette;
+  const m = geometry.margins;
+  const chapterLabel = escapeHtml(`Chapter ${chapter.chapterNumber} — ${chapter.chapterTitle}`);
+
+  // Emit scoped CSS for every architecture so any page in the chapter renders.
+  const archCss = (Object.values(LAYOUT_PROFILES).map((p) => p.artSlot) as ArtSlot[])
+    .filter((slot, i, arr) => arr.indexOf(slot) === i)
+    .map(scopedArtSlotCss)
+    .join('\n  ');
+
+  const pagesHtml = pages
+    .map((page) => {
+      const profile = getLayoutProfile(page.layoutTemplate);
+      const danger = page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? ' is-danger' : '';
+      const art = page.imageDataUri
+        ? `<img src="${page.imageDataUri}" alt="${escapeHtml(page.entryTitle)}">`
+        : `<div class="art-placeholder">PREVIEW · ART SLOT (${escapeHtml(page.layoutTemplate)})</div>`;
+      const scientific = page.scientificName
+        ? `<p class="scientific-name">${escapeHtml(page.scientificName)}</p>`
+        : '';
+      return `<article class="book-page arch-${profile.artSlot}${danger}">
+  <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
+  ${scientific}
+  <figure class="art-slot">${art}</figure>
+  ${bodyToHtml(page.bodyMarkdown)}
+</article>`;
+    })
+    .join('\n');
+
+  const polyfill = opts.polyfillJs ? `<script>${opts.polyfillJs}</script>` : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${chapterLabel}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  @page {
+    size: ${geometry.pageWidthIn}in ${geometry.pageHeightIn}in;
+    margin: ${m.topIn}in ${m.rightIn}in ${m.bottomIn}in ${m.gutterIn}in;
+    background: ${c.paper};
+    @bottom-center { content: "· " counter(page) " ·"; font-family: '${t.bodyFont}', serif; font-size: 9pt; color: ${c.ink}; }
+    @top-left { content: "${chapterLabel}"; font-family: '${t.bodyFont}', serif; ${t.smallCaps ? 'font-variant: small-caps;' : ''} font-size: 8.5pt; color: ${c.accent}; letter-spacing: 0.08em; }
+  }
+  html, body { background: ${c.paper}; margin: 0; padding: 0; }
+  body { font-family: '${t.bodyFont}', serif; color: ${c.ink}; font-size: ${t.bodyPt}pt; line-height: ${t.lineHeight}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .book-page { page-break-after: always; }
+  .book-page:last-child { page-break-after: auto; }
+  .entry-title { font-family: '${t.headingFont}', serif; font-weight: 700; font-size: 24pt; text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 4pt 0; color: ${c.ink}; }
+  .scientific-name { font-style: italic; font-size: 13pt; color: ${c.accent}; margin: 0 0 16pt 0; }
+  ${archCss}
+  .art-slot { page-break-inside: avoid; }
+  .art-placeholder { width: 100%; height: 100%; min-height: 2.4in; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #E8D9B0; outline: 1px dashed ${c.accent}; outline-offset: -4px; font-style: italic; font-size: 8pt; color: ${c.accent}; }
+  .art-slot img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); }
+  .section-header { ${t.smallCaps ? 'font-variant: small-caps;' : ''} font-weight: 600; font-size: ${t.bodyPt}pt; letter-spacing: 0.08em; margin: 8pt 0 2pt 0; color: ${c.ink}; }
+  .section-body { margin: 0 0 6pt 0; text-align: justify; hyphens: auto; }
+  .id-list { margin: 4pt 0 6pt 0; padding-left: 14pt; }
+  .id-list li { margin: 0 0 2pt 0; text-align: left; }
+  .mono { font-family: 'Courier New', monospace; font-size: 0.92em; }
+  .is-danger .entry-title { color: ${c.warning}; }
+  .is-danger { border-left: 4pt solid ${c.warning}; padding-left: 10pt; }
+</style>
+</head>
+<body>
+${pagesHtml}
+${polyfill}
 </body>
 </html>`;
 }

@@ -41,6 +41,7 @@
     "ioredis": "^5.4.1",
     "openai": "^4.73.0",
     "pagedjs": "^0.4.3",
+    "pdf-lib": "^1.17.1",
     "pino": "^9.5.0",
     "pino-pretty": "^11.3.0",
     "postgres": "^3.4.5",

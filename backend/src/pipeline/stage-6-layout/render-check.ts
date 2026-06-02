@@ -9,7 +9,7 @@
 
 import { ProjectConfigSchema, type PageManifest } from '@wildlands/shared';
 import { computePageGeometry } from './page-geometry.js';
-import { buildPageHtml } from './render-html.js';
+import { buildPageHtml, buildChapterHtml, type ChapterPageRender } from './render-html.js';
 import { isChromiumAvailable, loadPagedPolyfill, renderHtmlToPdf } from './render-pdf.js';
 
 const SAMPLE_PAGE: PageManifest = {
@@ -54,6 +54,44 @@ export async function renderSamplePagePdf(): Promise<RenderCheckResult> {
     polyfillJs,
     chapterLabel: 'CHAPTER 1 — SAMPLE',
   });
+  const { buffer, totalPages } = await renderHtmlToPdf(html, geometry);
+  return { pdf: buffer, totalPages, bytes: buffer.byteLength };
+}
+
+const SAMPLE_CHAPTER: ChapterPageRender[] = [
+  {
+    entryTitle: 'Chanterelle',
+    scientificName: 'Cantharellus spp.',
+    layoutTemplate: 'LAYOUT_1_STANDARD',
+    bodyMarkdown: SAMPLE_PAGE.bodyMarkdown,
+  },
+  {
+    entryTitle: 'Chanterelle vs Jack-o-Lantern',
+    scientificName: 'Omphalotus illudens',
+    layoutTemplate: 'LAYOUT_4_DANGER_WARNING',
+    bodyMarkdown:
+      '### Telling them apart\nThe edible chanterelle has blunt false-gill ridges; the toxic jack-o-lantern has true, knife-thin gills.\n\n### Key differences\n- **False gills vs true gills** — the single most reliable check.\n- **Habit:** chanterelles grow from soil; jack-o-lanterns grow in clusters on wood.',
+  },
+  {
+    entryTitle: 'Oak',
+    scientificName: 'Quercus spp.',
+    layoutTemplate: 'LAYOUT_14_SIDEBAR_FEATURE',
+    bodyMarkdown:
+      '### What it is\nA keystone hardwood of the eastern forest, supporting hundreds of species.\n\n### How to identify\n- **Leaves:** lobed, alternate.\n- **Bark:** deeply ridged with age.\n- **Acorns:** the definitive feature.',
+  },
+];
+
+/** Render a multi-page SAMPLE chapter (no DB) — proves chapter pagination in prod. */
+export async function renderSampleChapterPdf(): Promise<RenderCheckResult> {
+  const config = ProjectConfigSchema.parse({ volume: 1, title: 'The Wildlands', authorName: 'The Wildlands' });
+  const geometry = computePageGeometry(config.trimSize);
+  const polyfillJs = await loadPagedPolyfill();
+  const html = buildChapterHtml(
+    SAMPLE_CHAPTER,
+    config,
+    { chapterNumber: 1, chapterTitle: 'Forest Floor (Sample)' },
+    { geometry, polyfillJs },
+  );
   const { buffer, totalPages } = await renderHtmlToPdf(html, geometry);
   return { pdf: buffer, totalPages, bytes: buffer.byteLength };
 }
