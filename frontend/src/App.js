@@ -1646,6 +1646,25 @@ Use this entry to prove manuscript to manifest generation.`);
               Run Intake
             </button>
           </div>
+          <div
+            className={isDragging ? "upload-dropzone dragging" : "upload-dropzone"}
+            onClick={openManuscriptPicker}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleManuscriptDrop}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") openManuscriptPicker();
+            }}
+          >
+            <strong>{isDragging ? "Drop your manuscript file" : "Drag & drop your manuscript here"}</strong>
+            <span>or click to choose a .md / .txt file</span>
+            <span className="file-name-loaded">Loaded: {manuscriptName}</span>
+          </div>
           <div className="operator-log" aria-live="polite">
             {operatorLog.map((entry, index) => (
               <div className={`log-row ${entry.level}`} key={`${entry.time}-${index}`}>
