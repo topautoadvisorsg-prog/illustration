@@ -276,7 +276,15 @@ export function assertUsableManuscriptOutline(outline: ManuscriptOutline): void 
 }
 
 function normalizeTitle(value: string): string {
-  return value.replace(/\s+/g, ' ').trim().toLowerCase();
+  // Strip a leading "Chapter N" label (e.g. "CHAPTER 1 - ", "Chapter 2: ") so the
+  // raw manuscript heading ("CHAPTER 1 - Forest Floor") matches the clean title a
+  // model returns ("Forest Floor"). Without this, every "# CHAPTER N - Title"
+  // manuscript fails manifest validation with MANIFEST_OUTLINE_MISMATCH.
+  return value
+    .replace(/^\s*chapter\s+\d+\s*[-:.–—]?\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
 export function validateGeneratedChaptersAgainstOutline(

@@ -1184,7 +1184,10 @@ Use this entry to prove manuscript to manifest generation.`);
     const response = await fetch(`${apiUrl}${path}`, {
       ...options,
       headers: {
-        "Content-Type": "application/json",
+        // Only declare a JSON body when one is actually sent. Fastify rejects
+        // an empty body when Content-Type is application/json, which broke
+        // bodyless POSTs like Generate Manifests and Plan Pages.
+        ...(options.body != null ? { "Content-Type": "application/json" } : {}),
         ...(options.headers || {}),
       },
     });
@@ -1220,6 +1223,11 @@ Use this entry to prove manuscript to manifest generation.`);
     if (!activeProjectId && data.projects?.[0]) {
       setActiveProjectId(data.projects[0].id);
     }
+  }
+
+  function selectProject(id) {
+    setActiveProjectId(id);
+    if (id) run(`Loading project ${id.slice(0, 8)}...`, () => loadArtifacts(id));
   }
 
   async function createProject() {
@@ -1603,9 +1611,25 @@ Use this entry to prove manuscript to manifest generation.`);
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
-            <span className="hint">
-              {activeProjectId ? `Project ${activeProjectId.slice(0, 8)}` : "No project selected"}
-            </span>
+          </div>
+          <div className="phase-row project-row">
+            <label htmlFor="project-select">Project</label>
+            <select
+              id="project-select"
+              value={activeProjectId}
+              onChange={(event) => selectProject(event.target.value)}
+            >
+              <option value="">— Select a project —</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {(p.title || "Untitled")} · {p.id.slice(0, 8)} {p.manuscriptPath ? "✓ manuscript" : "· no manuscript"}
+                </option>
+              ))}
+            </select>
+            <button type="button" disabled={busy} onClick={() => run("Creating new project...", createProject)}>
+              + New Project
+            </button>
+            <span className="hint">{projects.length} project{projects.length === 1 ? "" : "s"}</span>
           </div>
           <form className="command-form" onSubmit={handleOperatorCommand}>
             <input

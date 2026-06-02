@@ -68,6 +68,23 @@ input[type="file"] {
   cursor: pointer;
 }
 
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.project-row select {
+  min-width: 280px;
+  max-width: 100%;
+  padding: 8px 10px;
+}
+
+.project-row button {
+  white-space: nowrap;
+}
+
 .upload-dropzone {
   display: flex;
   flex-direction: column;
