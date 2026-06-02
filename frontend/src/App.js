@@ -1619,6 +1619,7 @@ Use this entry to prove manuscript to manifest generation.`);
             <button disabled={busy || !activeProjectId} onClick={() => run("Saving project configuration...", saveProjectConfig)}>
               Save Config
             </button>
+            <button disabled={busy} onClick={openManuscriptPicker}>Choose File</button>
             <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
               Upload Manuscript
             </button>
