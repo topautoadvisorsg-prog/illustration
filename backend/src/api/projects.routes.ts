@@ -20,6 +20,7 @@ import {
 import { listManifests, listPages } from '../db/repositories/manifests.repo.js';
 import { updatePagePlanning } from '../db/repositories/manifests.repo.js';
 import { ingestManuscript } from '../pipeline/stage-1-ingestion/ingest-manuscript.js';
+import { UnsupportedManuscriptError } from '../pipeline/stage-1-ingestion/extract-manuscript.js';
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
@@ -28,6 +29,19 @@ import { countImagesForProject } from '../db/repositories/images.repo.js';
 import { estimateCost } from '../services/cost/estimate.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
+
+/**
+ * A manuscript upload error caused by the file itself (wrong type, empty, or no
+ * detectable chapter/entry structure) — surfaced to the client as a clean 400
+ * rather than a 500. Anything else is a real server fault and rethrown.
+ */
+function isManuscriptUserError(err: unknown): err is Error {
+  if (err instanceof UnsupportedManuscriptError) return true;
+  if (isNativeError(err)) {
+    return /^(NO_CHAPTERS_DETECTED|NO_ENTRIES_DETECTED|DUPLICATE_|CHAPTER_|ENTRY_)/.test(err.message);
+  }
+  return false;
+}
 
 function toContract(row: ProjectRow) {
   return {
@@ -46,10 +60,17 @@ const ProjectListResponseSchema = z.object({ projects: z.array(ProjectSchema) })
 const CreatedProjectResponseSchema = z.object({ project: ProjectSchema });
 const UpdateProjectConfigBodySchema = z.object({ config: ProjectConfigSchema });
 
-const UploadManuscriptBodySchema = z.object({
-  filename: z.string().min(1),
-  markdown: z.string().min(1),
-});
+const UploadManuscriptBodySchema = z
+  .object({
+    filename: z.string().min(1),
+    /** Plain text for .md/.markdown/.txt manuscripts. */
+    markdown: z.string().min(1).optional(),
+    /** Base64 bytes for binary uploads (.docx/.pdf). */
+    fileBase64: z.string().min(1).optional(),
+  })
+  .refine((v) => Boolean(v.markdown) || Boolean(v.fileBase64), {
+    message: 'Provide manuscript text (markdown) or file bytes (fileBase64).',
+  });
 const UploadManuscriptResponseSchema = z.object({
   project: ProjectSchema,
   manuscript: z.object({
@@ -260,7 +281,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       schema: {
         params: ProjectParamsSchema,
         body: UploadManuscriptBodySchema,
-        response: { 200: UploadManuscriptResponseSchema, 404: ApiErrorSchema },
+        response: { 200: UploadManuscriptResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
       },
     },
     async (request, reply) => {
@@ -270,7 +291,21 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       const existing = await getProject(id);
       if (!existing) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
 
-      const { manuscript, outline } = await ingestManuscript({ projectId: id, filename: body.filename, markdown: body.markdown });
+      let manuscript;
+      let outline;
+      try {
+        ({ manuscript, outline } = await ingestManuscript({
+          projectId: id,
+          filename: body.filename,
+          markdown: body.markdown,
+          fileBase64: body.fileBase64,
+        }));
+      } catch (err) {
+        if (isManuscriptUserError(err)) {
+          return reply.code(400).send({ error: 'Bad Request', message: err.message, statusCode: 400 });
+        }
+        throw err;
+      }
       const updated = await setManuscript(id, manuscript.relativePath, manuscript.sha256);
 
       return {

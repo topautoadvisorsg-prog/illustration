@@ -20,6 +20,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     logger: {
       level: env.LOG_LEVEL,
     },
+    // A full book manuscript (and base64-encoded DOCX/PDF) far exceeds Fastify's
+    // 1 MB default, which silently rejects full uploads. Allow up to 25 MB.
+    bodyLimit: 25 * 1024 * 1024,
   });
 
   app.setValidatorCompiler(validatorCompiler);

@@ -1040,6 +1040,7 @@ Found near hardwoods after summer rain.
 
 ### Notes
 Use this entry to prove manuscript to manifest generation.`);
+  const [manuscriptName, setManuscriptName] = useState("manuscript.md");
   const [manifests, setManifests] = useState([]);
   const [pages, setPages] = useState([]);
   const [plannedPages, setPlannedPages] = useState([]);
@@ -1246,7 +1247,7 @@ Use this entry to prove manuscript to manifest generation.`);
     if (!projectId) throw new Error("Create or select a project first.");
     const data = await call(`/api/projects/${projectId}/manuscript`, {
       method: "POST",
-      body: JSON.stringify({ filename: "milestone-1-test.md", markdown: manuscript }),
+      body: JSON.stringify({ filename: manuscriptName || "manuscript.md", markdown: manuscript }),
     });
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
     setMessage(`Manuscript uploaded: ${data.manuscript.sizeBytes} bytes.`);
@@ -1480,7 +1481,8 @@ Use this entry to prove manuscript to manifest generation.`);
     if (!file) return;
     const text = await readFileAsText(file);
     setManuscript(text);
-    appendLog("success", `Loaded local manuscript file: ${file.name}`);
+    setManuscriptName(file.name || "manuscript.md");
+    appendLog("success", `Loaded local manuscript file: ${file.name} (${text.length.toLocaleString()} chars)`);
   }
 
   async function runManuscriptIntake() {
@@ -1957,7 +1959,7 @@ Use this entry to prove manuscript to manifest generation.`);
                 Load .md
                 <input
                   type="file"
-                  accept=".md,text/markdown,text/plain"
+                  accept=".md,.markdown,.txt,text/markdown,text/plain"
                   onChange={(event) => uploadManuscriptFile(event.target.files?.[0])}
                 />
               </label>
