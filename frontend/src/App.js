@@ -6,6 +6,18 @@ import "@/App.css";
 const DEFAULT_BACKEND_URL = "https://wildlandsbackend-production.up.railway.app";
 const configuredBackend = process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND_URL;
 
+// Pipeline phases you can "talk to" in the operator console.
+const PHASES = ["Ingest", "Manifests", "Plan", "Text-Fit", "Images", "Review", "Render"];
+const DEV_ISSUES_KEY = "wildlands_dev_issues";
+
+function loadDevIssues() {
+  try {
+    return JSON.parse(localStorage.getItem(DEV_ISSUES_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
 const LAYOUT_TEMPLATES = [
   ["LAYOUT_1_STANDARD", "Standard", "Balanced text and illustration", 220, 320, 420],
   ["LAYOUT_2_TEXT_HEAVY", "Text Heavy", "Long entries with smaller art", 420, 560, 720],
@@ -922,6 +934,8 @@ Use this entry to prove manuscript to manifest generation.`);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [commandInput, setCommandInput] = useState("");
+  const [phase, setPhase] = useState("Manifests");
+  const [devIssues, setDevIssues] = useState(loadDevIssues);
   const [operatorLog, setOperatorLog] = useState([
     {
       level: "system",
@@ -962,6 +976,57 @@ Use this entry to prove manuscript to manifest generation.`);
       },
       ...current,
     ].slice(0, 80));
+  }
+
+  function persistDevIssues(next) {
+    try {
+      localStorage.setItem(DEV_ISSUES_KEY, JSON.stringify(next));
+    } catch {
+      /* localStorage unavailable — keep in memory only */
+    }
+  }
+
+  // Capture a plain-English issue tied to the current phase for the developer to fix.
+  function flagForDeveloper() {
+    const text = commandInput.trim();
+    if (!text) return;
+    const issue = {
+      phase,
+      projectId: activeProjectId || "(no project selected)",
+      projectTitle: selectedProject?.title || "",
+      status: selectedProject?.status || "",
+      message: text,
+      time: new Date().toISOString(),
+    };
+    setDevIssues((current) => {
+      const next = [issue, ...current].slice(0, 200);
+      persistDevIssues(next);
+      return next;
+    });
+    appendLog("issue", `[${phase}] flagged for developer: ${text}`);
+    setCommandInput("");
+  }
+
+  // Package all flagged issues into a structured report to hand to the developer.
+  async function copyDeveloperReport() {
+    if (devIssues.length === 0) return;
+    const lines = devIssues.map(
+      (i) => `- [${i.phase}] (project ${i.projectId}${i.status ? `, status ${i.status}` : ""}) ${i.message}  — ${i.time}`,
+    );
+    const report = `## Wildlands operator feedback for the developer\nBackend: ${apiUrl || "(unset)"}\nGenerated: ${new Date().toISOString()}\n\n${lines.join("\n")}\n`;
+    try {
+      await navigator.clipboard.writeText(report);
+      setMessage(`Copied ${devIssues.length} issue(s) — paste this to the developer.`);
+    } catch {
+      setMessage("Copy failed; the report is logged below — copy it manually.");
+      appendLog("issue", report);
+    }
+  }
+
+  function clearDevIssues() {
+    setDevIssues([]);
+    persistDevIssues([]);
+    setMessage("Cleared flagged developer issues.");
   }
 
   async function uploadLayoutMockup(index, file) {
@@ -1181,14 +1246,36 @@ Use this entry to prove manuscript to manifest generation.`);
             </div>
             <span className="mode-pill">{busy ? "Running" : "Ready"}</span>
           </div>
+          <div className="phase-row">
+            <label htmlFor="phase-select">Talking to phase</label>
+            <select id="phase-select" value={phase} onChange={(event) => setPhase(event.target.value)}>
+              {PHASES.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+            <span className="hint">
+              {activeProjectId ? `Project ${activeProjectId.slice(0, 8)}` : "No project selected"}
+            </span>
+          </div>
           <form className="command-form" onSubmit={handleOperatorCommand}>
             <input
               value={commandInput}
               onChange={(event) => setCommandInput(event.target.value)}
-              placeholder="Try: run intake, upload manuscript, generate manifests, refresh output"
+              placeholder={`Message the ${phase} phase — run an action, or flag an issue for the developer`}
             />
             <button disabled={busy} type="submit">Run</button>
+            <button type="button" disabled={!commandInput.trim()} onClick={flagForDeveloper} title="Save this as an issue for the developer to fix">
+              Flag for Developer
+            </button>
           </form>
+          <div className="dev-actions">
+            <button type="button" disabled={devIssues.length === 0} onClick={copyDeveloperReport}>
+              Copy Developer Report ({devIssues.length})
+            </button>
+            <button type="button" disabled={devIssues.length === 0} onClick={clearDevIssues}>
+              Clear Flags
+            </button>
+          </div>
           <div className="quick-actions">
             <button disabled={busy} onClick={() => run("Checking backend...", refreshHealth)}>Check Backend</button>
             <button disabled={busy} onClick={() => run("Creating project...", createProject)}>Create Project</button>
