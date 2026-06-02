@@ -1488,7 +1488,20 @@ Use this entry to prove manuscript to manifest generation.`);
   }
 
   function openManuscriptPicker() {
-    if (manuscriptInputRef.current) manuscriptInputRef.current.click();
+    const el = manuscriptInputRef.current;
+    if (!el) return;
+    // Chrome's modern, reliable way to open the file dialog. Falls back to
+    // .click() for older browsers. A display:none input can refuse to open,
+    // so the input is visually hidden (rendered) instead.
+    try {
+      if (typeof el.showPicker === "function") {
+        el.showPicker();
+        return;
+      }
+    } catch (err) {
+      /* showPicker can throw outside a user gesture — fall through to click */
+    }
+    el.click();
   }
 
   function handleManuscriptDrop(event) {
@@ -1976,7 +1989,8 @@ Use this entry to prove manuscript to manifest generation.`);
                 ref={manuscriptInputRef}
                 type="file"
                 accept=".md,.markdown,.txt,text/markdown,text/plain"
-                style={{ display: "none" }}
+                style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden", pointerEvents: "none" }}
+                tabIndex={-1}
                 onChange={(event) => {
                   uploadManuscriptFile(event.target.files?.[0]);
                   event.target.value = "";
