@@ -100,9 +100,9 @@ Treat the selected layout as a strong reference template, not a rigid rule. Mino
 
 Preserve future text areas above all else. Do not allow illustrations, background elements, diagrams, labels, decorative details, or environmental elements to consume areas intended for written educational content. When in doubt, leave more negative space.
 
-Do not generate readable text by default. The only permitted image text is an explicit subject-name label supplied by the prompt. If a label is used, render exactly the supplied label text, large and legible, with no extra words. Do not render paragraphs, article text, captions, educational content, fake encyclopedia text, page numbers, headers, reference notes, or unrequested labels.
+Generate clean artwork only. The illustration must contain ZERO readable text of any kind: no subject names, labels, captions, titles, headings, paragraphs, article text, fake encyclopedia text, page numbers, headers, reference notes, measurements, callouts, or annotations. Do not draw arrows, leader lines, or pointer marks with text. All labels, names, annotations, arrows, and typography are added later by the layout/composition system — never by the image model.
 
-Use minimal annotation only when structurally necessary. Limit callouts to 0-2 major, obvious educational features per subject. Avoid dense labeling systems, technical breakdowns, scientific poster layouts, and small-detail callouts.
+Do not build scientific-poster layouts, dense labeling systems, or technical breakdowns. The image is pure subject artwork; the educational markup is overlaid afterward.
 
 Layouts define image placement, negative space, reading flow, content zones, and visual hierarchy. They do not define subject matter, article content, or detailed scientific analysis.
 
@@ -858,10 +858,10 @@ function defaultProjectConfig() {
       smallCaps: true,
     },
     colorPalette: {
-      paper: "#f4f1ea",
-      ink: "#1b332d",
-      accent: "#2f5d50",
-      warning: "#9f2d20",
+      paper: "#F5EDD6",
+      ink: "#2C1A0E",
+      accent: "#3A5C3A",
+      warning: "#8B2020",
     },
     imageGeneration: {
       masterStyleBlockVersion: "VINTAGE_NATURALIST_DNA_v1.0",
