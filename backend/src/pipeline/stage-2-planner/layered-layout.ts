@@ -30,28 +30,136 @@ export interface ContentTypePolicy {
   defaultArchitecture: Architecture;
   /** The existing template this content type renders through today. */
   template: LayoutTemplateId;
+  /** One-line description of what this page type IS. */
+  purpose: string;
+  /** Plain-English "go-to" uses — the agent's built-in lookup for when to pick this. */
+  usedFor: string[];
+  /** Whether this page type typically depicts more than one subject. */
+  multiSubject: boolean;
 }
 
-/** Content type -> default coverage/architecture + back-compat render template. */
+/**
+ * Content type -> default coverage/architecture + back-compat template + usage
+ * guidance. `usedFor` is the agent's go-to reference ("comparison pages → this",
+ * "chapter openers → this"); it can be expanded as the system learns which types
+ * suit which pages.
+ */
 export const CONTENT_TYPE_POLICY: Record<ContentType, ContentTypePolicy> = {
-  SPECIES_PROFILE: { defaultCoverage: 40, defaultArchitecture: 'FLOAT_LEFT', template: 'LAYOUT_1_STANDARD' },
-  ANIMAL_PROFILE: { defaultCoverage: 40, defaultArchitecture: 'FLOAT_LEFT', template: 'LAYOUT_1_STANDARD' },
-  ENCYCLOPEDIA_ENTRY: { defaultCoverage: 15, defaultArchitecture: 'FLOAT_LEFT', template: 'LAYOUT_2_TEXT_HEAVY' },
-  FIELD_NOTES_PAGE: { defaultCoverage: 40, defaultArchitecture: 'SCATTERED', template: 'LAYOUT_7_SCATTERED_VIGNETTES' },
-  REFERENCE_PAGE: { defaultCoverage: 15, defaultArchitecture: 'FLOAT_RIGHT', template: 'LAYOUT_6_BACK_MATTER' },
-  COMPARISON: { defaultCoverage: 50, defaultArchitecture: 'SCATTERED', template: 'LAYOUT_4_DANGER_WARNING' },
-  MULTI_SPECIES_COMPARISON: { defaultCoverage: 50, defaultArchitecture: 'SCATTERED', template: 'LAYOUT_4_DANGER_WARNING' },
-  IDENTIFICATION_GUIDE: { defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM' },
-  DIAGNOSTIC_DIAGRAM: { defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM' },
-  CHAPTER_OPENER: { defaultCoverage: 60, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_5_CHAPTER_OPENER' },
-  HABITAT_OVERVIEW: { defaultCoverage: 60, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD' },
-  PROGRESSION_STUDY: { defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_15_PROGRESSION_STUDY' },
-  CUTAWAY_ILLUSTRATION: { defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_16_CUTAWAY_FEATURE' },
-  SIDEBAR_FEATURE: { defaultCoverage: 25, defaultArchitecture: 'SIDEBAR_RIGHT', template: 'LAYOUT_14_SIDEBAR_FEATURE' },
-  WARNING_PAGE: { defaultCoverage: 40, defaultArchitecture: 'FLOAT_LEFT', template: 'LAYOUT_4_DANGER_WARNING' },
-  BOTANICAL_PLATE: { defaultCoverage: 100, defaultArchitecture: 'FULL_PAGE', template: 'LAYOUT_10_FULL_PAGE_PLATE' },
-  TERRAIN_ANALYSIS: { defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_13_FEATURE_BANNER' },
+  SPECIES_PROFILE: {
+    defaultCoverage: 40, defaultArchitecture: 'FLOAT_LEFT', template: 'LAYOUT_1_STANDARD',
+    purpose: 'A single-species identification entry — the workhorse field-guide page.',
+    usedFor: ['individual plant/fungus entries', 'standard identification write-ups'],
+    multiSubject: false,
+  },
+  ANIMAL_PROFILE: {
+    defaultCoverage: 40, defaultArchitecture: 'FLOAT_LEFT', template: 'LAYOUT_1_STANDARD',
+    purpose: 'A single-animal profile entry.',
+    usedFor: ['mammal/bird/reptile entries', 'animal identification write-ups'],
+    multiSubject: false,
+  },
+  ENCYCLOPEDIA_ENTRY: {
+    defaultCoverage: 15, defaultArchitecture: 'FLOAT_LEFT', template: 'LAYOUT_2_TEXT_HEAVY',
+    purpose: 'A text-heavy reference entry with a small supporting illustration.',
+    usedFor: ['long encyclopedic write-ups', 'detailed reference entries'],
+    multiSubject: false,
+  },
+  FIELD_NOTES_PAGE: {
+    defaultCoverage: 40, defaultArchitecture: 'SCATTERED', template: 'LAYOUT_7_SCATTERED_VIGNETTES',
+    purpose: 'A scattered field-notes page of small vignettes.',
+    usedFor: ['tracks & signs', 'scat/trail notes', 'collections of small observations'],
+    multiSubject: true,
+  },
+  REFERENCE_PAGE: {
+    defaultCoverage: 15, defaultArchitecture: 'FLOAT_RIGHT', template: 'LAYOUT_6_BACK_MATTER',
+    purpose: 'Dense reference / back-matter content.',
+    usedFor: ['glossaries', 'indexes', 'quick-reference tables', 'look-alike lists'],
+    multiSubject: false,
+  },
+  COMPARISON: {
+    defaultCoverage: 50, defaultArchitecture: 'SCATTERED', template: 'LAYOUT_4_DANGER_WARNING',
+    purpose: 'A side-by-side comparison of a target species against a look-alike.',
+    usedFor: ['look-alike warnings', 'edible-vs-toxic comparisons', 'telling two similar species apart'],
+    multiSubject: true,
+  },
+  MULTI_SPECIES_COMPARISON: {
+    defaultCoverage: 50, defaultArchitecture: 'SCATTERED', template: 'LAYOUT_4_DANGER_WARNING',
+    purpose: 'A comparison across several related species at once.',
+    usedFor: ['genus/family comparison pages', "'which one is it' multi-species spreads"],
+    multiSubject: true,
+  },
+  IDENTIFICATION_GUIDE: {
+    defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
+    purpose: 'A how-to-identify page focused on diagnostic features.',
+    usedFor: ['key identifying features', 'step-by-step ID guidance'],
+    multiSubject: false,
+  },
+  DIAGNOSTIC_DIAGRAM: {
+    defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
+    purpose: 'An anatomy/parts diagram of a single subject (labels added by the layout, not the image).',
+    usedFor: ['labeled anatomy', 'parts/structure breakdowns', 'diagnostic feature callouts'],
+    multiSubject: false,
+  },
+  CHAPTER_OPENER: {
+    defaultCoverage: 60, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_5_CHAPTER_OPENER',
+    purpose: 'An atmospheric chapter opening page.',
+    usedFor: ['chapter/section openers', 'mood-setting spreads'],
+    multiSubject: false,
+  },
+  HABITAT_OVERVIEW: {
+    defaultCoverage: 60, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD',
+    purpose: 'A wide habitat or landscape scene.',
+    usedFor: ['region/habitat overviews', 'ecosystem context pages'],
+    multiSubject: true,
+  },
+  PROGRESSION_STUDY: {
+    defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_15_PROGRESSION_STUDY',
+    purpose: 'A sequence showing change over time or stages.',
+    usedFor: ['life cycles', 'growth stages', 'seasonal progressions'],
+    multiSubject: true,
+  },
+  CUTAWAY_ILLUSTRATION: {
+    defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_16_CUTAWAY_FEATURE',
+    purpose: 'A cross-section/cutaway revealing internal or layered structure.',
+    usedFor: ['soil/strata layers', 'internal anatomy cutaways', 'below-ground views'],
+    multiSubject: false,
+  },
+  SIDEBAR_FEATURE: {
+    defaultCoverage: 25, defaultArchitecture: 'SIDEBAR_RIGHT', template: 'LAYOUT_14_SIDEBAR_FEATURE',
+    purpose: 'A tall feature subject with a running text sidebar.',
+    usedFor: ['tall subjects (trees, vines)', 'feature spotlights with running text'],
+    multiSubject: false,
+  },
+  WARNING_PAGE: {
+    defaultCoverage: 40, defaultArchitecture: 'FLOAT_LEFT', template: 'LAYOUT_4_DANGER_WARNING',
+    purpose: 'A safety/danger entry for a toxic or hazardous subject.',
+    usedFor: ['toxic species', 'poisonous/deadly warnings', 'hazard notices'],
+    multiSubject: false,
+  },
+  BOTANICAL_PLATE: {
+    defaultCoverage: 100, defaultArchitecture: 'FULL_PAGE', template: 'LAYOUT_10_FULL_PAGE_PLATE',
+    purpose: 'A full-page showcase illustration plate.',
+    usedFor: ['full-page botanical/zoological plates', 'showcase art with minimal text'],
+    multiSubject: false,
+  },
+  TERRAIN_ANALYSIS: {
+    defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_13_FEATURE_BANNER',
+    purpose: 'A terrain/feature banner with analysis text.',
+    usedFor: ['watershed/mountain/river overviews', 'terrain feature breakdowns'],
+    multiSubject: true,
+  },
 };
+
+export interface ContentTypeGuideEntry extends ContentTypePolicy {
+  contentType: ContentType;
+}
+
+/** The full catalog the agent/operator reads to know what each page type is for. */
+export function getContentTypeGuide(): ContentTypeGuideEntry[] {
+  return (Object.keys(CONTENT_TYPE_POLICY) as ContentType[]).map((contentType) => ({
+    contentType,
+    ...CONTENT_TYPE_POLICY[contentType],
+  }));
+}
 
 export interface LayoutComposition {
   contentType: ContentType;

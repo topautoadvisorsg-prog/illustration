@@ -42,6 +42,23 @@ value Claude already set on the manifest). Stage 1.5 now asks Claude to classify
 `contentType`, `coverage`, `architecture` on every page plan and in the `/plan` API
 response — without changing which template renders.
 
+## Usage guidance — the agent's go-to reference
+
+Each content type carries built-in guidance so the classifier/agent knows *when* to
+pick it, without re-deriving it every time:
+
+- `purpose` — one line: what the page type IS.
+- `usedFor` — plain-English example uses (e.g. COMPARISON → "look-alike warnings",
+  "edible-vs-toxic comparisons"; CHAPTER_OPENER → "chapter/section openers").
+- `multiSubject` — whether the page typically shows more than one subject (COMPARISON,
+  FIELD_NOTES, PROGRESSION, HABITAT = true; SPECIES_PROFILE = false).
+
+`GET /api/content-types` returns the full catalog (every type + purpose + usedFor +
+defaults + render template) — the reference the agent reads. Each page plan and the
+`/plan` response also carry `contentTypePurpose`, `contentTypeUsedFor`, and
+`multiSubject` so the operator sees *why* a layout was chosen and what it's for. This
+guidance is meant to grow over time as we learn which types suit which pages.
+
 ## Adding a future layout WITHOUT a new hardcoded template
 
 `composeProfile(coverage, architecture)` is the forward engine: it returns render

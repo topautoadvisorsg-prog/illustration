@@ -22,7 +22,7 @@ import {
 } from '@wildlands/shared';
 import { getAgentContract } from '../../agents/agent-contracts.js';
 import { includesAny, isDangerPage, signalText } from './content-signals.js';
-import { classifyContentType, decomposeTemplate } from './layered-layout.js';
+import { CONTENT_TYPE_POLICY, classifyContentType, decomposeTemplate } from './layered-layout.js';
 
 const REQUIRED_PROMPT_PLACEHOLDERS = ['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'] as const;
 
@@ -52,6 +52,10 @@ export interface PagePlanningDecision {
   wordCount: number;
   /** Layered model (Phase 1): the page's purpose + its image-area axes. */
   contentType: ContentType;
+  /** Built-in usage guidance for this content type — the agent's go-to reference. */
+  contentTypePurpose: string;
+  contentTypeUsedFor: string[];
+  multiSubject: boolean;
   coverage: Coverage;
   architecture: Architecture;
   layoutTemplate: LayoutTemplateId;
@@ -338,6 +342,7 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
   // chosen render template into its coverage + architecture axes so the operator
   // sees what actually renders. Rendering still flows through `selected.template`.
   const contentType = classifyContentType(page).contentType;
+  const contentPolicy = CONTENT_TYPE_POLICY[contentType];
   const composition = decomposeTemplate(selected.template);
   const rawAsset = assetForTemplate(config, selected.template);
   const asset = rawAsset ? LayoutPromptAssetSchema.parse(rawAsset) : undefined;
@@ -393,6 +398,9 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
     entryTitle: page.entryTitle,
     wordCount,
     contentType,
+    contentTypePurpose: contentPolicy.purpose,
+    contentTypeUsedFor: contentPolicy.usedFor,
+    multiSubject: contentPolicy.multiSubject,
     coverage: composition.coverage,
     architecture: composition.architecture,
     layoutTemplate: selected.template,

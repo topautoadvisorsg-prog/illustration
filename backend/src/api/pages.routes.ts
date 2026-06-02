@@ -12,6 +12,7 @@ import {
 } from '../pipeline/stage-4-review/review-image.js';
 import { UpscaleBlockedError, upscalePageImage } from '../pipeline/stage-5-upscale/upscale-image.js';
 import { isChromiumAvailable, renderSamplePagePdf } from '../pipeline/stage-6-layout/render-check.js';
+import { getContentTypeGuide } from '../pipeline/stage-2-planner/layered-layout.js';
 
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
 const ImageVersionParamsSchema = z.object({ pageId: z.string().uuid(), version: z.coerce.number().int().positive() });
@@ -203,6 +204,27 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
         throw error;
       }
     },
+  );
+
+  // Content-type catalog — the agent's/operator's go-to reference: every page type,
+  // what it's used for, and its default coverage + architecture + render template.
+  const ContentTypeGuideResponseSchema = z.object({
+    contentTypes: z.array(
+      z.object({
+        contentType: z.string(),
+        purpose: z.string(),
+        usedFor: z.array(z.string()),
+        multiSubject: z.boolean(),
+        defaultCoverage: z.number(),
+        defaultArchitecture: z.string(),
+        template: z.string(),
+      }),
+    ),
+  });
+  app.get(
+    '/api/content-types',
+    { schema: { response: { 200: ContentTypeGuideResponseSchema } } },
+    async () => ({ contentTypes: getContentTypeGuide() }),
   );
 
   // Stage 6 — render smoke test: produce a real sample PDF via Paged.js to confirm

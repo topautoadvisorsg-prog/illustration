@@ -6,6 +6,7 @@ import {
   classifyContentType,
   composeProfile,
   decomposeTemplate,
+  getContentTypeGuide,
 } from '../pipeline/stage-2-planner/layered-layout.js';
 import { LAYOUT_PROFILES, getLayoutProfile } from '../pipeline/stage-6-layout/layout-profiles.js';
 
@@ -48,6 +49,23 @@ describe('layered model — policy + composition tables', () => {
 
   it('decomposeTemplate falls back to standard for safety', () => {
     expect(decomposeTemplate('LAYOUT_1_STANDARD').contentType).toBe('SPECIES_PROFILE');
+  });
+
+  it('gives every content type non-empty usage guidance (the agent go-to reference)', () => {
+    for (const ct of ALL_CONTENT_TYPES) {
+      const policy = CONTENT_TYPE_POLICY[ct];
+      expect(policy.purpose.length, `purpose for ${ct}`).toBeGreaterThan(0);
+      expect(policy.usedFor.length, `usedFor for ${ct}`).toBeGreaterThan(0);
+      expect(typeof policy.multiSubject).toBe('boolean');
+    }
+  });
+
+  it('exposes the full catalog via getContentTypeGuide', () => {
+    const guide = getContentTypeGuide();
+    expect(guide).toHaveLength(ALL_CONTENT_TYPES.length);
+    const comparison = guide.find((g) => g.contentType === 'COMPARISON');
+    expect(comparison?.usedFor.join(' ')).toMatch(/look-alike/);
+    expect(comparison?.multiSubject).toBe(true);
   });
 });
 
