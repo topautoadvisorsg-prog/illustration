@@ -5,6 +5,10 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
+# CRA/craco treats lint warnings as errors when CI=true (Railway build envs often
+# set it), which would fail the build. Force it off so warnings stay warnings.
+ENV CI=false
+
 RUN corepack enable && corepack prepare yarn@1.22.22 --activate \
  && npm install -g serve@14
 
