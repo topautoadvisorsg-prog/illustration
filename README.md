@@ -30,23 +30,34 @@ Implemented and testable:
 - Vintage Naturalist Master Style DNA stored in project config and injected into
   layout prompts
 - Agent behavior contracts
+- Layered layout model: Content Type -> Coverage -> Architecture -> Master Style
+  -> Subject, with a content-type catalog at `/api/content-types`
+- Stage 6 text-fit analyzer (proves manuscript text fits the chosen layout before
+  any image spend)
+- Stage 3 image generation via OpenAI `gpt-image-1`, spend-gated and
+  dependency-injected so tests never call the paid API
+- Stage 4 image review endpoints: approve / reject / regenerate / set-active, with
+  an `image_events` audit log
+- Stage 5 upscale + 300 DPI print gate (Replicate Real-ESRGAN)
+- Stage 6/7 chapter render + book stitch + KDP preflight (Puppeteer + Paged.js;
+  Chromium provided via `Dockerfile.backend`), producing a bleed-spec interior PDF
 - Publishing Intelligence Center foundation:
   experiments, decisions, standards, SOPs, cost records, print reviews, lessons,
   evidence, lineage links, version tables, audit events, backend API, and visible
   frontend panels
 - Operator frontend for backend URL, project setup, manuscript upload, manifest
-  generation, page planning, layout prompt assets, Publishing Intelligence, and
-  output inspection
+  generation, page planning, layout prompt assets, Publishing Intelligence, a
+  per-phase feedback console, and output inspection
 
 Not implemented yet:
 
-- Real Stage 3 image generation worker
-- Human image approval endpoints
-- Upscale worker
-- Text-fit preview renderer
-- Final PDF/EPUB production exports
-- Full auth enforcement
+- Kindle EPUB export (Stage 8)
+- AI-generated covers (front / full-wrap / back) and spine-width math
+- BullMQ background workers (pipeline stages currently run synchronously per request)
+- Object storage for generated art (local FS is ephemeral on Railway)
+- Full single-user auth enforcement
 - Advanced full-text/trigram/vector search for the Publishing Intelligence Center
+- ANNOTATION_COMPOSITOR (diagram labels/arrows) and COVER_ART_DIRECTOR agents
 
 ## V1 Scope
 
@@ -98,9 +109,20 @@ memory/    Project memory
    - selects one of the configured layout templates
    - validates the written layout library metadata
    - applies layout typography/capacity metadata
-   - assembles the image-only prompt
+   - classifies the content type and decomposes layout into coverage + architecture
+   - assembles the image-only prompt (clean art: no text baked into the image)
    - reports blockers/warnings before image spend
    - stores `layout_template`, `image_prompt`, and `image_prompt_sha256`
+7. `POST /api/projects/:id/text-fit-preview` checks every page's text fits its
+   layout before any image is generated.
+8. `POST /api/pages/:pageId/generate-image` generates the illustration
+   (spend-gated) -> page status `REVIEW`.
+9. Review: approve / reject / regenerate / set-active per image version.
+10. `POST /api/pages/:pageId/upscale` upscales the approved image and runs the
+    300 DPI print gate.
+11. `POST /api/projects/:id/chapters/:n/render` renders a chapter PDF; 
+    `POST /api/projects/:id/render-book` stitches the book and runs KDP preflight.
+    (`GET /api/render-check` / `/api/render-check-chapter` render samples with no DB.)
 
 ## Railway
 
