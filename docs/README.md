@@ -9,5 +9,6 @@ Living documentation for the platform.
 | `api-contracts.md` | Auto-generated from Zod (Phase 1+); see `/api/docs` at runtime |
 | `runbook.md` | What to do when X breaks |
 | `decision-log.md` | Architecture Decision Records (ADRs) |
+| `publishing-intelligence-center.md` | Standards ledger / knowledge system architecture |
 | `phase-0-plan.md` | Risk spike plan + daily checkpoints |
 | `phase-0-reports/` | End-of-day reports during Phase 0 |

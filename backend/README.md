@@ -1,90 +1,82 @@
-# Backend — Wildlands Publishing Platform
+# Backend - Wildlands Publishing Platform
 
-The pipeline. The API. The product.
+The backend owns the pipeline, API, database schema, workers, and durable
+Publishing Intelligence records.
 
-**Status:** Phase 0 — scaffold only. Smoke tests for all 6 external services. No real pipeline code yet.
-
----
+**Status:** Phase 1 backend foundation. Real routes exist for projects,
+manuscript ingestion, manifest generation, page planning, PDF preview/render
+work, and the Publishing Intelligence Center. External image/export spend is
+still gated behind later stages.
 
 ## What's Here
 
-```
+```text
 src/
-  api/                Fastify routes (Phase 1+)
-  db/                 Drizzle schema + migrations (Phase 1)
-  pipeline/           The 8-stage pipeline
-    stage-1-ingestion/
-    stage-1.5-manifests/
-    stage-2-planner/
-    stage-3-generation/
-    stage-4-review/
-    stage-5-upscale/
-    stage-6-layout/
-    stage-7-pdf-compile/
-    stage-8-epub/
-  services/           Typed wrappers for every external API
-    claude/           Anthropic Claude SDK
-    openai/           OpenAI gpt-image-1
+  api/                Fastify route groups
+  db/                 Drizzle schema, migrations, repositories
+  pipeline/           The 8-stage publishing pipeline
+  services/           External clients and domain services
+    claude/           Anthropic Claude SDK wrapper
+    openai/           OpenAI gpt-image-1 wrapper
+    publishing-intelligence/
+                      Experiments, decisions, standards, SOPs, costs,
+                      print reviews, lessons, evidence, lineage
     replicate/        Real-ESRGAN upscaling
-    storage/          StorageService interface (local FS for v1, S3 v2)
-    supabase/         Auth + Postgres client
-    redis/            Upstash Redis connection
+    storage/          Local file storage for v1
+    supabase/         Supabase client notes
+    redis/            Upstash Redis/BullMQ connection
     sentry/           Error monitoring setup
   workers/            BullMQ workers for async pipeline stages
-  lib/                Cross-cutting code (logger, errors)
+  lib/                Cross-cutting code
   env.ts              Zod-validated env loading
   server.ts           Fastify server factory
   index.ts            App entry point
 
 scripts/
-  smoke-test.ts       Day 1 smoke tests for all external APIs
+  smoke-test.ts       External API smoke tests
+  audit-manuscript.ts Deterministic manuscript parser audit
 ```
 
-Each subdirectory has its own README. Read those for stage-by-stage detail.
-
----
+Each major subdirectory has its own README. Read those for stage-by-stage detail.
 
 ## How To Run Locally
 
 ```bash
-# From repo root
 yarn install
-
-# Copy & fill env vars
-cp .env.example .env
-# Edit .env with real keys
-
-# Run smoke tests (validates all 6 external APIs reachable)
-yarn smoke
-
-# Run backend dev server (Phase 1+ — once routes exist)
-yarn dev:backend
-
-# Type-check
 yarn workspace @wildlands/backend typecheck
+yarn workspace @wildlands/backend test
+yarn dev:backend
 ```
 
----
+Run migrations:
+
+```bash
+yarn workspace @wildlands/backend drizzle:migrate
+```
+
+Run smoke tests when keys are present:
+
+```bash
+yarn smoke
+```
 
 ## What Can Go Wrong
 
 | Symptom | Likely Cause | Fix |
 |---|---|---|
-| `Env validation failed` at boot | Missing or placeholder values in `.env` | Fill required keys; check `src/env.ts` schema |
-| `ECONNREFUSED` on Redis | Upstash URL wrong or BullMQ using REST URL instead of TCP | Use TCP/native Redis URL from Upstash, not REST |
-| Anthropic 401 | Bad / missing `ANTHROPIC_API_KEY` | Regenerate at console.anthropic.com |
-| OpenAI 403 on gpt-image-1 | Org not verified | Complete OpenAI org verification |
-| Replicate 401 | Bad token | Regenerate at replicate.com/account/api-tokens |
-| Supabase 401 | Wrong key (anon vs service_role) | Service-role key required for server-side ops |
-| Sharp install fails | Native binary missing | `yarn install` with platform-correct prebuilds |
-
----
+| `Env validation failed` at boot | Missing or placeholder env values | Fill required keys; check `src/env.ts` |
+| `/api/intelligence/*` missing table | Drizzle migration has not run | Run `yarn workspace @wildlands/backend drizzle:migrate` |
+| `DATABASE_URL is still a placeholder` | Backend tried DB access without Supabase URL | Set the Supabase Postgres pooler URL |
+| `ECONNREFUSED` on Redis | Wrong Upstash URL type | Use the native Redis URL for BullMQ |
+| Anthropic 401 | Bad or missing `ANTHROPIC_API_KEY` | Regenerate the key |
+| OpenAI 403 on image model | Org/key access problem | Confirm org access and key permissions |
+| Supabase 401 | Wrong anon/service role key | Use service role only on backend |
+| Sharp install fails | Native binary mismatch | Reinstall dependencies on the target platform |
 
 ## Conventions
 
-- **One file = one responsibility.** Max 200 lines.
-- **One function = one job.** Max 50 lines.
-- **No `any`.** Ever.
-- **Every external API call** goes through a typed service wrapper in `src/services/*`. Never raw `fetch` in pipeline code.
-- **All async pipeline stages are idempotent.** Re-running produces the same output.
-- **All errors logged via Pino with `stage`, `book_id`, `page_id`, `correlation_id` fields.**
+- Keep pipeline stages idempotent.
+- Keep routes thin; business workflows live in services.
+- Keep persistence in repository files.
+- Validate public API payloads with Zod contracts from `@wildlands/shared`.
+- Avoid unrelated refactors while pipeline stages are under test.

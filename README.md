@@ -30,8 +30,13 @@ Implemented and testable:
 - Vintage Naturalist Master Style DNA stored in project config and injected into
   layout prompts
 - Agent behavior contracts
+- Publishing Intelligence Center foundation:
+  experiments, decisions, standards, SOPs, cost records, print reviews, lessons,
+  evidence, lineage links, version tables, audit events, backend API, and visible
+  frontend panels
 - Operator frontend for backend URL, project setup, manuscript upload, manifest
-  generation, page planning, layout prompt assets, and output inspection
+  generation, page planning, layout prompt assets, Publishing Intelligence, and
+  output inspection
 
 Not implemented yet:
 
@@ -41,6 +46,7 @@ Not implemented yet:
 - Text-fit preview renderer
 - Final PDF/EPUB production exports
 - Full auth enforcement
+- Advanced full-text/trigram/vector search for the Publishing Intelligence Center
 
 ## V1 Scope
 
@@ -154,8 +160,15 @@ Start with:
 - `backend/src/pipeline/stage-1-ingestion/README.md`
 - `backend/src/pipeline/stage-1.5-manifests/README.md`
 - `backend/src/pipeline/stage-2-planner/README.md`
+- `docs/publishing-intelligence-center.md`
+- `backend/src/services/publishing-intelligence/README.md`
 - `backend/src/api/README.md`
 
 The highest-value review target is Stage 2 correctness: layout selection,
 prompt assembly, missing placeholder detection, capacity risk reporting, and
 operator-visible page planning output.
+
+The highest-value business-process review target is the Publishing Intelligence
+Center: verify the `Experiment -> Decision -> Standard -> SOP Update` lineage,
+evidence/audit behavior, and visible operator workflow before real proof-copy
+testing begins.

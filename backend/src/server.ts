@@ -12,6 +12,7 @@ import { getEnv } from './env.js';
 import { registerHealthRoutes } from './api/health.routes.js';
 import { registerProjectRoutes } from './api/projects.routes.js';
 import { registerPageRoutes } from './api/pages.routes.js';
+import { registerIntelligenceRoutes } from './api/intelligence.routes.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -40,6 +41,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await registerHealthRoutes(app);
   await registerProjectRoutes(app);
   await registerPageRoutes(app);
+  await registerIntelligenceRoutes(app);
 
   app.get('/', async () => ({
     service: 'wildlands-backend',

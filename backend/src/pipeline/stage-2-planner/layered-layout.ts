@@ -3,7 +3,7 @@
  *
  * Content Type -> Coverage -> Architecture -> Master Style -> Subject.
  *
- * This is a migration layer that sits ABOVE the 15 named layout templates. The
+ * This is a migration layer that sits ABOVE the 16 named layout templates. The
  * templates + LAYOUT_PROFILES remain the render authority (rendering is unchanged),
  * but layout intent is now expressed as orthogonal axes:
  *   - Content Type: what KIND of educational page this is (its purpose).
@@ -88,13 +88,13 @@ export const CONTENT_TYPE_POLICY: Record<ContentType, ContentTypePolicy> = {
     multiSubject: true,
   },
   IDENTIFICATION_GUIDE: {
-    defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
+    defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM',
     purpose: 'A how-to-identify page focused on diagnostic features.',
     usedFor: ['key identifying features', 'step-by-step ID guidance'],
     multiSubject: false,
   },
   DIAGNOSTIC_DIAGRAM: {
-    defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
+    defaultCoverage: 40, defaultArchitecture: 'TOP_BAND', template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM',
     purpose: 'An anatomy/parts diagram of a single subject (labels added by the layout, not the image).',
     usedFor: ['labeled anatomy', 'parts/structure breakdowns', 'diagnostic feature callouts'],
     multiSubject: false,
@@ -177,9 +177,10 @@ export const LAYOUT_TEMPLATE_COMPOSITION: Record<LayoutTemplateId, LayoutComposi
   LAYOUT_6_BACK_MATTER: { contentType: 'REFERENCE_PAGE', coverage: 15, architecture: 'FLOAT_RIGHT' },
   LAYOUT_7_SCATTERED_VIGNETTES: { contentType: 'FIELD_NOTES_PAGE', coverage: 40, architecture: 'SCATTERED' },
   LAYOUT_8_MARGIN_ILLUSTRATION: { contentType: 'SPECIES_PROFILE', coverage: 25, architecture: 'FLOAT_RIGHT' },
-  LAYOUT_9_DIAGNOSTIC_DIAGRAM: { contentType: 'DIAGNOSTIC_DIAGRAM', coverage: 40, architecture: 'TOP_BAND' },
+  LAYOUT_9_DIAGNOSTIC_DIAGRAM: { contentType: 'FIELD_NOTES_PAGE', coverage: 40, architecture: 'SCATTERED' },
   LAYOUT_10_FULL_PAGE_PLATE: { contentType: 'BOTANICAL_PLATE', coverage: 100, architecture: 'FULL_PAGE' },
   LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD: { contentType: 'HABITAT_OVERVIEW', coverage: 60, architecture: 'TOP_BAND' },
+  LAYOUT_12_DIAGNOSTIC_DIAGRAM: { contentType: 'DIAGNOSTIC_DIAGRAM', coverage: 40, architecture: 'TOP_BAND' },
   LAYOUT_13_FEATURE_BANNER: { contentType: 'TERRAIN_ANALYSIS', coverage: 40, architecture: 'TOP_BAND' },
   LAYOUT_14_SIDEBAR_FEATURE: { contentType: 'SIDEBAR_FEATURE', coverage: 25, architecture: 'SIDEBAR_RIGHT' },
   LAYOUT_15_PROGRESSION_STUDY: { contentType: 'PROGRESSION_STUDY', coverage: 40, architecture: 'TOP_BAND' },
@@ -241,7 +242,7 @@ function clamp(n: number, lo: number, hi: number): number {
  * Forward composition engine: build render params from coverage + architecture
  * alone, with no named template. Wrap architectures let text reclaim space
  * alongside the art; band/full architectures consume that fraction of the page.
- * (LAYOUT_PROFILES remains the authority for the 15 existing templates; this is
+ * (LAYOUT_PROFILES remains the authority for the 16 existing templates; this is
  * for future ad-hoc compositions.)
  */
 export function composeProfile(coverage: Coverage, architecture: Architecture): LayoutProfile {

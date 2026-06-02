@@ -91,7 +91,7 @@ current layout library values.
 Current deterministic first pass:
 
 ```text
-danger signal                 -> LAYOUT_12_DIAGNOSTIC_DIAGRAM
+danger signal                 -> LAYOUT_4_DANGER_WARNING
 chapter opener                -> LAYOUT_5_CHAPTER_OPENER
 progression or life cycle     -> LAYOUT_15_PROGRESSION_STUDY
 cutaway or layered subject    -> LAYOUT_16_CUTAWAY_FEATURE

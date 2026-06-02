@@ -1,33 +1,72 @@
-# db
+# Database
 
-Drizzle ORM schema + migrations + repository functions.
+Drizzle ORM schema, migrations, and repository functions.
 
-**Phase 1 tables (locked):**
+## Tables
 
 | Table | Purpose |
 |---|---|
-| `users` | Single user in v1; multi-user in v2 |
+| `users` | Single user in v1; multi-user later |
 | `projects` | One row per book project |
-| `manifests` | Book / chapter / page manifests (JSON column) |
-| `pages` | One row per page; FK → projects, manifest_id |
-| `images` | One row per image version; FK → pages |
-| `jobs` | BullMQ-side mirror — keeps job state outside of Redis for audit |
-| `exports` | Final PDF/EPUB exports per project |
-| `llm_usage` | Token + cost accounting for Claude/OpenAI |
-| `image_events` | Audit log for approvals, regenerations |
+| `manifests` | Book/chapter/page manifests |
+| `pages` | One row per planned page |
+| `images` | One row per image version |
+| `jobs` | BullMQ job mirror for auditability |
+| `exports` | Final PDF/EPUB exports |
+| `llm_usage` | Token and cost accounting |
+| `image_events` | Image approval/regeneration events |
+| `knowledge_items` | Common base table for Publishing Intelligence records |
+| `experiments` | Hypotheses, tests, results, conclusions |
+| `decisions` | Publishing decisions and reasons |
+| `standards` | Durable publishing standards |
+| `standard_versions` | Version history for standards |
+| `sops` | SOP library records |
+| `sop_versions` | Version history for SOP bodies/checklists |
+| `lessons_learned` | Searchable lessons and prevention notes |
+| `print_reviews` | Physical proof copy reviews |
+| `print_findings` | Margin, typography, image, KDP, paper, cover findings |
+| `cost_events` | API/render/storage cost events |
+| `knowledge_evidence` | Evidence files, URLs, proof photos, notes |
+| `knowledge_links` | Typed lineage between records |
+| `knowledge_events` | Audit trail for knowledge changes |
 
-**Migrations:**
+## Migrations
+
 - Tool: Drizzle Kit
-- Migrations live in `src/db/migrations/`
-- Generated from schema files in `src/db/schema/`
-- Run via `yarn workspace @wildlands/backend drizzle:migrate`
+- Schema: `src/db/schema/index.ts`
+- Output: `src/db/migrations/`
+- Generate: `yarn workspace @wildlands/backend drizzle:generate`
+- Apply: `yarn workspace @wildlands/backend drizzle:migrate`
 
-**What can go wrong:**
-- Migration drift — schema in code ≠ DB; always run `drizzle:check` in CI
-- Postgres connection limit hit — Supabase free tier ~60 connections; use pooled URL
-- JSON column too large — Postgres `jsonb` has no hard cap but query perf degrades; keep manifests < 5MB
+The production backend runs migrations before `node dist/index.js`.
 
-**Conventions:**
-- All tables have `id` (uuid), `created_at`, `updated_at`.
-- All FK relations explicit + on-delete cascade or restrict (never default).
-- Repository functions live in `src/db/repos/` — one file per table.
+## Publishing Intelligence Model
+
+Publishing Intelligence uses a base/specialist model:
+
+- `knowledge_items` stores shared fields used for search, filtering, status,
+  ownership, tags, project scope, and timestamps.
+- Specialist tables store type-specific details.
+- `knowledge_links` preserves relationships such as
+  `EXPERIMENT -> DECISION -> STANDARD -> SOP`.
+- `standard_versions` and `sop_versions` preserve rulebook history.
+- `knowledge_events` stores audit entries for creates, evidence, links, and
+  promotions.
+
+## What Can Go Wrong
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| Migration drift | Schema in code differs from DB | Generate/apply migrations before deploy |
+| Connection limit hit | Too many direct Supabase connections | Use pooled `DATABASE_URL` |
+| Missing Intelligence tables | Migration did not run or DB URL points elsewhere | Run `drizzle:migrate` and confirm Railway env |
+| Slow knowledge search later | Data volume outgrew simple text search | Add full-text/trigram indexes in the next phase |
+
+## Conventions
+
+- Tables use UUID primary keys.
+- FK behavior is explicit.
+- Repository functions live in `src/db/repositories/`.
+- Routes should not write SQL directly.
+- JSONB is used for flexible metadata, but the important workflow fields live in
+  typed columns.

@@ -9,6 +9,27 @@ const configuredBackend = process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND_U
 // Pipeline phases you can "talk to" in the operator console.
 const PHASES = ["Ingest", "Manifests", "Plan", "Text-Fit", "Images", "Review", "Render"];
 const DEV_ISSUES_KEY = "wildlands_dev_issues";
+const INTELLIGENCE_TYPES = [
+  ["", "All Intelligence"],
+  ["EXPERIMENT", "Experiments"],
+  ["DECISION", "Decisions"],
+  ["STANDARD", "Standards"],
+  ["SOP", "SOP Library"],
+  ["COST_RECORD", "Cost Tracking"],
+  ["PRINT_REVIEW", "Print Reviews"],
+  ["LESSON", "Lessons Learned"],
+];
+
+const RELATION_TYPES = [
+  "DERIVED_FROM",
+  "PRODUCED_DECISION",
+  "PROMOTED_TO_STANDARD",
+  "UPDATES_SOP",
+  "SUPERSEDES",
+  "EVIDENCED_BY",
+  "AFFECTS",
+  "RELATED_TO",
+];
 
 function loadDevIssues() {
   try {
@@ -881,6 +902,30 @@ function trimNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function parseTags(value) {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function parseLines(value) {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function parseJsonRecord(value, fallback = {}) {
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  const parsed = JSON.parse(trimmed);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("JSON value must be an object.");
+  }
+  return parsed;
+}
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -907,6 +952,75 @@ async function readJson(response) {
   }
   return data;
 }
+
+const defaultExperimentDraft = {
+  title: "Typography Test: 11pt vs 11.5pt",
+  hypothesis: "11.5pt body text will improve readability without causing common overflows.",
+  testPerformed: "Render representative pages at 11pt and 11.5pt, then compare screen preview and proof output.",
+  result: "",
+  conclusion: "",
+  ownerName: "Operator",
+  tags: "typography, readability",
+};
+
+const defaultDecisionDraft = {
+  title: "Decision: Use OpenAI as primary image generator",
+  decision: "Use OpenAI gpt-image-1 as the primary image generator for v1 testing.",
+  reason: "It produced the strongest style consistency in early smoke tests.",
+  ownerName: "Operator",
+  tags: "images, generator",
+};
+
+const defaultStandardDraft = {
+  title: "Standard: Body text size",
+  domain: "Typography",
+  standardKey: "body_text",
+  valueJson: '{ "font": "EB Garamond", "bodyPt": 11.5, "lineHeight": 1.28 }',
+  rationale: "Accepted after readability and text-fit comparison testing.",
+  ownerName: "Operator",
+  tags: "typography, locked-standard",
+};
+
+const defaultSopDraft = {
+  title: "SOP: Image Review",
+  workflowName: "Image Review SOP",
+  bodyMarkdown: "1. Review text-safe negative space.\n2. Confirm no generated article text.\n3. Approve only if subject matches the page context.",
+  checklist: "No fake text\nText zones preserved\nSubject matches page\nReady for upscale",
+  changeNotes: "Initial operator workflow.",
+  ownerName: "Operator",
+  tags: "sop, image-review",
+};
+
+const defaultCostDraft = {
+  title: "Cost: Test image generation",
+  provider: "OpenAI",
+  model: "gpt-image-1",
+  operation: "IMAGE_GENERATION",
+  quantity: 1,
+  unitCostUsd: 0,
+  costUsd: 0,
+  ownerName: "Operator",
+  tags: "cost, images",
+};
+
+const defaultPrintDraft = {
+  title: "Print Review: First proof copy",
+  proofName: "Wildlands proof copy 1",
+  vendor: "KDP",
+  format: "Premium color hardcover",
+  overallStatus: "OPEN",
+  ownerName: "Operator",
+  tags: "print-proof, kdp",
+};
+
+const defaultLessonDraft = {
+  title: "Lesson: Preserve text zones",
+  lesson: "Layouts fail when illustration detail consumes the reserved educational text area.",
+  prevention: "Run text-fit preview before image spend and keep negative space intentional.",
+  appliesTo: "layout planning\nimage prompts\nprint review",
+  ownerName: "Operator",
+  tags: "layout, image-prompt",
+};
 
 function App() {
   const [backendUrl, setBackendUrl] = useState(trimSlash(configuredBackend));
@@ -936,6 +1050,22 @@ Use this entry to prove manuscript to manifest generation.`);
   const [commandInput, setCommandInput] = useState("");
   const [phase, setPhase] = useState("Manifests");
   const [devIssues, setDevIssues] = useState(loadDevIssues);
+  const [intelligenceOverview, setIntelligenceOverview] = useState(null);
+  const [intelligenceItems, setIntelligenceItems] = useState([]);
+  const [intelligenceFilter, setIntelligenceFilter] = useState({ type: "", q: "" });
+  const [experimentDraft, setExperimentDraft] = useState(defaultExperimentDraft);
+  const [decisionDraft, setDecisionDraft] = useState(defaultDecisionDraft);
+  const [standardDraft, setStandardDraft] = useState(defaultStandardDraft);
+  const [sopDraft, setSopDraft] = useState(defaultSopDraft);
+  const [costDraft, setCostDraft] = useState(defaultCostDraft);
+  const [printDraft, setPrintDraft] = useState(defaultPrintDraft);
+  const [lessonDraft, setLessonDraft] = useState(defaultLessonDraft);
+  const [linkDraft, setLinkDraft] = useState({
+    sourceItemId: "",
+    targetItemId: "",
+    relationType: "RELATED_TO",
+    note: "",
+  });
   const [operatorLog, setOperatorLog] = useState([
     {
       level: "system",
@@ -957,6 +1087,10 @@ Use this entry to prove manuscript to manifest generation.`);
       target[path[path.length - 1]] = value;
       return next;
     });
+  }
+
+  function updateDraft(setter, key, value) {
+    setter((current) => ({ ...current, [key]: value }));
   }
 
   function updateLayoutAsset(index, key, value) {
@@ -1130,6 +1264,192 @@ Use this entry to prove manuscript to manifest generation.`);
     setMessage("Loaded manifests and pages.");
   }
 
+  async function refreshIntelligence() {
+    const params = new URLSearchParams();
+    if (intelligenceFilter.type) params.set("type", intelligenceFilter.type);
+    if (intelligenceFilter.q.trim()) params.set("q", intelligenceFilter.q.trim());
+    params.set("limit", "40");
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    const [overviewData, itemsData] = await Promise.all([
+      call("/api/intelligence/overview"),
+      call(`/api/intelligence/items${suffix}`),
+    ]);
+    setIntelligenceOverview(overviewData);
+    setIntelligenceItems(itemsData.items || []);
+    setMessage("Publishing Intelligence refreshed.");
+  }
+
+  async function createExperimentRecord() {
+    const data = await call("/api/intelligence/experiments", {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: activeProjectId || undefined,
+        title: experimentDraft.title,
+        summary: experimentDraft.conclusion || experimentDraft.hypothesis,
+        scope: activeProjectId ? "PROJECT" : "GLOBAL",
+        ownerName: experimentDraft.ownerName,
+        tags: parseTags(experimentDraft.tags),
+        hypothesis: experimentDraft.hypothesis,
+        testPerformed: experimentDraft.testPerformed,
+        result: experimentDraft.result || undefined,
+        conclusion: experimentDraft.conclusion || undefined,
+        status: experimentDraft.conclusion ? "CONCLUDED" : "RUNNING",
+      }),
+    });
+    appendLog("success", `Experiment recorded: ${data.item.title}`);
+    await refreshIntelligence();
+  }
+
+  async function createDecisionRecord() {
+    const data = await call("/api/intelligence/decisions", {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: activeProjectId || undefined,
+        title: decisionDraft.title,
+        summary: decisionDraft.decision,
+        scope: activeProjectId ? "PROJECT" : "GLOBAL",
+        ownerName: decisionDraft.ownerName,
+        tags: parseTags(decisionDraft.tags),
+        decision: decisionDraft.decision,
+        reason: decisionDraft.reason,
+        status: "ACCEPTED",
+      }),
+    });
+    appendLog("success", `Decision recorded: ${data.item.title}`);
+    await refreshIntelligence();
+  }
+
+  async function createStandardRecord() {
+    const value = parseJsonRecord(standardDraft.valueJson);
+    const data = await call("/api/intelligence/standards", {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: activeProjectId || undefined,
+        title: standardDraft.title,
+        summary: `${standardDraft.domain}: ${standardDraft.standardKey}`,
+        scope: "GLOBAL",
+        ownerName: standardDraft.ownerName,
+        tags: parseTags(standardDraft.tags),
+        domain: standardDraft.domain,
+        standardKey: standardDraft.standardKey,
+        value,
+        rationale: standardDraft.rationale,
+        status: "LOCKED",
+      }),
+    });
+    appendLog("success", `Standard locked: ${data.item.title}`);
+    await refreshIntelligence();
+  }
+
+  async function createSopRecord() {
+    const data = await call("/api/intelligence/sops", {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: activeProjectId || undefined,
+        title: sopDraft.title,
+        summary: sopDraft.workflowName,
+        scope: "WORKFLOW",
+        ownerName: sopDraft.ownerName,
+        tags: parseTags(sopDraft.tags),
+        workflowName: sopDraft.workflowName,
+        bodyMarkdown: sopDraft.bodyMarkdown,
+        checklist: parseLines(sopDraft.checklist),
+        changeNotes: sopDraft.changeNotes || undefined,
+        status: "ACCEPTED",
+      }),
+    });
+    appendLog("success", `SOP recorded: ${data.item.title}`);
+    await refreshIntelligence();
+  }
+
+  async function createCostRecord() {
+    const data = await call("/api/intelligence/cost-events", {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: activeProjectId || undefined,
+        title: costDraft.title,
+        summary: `${costDraft.provider} ${costDraft.operation}: $${Number(costDraft.costUsd).toFixed(4)}`,
+        scope: activeProjectId ? "PROJECT" : "GLOBAL",
+        ownerName: costDraft.ownerName,
+        tags: parseTags(costDraft.tags),
+        provider: costDraft.provider,
+        model: costDraft.model || undefined,
+        operation: costDraft.operation,
+        quantity: Number(costDraft.quantity),
+        unitCostUsd: Number(costDraft.unitCostUsd) || undefined,
+        costUsd: Number(costDraft.costUsd),
+      }),
+    });
+    appendLog("success", `Cost recorded: ${data.item.title}`);
+    await refreshIntelligence();
+  }
+
+  async function createPrintReviewRecord() {
+    const data = await call("/api/intelligence/print-reviews", {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: activeProjectId || undefined,
+        title: printDraft.title,
+        summary: `${printDraft.vendor} ${printDraft.format}`,
+        scope: activeProjectId ? "PROJECT" : "GLOBAL",
+        ownerName: printDraft.ownerName,
+        tags: parseTags(printDraft.tags),
+        proofName: printDraft.proofName,
+        vendor: printDraft.vendor,
+        format: printDraft.format,
+        overallStatus: printDraft.overallStatus,
+        status: "RUNNING",
+      }),
+    });
+    appendLog("success", `Print review recorded: ${data.item.title}`);
+    await refreshIntelligence();
+  }
+
+  async function createLessonRecord() {
+    const data = await call("/api/intelligence/lessons", {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: activeProjectId || undefined,
+        title: lessonDraft.title,
+        summary: lessonDraft.lesson,
+        scope: "GLOBAL",
+        ownerName: lessonDraft.ownerName,
+        tags: parseTags(lessonDraft.tags),
+        lesson: lessonDraft.lesson,
+        prevention: lessonDraft.prevention || undefined,
+        appliesTo: parseLines(lessonDraft.appliesTo),
+        status: "ACCEPTED",
+      }),
+    });
+    appendLog("success", `Lesson recorded: ${data.item.title}`);
+    await refreshIntelligence();
+  }
+
+  async function createKnowledgeLink() {
+    if (!linkDraft.sourceItemId || !linkDraft.targetItemId) {
+      throw new Error("Source and target item IDs are required for lineage links.");
+    }
+    await call("/api/intelligence/links", {
+      method: "POST",
+      body: JSON.stringify({
+        sourceItemId: linkDraft.sourceItemId,
+        targetItemId: linkDraft.targetItemId,
+        relationType: linkDraft.relationType,
+        note: linkDraft.note || undefined,
+      }),
+    });
+    appendLog("success", `${linkDraft.relationType} lineage link recorded.`);
+    await refreshIntelligence();
+  }
+
+  async function promoteExperimentRecord(itemId) {
+    const data = await call(`/api/intelligence/experiments/${itemId}/promote-decision`, {
+      method: "POST",
+    });
+    appendLog("success", `Promoted experiment to decision: ${data.item.title}`);
+    await refreshIntelligence();
+  }
+
   async function generateManifests(projectId = activeProjectId) {
     if (!projectId) throw new Error("Create or select a project first.");
     const data = await call(`/api/projects/${projectId}/manifests`, {
@@ -1193,10 +1513,12 @@ Use this entry to prove manuscript to manifest generation.`);
       await run("Planning pages...", planPages);
     } else if (normalized.includes("refresh") || normalized.includes("output")) {
       await run("Loading output...", () => loadArtifacts());
+    } else if (normalized.includes("intelligence") || normalized.includes("knowledge") || normalized.includes("standards")) {
+      await run("Refreshing Publishing Intelligence...", refreshIntelligence);
     } else if (normalized.includes("run") || normalized.includes("start")) {
       await run("Running manuscript intake...", runManuscriptIntake);
     } else {
-      appendLog("system", "Try: check backend, create project, upload manuscript, generate manifests, refresh output, or run intake.");
+      appendLog("system", "Try: check backend, create project, upload manuscript, generate manifests, refresh intelligence, refresh output, or run intake.");
     }
   }
 
@@ -1322,7 +1644,7 @@ Use this entry to prove manuscript to manifest generation.`);
             </div>
             <div className={`flow-step ${plannedPages.length > 0 ? "done" : pages.length > 0 ? "current" : ""}`}>
               <strong>4. Layout Fit</strong>
-              <span>Agent selects one of 9 layouts, assembles prompts, then waits for text-fit approval</span>
+              <span>Agent selects one of 16 layouts, assembles prompts, then waits for text-fit approval</span>
             </div>
             <div className="flow-step">
               <strong>5. Images + Exports</strong>
@@ -1330,6 +1652,300 @@ Use this entry to prove manuscript to manifest generation.`);
             </div>
           </div>
         </section>
+      </section>
+
+      <section className="panel intelligence-panel">
+        <div className="section-head">
+          <div>
+            <p className="eyebrow">Publishing Intelligence</p>
+            <h2>Standards Ledger + Knowledge System</h2>
+            <p className="hint">
+              Capture experiments, decisions, locked standards, SOPs, costs, print-proof findings, and lessons learned.
+            </p>
+          </div>
+          <button disabled={busy} onClick={() => run("Refreshing Publishing Intelligence...", refreshIntelligence)}>
+            Refresh Intelligence
+          </button>
+        </div>
+
+        <div className="intelligence-metrics">
+          <div>
+            <strong>{intelligenceOverview?.totals?.experiments ?? 0}</strong>
+            <span>Experiments</span>
+          </div>
+          <div>
+            <strong>{intelligenceOverview?.totals?.decisions ?? 0}</strong>
+            <span>Decisions</span>
+          </div>
+          <div>
+            <strong>{intelligenceOverview?.lockedStandards ?? 0}</strong>
+            <span>Locked Standards</span>
+          </div>
+          <div>
+            <strong>{intelligenceOverview?.totals?.sops ?? 0}</strong>
+            <span>SOPs</span>
+          </div>
+          <div>
+            <strong>{intelligenceOverview?.totals?.printReviews ?? 0}</strong>
+            <span>Print Reviews</span>
+          </div>
+          <div>
+            <strong>{intelligenceOverview?.totals?.costRecords ?? 0}</strong>
+            <span>Cost Records</span>
+          </div>
+        </div>
+
+        <div className="intelligence-filter">
+          <Field label="Search Intelligence">
+            <input
+              value={intelligenceFilter.q}
+              onChange={(event) => setIntelligenceFilter((current) => ({ ...current, q: event.target.value }))}
+              placeholder="Search title or summary"
+            />
+          </Field>
+          <Field label="Record Type">
+            <select
+              value={intelligenceFilter.type}
+              onChange={(event) => setIntelligenceFilter((current) => ({ ...current, type: event.target.value }))}
+            >
+              {INTELLIGENCE_TYPES.map(([value, label]) => (
+                <option key={value || "all"} value={value}>{label}</option>
+              ))}
+            </select>
+          </Field>
+          <button disabled={busy} onClick={() => run("Searching Publishing Intelligence...", refreshIntelligence)}>
+            Search
+          </button>
+        </div>
+
+        <div className="capture-grid">
+          <article className="mini-form">
+            <h3>Experiment</h3>
+            <Field label="Title">
+              <input value={experimentDraft.title} onChange={(event) => updateDraft(setExperimentDraft, "title", event.target.value)} />
+            </Field>
+            <Field label="Hypothesis">
+              <textarea className="notes-field" value={experimentDraft.hypothesis} onChange={(event) => updateDraft(setExperimentDraft, "hypothesis", event.target.value)} />
+            </Field>
+            <Field label="Test Performed">
+              <textarea className="notes-field" value={experimentDraft.testPerformed} onChange={(event) => updateDraft(setExperimentDraft, "testPerformed", event.target.value)} />
+            </Field>
+            <Field label="Result">
+              <textarea className="notes-field" value={experimentDraft.result} onChange={(event) => updateDraft(setExperimentDraft, "result", event.target.value)} />
+            </Field>
+            <Field label="Conclusion">
+              <textarea className="notes-field" value={experimentDraft.conclusion} onChange={(event) => updateDraft(setExperimentDraft, "conclusion", event.target.value)} />
+            </Field>
+            <Field label="Tags">
+              <input value={experimentDraft.tags} onChange={(event) => updateDraft(setExperimentDraft, "tags", event.target.value)} />
+            </Field>
+            <button disabled={busy} onClick={() => run("Recording experiment...", createExperimentRecord)}>
+              Record Experiment
+            </button>
+          </article>
+
+          <article className="mini-form">
+            <h3>Decision</h3>
+            <Field label="Title">
+              <input value={decisionDraft.title} onChange={(event) => updateDraft(setDecisionDraft, "title", event.target.value)} />
+            </Field>
+            <Field label="Decision">
+              <textarea className="notes-field" value={decisionDraft.decision} onChange={(event) => updateDraft(setDecisionDraft, "decision", event.target.value)} />
+            </Field>
+            <Field label="Reason">
+              <textarea className="notes-field" value={decisionDraft.reason} onChange={(event) => updateDraft(setDecisionDraft, "reason", event.target.value)} />
+            </Field>
+            <Field label="Tags">
+              <input value={decisionDraft.tags} onChange={(event) => updateDraft(setDecisionDraft, "tags", event.target.value)} />
+            </Field>
+            <button disabled={busy} onClick={() => run("Recording decision...", createDecisionRecord)}>
+              Record Decision
+            </button>
+          </article>
+
+          <article className="mini-form">
+            <h3>Locked Standard</h3>
+            <Field label="Title">
+              <input value={standardDraft.title} onChange={(event) => updateDraft(setStandardDraft, "title", event.target.value)} />
+            </Field>
+            <div className="two-col">
+              <Field label="Domain">
+                <input value={standardDraft.domain} onChange={(event) => updateDraft(setStandardDraft, "domain", event.target.value)} />
+              </Field>
+              <Field label="Standard Key">
+                <input value={standardDraft.standardKey} onChange={(event) => updateDraft(setStandardDraft, "standardKey", event.target.value)} />
+              </Field>
+            </div>
+            <Field label="Value JSON">
+              <textarea className="notes-field" value={standardDraft.valueJson} onChange={(event) => updateDraft(setStandardDraft, "valueJson", event.target.value)} />
+            </Field>
+            <Field label="Rationale">
+              <textarea className="notes-field" value={standardDraft.rationale} onChange={(event) => updateDraft(setStandardDraft, "rationale", event.target.value)} />
+            </Field>
+            <Field label="Tags">
+              <input value={standardDraft.tags} onChange={(event) => updateDraft(setStandardDraft, "tags", event.target.value)} />
+            </Field>
+            <button disabled={busy} onClick={() => run("Locking standard...", createStandardRecord)}>
+              Lock Standard
+            </button>
+          </article>
+
+          <article className="mini-form">
+            <h3>SOP Library</h3>
+            <Field label="Workflow Name">
+              <input value={sopDraft.workflowName} onChange={(event) => updateDraft(setSopDraft, "workflowName", event.target.value)} />
+            </Field>
+            <Field label="SOP Body">
+              <textarea className="notes-field" value={sopDraft.bodyMarkdown} onChange={(event) => updateDraft(setSopDraft, "bodyMarkdown", event.target.value)} />
+            </Field>
+            <Field label="Checklist">
+              <textarea className="notes-field" value={sopDraft.checklist} onChange={(event) => updateDraft(setSopDraft, "checklist", event.target.value)} />
+            </Field>
+            <Field label="Change Notes">
+              <input value={sopDraft.changeNotes} onChange={(event) => updateDraft(setSopDraft, "changeNotes", event.target.value)} />
+            </Field>
+            <button disabled={busy} onClick={() => run("Recording SOP...", createSopRecord)}>
+              Record SOP
+            </button>
+          </article>
+
+          <article className="mini-form">
+            <h3>Cost Tracking</h3>
+            <Field label="Title">
+              <input value={costDraft.title} onChange={(event) => updateDraft(setCostDraft, "title", event.target.value)} />
+            </Field>
+            <div className="two-col">
+              <Field label="Provider">
+                <input value={costDraft.provider} onChange={(event) => updateDraft(setCostDraft, "provider", event.target.value)} />
+              </Field>
+              <Field label="Model">
+                <input value={costDraft.model} onChange={(event) => updateDraft(setCostDraft, "model", event.target.value)} />
+              </Field>
+            </div>
+            <Field label="Operation">
+              <select value={costDraft.operation} onChange={(event) => updateDraft(setCostDraft, "operation", event.target.value)}>
+                <option value="LLM">LLM</option>
+                <option value="IMAGE_GENERATION">Image Generation</option>
+                <option value="UPSCALE">Upscale</option>
+                <option value="PDF_RENDER">PDF Render</option>
+                <option value="EPUB_EXPORT">EPUB Export</option>
+                <option value="STORAGE">Storage</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </Field>
+            <div className="two-col">
+              <Field label="Quantity">
+                <input type="number" step="0.0001" value={costDraft.quantity} onChange={(event) => updateDraft(setCostDraft, "quantity", trimNumber(event.target.value))} />
+              </Field>
+              <Field label="Cost USD">
+                <input type="number" step="0.0001" value={costDraft.costUsd} onChange={(event) => updateDraft(setCostDraft, "costUsd", trimNumber(event.target.value))} />
+              </Field>
+            </div>
+            <button disabled={busy} onClick={() => run("Recording cost...", createCostRecord)}>
+              Record Cost
+            </button>
+          </article>
+
+          <article className="mini-form">
+            <h3>Print Review</h3>
+            <Field label="Proof Name">
+              <input value={printDraft.proofName} onChange={(event) => updateDraft(setPrintDraft, "proofName", event.target.value)} />
+            </Field>
+            <div className="two-col">
+              <Field label="Vendor">
+                <input value={printDraft.vendor} onChange={(event) => updateDraft(setPrintDraft, "vendor", event.target.value)} />
+              </Field>
+              <Field label="Format">
+                <input value={printDraft.format} onChange={(event) => updateDraft(setPrintDraft, "format", event.target.value)} />
+              </Field>
+            </div>
+            <Field label="Overall Status">
+              <input value={printDraft.overallStatus} onChange={(event) => updateDraft(setPrintDraft, "overallStatus", event.target.value)} />
+            </Field>
+            <Field label="Tags">
+              <input value={printDraft.tags} onChange={(event) => updateDraft(setPrintDraft, "tags", event.target.value)} />
+            </Field>
+            <button disabled={busy} onClick={() => run("Recording print review...", createPrintReviewRecord)}>
+              Record Print Review
+            </button>
+          </article>
+
+          <article className="mini-form">
+            <h3>Lessons Learned</h3>
+            <Field label="Title">
+              <input value={lessonDraft.title} onChange={(event) => updateDraft(setLessonDraft, "title", event.target.value)} />
+            </Field>
+            <Field label="Lesson">
+              <textarea className="notes-field" value={lessonDraft.lesson} onChange={(event) => updateDraft(setLessonDraft, "lesson", event.target.value)} />
+            </Field>
+            <Field label="Prevention">
+              <textarea className="notes-field" value={lessonDraft.prevention} onChange={(event) => updateDraft(setLessonDraft, "prevention", event.target.value)} />
+            </Field>
+            <Field label="Applies To">
+              <textarea className="notes-field" value={lessonDraft.appliesTo} onChange={(event) => updateDraft(setLessonDraft, "appliesTo", event.target.value)} />
+            </Field>
+            <Field label="Tags">
+              <input value={lessonDraft.tags} onChange={(event) => updateDraft(setLessonDraft, "tags", event.target.value)} />
+            </Field>
+            <button disabled={busy} onClick={() => run("Recording lesson...", createLessonRecord)}>
+              Record Lesson
+            </button>
+          </article>
+
+          <article className="mini-form">
+            <h3>Lineage Link</h3>
+            <Field label="Source Item ID">
+              <input value={linkDraft.sourceItemId} onChange={(event) => updateDraft(setLinkDraft, "sourceItemId", event.target.value)} />
+            </Field>
+            <Field label="Target Item ID">
+              <input value={linkDraft.targetItemId} onChange={(event) => updateDraft(setLinkDraft, "targetItemId", event.target.value)} />
+            </Field>
+            <Field label="Relationship">
+              <select value={linkDraft.relationType} onChange={(event) => updateDraft(setLinkDraft, "relationType", event.target.value)}>
+                {RELATION_TYPES.map((relation) => (
+                  <option key={relation} value={relation}>{relation}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Note">
+              <input value={linkDraft.note} onChange={(event) => updateDraft(setLinkDraft, "note", event.target.value)} />
+            </Field>
+            <button disabled={busy} onClick={() => run("Linking knowledge records...", createKnowledgeLink)}>
+              Create Link
+            </button>
+          </article>
+        </div>
+
+        <div className="knowledge-list">
+          <div className="section-head">
+            <h3>Recent Knowledge Records</h3>
+            <span className="hint">{intelligenceItems.length} visible</span>
+          </div>
+          <div className="table">
+            {intelligenceItems.map((item) => (
+              <div className="row knowledge-row" key={item.id}>
+                <span>{item.type}</span>
+                <span>
+                  <strong>{item.title}</strong>
+                  <small>{item.summary || "No summary"} / {item.id}</small>
+                </span>
+                <span>{item.status}</span>
+                <span>{item.scope}</span>
+                <span>{item.tags?.join(", ") || "No tags"}</span>
+                <span>
+                  {item.type === "EXPERIMENT" ? (
+                    <button disabled={busy} onClick={() => run("Promoting experiment...", () => promoteExperimentRecord(item.id))}>
+                      Promote
+                    </button>
+                  ) : (
+                    "Audit kept"
+                  )}
+                </span>
+              </div>
+            ))}
+            {intelligenceItems.length === 0 && <p className="empty">No intelligence records loaded yet.</p>}
+          </div>
+        </div>
       </section>
 
       <section className="pipeline-grid">
@@ -1931,7 +2547,7 @@ Use this entry to prove manuscript to manifest generation.`);
           </section>
 
           <section className="panel template-panel">
-            <h2>9 Layout Templates</h2>
+            <h2>16 Layout Templates</h2>
             {LAYOUT_TEMPLATES.map(([id, name, description]) => (
               <div className="template-row" key={id}>
                 <strong>{name}</strong>

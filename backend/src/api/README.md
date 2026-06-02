@@ -18,6 +18,20 @@ Implemented foundation routes:
 | `GET` | `/api/projects/:id/manifests` | Read persisted manifests |
 | `POST` | `/api/projects/:id/plan` | Run Stage 2 page planning |
 | `GET` | `/api/projects/:id/pages` | Read persisted page rows and planner output fields |
+| `GET` | `/api/intelligence/overview` | Read Publishing Intelligence dashboard counts |
+| `GET` | `/api/intelligence/items` | Search/list knowledge records |
+| `POST` | `/api/intelligence/experiments` | Record an experiment |
+| `POST` | `/api/intelligence/decisions` | Record a publishing decision |
+| `POST` | `/api/intelligence/standards` | Lock a versioned publishing standard |
+| `POST` | `/api/intelligence/sops` | Create a versioned SOP |
+| `POST` | `/api/intelligence/lessons` | Record a lesson learned |
+| `POST` | `/api/intelligence/print-reviews` | Start a print proof review |
+| `POST` | `/api/intelligence/print-findings` | Add a print proof finding |
+| `POST` | `/api/intelligence/cost-events` | Record an API/render/storage cost |
+| `POST` | `/api/intelligence/evidence` | Attach evidence to a knowledge record |
+| `POST` | `/api/intelligence/links` | Link records for lineage |
+| `POST` | `/api/intelligence/experiments/:id/promote-decision` | Promote experiment into a decision |
+| `POST` | `/api/intelligence/decisions/:id/promote-standard` | Promote decision into a locked standard |
 
 Routes not implemented yet:
 
@@ -37,6 +51,8 @@ Routes not implemented yet:
   live inside route functions.
 - Route responses should expose enough state for the operator UI and reviewer
   debugging.
+- Publishing Intelligence routes should preserve lineage and auditability; do
+  not replace promotion workflows with ad hoc notes.
 
 ## Auth Status
 
@@ -66,6 +82,21 @@ Run planner:
 
 ```bash
 curl -X POST http://localhost:8001/api/projects/{projectId}/plan
+```
+
+Refresh Publishing Intelligence:
+
+```bash
+curl http://localhost:8001/api/intelligence/overview
+curl "http://localhost:8001/api/intelligence/items?type=STANDARD"
+```
+
+Record a small experiment:
+
+```bash
+curl -X POST http://localhost:8001/api/intelligence/experiments \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"Typography Test\",\"hypothesis\":\"11.5pt improves readability\",\"testPerformed\":\"Compare rendered pages\",\"tags\":[\"typography\"]}"
 ```
 
 Save project config before planning:

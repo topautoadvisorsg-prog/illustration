@@ -8,6 +8,13 @@
       "when": 1779941769430,
       "tag": "0000_gray_odin",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780365881625,
+      "tag": "0001_wealthy_golden_guardian",
+      "breakpoints": true
     }
   ]
 }

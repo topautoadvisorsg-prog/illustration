@@ -1,7 +1,7 @@
 /**
  * Stage 6 — per-layout composition profiles.
  *
- * What it does: for each of the 15 canonical layouts, declares how much of the
+ * What it does: for each of the 16 canonical layouts, declares how much of the
  * text frame is actually available to body copy (the rest is the art slot) and
  * where the art sits. The text-fit analyzer uses `textAreaFactor` to estimate
  * capacity; the HTML renderer uses `artSlot` to place the (clean, text-free)
@@ -42,9 +42,10 @@ export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
   LAYOUT_6_BACK_MATTER: { textAreaFactor: 0.95, artSlot: 'FLOAT_RIGHT', artAreaFraction: 0.1, textLight: false },
   LAYOUT_7_SCATTERED_VIGNETTES: { textAreaFactor: 0.7, artSlot: 'SCATTERED', artAreaFraction: 0.36, textLight: false },
   LAYOUT_8_MARGIN_ILLUSTRATION: { textAreaFactor: 0.78, artSlot: 'FLOAT_RIGHT', artAreaFraction: 0.26, textLight: false },
-  LAYOUT_9_DIAGNOSTIC_DIAGRAM: { textAreaFactor: 0.62, artSlot: 'TOP_BAND', artAreaFraction: 0.42, textLight: false },
+  LAYOUT_9_DIAGNOSTIC_DIAGRAM: { textAreaFactor: 0.7, artSlot: 'SCATTERED', artAreaFraction: 0.38, textLight: false },
   LAYOUT_10_FULL_PAGE_PLATE: { textAreaFactor: 0.12, artSlot: 'FULL_PAGE', artAreaFraction: 0.95, textLight: true },
   LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD: { textAreaFactor: 0.3, artSlot: 'TOP_BAND', artAreaFraction: 0.6, textLight: true },
+  LAYOUT_12_DIAGNOSTIC_DIAGRAM: { textAreaFactor: 0.62, artSlot: 'TOP_BAND', artAreaFraction: 0.42, textLight: false },
   LAYOUT_13_FEATURE_BANNER: { textAreaFactor: 0.65, artSlot: 'TOP_BAND', artAreaFraction: 0.4, textLight: false },
   LAYOUT_14_SIDEBAR_FEATURE: { textAreaFactor: 0.7, artSlot: 'SIDEBAR_RIGHT', artAreaFraction: 0.3, textLight: false },
   LAYOUT_15_PROGRESSION_STUDY: { textAreaFactor: 0.62, artSlot: 'TOP_BAND', artAreaFraction: 0.42, textLight: false },

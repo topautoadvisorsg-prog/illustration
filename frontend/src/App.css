@@ -182,7 +182,8 @@ h3 {
 .notice,
 .operator-grid,
 .workspace-grid,
-.pipeline-grid {
+.pipeline-grid,
+.intelligence-panel {
   margin-bottom: 14px;
 }
 
@@ -215,7 +216,10 @@ h3 {
 .form-grid,
 .number-row,
 .swatch-grid,
-.output-grid {
+.output-grid,
+.intelligence-metrics,
+.capture-grid,
+.two-col {
   display: grid;
   gap: 12px;
 }
@@ -240,11 +244,94 @@ h3 {
   grid-template-columns: repeat(3, minmax(260px, 1fr));
 }
 
+.intelligence-metrics {
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  margin-top: 14px;
+}
+
+.intelligence-metrics div {
+  border: 1px solid #e0d7ca;
+  border-radius: 6px;
+  padding: 12px;
+  background: #fffdf8;
+}
+
+.intelligence-metrics strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #1b332d;
+  font-size: 1.45rem;
+}
+
+.intelligence-metrics span {
+  color: #6d6258;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.intelligence-filter {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(200px, 0.34fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.capture-grid {
+  grid-template-columns: repeat(4, minmax(240px, 1fr));
+  align-items: start;
+  margin-top: 14px;
+}
+
+.mini-form {
+  border: 1px solid #e0d7ca;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffdf8;
+}
+
+.mini-form h3 {
+  margin-bottom: 4px;
+}
+
+.mini-form button {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.knowledge-list {
+  margin-top: 16px;
+}
+
+.knowledge-row {
+  grid-template-columns: 0.72fr minmax(240px, 1.6fr) 0.58fr 0.58fr 1fr 0.62fr;
+  align-items: center;
+}
+
+.knowledge-row small {
+  display: block;
+  margin-top: 3px;
+  color: #6d6258;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.knowledge-row button {
+  min-height: 32px;
+  width: 100%;
+}
+
 .inline-form,
 .button-row,
 .section-head,
 .command-form,
-.quick-actions {
+.quick-actions,
+.phase-row,
+.dev-actions {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -291,6 +378,22 @@ h3 {
 .quick-actions {
   flex-wrap: wrap;
   margin-top: 12px;
+}
+
+.phase-row,
+.dev-actions {
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.phase-row label {
+  color: #4d453d;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.phase-row select {
+  max-width: 180px;
 }
 
 .operator-log {
@@ -585,8 +688,13 @@ h3 {
 @media (max-width: 1120px) {
   .operator-grid,
   .workspace-grid,
-  .pipeline-grid {
+  .pipeline-grid,
+  .capture-grid {
     grid-template-columns: 1fr;
+  }
+
+  .intelligence-metrics {
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
   }
 }
 
@@ -596,7 +704,9 @@ h3 {
   .button-row,
   .section-head,
   .command-form,
-  .quick-actions {
+  .quick-actions,
+  .phase-row,
+  .dev-actions {
     align-items: stretch;
     flex-direction: column;
   }
@@ -607,7 +717,11 @@ h3 {
   .swatch-grid,
   .output-grid,
   .layout-asset-grid,
-  .capacity-grid {
+  .capacity-grid,
+  .intelligence-metrics,
+  .intelligence-filter,
+  .capture-grid,
+  .two-col {
     grid-template-columns: 1fr;
   }
 }

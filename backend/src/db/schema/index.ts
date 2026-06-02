@@ -52,6 +52,67 @@ export const jobTypeEnum = pgEnum('job_type', ['image-generation', 'upscale', 'l
 export const jobStatusEnum = pgEnum('job_status', ['queued', 'active', 'completed', 'failed', 'dead-lettered']);
 export const exportKindEnum = pgEnum('export_kind', ['PREMIUM_PDF', 'KINDLE_EPUB']);
 export const exportStatusEnum = pgEnum('export_status', ['REQUESTED', 'RUNNING', 'READY', 'FAILED']);
+export const knowledgeItemTypeEnum = pgEnum('knowledge_item_type', [
+  'EXPERIMENT',
+  'DECISION',
+  'STANDARD',
+  'SOP',
+  'COST_RECORD',
+  'PRINT_REVIEW',
+  'LESSON',
+]);
+export const knowledgeStatusEnum = pgEnum('knowledge_status', [
+  'DRAFT',
+  'RUNNING',
+  'CONCLUDED',
+  'ACCEPTED',
+  'REJECTED',
+  'LOCKED',
+  'SUPERSEDED',
+  'ARCHIVED',
+]);
+export const knowledgeScopeEnum = pgEnum('knowledge_scope', ['GLOBAL', 'PROJECT', 'BOOK', 'CHAPTER', 'PAGE', 'LAYOUT', 'WORKFLOW']);
+export const evidenceTypeEnum = pgEnum('knowledge_evidence_type', [
+  'FILE',
+  'URL',
+  'SCREENSHOT',
+  'PDF',
+  'IMAGE',
+  'NOTE',
+  'COST_REPORT',
+  'PROOF_PHOTO',
+]);
+export const knowledgeRelationTypeEnum = pgEnum('knowledge_relation_type', [
+  'DERIVED_FROM',
+  'PRODUCED_DECISION',
+  'PROMOTED_TO_STANDARD',
+  'UPDATES_SOP',
+  'SUPERSEDES',
+  'EVIDENCED_BY',
+  'AFFECTS',
+  'RELATED_TO',
+]);
+export const printFindingSeverityEnum = pgEnum('print_finding_severity', ['LOW', 'MEDIUM', 'HIGH', 'BLOCKER']);
+export const printFindingCategoryEnum = pgEnum('print_finding_category', [
+  'MARGIN',
+  'TYPOGRAPHY',
+  'IMAGE_QUALITY',
+  'PAPER',
+  'COVER',
+  'KDP',
+  'COLOR',
+  'BINDING',
+  'OTHER',
+]);
+export const costOperationEnum = pgEnum('cost_operation', [
+  'LLM',
+  'IMAGE_GENERATION',
+  'UPSCALE',
+  'PDF_RENDER',
+  'EPUB_EXPORT',
+  'STORAGE',
+  'OTHER',
+]);
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -215,3 +276,262 @@ export const imageEvents = pgTable('image_events', {
   metadata: jsonb('metadata'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const knowledgeItems = pgTable(
+  'knowledge_items',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }),
+    type: knowledgeItemTypeEnum('type').notNull(),
+    title: text('title').notNull(),
+    summary: text('summary'),
+    status: knowledgeStatusEnum('status').default('DRAFT').notNull(),
+    scope: knowledgeScopeEnum('scope').default('GLOBAL').notNull(),
+    ownerName: text('owner_name'),
+    tags: jsonb('tags').notNull(),
+    metadata: jsonb('metadata').notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    projectTypeIdx: index('knowledge_items_project_type_idx').on(table.projectId, table.type),
+    statusIdx: index('knowledge_items_status_idx').on(table.status),
+    scopeIdx: index('knowledge_items_scope_idx').on(table.scope),
+    createdAtIdx: index('knowledge_items_created_at_idx').on(table.createdAt),
+  }),
+);
+
+export const experiments = pgTable('experiments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  itemId: uuid('item_id')
+    .notNull()
+    .unique()
+    .references(() => knowledgeItems.id, { onDelete: 'cascade' }),
+  hypothesis: text('hypothesis').notNull(),
+  testPerformed: text('test_performed').notNull(),
+  result: text('result'),
+  conclusion: text('conclusion'),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  ...timestamps,
+});
+
+export const decisions = pgTable('decisions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  itemId: uuid('item_id')
+    .notNull()
+    .unique()
+    .references(() => knowledgeItems.id, { onDelete: 'cascade' }),
+  decision: text('decision').notNull(),
+  reason: text('reason').notNull(),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+  supersededByItemId: uuid('superseded_by_item_id').references(() => knowledgeItems.id, { onDelete: 'set null' }),
+  ...timestamps,
+});
+
+export const standards = pgTable(
+  'standards',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    itemId: uuid('item_id')
+      .notNull()
+      .unique()
+      .references(() => knowledgeItems.id, { onDelete: 'cascade' }),
+    domain: text('domain').notNull(),
+    standardKey: text('standard_key').notNull(),
+    currentVersionId: uuid('current_version_id'),
+    lockedAt: timestamp('locked_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => ({
+    domainKeyIdx: uniqueIndex('standards_domain_key_idx').on(table.domain, table.standardKey),
+  }),
+);
+
+export const standardVersions = pgTable(
+  'standard_versions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    standardId: uuid('standard_id')
+      .notNull()
+      .references(() => standards.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    value: jsonb('value').notNull(),
+    rationale: text('rationale').notNull(),
+    effectiveAt: timestamp('effective_at', { withTimezone: true }).defaultNow().notNull(),
+    createdBy: text('created_by'),
+    ...timestamps,
+  },
+  (table) => ({
+    standardVersionIdx: uniqueIndex('standard_versions_standard_version_idx').on(table.standardId, table.version),
+  }),
+);
+
+export const sops = pgTable('sops', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  itemId: uuid('item_id')
+    .notNull()
+    .unique()
+    .references(() => knowledgeItems.id, { onDelete: 'cascade' }),
+  workflowName: text('workflow_name').notNull(),
+  currentVersionId: uuid('current_version_id'),
+  ...timestamps,
+});
+
+export const sopVersions = pgTable(
+  'sop_versions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    sopId: uuid('sop_id')
+      .notNull()
+      .references(() => sops.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    bodyMarkdown: text('body_markdown').notNull(),
+    checklist: jsonb('checklist').notNull(),
+    changeNotes: text('change_notes'),
+    createdBy: text('created_by'),
+    ...timestamps,
+  },
+  (table) => ({
+    sopVersionIdx: uniqueIndex('sop_versions_sop_version_idx').on(table.sopId, table.version),
+  }),
+);
+
+export const lessonsLearned = pgTable('lessons_learned', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  itemId: uuid('item_id')
+    .notNull()
+    .unique()
+    .references(() => knowledgeItems.id, { onDelete: 'cascade' }),
+  lesson: text('lesson').notNull(),
+  prevention: text('prevention'),
+  appliesTo: jsonb('applies_to').notNull(),
+  ...timestamps,
+});
+
+export const printReviews = pgTable('print_reviews', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  itemId: uuid('item_id')
+    .notNull()
+    .unique()
+    .references(() => knowledgeItems.id, { onDelete: 'cascade' }),
+  proofName: text('proof_name').notNull(),
+  vendor: text('vendor').notNull(),
+  format: text('format').notNull(),
+  orderedAt: timestamp('ordered_at', { withTimezone: true }),
+  receivedAt: timestamp('received_at', { withTimezone: true }),
+  overallStatus: text('overall_status').default('OPEN').notNull(),
+  metadata: jsonb('metadata').notNull(),
+  ...timestamps,
+});
+
+export const printFindings = pgTable(
+  'print_findings',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    printReviewId: uuid('print_review_id')
+      .notNull()
+      .references(() => printReviews.id, { onDelete: 'cascade' }),
+    relatedItemId: uuid('related_item_id').references(() => knowledgeItems.id, { onDelete: 'set null' }),
+    severity: printFindingSeverityEnum('severity').notNull(),
+    category: printFindingCategoryEnum('category').notNull(),
+    pageKey: text('page_key'),
+    layoutTemplate: text('layout_template'),
+    finding: text('finding').notNull(),
+    recommendation: text('recommendation'),
+    status: text('status').default('OPEN').notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    reviewSeverityIdx: index('print_findings_review_severity_idx').on(table.printReviewId, table.severity),
+    categoryIdx: index('print_findings_category_idx').on(table.category),
+  }),
+);
+
+export const costEvents = pgTable(
+  'cost_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    itemId: uuid('item_id')
+      .notNull()
+      .unique()
+      .references(() => knowledgeItems.id, { onDelete: 'cascade' }),
+    projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }),
+    pageId: uuid('page_id').references(() => pages.id, { onDelete: 'set null' }),
+    provider: text('provider').notNull(),
+    model: text('model'),
+    operation: costOperationEnum('operation').notNull(),
+    quantity: numeric('quantity', { precision: 12, scale: 4 }).notNull(),
+    unitCostUsd: numeric('unit_cost_usd', { precision: 10, scale: 6 }),
+    costUsd: numeric('cost_usd', { precision: 10, scale: 4 }).notNull(),
+    incurredAt: timestamp('incurred_at', { withTimezone: true }).defaultNow().notNull(),
+    metadata: jsonb('metadata').notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    projectOperationIdx: index('cost_events_project_operation_idx').on(table.projectId, table.operation),
+    incurredAtIdx: index('cost_events_incurred_at_idx').on(table.incurredAt),
+  }),
+);
+
+export const knowledgeEvidence = pgTable(
+  'knowledge_evidence',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => knowledgeItems.id, { onDelete: 'cascade' }),
+    evidenceType: evidenceTypeEnum('evidence_type').notNull(),
+    title: text('title').notNull(),
+    uri: text('uri'),
+    storagePath: text('storage_path'),
+    sha256: text('sha256'),
+    mimeType: text('mime_type'),
+    notes: text('notes'),
+    metadata: jsonb('metadata').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    itemIdx: index('knowledge_evidence_item_idx').on(table.itemId),
+    typeIdx: index('knowledge_evidence_type_idx').on(table.evidenceType),
+  }),
+);
+
+export const knowledgeLinks = pgTable(
+  'knowledge_links',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    sourceItemId: uuid('source_item_id')
+      .notNull()
+      .references(() => knowledgeItems.id, { onDelete: 'cascade' }),
+    targetItemId: uuid('target_item_id')
+      .notNull()
+      .references(() => knowledgeItems.id, { onDelete: 'cascade' }),
+    relationType: knowledgeRelationTypeEnum('relation_type').notNull(),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    lineageIdx: uniqueIndex('knowledge_links_lineage_idx').on(table.sourceItemId, table.targetItemId, table.relationType),
+    sourceIdx: index('knowledge_links_source_idx').on(table.sourceItemId),
+    targetIdx: index('knowledge_links_target_idx').on(table.targetItemId),
+  }),
+);
+
+export const knowledgeEvents = pgTable(
+  'knowledge_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => knowledgeItems.id, { onDelete: 'cascade' }),
+    eventType: text('event_type').notNull(),
+    actorName: text('actor_name'),
+    summary: text('summary').notNull(),
+    previousValue: jsonb('previous_value'),
+    nextValue: jsonb('next_value'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    itemCreatedIdx: index('knowledge_events_item_created_idx').on(table.itemId, table.createdAt),
+  }),
+);

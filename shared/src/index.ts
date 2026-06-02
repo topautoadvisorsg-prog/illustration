@@ -47,6 +47,40 @@ export const JobTypeSchema = z.enum(['image-generation', 'upscale', 'layout', 'p
 export const JobStatusSchema = z.enum(['queued', 'active', 'completed', 'failed', 'dead-lettered']);
 export const ExportKindSchema = z.enum(['PREMIUM_PDF', 'KINDLE_EPUB']);
 export const ExportStatusSchema = z.enum(['REQUESTED', 'RUNNING', 'READY', 'FAILED']);
+export const KnowledgeItemTypeSchema = z.enum([
+  'EXPERIMENT',
+  'DECISION',
+  'STANDARD',
+  'SOP',
+  'COST_RECORD',
+  'PRINT_REVIEW',
+  'LESSON',
+]);
+export const KnowledgeStatusSchema = z.enum([
+  'DRAFT',
+  'RUNNING',
+  'CONCLUDED',
+  'ACCEPTED',
+  'REJECTED',
+  'LOCKED',
+  'SUPERSEDED',
+  'ARCHIVED',
+]);
+export const KnowledgeScopeSchema = z.enum(['GLOBAL', 'PROJECT', 'BOOK', 'CHAPTER', 'PAGE', 'LAYOUT', 'WORKFLOW']);
+export const EvidenceTypeSchema = z.enum(['FILE', 'URL', 'SCREENSHOT', 'PDF', 'IMAGE', 'NOTE', 'COST_REPORT', 'PROOF_PHOTO']);
+export const KnowledgeRelationTypeSchema = z.enum([
+  'DERIVED_FROM',
+  'PRODUCED_DECISION',
+  'PROMOTED_TO_STANDARD',
+  'UPDATES_SOP',
+  'SUPERSEDES',
+  'EVIDENCED_BY',
+  'AFFECTS',
+  'RELATED_TO',
+]);
+export const PrintFindingSeveritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'BLOCKER']);
+export const PrintFindingCategorySchema = z.enum(['MARGIN', 'TYPOGRAPHY', 'IMAGE_QUALITY', 'PAPER', 'COVER', 'KDP', 'COLOR', 'BINDING', 'OTHER']);
+export const CostOperationSchema = z.enum(['LLM', 'IMAGE_GENERATION', 'UPSCALE', 'PDF_RENDER', 'EPUB_EXPORT', 'STORAGE', 'OTHER']);
 export const LayoutTemplateIdSchema = z.enum([
   'LAYOUT_1_STANDARD',
   'LAYOUT_2_TEXT_HEAVY',
@@ -59,8 +93,7 @@ export const LayoutTemplateIdSchema = z.enum([
   'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
   'LAYOUT_10_FULL_PAGE_PLATE',
   'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD',
-  // LAYOUT_12 removed: was a duplicate of LAYOUT_9_DIAGNOSTIC_DIAGRAM. Numbering 13-16
-  // kept stable to avoid churn in tests/stored rows (intentional gap at 12).
+  'LAYOUT_12_DIAGNOSTIC_DIAGRAM',
   'LAYOUT_13_FEATURE_BANNER',
   'LAYOUT_14_SIDEBAR_FEATURE',
   'LAYOUT_15_PROGRESSION_STUDY',
@@ -310,6 +343,174 @@ export const LayoutReferenceSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const KnowledgeItemSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid().nullable(),
+  type: KnowledgeItemTypeSchema,
+  title: z.string(),
+  summary: z.string().nullable(),
+  status: KnowledgeStatusSchema,
+  scope: KnowledgeScopeSchema,
+  ownerName: z.string().nullable(),
+  tags: z.array(z.string()),
+  metadata: z.record(z.unknown()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const KnowledgeEvidenceSchema = z.object({
+  id: z.string().uuid(),
+  itemId: z.string().uuid(),
+  evidenceType: EvidenceTypeSchema,
+  title: z.string(),
+  uri: z.string().nullable(),
+  storagePath: z.string().nullable(),
+  sha256: z.string().nullable(),
+  mimeType: z.string().nullable(),
+  notes: z.string().nullable(),
+  metadata: z.record(z.unknown()),
+  createdAt: z.string(),
+});
+
+export const KnowledgeLinkSchema = z.object({
+  id: z.string().uuid(),
+  sourceItemId: z.string().uuid(),
+  targetItemId: z.string().uuid(),
+  relationType: KnowledgeRelationTypeSchema,
+  note: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export const KnowledgeEventSchema = z.object({
+  id: z.string().uuid(),
+  itemId: z.string().uuid(),
+  eventType: z.string(),
+  actorName: z.string().nullable(),
+  summary: z.string(),
+  previousValue: z.record(z.unknown()).nullable(),
+  nextValue: z.record(z.unknown()).nullable(),
+  createdAt: z.string(),
+});
+
+export const KnowledgeOverviewSchema = z.object({
+  totals: z.object({
+    experiments: z.number(),
+    decisions: z.number(),
+    standards: z.number(),
+    sops: z.number(),
+    costRecords: z.number(),
+    printReviews: z.number(),
+    lessons: z.number(),
+  }),
+  lockedStandards: z.number(),
+  openExperiments: z.number(),
+  recentItems: z.array(KnowledgeItemSchema),
+});
+
+export const CreateKnowledgeBaseSchema = z.object({
+  projectId: z.string().uuid().optional(),
+  title: z.string().min(1),
+  summary: z.string().optional(),
+  scope: KnowledgeScopeSchema.default('GLOBAL'),
+  ownerName: z.string().optional(),
+  tags: z.array(z.string().min(1)).default([]),
+  metadata: z.record(z.unknown()).default({}),
+});
+
+export const CreateExperimentRequestSchema = CreateKnowledgeBaseSchema.extend({
+  hypothesis: z.string().min(1),
+  testPerformed: z.string().min(1),
+  result: z.string().optional(),
+  conclusion: z.string().optional(),
+  status: KnowledgeStatusSchema.default('RUNNING'),
+  startedAt: z.string().datetime().optional(),
+  completedAt: z.string().datetime().optional(),
+});
+
+export const CreateDecisionRequestSchema = CreateKnowledgeBaseSchema.extend({
+  decision: z.string().min(1),
+  reason: z.string().min(1),
+  status: KnowledgeStatusSchema.default('ACCEPTED'),
+  acceptedAt: z.string().datetime().optional(),
+  supersededByItemId: z.string().uuid().optional(),
+});
+
+export const CreateStandardRequestSchema = CreateKnowledgeBaseSchema.extend({
+  domain: z.string().min(1),
+  standardKey: z.string().min(1),
+  value: z.record(z.unknown()),
+  rationale: z.string().min(1),
+  status: KnowledgeStatusSchema.default('LOCKED'),
+  effectiveAt: z.string().datetime().optional(),
+});
+
+export const CreateSopRequestSchema = CreateKnowledgeBaseSchema.extend({
+  workflowName: z.string().min(1),
+  bodyMarkdown: z.string().min(1),
+  checklist: z.array(z.string().min(1)).default([]),
+  changeNotes: z.string().optional(),
+  status: KnowledgeStatusSchema.default('ACCEPTED'),
+});
+
+export const CreateLessonRequestSchema = CreateKnowledgeBaseSchema.extend({
+  lesson: z.string().min(1),
+  prevention: z.string().optional(),
+  appliesTo: z.array(z.string().min(1)).default([]),
+  status: KnowledgeStatusSchema.default('ACCEPTED'),
+});
+
+export const CreatePrintReviewRequestSchema = CreateKnowledgeBaseSchema.extend({
+  proofName: z.string().min(1),
+  vendor: z.string().min(1).default('KDP'),
+  format: z.string().min(1).default('Premium color proof'),
+  orderedAt: z.string().datetime().optional(),
+  receivedAt: z.string().datetime().optional(),
+  overallStatus: z.string().min(1).default('OPEN'),
+  status: KnowledgeStatusSchema.default('RUNNING'),
+});
+
+export const CreatePrintFindingRequestSchema = z.object({
+  printReviewItemId: z.string().uuid(),
+  relatedItemId: z.string().uuid().optional(),
+  severity: PrintFindingSeveritySchema,
+  category: PrintFindingCategorySchema,
+  pageKey: z.string().optional(),
+  layoutTemplate: LayoutTemplateIdSchema.optional(),
+  finding: z.string().min(1),
+  recommendation: z.string().optional(),
+  status: z.string().min(1).default('OPEN'),
+});
+
+export const CreateCostEventRequestSchema = CreateKnowledgeBaseSchema.extend({
+  pageId: z.string().uuid().optional(),
+  provider: z.string().min(1),
+  model: z.string().optional(),
+  operation: CostOperationSchema,
+  quantity: z.number().nonnegative().default(1),
+  unitCostUsd: z.number().nonnegative().optional(),
+  costUsd: z.number().nonnegative(),
+  incurredAt: z.string().datetime().optional(),
+});
+
+export const CreateKnowledgeEvidenceRequestSchema = z.object({
+  itemId: z.string().uuid(),
+  evidenceType: EvidenceTypeSchema,
+  title: z.string().min(1),
+  uri: z.string().optional(),
+  storagePath: z.string().optional(),
+  sha256: z.string().optional(),
+  mimeType: z.string().optional(),
+  notes: z.string().optional(),
+  metadata: z.record(z.unknown()).default({}),
+});
+
+export const CreateKnowledgeLinkRequestSchema = z.object({
+  sourceItemId: z.string().uuid(),
+  targetItemId: z.string().uuid(),
+  relationType: KnowledgeRelationTypeSchema,
+  note: z.string().optional(),
+});
+
 export const ApiErrorSchema = z.object({
   error: z.string(),
   message: z.string(),
@@ -327,6 +528,14 @@ export type JobType = z.infer<typeof JobTypeSchema>;
 export type JobStatus = z.infer<typeof JobStatusSchema>;
 export type ExportKind = z.infer<typeof ExportKindSchema>;
 export type ExportStatus = z.infer<typeof ExportStatusSchema>;
+export type KnowledgeItemType = z.infer<typeof KnowledgeItemTypeSchema>;
+export type KnowledgeStatus = z.infer<typeof KnowledgeStatusSchema>;
+export type KnowledgeScope = z.infer<typeof KnowledgeScopeSchema>;
+export type EvidenceType = z.infer<typeof EvidenceTypeSchema>;
+export type KnowledgeRelationType = z.infer<typeof KnowledgeRelationTypeSchema>;
+export type PrintFindingSeverity = z.infer<typeof PrintFindingSeveritySchema>;
+export type PrintFindingCategory = z.infer<typeof PrintFindingCategorySchema>;
+export type CostOperation = z.infer<typeof CostOperationSchema>;
 export type LayoutTemplateId = z.infer<typeof LayoutTemplateIdSchema>;
 export type TrimSize = z.infer<typeof TrimSizeSchema>;
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
@@ -335,3 +544,18 @@ export type Project = z.infer<typeof ProjectSchema>;
 export type PageManifest = z.infer<typeof PageManifestSchema>;
 export type LayoutReference = z.infer<typeof LayoutReferenceSchema>;
 export type LayoutPromptAsset = z.infer<typeof LayoutPromptAssetSchema>;
+export type KnowledgeItem = z.infer<typeof KnowledgeItemSchema>;
+export type KnowledgeEvidence = z.infer<typeof KnowledgeEvidenceSchema>;
+export type KnowledgeLink = z.infer<typeof KnowledgeLinkSchema>;
+export type KnowledgeEvent = z.infer<typeof KnowledgeEventSchema>;
+export type KnowledgeOverview = z.infer<typeof KnowledgeOverviewSchema>;
+export type CreateExperimentRequest = z.infer<typeof CreateExperimentRequestSchema>;
+export type CreateDecisionRequest = z.infer<typeof CreateDecisionRequestSchema>;
+export type CreateStandardRequest = z.infer<typeof CreateStandardRequestSchema>;
+export type CreateSopRequest = z.infer<typeof CreateSopRequestSchema>;
+export type CreateLessonRequest = z.infer<typeof CreateLessonRequestSchema>;
+export type CreatePrintReviewRequest = z.infer<typeof CreatePrintReviewRequestSchema>;
+export type CreatePrintFindingRequest = z.infer<typeof CreatePrintFindingRequestSchema>;
+export type CreateCostEventRequest = z.infer<typeof CreateCostEventRequestSchema>;
+export type CreateKnowledgeEvidenceRequest = z.infer<typeof CreateKnowledgeEvidenceRequestSchema>;
+export type CreateKnowledgeLinkRequest = z.infer<typeof CreateKnowledgeLinkRequestSchema>;

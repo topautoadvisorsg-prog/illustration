@@ -1,129 +1,117 @@
 # Layout References
 
-This folder is the source library for stakeholder-provided page layout reference images.
+This folder documents the stakeholder-provided layout reference library. The
+current canonical set is **16 Vintage Naturalist templates**.
 
 ## What Goes Here
 
-The operator provides one reference/mockup image per production layout. The canonical
-set is **15 templates** (numbering runs 1–11 and 13–16; LAYOUT_12 was removed as a
-duplicate of LAYOUT_9, so there is an intentional gap at 12). Each reference image
-travels with a matching image prompt template. Together they define where the art goes,
-how much room the text gets, and what prompt should be filled once the text-fit mockup
-is approved.
+Each production layout has:
 
-Each image maps to one of the 15 production layout templates:
+- a mockup/reference image
+- written layout description
+- use cases and avoid rules
+- protected text-zone description
+- image-zone description
+- word-capacity estimate
+- prompt template
+- placeholder list
+- operator notes
+
+The image is the source during setup. After analysis, the written metadata is
+what the planner agent should use repeatedly.
+
+## Canonical Templates
 
 | Template | Purpose |
 |---|---|
-| `LAYOUT_1_STANDARD` | Balanced text + illustration page |
-| `LAYOUT_2_TEXT_HEAVY` | Long text with smaller supporting art |
-| `LAYOUT_3_ILLUSTRATION_DOMINANT` | Shorter text where image carries the page |
-| `LAYOUT_4_DANGER_WARNING` | Toxic, poisonous, safety, or warning-heavy entry |
-| `LAYOUT_5_CHAPTER_OPENER` | Atmospheric chapter opening spread/page |
-| `LAYOUT_6_BACK_MATTER` | Tables, indexes, glossary, look-alike lists |
-| `LAYOUT_7_SCATTERED_VIGNETTES` | Multiple small naturalist vignettes |
-| `LAYOUT_8_MARGIN_ILLUSTRATION` | Small margin illustration beside text |
-| `LAYOUT_9_DIAGNOSTIC_DIAGRAM` | Anatomy, parts, identifying features, diagrams |
-| `LAYOUT_10_FULL_PAGE_PLATE` | Full-page showcase illustration, minimal text |
-| `LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD` | Habitat / scenery landscape spread |
-| `LAYOUT_13_FEATURE_BANNER` | Region/overview banner (watershed, range, landscape) |
-| `LAYOUT_14_SIDEBAR_FEATURE` | Tall subject with a text sidebar (≥300 words) |
-| `LAYOUT_15_PROGRESSION_STUDY` | Life cycle / growth stages / seasonal progression |
+| `LAYOUT_1_STANDARD` | Balanced single-subject page with strong text space |
+| `LAYOUT_2_TEXT_HEAVY` | Long educational entries with small supporting art |
+| `LAYOUT_3_ILLUSTRATION_DOMINANT` | Dramatic primary art while preserving open content area |
+| `LAYOUT_4_DANGER_WARNING` | Comparison / quick recognition / safety-heavy pages |
+| `LAYOUT_5_CHAPTER_OPENER` | Atmospheric chapter opener with reserved lower text area |
+| `LAYOUT_6_BACK_MATTER` | Reference grid / three studies over protected text area |
+| `LAYOUT_7_SCATTERED_VIGNETTES` | Three staggered reference studies with flowing text space |
+| `LAYOUT_8_MARGIN_ILLUSTRATION` | Tall right-side illustration with left text area |
+| `LAYOUT_9_DIAGNOSTIC_DIAGRAM` | Scattered studies composition, despite the legacy internal ID |
+| `LAYOUT_10_FULL_PAGE_PLATE` | Full-page museum plate with minimal text |
+| `LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD` | Two-page continuous landscape spread |
+| `LAYOUT_12_DIAGNOSTIC_DIAGRAM` | Large central diagnostic subject with restrained callouts |
+| `LAYOUT_13_FEATURE_BANNER` | Wide feature banner over text area |
+| `LAYOUT_14_SIDEBAR_FEATURE` | Left vertical illustration with large right text area |
+| `LAYOUT_15_PROGRESSION_STUDY` | Sequence, life cycle, or development stages |
 | `LAYOUT_16_CUTAWAY_FEATURE` | Cutaway, cross-section, layered/internal structure |
-
-> Comparison / look-alike pages route to a configurable template via
-> `layoutPolicy.comparisonTemplate` (default `LAYOUT_4_DANGER_WARNING`).
 
 ## Intended Workflow
 
-1. Store the 9 mockup/reference images here.
-2. Add metadata to `manifest.json` describing each layout, its mockup image path,
-   its prompt template, placeholders, text-fit rule, and image slot rule.
-3. Stage 2 reads the page text and chooses the best layout template/reference.
-4. Stage 6 renders the manuscript text into that mockup layout using the reference
-   art slot. This proves the text fits before any image API spend.
-5. Once text fit is approved, Stage 2 fills the layout's prompt template with the
-   page subject, for example `{SUBJECT}=frog`.
-6. Stage 3 generates only the real subject illustration.
-7. Stage 6 replaces the mockup/reference art slot with the generated/upscaled art.
+1. Upload the mockup/reference image for each layout.
+2. Fill in written metadata and prompt template in the operator UI.
+3. Stage 2 chooses a layout based on page purpose, word count, and metadata.
+4. Stage 6 proves text fit before image spend.
+5. Stage 3 generates clean subject art only.
+6. Stage 6 places typography, labels, callouts, and final composition.
 
-The image-generation model must create the subject illustration only. It must not bake page text into the image. Text placement, typography, page furniture, and final composition are handled by Puppeteer + Paged.js.
+## Prompt Safety
+
+Image generation should not create article text, fake labels, headers, page
+numbers, or paragraphs. Text areas are protected. If any explicit label is ever
+allowed, it must be supplied exactly by the prompt, large and legible, with no
+extra words.
 
 ## Naming Convention
 
-Use stable names so metadata can point to them:
-
-```text
-layout-01-standard-a.png
-layout-02-text-heavy-a.png
-layout-09-diagnostic-comparison-a.png
-```
-
-Recommended canonical set:
+Use stable names:
 
 ```text
 layout-01-standard.png
 layout-02-text-heavy.png
 layout-03-illustration-dominant.png
-layout-04-danger-warning.png
+layout-04-comparison-recognition.png
 layout-05-chapter-opener.png
-layout-06-back-matter.png
-layout-07-scattered-vignettes.png
+layout-06-reference-grid.png
+layout-07-reference-studies.png
 layout-08-margin-illustration.png
-layout-09-diagnostic-diagram.png
+layout-09-scattered-studies.png
+layout-10-full-page-plate.png
+layout-11-continuous-landscape-spread.png
+layout-12-diagnostic-diagram.png
+layout-13-feature-banner.png
+layout-14-sidebar-feature.png
+layout-15-progression-study.png
+layout-16-cutaway-feature.png
 ```
 
-The UI also accepts direct image uploads per layout card. For the current
-Milestone 1 test build, uploaded mockups are stored in the project config as data
-URLs so they stay attached to the project record. Later, this should move to
-Supabase Storage or another object-storage backend before large production files.
+The current frontend stores uploaded mockups in project config as data URLs for
+testing. Production storage should move large assets to object storage.
 
-## Metadata
+## Capacity Testing
 
-Create `manifest.json` next to the images:
+Each layout has:
 
-```json
-[
-  {
-    "id": "layout-02-text-heavy-a",
-    "templateId": "LAYOUT_2_TEXT_HEAVY",
-    "imagePath": "layout-02-text-heavy-a.png",
-    "label": "Long entry with small corner image",
-    "useWhen": ["word_count > 400", "single subject", "text must dominate"],
-    "minWords": 400,
-    "targetWords": 560,
-    "maxWords": 720,
-    "recommendedBodyPt": 10.5,
-    "recommendedLineHeight": 1.23,
-    "capacityTestStatus": "UNTESTED",
-    "promptTemplate": "Create the final illustration for {SUBJECT}. Match the approved mockup art slot for LAYOUT_2_TEXT_HEAVY. Scientific details: {SCIENTIFIC_DETAILS}. Do not render page text.",
-    "placeholders": ["{SUBJECT}", "{SCIENTIFIC_DETAILS}", "{COMPOSITION_NOTES}"],
-    "imageSlotDescription": "Small corner illustration; text remains dominant.",
-    "contentTypes": ["field_guide_entry"],
-    "operatorNotes": "Word range must be confirmed by rendering real manuscript text into the mockup."
-  }
-]
-```
+- `minWords`
+- `targetWords`
+- `maxWords`
+- `recommendedBodyPt`
+- `recommendedLineHeight`
+- `capacityTestStatus`
 
-## Word-Capacity Testing
-
-Each layout has a recommended word range and a status:
+Statuses:
 
 - `UNTESTED` - starting estimate only
-- `TESTING` - agent is fitting real text into the mockup
-- `APPROVED` - operator has reviewed the mockup and accepted the range
+- `TESTING` - real manuscript text is being fitted
+- `APPROVED` - operator accepted the range
 
-The agent should update `minWords`, `targetWords`, `maxWords`,
-`recommendedBodyPt`, and `recommendedLineHeight` after actual text-fit tests.
-KDP requires the final interior PDF to match the selected trim/bleed and pass
-Previewer checks for margins and embedded fonts; it does not prescribe one exact
-font size for this field-guide format.
+## Debugging
 
-## What Can Go Wrong
+Run:
 
-| Symptom | Likely Cause | Fix |
-|---|---|---|
-| Text does not fit | Wrong template chosen for word count | Stage 2 retries with a more text-heavy template |
-| Image subject feels wrong | Page manifest subject is too vague | Tighten `imageSubject` during Stage 1.5 manifest generation |
-| AI returns a full poster/page | Prompt leaked layout/text instructions into image generation | Keep layout instructions in Stage 6 only; image prompt describes subject art |
-| Similar pages look inconsistent | References are unmapped or too broad | Add metadata and pick one canonical reference per template |
+```bash
+yarn audit:layouts
+```
+
+The audit confirms:
+
+- 16 templates are present
+- each template appears in shared contracts
+- planner capacities exist
+- mockup images exist
+- frontend/backend prompt safety rules stay aligned
