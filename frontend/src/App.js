@@ -1930,6 +1930,13 @@ function App() {
     appendLog("success", "Rendered full book PDF preview.");
   }
 
+  async function renderCoverPreview() {
+    if (!activeProjectId) throw new Error("Create or select a project first.");
+    const { blob } = await callPdf(`/api/projects/${activeProjectId}/render-cover`, { method: "POST" });
+    setPreviewBlob("Cover Preview (full wrap + spine)", blob, "Print-ready cover; spine width from page count");
+    appendLog("success", "Rendered cover preview.");
+  }
+
   async function renderBookReport() {
     if (!activeProjectId) throw new Error("Create or select a project first.");
     const data = await call(`/api/projects/${activeProjectId}/render-book?format=json`, {
@@ -2568,6 +2575,9 @@ function App() {
                 </button>
                 <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book preview...", renderBookPreview)}>
                   Render Book PDF
+                </button>
+                <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering cover...", renderCoverPreview)}>
+                  Render Cover
                 </button>
               </div>
             </div>

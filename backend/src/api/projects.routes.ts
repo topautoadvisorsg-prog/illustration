@@ -28,7 +28,7 @@ import { UnsupportedManuscriptError } from '../pipeline/stage-1-ingestion/extrac
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
-import { RenderBlockedError, renderBookPdf, renderChapterPdf } from '../pipeline/stage-6-layout/render-chapter.js';
+import { RenderBlockedError, renderBookPdf, renderChapterPdf, renderCoverPdf } from '../pipeline/stage-6-layout/render-chapter.js';
 import { countImagesForProject } from '../db/repositories/images.repo.js';
 import { estimateCost } from '../services/cost/estimate.js';
 
@@ -801,6 +801,24 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       reply.header('content-disposition', 'inline; filename="wildlands-book.pdf"');
       reply.header('x-page-count', String(result.pageCount));
       reply.header('x-preflight-passed', String(result.preflight.passed));
+      return reply.send(result.pdf);
+    } catch (error) {
+      if (error instanceof RenderBlockedError) {
+        const status = renderErrorStatus(error.code);
+        return reply.code(status).send({ error: 'Render Blocked', message: error.message, statusCode: status });
+      }
+      throw error;
+    }
+  });
+
+  // Stage 7 — render the print-ready full-wrap cover PDF (spine width from the
+  // interior page count). Returns the cover PDF inline.
+  app.post('/api/projects/:id/render-cover', async (request, reply) => {
+    const { id } = ProjectParamsSchema.parse(request.params);
+    try {
+      const result = await renderCoverPdf(id);
+      reply.header('content-type', 'application/pdf');
+      reply.header('content-disposition', 'inline; filename="wildlands-cover.pdf"');
       return reply.send(result.pdf);
     } catch (error) {
       if (error instanceof RenderBlockedError) {

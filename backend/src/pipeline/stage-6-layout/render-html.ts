@@ -361,3 +361,241 @@ ${polyfill}
 </body>
 </html>`;
 }
+
+// ─── Book assembly (front matter + chapters + back matter, single render) ──────
+
+export interface BookChapter {
+  chapterNumber: number;
+  chapterTitle: string;
+  pages: ChapterPageRender[];
+}
+
+export interface BookAssemblyInput {
+  /** Optional introduction text (markdown) pulled from the manuscript front matter. */
+  introMarkdown?: string;
+  /** Optional glossary text (markdown) pulled from the manuscript back matter. */
+  glossaryMarkdown?: string;
+  chapters: BookChapter[];
+}
+
+function slugifyId(s: string, fallback: string): string {
+  const base = s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return base || fallback;
+}
+
+/** One entry article (chapter body page). Mirrors buildChapterHtml's per-entry markup. */
+function entryArticleHtml(page: ChapterPageRender, geometry: PageGeometry, anchorId?: string): string {
+  const profile = getLayoutProfile(page.layoutTemplate);
+  const danger = page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? ' is-danger' : '';
+  const art = page.imageDataUri
+    ? `<img src="${page.imageDataUri}" alt="${escapeHtml(page.entryTitle)}">`
+    : `<div class="art-placeholder">${escapeHtml(artPlaceholderLabel(page.layoutTemplate))}<br>${escapeHtml(page.layoutTemplate)}</div>`;
+  const scientific = page.scientificName ? `<p class="scientific-name">${escapeHtml(page.scientificName)}</p>` : '';
+  const idAttr = anchorId ? ` id="${anchorId}"` : '';
+  return `<article class="book-page arch-${profile.artSlot}${danger}"${idAttr}>
+  <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
+  ${scientific}
+  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry.textHeightIn)}">${art}</figure>
+  ${bodyToHtml(page.bodyMarkdown)}
+</article>`;
+}
+
+/**
+ * Build the COMPLETE book as one HTML document: cover-less interior with front
+ * matter (title, copyright, table of contents, introduction) → chapters → back
+ * matter (glossary, index, colophon). Rendered in a single Paged.js pass so page
+ * numbers are continuous and the TOC/index page references are filled
+ * automatically via `target-counter` (they always match the printed footers).
+ */
+export function buildBookHtml(input: BookAssemblyInput, config: ProjectConfig, opts: ChapterHtmlOptions): string {
+  const { geometry } = opts;
+  const t = config.typography;
+  const c = config.colorPalette;
+  const m = geometry.margins;
+  const year = new Date().getFullYear();
+  const bookTitle = escapeHtml(config.title);
+  const subtitle = config.subtitle ? escapeHtml(config.subtitle) : '';
+  const author = escapeHtml(config.authorName);
+
+  const archCss = (Object.values(LAYOUT_PROFILES).map((p) => p.artSlot) as ArtSlot[])
+    .filter((slot, i, arr) => arr.indexOf(slot) === i)
+    .map(scopedArtSlotCss)
+    .join('\n  ');
+
+  // Tag each chapter's first entry (#chap-N) and every entry (#entry-K) so the
+  // TOC and index can reference real page numbers via target-counter.
+  let entryCounter = 0;
+  const indexItems: { title: string; id: string }[] = [];
+  const chaptersHtml = input.chapters
+    .map((chapter) =>
+      chapter.pages
+        .map((page, pageIdx) => {
+          entryCounter += 1;
+          const entryId = `entry-${entryCounter}`;
+          const anchorId = pageIdx === 0 ? `chap-${chapter.chapterNumber}` : entryId;
+          indexItems.push({ title: page.entryTitle, id: anchorId });
+          return entryArticleHtml(page, geometry, anchorId);
+        })
+        .join('\n'),
+    )
+    .join('\n');
+
+  const tocRows = input.chapters
+    .map(
+      (chapter) =>
+        `<a class="toc-row" href="#chap-${chapter.chapterNumber}"><span class="toc-title">${escapeHtml(
+          `${chapter.chapterNumber}. ${chapter.chapterTitle.replace(/^chapter\s+\d+\s*[—–:-]?\s*/i, '')}`,
+        )}</span><span class="dots"></span><span class="toc-page" data-ref="#chap-${chapter.chapterNumber}"></span></a>`,
+    )
+    .join('\n');
+
+  const indexRows = [...indexItems]
+    .sort((a, b) => a.title.localeCompare(b.title))
+    .map(
+      (it) =>
+        `<a class="index-row" href="#${it.id}"><span>${escapeHtml(it.title)}</span><span class="dots"></span><span class="index-page" data-ref="#${it.id}"></span></a>`,
+    )
+    .join('\n');
+
+  const introHtml = input.introMarkdown?.trim()
+    ? `<section class="fm-page intro"><h1 class="section-title">Introduction</h1>${bodyToHtml(input.introMarkdown)}</section>`
+    : '';
+  const glossaryHtml = input.glossaryMarkdown?.trim()
+    ? `<section class="bm-page glossary"><h1 class="section-title">Glossary</h1>${bodyToHtml(input.glossaryMarkdown)}</section>`
+    : '';
+
+  const polyfill = opts.polyfillJs ? `<script>${opts.polyfillJs}</script>` : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${bookTitle}</title>
+${fontLinkTags(t)}
+<style>
+  @page {
+    size: ${geometry.pageWidthIn}in ${geometry.pageHeightIn}in;
+    margin: ${m.topIn}in ${m.rightIn}in ${m.bottomIn}in ${m.gutterIn}in;
+    background: ${c.paper};
+    ${pageBoxesCss(t, c, bookTitle)}
+  }
+  @page :first { @top-left { content: ""; } @bottom-center { content: ""; } }
+  ${typographyStyleBlock(t, c)}
+  ${archCss}
+  .book-page, .fm-page, .bm-page { page-break-after: always; }
+  .art-slot { page-break-inside: avoid; }
+  .is-danger .entry-title { color: ${c.warning}; }
+  .is-danger { border-left: 4pt solid ${c.warning}; padding-left: 10pt; }
+  .title-page { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 8in; page-break-after: always; }
+  .title-page .book-title { font-family: var(--font-display); font-weight: 600; font-size: ${t.bookTitlePt}pt; line-height: 1.05; margin: 0; color: ${c.ink}; }
+  .title-page .subtitle { font-family: var(--font-display); font-style: italic; font-size: ${t.chapterTitlePt}pt; color: ${c.accent}; margin: 14pt 0 0; }
+  .title-page .author { font-family: var(--font-display); font-size: ${t.sectionHeadingPt}pt; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 40pt; color: ${c.ink}; }
+  .copyright { display: flex; flex-direction: column; justify-content: flex-end; min-height: 8in; page-break-after: always; font-family: var(--font-body); font-size: ${t.captionPt}pt; color: ${c.ink}; }
+  .copyright p { margin: 0 0 6pt; }
+  .section-title { font-family: var(--font-display); font-weight: 600; font-size: ${t.chapterTitlePt}pt; text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 14pt; color: ${c.ink}; }
+  .toc-row, .index-row { display: flex; align-items: baseline; text-decoration: none; color: ${c.ink}; font-family: var(--font-body); font-size: ${t.bodyPt}pt; margin: 5pt 0; }
+  .toc-title { white-space: nowrap; overflow: hidden; }
+  .dots { flex: 1; margin: 0 4pt; border-bottom: 1px dotted ${c.accent}; transform: translateY(-3pt); }
+  .toc-page::after { content: target-counter(attr(data-ref), page); }
+  .index-page::after { content: target-counter(attr(data-ref), page); }
+  .index { column-count: 2; column-gap: 24pt; }
+  .index .index-row { break-inside: avoid; }
+</style>
+</head>
+<body>
+  <section class="title-page">
+    <h1 class="book-title">${bookTitle}</h1>
+    ${subtitle ? `<p class="subtitle">${subtitle}</p>` : ''}
+    <p class="author">${author}</p>
+  </section>
+  <section class="copyright">
+    <p>${bookTitle}${subtitle ? ` — ${subtitle}` : ''}</p>
+    <p>Copyright © ${year} ${author}. All rights reserved.</p>
+    <p>No part of this book may be reproduced without written permission.</p>
+    <p>First edition, ${year}.</p>
+  </section>
+  <section class="fm-page toc"><h1 class="section-title">Table of Contents</h1>${tocRows}</section>
+  ${introHtml}
+  ${chaptersHtml}
+  ${glossaryHtml}
+  <section class="bm-page index-section"><h1 class="section-title">Index</h1><div class="index">${indexRows}</div></section>
+  <section class="bm-page colophon"><h1 class="section-title">About</h1><p class="section-body">${author} — ${bookTitle}. Produced with The Wildlands Publishing Platform.</p></section>
+  ${polyfill}
+</body>
+</html>`;
+}
+
+/** Paper thickness per interior page (inches). KDP white paper ≈ 0.002252"/page. */
+const PAGE_THICKNESS_IN = 0.002252;
+
+export interface CoverDimensions {
+  fullWidthIn: number;
+  fullHeightIn: number;
+  spineIn: number;
+}
+
+/** KDP full-wrap cover dimensions for a given interior page count. */
+export function computeCoverDimensions(config: ProjectConfig, pageCount: number): CoverDimensions {
+  const trim = config.trimSize;
+  const spineIn = Math.max(0.06, pageCount * PAGE_THICKNESS_IN);
+  return {
+    fullWidthIn: trim.widthIn * 2 + spineIn + trim.bleedIn * 2,
+    fullHeightIn: trim.heightIn + trim.bleedIn * 2,
+    spineIn,
+  };
+}
+
+/**
+ * Build a print-ready full-wrap cover (back panel | spine | front panel) at KDP
+ * dimensions, with the spine width derived from the interior page count. A clean
+ * typographic cover — front title/author, spine text, back blurb + barcode zone.
+ */
+export function buildCoverHtml(config: ProjectConfig, pageCount: number, opts: { polyfillJs?: string }): string {
+  const t = config.typography;
+  const c = config.colorPalette;
+  const dims = computeCoverDimensions(config, pageCount);
+  const bookTitle = escapeHtml(config.title);
+  const subtitle = config.subtitle ? escapeHtml(config.subtitle) : '';
+  const author = escapeHtml(config.authorName);
+  const polyfill = opts.polyfillJs ? `<script>${opts.polyfillJs}</script>` : '';
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${bookTitle} — Cover</title>
+${fontLinkTags(t)}
+<style>
+  @page { size: ${round(dims.fullWidthIn)}in ${round(dims.fullHeightIn)}in; margin: 0; }
+  html, body { margin: 0; padding: 0; }
+  .cover { display: flex; width: ${round(dims.fullWidthIn)}in; height: ${round(dims.fullHeightIn)}in; background: ${c.paper}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .panel { box-sizing: border-box; height: 100%; padding: ${round(config.trimSize.bleedIn + 0.4)}in; }
+  .back { width: ${round(config.trimSize.widthIn + config.trimSize.bleedIn)}in; display: flex; flex-direction: column; justify-content: space-between; }
+  .back .blurb { font-family: var(--font-body); font-size: ${t.bodyPt}pt; color: ${c.ink}; line-height: 1.4; }
+  .back .barcode { align-self: flex-end; width: 2in; height: 1.2in; background: #fff; border: 1px solid #999; display: flex; align-items: center; justify-content: center; font-family: var(--font-body); font-size: 8pt; color: #555; }
+  .spine { width: ${round(dims.spineIn)}in; background: ${c.accent}; display: flex; align-items: center; justify-content: center; }
+  .spine .spine-text { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--font-display); font-weight: 600; font-size: ${Math.min(t.sectionHeadingPt, Math.max(8, dims.spineIn * 40))}pt; color: ${c.paper}; white-space: nowrap; letter-spacing: 0.04em; }
+  .front { width: ${round(config.trimSize.widthIn + config.trimSize.bleedIn)}in; background: ${c.accent}; color: ${c.paper}; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .front .book-title { font-family: var(--font-display); font-weight: 600; font-size: ${t.bookTitlePt}pt; line-height: 1.05; margin: 0; }
+  .front .subtitle { font-family: var(--font-display); font-style: italic; font-size: ${t.chapterTitlePt}pt; margin: 16pt 0 0; opacity: 0.92; }
+  .front .author { font-family: var(--font-display); font-size: ${t.sectionHeadingPt}pt; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 48pt; }
+</style>
+</head>
+<body>
+  <div class="cover">
+    <div class="panel back">
+      <div class="blurb">${subtitle || bookTitle}</div>
+      <div class="barcode">ISBN barcode area</div>
+    </div>
+    <div class="panel spine"><span class="spine-text">${bookTitle} &nbsp;·&nbsp; ${author}</span></div>
+    <div class="panel front">
+      <h1 class="book-title">${bookTitle}</h1>
+      ${subtitle ? `<p class="subtitle">${subtitle}</p>` : ''}
+      <p class="author">${author}</p>
+    </div>
+  </div>
+  ${polyfill}
+</body>
+</html>`;
+}

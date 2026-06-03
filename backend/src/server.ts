@@ -29,7 +29,11 @@ export async function buildServer(): Promise<FastifyInstance> {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, {
+    origin: true,
+    // Expose render headers so the browser can read page counts on the PDF responses.
+    exposedHeaders: ['x-total-pages', 'x-page-count', 'x-preflight-passed'],
+  });
   await app.register(sensible);
   await app.register(swagger, {
     openapi: {
