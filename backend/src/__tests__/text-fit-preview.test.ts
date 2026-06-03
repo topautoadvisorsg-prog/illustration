@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema, type PageManifest } from '@wildlands/shared';
 import { buildTextFitPreview } from '../pipeline/stage-6-layout/text-fit-preview.js';
 
-const config = ProjectConfigSchema.parse({ volume: 1, title: 'The Wildlands', authorName: 'The Wildlands' });
+// Pin trim + line-height so the capacity/fit assertions below are deterministic.
+const config = ProjectConfigSchema.parse({
+  volume: 1,
+  title: 'The Wildlands',
+  authorName: 'The Wildlands',
+  trimSize: { widthIn: 8.5, heightIn: 11, bleedIn: 0.125 },
+  typography: { lineHeight: 1.28 },
+});
 
 /** N space-separated words, so the planner's word-count layout logic behaves realistically. */
 function words(n: number): string {

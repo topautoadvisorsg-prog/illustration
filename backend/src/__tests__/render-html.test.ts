@@ -3,7 +3,13 @@ import { ProjectConfigSchema, type PageManifest } from '@wildlands/shared';
 import { buildPageHtml, inlineMarkdown } from '../pipeline/stage-6-layout/render-html.js';
 import { computePageGeometry } from '../pipeline/stage-6-layout/page-geometry.js';
 
-const config = ProjectConfigSchema.parse({ volume: 1, title: 'The Wildlands', authorName: 'The Wildlands' });
+const config = ProjectConfigSchema.parse({
+  volume: 1,
+  title: 'The Wildlands',
+  authorName: 'The Wildlands',
+  // Pin trim so the geometry assertions below stay stable regardless of the default.
+  trimSize: { widthIn: 8.5, heightIn: 11, bleedIn: 0.125 },
+});
 const geometry = computePageGeometry(config.trimSize);
 
 function page(overrides: Partial<PageManifest> = {}): PageManifest {
@@ -33,7 +39,8 @@ describe('buildPageHtml', () => {
   it('sets the @page size to the bleed page dimensions from config trim', () => {
     const html = buildPageHtml(page(), config, { geometry });
     expect(html).toContain('size: 8.625in 11.25in;');
-    expect(html).toContain("font-family: 'EB Garamond', serif;");
+    expect(html).toContain("--font-body: 'EB Garamond'");
+    expect(html).toContain("--font-display: 'Cormorant Garamond'");
     expect(html).toContain('background: #F5EDD6;');
   });
 

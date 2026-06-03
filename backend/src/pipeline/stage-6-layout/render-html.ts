@@ -43,6 +43,63 @@ function fmt(text: string): string {
   return inlineMarkdown(escapeHtml(text.trim()));
 }
 
+type Typography = ProjectConfig['typography'];
+type Palette = ProjectConfig['colorPalette'];
+
+/**
+ * Build the Google Fonts stylesheet URL from whatever fonts the project config
+ * specifies (display, body, caption) — so changing the typeface in config
+ * actually loads it, instead of being hardcoded to one family.
+ */
+export function googleFontsHref(t: Typography): string {
+  const families = Array.from(
+    new Set([t.headingFont, t.bodyFont, t.captionFont].map((f) => f.trim()).filter(Boolean)),
+  );
+  const weights = 'ital,wght@0,400;0,500;0,600;0,700;1,400';
+  const query = families.map((f) => `family=${f.replace(/\s+/g, '+')}:${weights}`).join('&');
+  return `https://fonts.googleapis.com/css2?${query}&display=swap`;
+}
+
+/** The <head> font tags, driven by config. */
+function fontLinkTags(t: Typography): string {
+  return `<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="${googleFontsHref(t)}" rel="stylesheet">`;
+}
+
+/** The @page margin boxes (running header + page number) — uses the Label role. */
+function pageBoxesCss(t: Typography, c: Palette, chapterLabel: string): string {
+  const sc = t.smallCaps ? 'font-variant: small-caps;' : '';
+  return `@bottom-center { content: "· " counter(page) " ·"; font-family: '${t.headingFont}', serif; font-size: ${t.labelPt}pt; color: ${c.ink}; }
+    @top-left { content: "${chapterLabel}"; font-family: '${t.headingFont}', serif; ${sc} font-size: ${t.labelPt}pt; color: ${c.accent}; letter-spacing: 0.08em; }`;
+}
+
+/**
+ * Shared, role-based typography CSS. Single source of truth for both the single
+ * page and full-chapter renderers, so every role (entry/section/body/caption/
+ * label) is consistent and driven by config rather than scattered literals.
+ */
+function typographyStyleBlock(t: Typography, c: Palette): string {
+  const sc = t.smallCaps ? 'font-variant: small-caps;' : '';
+  return `:root {
+    --font-display: '${t.headingFont}', Georgia, 'Times New Roman', serif;
+    --font-body: '${t.bodyFont}', Georgia, 'Times New Roman', serif;
+    --font-caption: '${t.captionFont}', Georgia, serif;
+  }
+  html, body { background: ${c.paper}; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); color: ${c.ink}; font-size: ${t.bodyPt}pt; line-height: ${t.lineHeight}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .entry-title { font-family: var(--font-display); font-weight: 600; font-size: ${t.entryTitlePt}pt; text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 4pt 0; color: ${c.ink}; }
+  .scientific-name { font-family: var(--font-body); font-style: italic; font-size: ${t.subsectionHeadingPt}pt; color: ${c.accent}; margin: 0 0 16pt 0; }
+  .section-header { font-family: var(--font-display); ${sc} font-weight: 600; font-size: ${t.sectionHeadingPt}pt; letter-spacing: 0.06em; margin: 8pt 0 2pt 0; color: ${c.ink}; }
+  .section-body { font-family: var(--font-body); margin: 0 0 6pt 0; text-align: justify; hyphens: auto; }
+  .id-list { margin: 4pt 0 6pt 0; padding-left: 14pt; }
+  .id-list li { margin: 0 0 2pt 0; text-align: left; }
+  .caption { font-family: var(--font-body); font-style: italic; font-size: ${t.captionPt}pt; color: ${c.accent}; }
+  .mono { font-family: 'Courier New', monospace; font-size: 0.92em; }
+  .art-placeholder { width: 100%; height: 100%; min-height: 2.4in; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #E8D9B0; outline: 1px dashed ${c.accent}; outline-offset: -4px; font-family: var(--font-display); font-style: italic; font-size: ${t.captionPt}pt; color: ${c.accent}; }
+  .art-slot img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); }`;
+}
+
 /**
  * Render entry body markdown into book-quality HTML: section headings, bullet
  * ID-checklists (core to field guides), and paragraphs, with inline bold/italic.
@@ -166,29 +223,16 @@ export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: R
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(page.entryTitle)}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+${fontLinkTags(t)}
 <style>
   @page {
     size: ${geometry.pageWidthIn}in ${geometry.pageHeightIn}in;
     margin: ${m.topIn}in ${m.rightIn}in ${m.bottomIn}in ${m.gutterIn}in;
     background: ${c.paper};
-    @bottom-center { content: "· " counter(page) " ·"; font-family: '${t.bodyFont}', serif; font-size: 9pt; color: ${c.ink}; }
-    @top-left { content: "${chapterLabel}"; font-family: '${t.bodyFont}', serif; ${t.smallCaps ? 'font-variant: small-caps;' : ''} font-size: 8.5pt; color: ${c.accent}; letter-spacing: 0.08em; }
+    ${pageBoxesCss(t, c, chapterLabel)}
   }
-  html, body { background: ${c.paper}; margin: 0; padding: 0; }
-  body { font-family: '${t.bodyFont}', serif; color: ${c.ink}; font-size: ${t.bodyPt}pt; line-height: ${t.lineHeight}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .entry-title { font-family: '${t.headingFont}', serif; font-weight: 700; font-size: 24pt; text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 4pt 0; color: ${c.ink}; }
-  .scientific-name { font-style: italic; font-size: 13pt; color: ${c.accent}; margin: 0 0 16pt 0; }
+  ${typographyStyleBlock(t, c)}
   .art-slot { ${artSlotPositionCss(profile.artSlot)} page-break-inside: avoid; }
-  .art-placeholder { width: 100%; height: 100%; min-height: 2.4in; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #E8D9B0; outline: 1px dashed ${c.accent}; outline-offset: -4px; font-style: italic; font-size: 8pt; color: ${c.accent}; }
-  .art-slot img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); }
-  .section-header { ${t.smallCaps ? 'font-variant: small-caps;' : ''} font-weight: 600; font-size: ${t.bodyPt}pt; letter-spacing: 0.08em; margin: 8pt 0 2pt 0; color: ${c.ink}; }
-  .section-body { margin: 0 0 6pt 0; text-align: justify; hyphens: auto; }
-  .id-list { margin: 4pt 0 6pt 0; padding-left: 14pt; }
-  .id-list li { margin: 0 0 2pt 0; text-align: left; }
-  .mono { font-family: 'Courier New', monospace; font-size: 0.92em; }
   ${page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? `.entry-title{color:${c.warning};} body{border-left:4pt solid ${c.warning};padding-left:10pt;}` : ''}
 </style>
 </head>
@@ -277,32 +321,19 @@ export function buildChapterHtml(
 <head>
 <meta charset="utf-8">
 <title>${chapterLabel}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+${fontLinkTags(t)}
 <style>
   @page {
     size: ${geometry.pageWidthIn}in ${geometry.pageHeightIn}in;
     margin: ${m.topIn}in ${m.rightIn}in ${m.bottomIn}in ${m.gutterIn}in;
     background: ${c.paper};
-    @bottom-center { content: "· " counter(page) " ·"; font-family: '${t.bodyFont}', serif; font-size: 9pt; color: ${c.ink}; }
-    @top-left { content: "${chapterLabel}"; font-family: '${t.bodyFont}', serif; ${t.smallCaps ? 'font-variant: small-caps;' : ''} font-size: 8.5pt; color: ${c.accent}; letter-spacing: 0.08em; }
+    ${pageBoxesCss(t, c, chapterLabel)}
   }
-  html, body { background: ${c.paper}; margin: 0; padding: 0; }
-  body { font-family: '${t.bodyFont}', serif; color: ${c.ink}; font-size: ${t.bodyPt}pt; line-height: ${t.lineHeight}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  ${typographyStyleBlock(t, c)}
   .book-page { page-break-after: always; }
   .book-page:last-child { page-break-after: auto; }
-  .entry-title { font-family: '${t.headingFont}', serif; font-weight: 700; font-size: 24pt; text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 4pt 0; color: ${c.ink}; }
-  .scientific-name { font-style: italic; font-size: 13pt; color: ${c.accent}; margin: 0 0 16pt 0; }
   ${archCss}
   .art-slot { page-break-inside: avoid; }
-  .art-placeholder { width: 100%; height: 100%; min-height: 2.4in; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #E8D9B0; outline: 1px dashed ${c.accent}; outline-offset: -4px; font-style: italic; font-size: 8pt; color: ${c.accent}; }
-  .art-slot img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); }
-  .section-header { ${t.smallCaps ? 'font-variant: small-caps;' : ''} font-weight: 600; font-size: ${t.bodyPt}pt; letter-spacing: 0.08em; margin: 8pt 0 2pt 0; color: ${c.ink}; }
-  .section-body { margin: 0 0 6pt 0; text-align: justify; hyphens: auto; }
-  .id-list { margin: 4pt 0 6pt 0; padding-left: 14pt; }
-  .id-list li { margin: 0 0 2pt 0; text-align: left; }
-  .mono { font-family: 'Courier New', monospace; font-size: 0.92em; }
   .is-danger .entry-title { color: ${c.warning}; }
   .is-danger { border-left: 4pt solid ${c.warning}; padding-left: 10pt; }
 </style>

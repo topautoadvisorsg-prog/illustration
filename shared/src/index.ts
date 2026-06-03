@@ -160,12 +160,26 @@ export const TrimSizeSchema = z.object({
   bleedIn: z.number().nonnegative(),
 });
 
+/**
+ * Role-based typography. `headingFont` is the display face (book/chapter/section/
+ * entry titles, headings, labels); `bodyFont` is the text face (body + captions).
+ * Per-role point sizes are tuned for a ~7x10 trim and may be scaled per trim.
+ * Defaults follow the Wild Lands system: Cormorant Garamond display + EB Garamond body.
+ */
 export const TypographyConfigSchema = z.object({
-  headingFont: z.string().min(1).default('EB Garamond'),
+  headingFont: z.string().min(1).default('Cormorant Garamond'),
   bodyFont: z.string().min(1).default('EB Garamond'),
-  captionFont: z.string().min(1).default('Inter'),
+  captionFont: z.string().min(1).default('EB Garamond'),
+  // Role sizes (pt), tuned for a ~7x10 trim.
+  bookTitlePt: z.number().positive().default(52),
+  chapterTitlePt: z.number().positive().default(32),
+  entryTitlePt: z.number().positive().default(26),
+  sectionHeadingPt: z.number().positive().default(13),
+  subsectionHeadingPt: z.number().positive().default(12.5),
   bodyPt: z.number().positive().default(11),
-  lineHeight: z.number().positive().default(1.28),
+  captionPt: z.number().positive().default(9),
+  labelPt: z.number().positive().default(8.5),
+  lineHeight: z.number().positive().default(1.4),
   smallCaps: z.boolean().default(true),
 });
 
@@ -233,7 +247,7 @@ export const ProjectConfigSchema = z.object({
   title: z.string().min(1),
   subtitle: z.string().optional(),
   authorName: z.string().min(1),
-  trimSize: TrimSizeSchema.default({ widthIn: 8.5, heightIn: 11, bleedIn: 0.125 }),
+  trimSize: TrimSizeSchema.default({ widthIn: 7, heightIn: 10, bleedIn: 0.125 }),
   typography: TypographyConfigSchema.default({}),
   colorPalette: ColorPaletteSchema.default({}),
   imageGeneration: ImageGenerationConfigSchema.default({}),

@@ -5,7 +5,13 @@ import { buildChapterHtml, type ChapterPageRender } from '../pipeline/stage-6-la
 import { computePageGeometry, PT_PER_INCH } from '../pipeline/stage-6-layout/page-geometry.js';
 import { preflightBook, stitchPdfs } from '../pipeline/stage-7-pdf-compile/stitch-book.js';
 
-const config = ProjectConfigSchema.parse({ volume: 1, title: 'The Wildlands', authorName: 'The Wildlands' });
+// Pin trim to 8.5x11 so the hardcoded page-size constants/assertions below stay valid.
+const config = ProjectConfigSchema.parse({
+  volume: 1,
+  title: 'The Wildlands',
+  authorName: 'The Wildlands',
+  trimSize: { widthIn: 8.5, heightIn: 11, bleedIn: 0.125 },
+});
 const geometry = computePageGeometry(config.trimSize);
 
 const pages: ChapterPageRender[] = [
