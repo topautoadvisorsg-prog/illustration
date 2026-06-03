@@ -18,6 +18,7 @@ import {
   BookManifestSchema,
   ChapterManifestSchema,
   PageManifestSchema,
+  type PageManifest,
   type ProjectConfig,
 } from '@wildlands/shared';
 import { getProject } from '../../db/repositories/projects.repo.js';
@@ -28,8 +29,10 @@ import { LocalStorageService } from '../../services/storage/local-storage.js';
 import { logger } from '../../lib/logger.js';
 import { computePageGeometry } from './page-geometry.js';
 import { buildChapterHtml, type ChapterPageRender } from './render-html.js';
+import { directLayout } from './layout-director.js';
 import { isChromiumAvailable, loadPagedPolyfill, renderHtmlToPdf } from './render-pdf.js';
 import { preflightBook, stitchPdfs, type PreflightReport } from '../stage-7-pdf-compile/stitch-book.js';
+import sharp from 'sharp';
 
 export class RenderBlockedError extends Error {
   constructor(
@@ -48,6 +51,7 @@ function pad2(n: number): string {
 async function imageDataUriForPage(
   storage: LocalStorageService,
   pageRowId: string | undefined,
+  targetPx: { width: number; height: number },
 ): Promise<string | undefined> {
   if (!pageRowId) return undefined;
   const active = await getActiveImage(pageRowId);
@@ -55,10 +59,39 @@ async function imageDataUriForPage(
   if (!path) return undefined;
   try {
     const buf = await storage.readProjectFile(path);
-    return `data:image/png;base64,${buf.toString('base64')}`;
+    const image = sharp(buf, { limitInputPixels: false });
+    const metadata = await image.metadata();
+    const needsResize = (metadata.width ?? 0) > targetPx.width || (metadata.height ?? 0) > targetPx.height;
+    const renderBuffer = needsResize
+      ? await image
+          .resize({
+            width: targetPx.width,
+            height: targetPx.height,
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
+          .png({ compressionLevel: 9 })
+          .toBuffer()
+      : buf;
+    return `data:image/png;base64,${renderBuffer.toString('base64')}`;
   } catch {
     return undefined; // missing file (e.g. ephemeral FS) -> placeholder
   }
+}
+
+function renderImageTargetPx(pm: PageManifest, config: ProjectConfig, geometry: ReturnType<typeof computePageGeometry>): { width: number; height: number } {
+  const allocation = directLayout({
+    bodyMarkdown: pm.bodyMarkdown,
+    layoutTemplate: pm.layoutTemplate,
+    geometry,
+    bodyPt: config.typography.bodyPt,
+    lineHeight: config.typography.lineHeight,
+  });
+  const box = allocation.artBox;
+  return {
+    width: Math.max(900, box.recommendedWidthPx + box.bleedPaddingPx * 2),
+    height: Math.max(900, box.recommendedHeightPx + box.bleedPaddingPx * 2),
+  };
 }
 
 export interface ChapterRenderResult {
@@ -89,10 +122,11 @@ export async function renderChapterPdf(projectId: string, chapterNumber: number)
   const storage = new LocalStorageService();
   const pageRows = await listPages(projectId);
   const rowByKey = new Map(pageRows.map((row) => [row.pageKey, row]));
+  const geometry = computePageGeometry(config.trimSize);
 
   const pages: ChapterPageRender[] = [];
   for (const pm of pageManifests) {
-    const imageDataUri = await imageDataUriForPage(storage, rowByKey.get(pm.pageId)?.id);
+    const imageDataUri = await imageDataUriForPage(storage, rowByKey.get(pm.pageId)?.id, renderImageTargetPx(pm, config, geometry));
     pages.push({
       entryTitle: pm.entryTitle,
       scientificName: pm.scientificName,
@@ -102,7 +136,6 @@ export async function renderChapterPdf(projectId: string, chapterNumber: number)
     });
   }
 
-  const geometry = computePageGeometry(config.trimSize);
   const polyfillJs = await loadPagedPolyfill();
   const html = buildChapterHtml(
     pages,
