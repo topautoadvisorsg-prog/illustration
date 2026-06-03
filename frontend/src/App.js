@@ -1451,6 +1451,29 @@ function App() {
     }
   }
 
+  // Per-stage "Review": ask the agent to QA its own output for a step. The verdict
+  // shows in the chat panel so the operator gets a real check without inspecting by hand.
+  async function reviewStage(stage) {
+    if (!activeProjectId) {
+      setChatMessages((m) => [...m, { role: "assistant", content: "Select a project first so I can review its work." }]);
+      return;
+    }
+    if (chatBusy) return;
+    setChatMessages((m) => [...m, { role: "user", content: `Review the ${stage} step and verify it's done right.` }]);
+    setChatBusy(true);
+    appendLog("running", `Agent reviewing ${stage}...`);
+    try {
+      const data = await call(`/api/projects/${activeProjectId}/review`, { method: "POST", body: JSON.stringify({ stage }) });
+      setChatMessages((m) => [...m, { role: "assistant", content: `🔍 ${stage.toUpperCase()} REVIEW\n\n${data.review}` }]);
+      appendLog("success", `Agent review of ${stage} complete (see chat).`);
+    } catch (err) {
+      setChatMessages((m) => [...m, { role: "assistant", content: `⚠️ ${err.message}` }]);
+      appendLog("error", `Review failed: ${err.message}`);
+    } finally {
+      setChatBusy(false);
+    }
+  }
+
   function selectProject(id) {
     setActiveProjectId(id);
     setSelectedPageId("");
@@ -2340,9 +2363,14 @@ function App() {
                 <h3>1. Manuscript Breakdown</h3>
                 <p className="hint">Review the chapter-to-page structure before downstream spend.</p>
               </div>
-              <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
-                Start Breakdown
-              </button>
+              <div className="button-row">
+                <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
+                  Start Breakdown
+                </button>
+                <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("breakdown")}>
+                  🔍 Review
+                </button>
+              </div>
             </div>
             <div className="metric-row">
               <span>{manuscriptSummary?.totalChapters ?? bookManifest.totalChapters ?? 0} chapters</span>
@@ -2393,6 +2421,9 @@ function App() {
               <div className="button-row">
                 <button disabled={busy || !activeProjectId || pageManifests.length === 0} onClick={() => run("Planning pages...", planPages)}>
                   Generate Page Plan
+                </button>
+                <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("plan")}>
+                  🔍 Review
                 </button>
                 <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview)}>
                   Text-Fit
@@ -2486,9 +2517,14 @@ function App() {
                 <h3>3. Image Proofing</h3>
                 <p className="hint">Generate only after the plan/text-fit looks right. Approve, reject, regenerate, then upscale.</p>
               </div>
-              <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages())}>
-                Load Images
-              </button>
+              <div className="button-row">
+                <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages())}>
+                  Load Images
+                </button>
+                <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("images")}>
+                  🔍 Review
+                </button>
+              </div>
             </div>
             <div className="field">
               <span>Selected Page</span>
@@ -2578,6 +2614,9 @@ function App() {
                 </button>
                 <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering cover...", renderCoverPreview)}>
                   Render Cover
+                </button>
+                <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("render")}>
+                  🔍 Review
                 </button>
               </div>
             </div>

@@ -134,6 +134,17 @@ input[type="file"] {
   white-space: nowrap;
 }
 
+.review-button {
+  border-color: #7b5a18;
+  background: #f3ead2;
+  color: #6d4f12;
+  white-space: nowrap;
+}
+
+.review-button:hover:not(:disabled) {
+  background: #e6d6a8;
+}
+
 .project-row {
   display: flex;
   align-items: center;

@@ -397,6 +397,76 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     },
   );
 
+  // Per-stage "Review" — the agent QA-checks its own output for a step and gives
+  // a verdict, so the operator doesn't have to inspect every page by hand.
+  const REVIEW_RUBRICS: Record<string, string> = {
+    breakdown:
+      'Verify the manuscript was split into sensible chapters and entries. Flag: empty/near-empty entries, missing or garbled titles, entries that look like meta/outline/front-matter rather than real content, and any chapter with an implausible entry count.',
+    plan:
+      'Verify every page has a layout assigned and a resolved image prompt. Flag: pages with no layout, blockers, unresolved prompt placeholders, or layouts that look wrong for the content.',
+    textfit:
+      'Verify the text-fit results. Long entries flowing across multiple pages are FINE (not overflow). Flag only genuinely broken cases (e.g. an illustration-dominant layout chosen for a very long entry).',
+    images:
+      'Verify image status. Report how many pages have approved art vs none. Do NOT recommend spending on generation unless the plan/text-fit look right first.',
+    render:
+      'Verify the book is structurally complete: chapters present, and (for a full book) front matter, table of contents, index, and back matter should exist. Flag missing structural pieces.',
+  };
+  const ReviewBodySchema = z.object({ stage: z.enum(['breakdown', 'plan', 'textfit', 'images', 'render']) });
+  app.post(
+    '/api/projects/:id/review',
+    { schema: { params: ProjectParamsSchema, body: ReviewBodySchema, response: { 200: z.object({ review: z.string() }), 404: ApiErrorSchema } } },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const { stage } = ReviewBodySchema.parse(request.body);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+
+      const manifests = await listManifests(id);
+      const pages = await listPages(id);
+      const book = manifests.find((m) => m.kind === 'BOOK');
+      const chapters = manifests
+        .filter((m) => m.kind === 'CHAPTER')
+        .map((m) => m.content as { chapterNumber: number; chapterTitle: string; pageKeys?: string[] });
+      const statusCounts = pages.reduce<Record<string, number>>((acc, p) => {
+        acc[p.status] = (acc[p.status] ?? 0) + 1;
+        return acc;
+      }, {});
+      const bookContent = book?.content as { totalChapters?: number; totalEntries?: number; chapters?: Array<{ chapterNumber: number; chapterTitle: string; entryCount: number }> } | undefined;
+      const chapterLines = (bookContent?.chapters ?? chapters.map((c) => ({ chapterNumber: c.chapterNumber, chapterTitle: c.chapterTitle, entryCount: c.pageKeys?.length ?? 0 })))
+        .slice(0, 30)
+        .map((c) => `  - Ch${c.chapterNumber} "${c.chapterTitle}": ${c.entryCount} entries`)
+        .join('\n');
+      const pagesNoLayout = pages.filter((p) => !p.layoutTemplate).length;
+
+      const system = [
+        `You are a strict, meticulous book-production QA reviewer for The Wildlands Publishing Platform, reviewing the "${stage}" step for the book "${project.title}". Be an honest editor/production manager: do not invent problems, do not rubber-stamp.`,
+        '',
+        'PROJECT STATE:',
+        `- Status: ${project.status}; chapters: ${bookContent?.totalChapters ?? chapters.length}; total entries: ${bookContent?.totalEntries ?? pages.length}; pages: ${pages.length} (status: ${JSON.stringify(statusCounts)}); pages missing a layout: ${pagesNoLayout}`,
+        chapterLines ? `Chapters:\n${chapterLines}` : '',
+        '',
+        `RUBRIC for "${stage}": ${REVIEW_RUBRICS[stage]}`,
+        '',
+        'Respond EXACTLY in this format, concise and specific:',
+        'VERDICT: PASS or NEEDS WORK',
+        "WHAT'S GOOD: 1-3 short bullets",
+        'ISSUES: specific problems, or "none"',
+        'FIX NEXT: concrete next action(s), or "nothing — ready to proceed"',
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      const review = await callChat({
+        system,
+        messages: [{ role: 'user', content: `Review the ${stage} output and give your verdict.` }],
+        projectId: id,
+        operation: `review-${stage}`,
+        maxTokens: 600,
+      });
+      return { review };
+    },
+  );
+
   app.patch(
     '/api/projects/:id/config',
     {
