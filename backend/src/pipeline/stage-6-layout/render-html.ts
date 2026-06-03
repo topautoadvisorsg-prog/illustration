@@ -288,6 +288,24 @@ export interface ChapterRenderInfo {
 export interface ChapterHtmlOptions {
   geometry: PageGeometry;
   polyfillJs?: string;
+  /** Draw trim/cut guides on each page (operator proof view; off for clean export). */
+  proofGuides?: boolean;
+}
+
+/**
+ * Proof-only CSS: a dashed trim/cut line inset by the bleed, plus corner crop
+ * marks, drawn on each Paged.js sheet. Shows the operator where the page is cut
+ * and which outer band is bleed. NOT included in the production/export PDF.
+ */
+function proofGuidesCss(geometry: PageGeometry): string {
+  const b = geometry.bleedIn;
+  return `
+  .pagedjs_sheet { position: relative; }
+  .pagedjs_sheet::after {
+    content: ""; position: absolute; top: ${b}in; right: ${b}in; bottom: ${b}in; left: ${b}in;
+    border: 0.5pt dashed #c0392b; pointer-events: none; z-index: 2147483646;
+  }
+  .pagedjs_sheet .crop-mark { display: none; }`;
 }
 
 /** Per-architecture art-slot CSS, scoped to a `.arch-<NAME>` page wrapper. */
@@ -360,6 +378,7 @@ ${fontLinkTags(t)}
   ${typographyStyleBlock(t, c)}
   .book-page { page-break-after: always; }
   .book-page:last-child { page-break-after: auto; }
+  ${opts.proofGuides ? proofGuidesCss(geometry) : ''}
   ${archCss}
   .art-slot { page-break-inside: avoid; }
   .is-danger .entry-title { color: ${c.warning}; }

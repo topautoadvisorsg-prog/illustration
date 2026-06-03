@@ -1793,7 +1793,7 @@ function App() {
       cachedAt: new Date().toISOString(),
     });
     setMessage(`Manuscript uploaded: ${data.manuscript.sizeBytes} bytes.`);
-    appendLog("success", `Manuscript uploaded: ${data.manuscript.totalChapters} chapter(s), ${data.manuscript.totalEntries} page candidate(s).`);
+    appendLog("success", `Manuscript uploaded: ${data.manuscript.totalChapters} chapter(s), ${data.manuscript.totalEntries} entries (each entry may render across multiple pages).`);
   }
 
   async function loadArtifacts(projectId = activeProjectId) {
@@ -2050,8 +2050,8 @@ function App() {
       }
     }
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
-    setMessage(`Manifested ${data.summary.totalPages} page(s), ${data.summary.manifestsWritten} manifest row(s).`);
-    appendLog("success", `Manifest breakdown wrote ${data.summary.totalPages} page(s).`);
+    setMessage(`Broke down into ${data.summary.totalPages} entries, ${data.summary.manifestsWritten} manifest row(s).`);
+    appendLog("success", `Breakdown wrote ${data.summary.totalPages} entries (rendered page count is determined at render time as text flows).`);
     await loadArtifacts(projectId);
   }
 
@@ -2702,7 +2702,7 @@ function App() {
             </div>
             <div className="metric-row">
               <span>{manuscriptSummary?.totalChapters ?? bookManifest.totalChapters ?? 0} chapters</span>
-              <span>{manuscriptSummary?.totalEntries ?? bookManifest.totalEntries ?? 0} pages</span>
+              <span>{manuscriptSummary?.totalEntries ?? bookManifest.totalEntries ?? 0} entries</span>
               <span>{manuscriptSummary?.totalWords ? `${manuscriptSummary.totalWords.toLocaleString()} words` : "word count pending"}</span>
             </div>
             <div className="chapter-tree">

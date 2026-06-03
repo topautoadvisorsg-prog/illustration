@@ -188,7 +188,7 @@ export async function renderChapterPdf(projectId: string, chapterNumber: number)
     pages,
     config,
     { chapterNumber, chapterTitle: chapterRow.chapterTitle },
-    { geometry, polyfillJs },
+    { geometry, polyfillJs, proofGuides: true }, // chapter preview is the operator proof view
   );
 
   logger.info({ projectId, chapterNumber, pages: pages.length }, 'Stage 6: rendering chapter PDF');
