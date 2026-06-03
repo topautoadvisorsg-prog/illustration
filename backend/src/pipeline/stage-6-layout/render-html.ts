@@ -91,7 +91,7 @@ function typographyStyleBlock(t: Typography, c: Palette): string {
   .entry-title { font-family: var(--font-display); font-weight: 600; font-size: ${t.entryTitlePt}pt; text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 4pt 0; color: ${c.ink}; }
   .scientific-name { font-family: var(--font-body); font-style: italic; font-size: ${t.subsectionHeadingPt}pt; color: ${c.accent}; margin: 0 0 16pt 0; }
   .section-header { font-family: var(--font-display); ${sc} font-weight: 600; font-size: ${t.sectionHeadingPt}pt; letter-spacing: 0.06em; margin: 8pt 0 2pt 0; color: ${c.ink}; }
-  .section-body { font-family: var(--font-body); margin: 0 0 6pt 0; text-align: justify; hyphens: auto; }
+  .section-body { font-family: var(--font-body); margin: 0 0 6pt 0; text-align: left; hyphens: auto; }
   .id-list { margin: 4pt 0 6pt 0; padding-left: 14pt; }
   .id-list li { margin: 0 0 2pt 0; text-align: left; }
   .caption { font-family: var(--font-body); font-style: italic; font-size: ${t.captionPt}pt; color: ${c.accent}; }
