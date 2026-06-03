@@ -2666,6 +2666,7 @@ function App() {
         </div>
       </section>
 
+      {advancedMode && (
       <section className="panel intelligence-panel">
         <div className="section-head">
           <div>
@@ -2959,6 +2960,7 @@ function App() {
           </div>
         </div>
       </section>
+      )}
 
       <section className="pipeline-grid">
         <section className="panel">
