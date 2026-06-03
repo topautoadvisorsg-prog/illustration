@@ -24,6 +24,14 @@ const COMMON_CHROMIUM_PATHS = [
   '/usr/bin/google-chrome',
   '/usr/bin/google-chrome-stable',
 ];
+const DEFAULT_RENDER_TIMEOUT_MS = 120_000;
+
+function renderTimeoutMs(): number {
+  const raw = process.env.PDF_RENDER_TIMEOUT_MS;
+  if (!raw) return DEFAULT_RENDER_TIMEOUT_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RENDER_TIMEOUT_MS;
+}
 
 /** Resolve a Chromium executable path, or null if none is available. */
 export function resolveChromiumPath(): string | null {
@@ -89,7 +97,9 @@ export async function renderHtmlToPdf(html: string, geometry: PageGeometry): Pro
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 });
+    const timeout = renderTimeoutMs();
+    page.setDefaultTimeout(timeout);
+    await page.setContent(html, { waitUntil: 'load', timeout });
     // These callbacks run inside the browser; reference DOM via globalThis to
     // avoid pulling the DOM lib into the Node TS build.
     await page.waitForFunction(
@@ -97,7 +107,7 @@ export async function renderHtmlToPdf(html: string, geometry: PageGeometry): Pro
         const w = globalThis as unknown as { PagedPolyfill?: { pages?: unknown[] }; document: { querySelectorAll: (s: string) => { length: number } } };
         return Boolean(w.PagedPolyfill?.pages?.length) || w.document.querySelectorAll('.pagedjs_page').length > 0;
       },
-      { timeout: 30_000 },
+      { timeout },
     );
     const totalPages = await page.evaluate(() => {
       const w = globalThis as unknown as { document: { querySelectorAll: (s: string) => { length: number } } };
