@@ -20,6 +20,7 @@ import {
 } from '../db/repositories/projects.repo.js';
 import { listManifests, listPages } from '../db/repositories/manifests.repo.js';
 import { updatePagePlanning } from '../db/repositories/manifests.repo.js';
+import { callChat } from '../services/claude/claude.js';
 import { ingestManuscript } from '../pipeline/stage-1-ingestion/ingest-manuscript.js';
 import { UnsupportedManuscriptError } from '../pipeline/stage-1-ingestion/extract-manuscript.js';
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
@@ -268,6 +269,64 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       if (!existing) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
       await deleteProject(id);
       return { deleted: true, id };
+    },
+  );
+
+  // Operator chat: talk to the agent about THIS project. Read-only/advisory —
+  // it explains state and recommends the next button; it does not run actions.
+  const ChatBodySchema = z.object({
+    messages: z
+      .array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().min(1) }))
+      .min(1)
+      .max(40),
+    recentLog: z.array(z.string()).max(40).optional(),
+  });
+  app.post(
+    '/api/projects/:id/chat',
+    { schema: { params: ProjectParamsSchema, body: ChatBodySchema, response: { 200: z.object({ reply: z.string() }), 404: ApiErrorSchema } } },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const body = ChatBodySchema.parse(request.body);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+
+      const manifests = await listManifests(id);
+      const pages = await listPages(id);
+      const chapters = manifests.filter((m) => m.kind === 'CHAPTER').length;
+      const statusCounts = pages.reduce<Record<string, number>>((acc, p) => {
+        acc[p.status] = (acc[p.status] ?? 0) + 1;
+        return acc;
+      }, {});
+      const pageLines = pages
+        .slice(0, 30)
+        .map((p) => `  - ${p.pageKey}: layout=${p.layoutTemplate ?? 'none'} status=${p.status}`)
+        .join('\n');
+
+      const system = [
+        'You are the operator-facing agent for The Wildlands Publishing Platform, which turns a manuscript into a print-ready illustrated book.',
+        'The pipeline order is: Upload manuscript -> Breakdown (split into chapters/pages) -> Page Plan (assign layouts) -> Text-Fit -> Generate Images (paid) -> Approve -> Render PDF -> Export.',
+        'You ADVISE and EXPLAIN. You cannot click buttons or run actions yourself; tell the operator which button to click. Be concise, plain, and direct. No jargon, no filler.',
+        '',
+        'CURRENT PROJECT STATE:',
+        `- Title: ${project.title}`,
+        `- Status: ${project.status}`,
+        `- Manuscript uploaded: ${project.manuscriptPath ? 'yes' : 'no'}`,
+        `- Chapters detected: ${chapters}`,
+        `- Pages: ${pages.length}${pages.length ? ` (by status: ${JSON.stringify(statusCounts)})` : ''}`,
+        pages.length ? `Pages:\n${pageLines}` : '',
+        body.recentLog?.length ? `\nRECENT ACTIVITY LOG (newest first):\n${body.recentLog.slice(0, 20).map((l) => `  - ${l}`).join('\n')}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      const replyText = await callChat({
+        system,
+        messages: body.messages,
+        projectId: id,
+        operation: 'operator-chat',
+        maxTokens: 700,
+      });
+      return { reply: replyText };
     },
   );
 

@@ -1097,6 +1097,9 @@ Use this entry to prove manuscript to manifest generation.`);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [commandInput, setCommandInput] = useState("");
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
   const [phase, setPhase] = useState(PHASES[0]);
   const [devIssues, setDevIssues] = useState(loadDevIssues);
   const [intelligenceOverview, setIntelligenceOverview] = useState(null);
@@ -1345,6 +1348,36 @@ Use this entry to prove manuscript to manifest generation.`);
   async function refreshAgents() {
     const data = await call("/api/agents");
     setAgents(data.agents || []);
+  }
+
+  async function sendChat(event) {
+    if (event) event.preventDefault();
+    const text = chatInput.trim();
+    if (!text || chatBusy) return;
+    if (!activeProjectId) {
+      setChatMessages((m) => [...m, { role: "assistant", content: "Select or create a project first so I can see its state and help." }]);
+      setChatInput("");
+      return;
+    }
+    const next = [...chatMessages, { role: "user", content: text }];
+    setChatMessages(next);
+    setChatInput("");
+    setChatBusy(true);
+    try {
+      const recentLog = operatorLog.slice(0, 20).map((e) => e.text);
+      const data = await call(`/api/projects/${activeProjectId}/chat`, {
+        method: "POST",
+        body: JSON.stringify({
+          messages: next.slice(-20).map((m) => ({ role: m.role, content: m.content })),
+          recentLog,
+        }),
+      });
+      setChatMessages((m) => [...m, { role: "assistant", content: data.reply }]);
+    } catch (err) {
+      setChatMessages((m) => [...m, { role: "assistant", content: `⚠️ ${err.message}` }]);
+    } finally {
+      setChatBusy(false);
+    }
   }
 
   function selectProject(id) {
@@ -2034,6 +2067,39 @@ Use this entry to prove manuscript to manifest generation.`);
             {agents.length === 0 && <p className="empty">Agent roster not loaded yet.</p>}
           </div>
         </section>
+      </section>
+
+      <section className="panel chat-panel">
+        <div className="section-head">
+          <h2>💬 Chat with the Agent</h2>
+          <span className="hint">Ask what happened, what's wrong, or what to do next — it knows this project's live state.</span>
+        </div>
+        <div className="chat-log">
+          {chatMessages.length === 0 && (
+            <p className="empty">Ask me anything about this project — e.g. “what’s the status?”, “what do I click next?”, “why did that fail?”</p>
+          )}
+          {chatMessages.map((m, i) => (
+            <div className={`chat-msg ${m.role}`} key={i}>
+              <strong>{m.role === "user" ? "You" : "Agent"}</strong>
+              <p>{m.content}</p>
+            </div>
+          ))}
+          {chatBusy && (
+            <div className="chat-msg assistant">
+              <strong>Agent</strong>
+              <p>…thinking</p>
+            </div>
+          )}
+        </div>
+        <form className="chat-form" onSubmit={sendChat}>
+          <input
+            value={chatInput}
+            onChange={(event) => setChatInput(event.target.value)}
+            placeholder={activeProjectId ? "Message the agent about this project…" : "Select a project first…"}
+            disabled={chatBusy}
+          />
+          <button type="submit" disabled={chatBusy || !chatInput.trim()}>Send</button>
+        </form>
       </section>
 
       <section className="panel review-board">

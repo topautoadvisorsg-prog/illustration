@@ -28,6 +28,51 @@ function getClient(): Anthropic {
   return client;
 }
 
+export interface ChatTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatCallInput {
+  system: string;
+  messages: ChatTurn[];
+  projectId?: string | null;
+  operation: string;
+  maxTokens?: number;
+}
+
+/**
+ * Plain conversational Claude call (no forced tool). Used by the operator chat
+ * so a human can ask "what's wrong / what's next" and get a readable answer.
+ */
+export async function callChat(input: ChatCallInput): Promise<string> {
+  const env = getEnv();
+  const anthropic = getClient();
+  const response = await anthropic.messages.create({
+    model: env.ANTHROPIC_MODEL,
+    max_tokens: input.maxTokens ?? 1024,
+    temperature: 0.3,
+    system: input.system,
+    messages: input.messages.map((m) => ({ role: m.role, content: m.content })),
+  });
+
+  await recordUsage({
+    projectId: input.projectId ?? null,
+    provider: 'anthropic',
+    model: env.ANTHROPIC_MODEL,
+    operation: input.operation,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  });
+
+  const text = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n')
+    .trim();
+  return text || '(The agent returned an empty response.)';
+}
+
 export interface StructuredCallInput<T> {
   system: string;
   user: string;
