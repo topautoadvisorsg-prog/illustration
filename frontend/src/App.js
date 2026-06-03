@@ -2165,14 +2165,6 @@ function App() {
             </div>
             <span className="mode-pill">{busy ? "Running" : "Ready"}</span>
           </div>
-          <div className="phase-row">
-            <label htmlFor="phase-select">Talking to phase</label>
-            <select id="phase-select" value={phase} onChange={(event) => setPhase(event.target.value)}>
-              {PHASES.map((p) => (
-                <option key={p} value={p} label={p} />
-              ))}
-            </select>
-          </div>
           <div className="phase-row project-row">
             <label htmlFor="project-select">Project</label>
             <div className="project-picker" id="project-select" role="listbox" aria-label="Projects">
@@ -2205,55 +2197,14 @@ function App() {
             </button>
             <span className="hint">{projects.length} project{projects.length === 1 ? "" : "s"}</span>
           </div>
-          <form className="command-form" onSubmit={handleOperatorCommand}>
-            <input
-              value={commandInput}
-              onChange={(event) => setCommandInput(event.target.value)}
-              placeholder={`Message the ${phase} phase - run an action, or flag an issue for the developer`}
-            />
-            <button disabled={busy} type="submit">Run</button>
-            <button type="button" disabled={!commandInput.trim()} onClick={flagForDeveloper} title="Save this as an issue for the developer to fix">
-              Flag for Developer
-            </button>
-          </form>
-          <div className="dev-actions">
-            <button type="button" disabled={devIssues.length === 0} onClick={copyDeveloperReport}>
-              Copy Developer Report ({devIssues.length})
-            </button>
-            <button type="button" disabled={devIssues.length === 0} onClick={clearDevIssues}>
-              Clear Flags
-            </button>
-          </div>
           <div className="quick-actions">
             <button disabled={busy} onClick={() => run("Checking backend...", refreshHealth)}>Check Backend</button>
-            <button disabled={busy} onClick={createNamedProject}>Create Project</button>
-            <button disabled={busy || !activeProjectId} onClick={() => run("Saving project configuration...", saveProjectConfig)}>
-              Save Config
-            </button>
             <button disabled={busy} onClick={openManuscriptPicker}>Choose File</button>
             <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
               Upload Manuscript
             </button>
-            <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
-              Generate Manifests
-            </button>
-            <button disabled={busy || !activeProjectId} onClick={() => run("Planning pages...", planPages)}>
-              Plan Pages
-            </button>
-            <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview)}>
-              Text-Fit Preview
-            </button>
-            <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages())}>
-              Proof Images
-            </button>
-            <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering chapter preview...", () => renderChapterPreview(chapterManifests[0]?.chapterNumber || 1))}>
-              Render Preview
-            </button>
-            <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book preview...", renderBookPreview)}>
-              Export PDF
-            </button>
-            <button disabled={busy} onClick={() => run("Running manuscript intake...", runManuscriptIntake)}>
-              Run Intake
+            <button disabled={busy || !activeProjectId} onClick={() => run("Saving project configuration...", saveProjectConfig)}>
+              Save Config
             </button>
           </div>
           <div
