@@ -343,7 +343,22 @@ textarea {
   width: min(1480px, calc(100% - 32px));
   margin: 0 auto;
   padding: 26px 0 48px;
+  display: flex;
+  flex-direction: column;
 }
+
+/* Logical operator flow, ordered without moving markup:
+   topbar/notice -> Command Center -> Project Setup -> Manuscript -> Workflow Board
+   -> Chat -> (Advanced: Intelligence, Backend URL). */
+.shell > .topbar { order: 0; }
+.shell > .notice { order: 1; }
+.shell > .operator-grid { order: 2; }
+.shell > .workspace-grid { order: 3; }
+.shell > .pipeline-grid { order: 4; }
+.shell > .review-board { order: 5; }
+.shell > .chat-panel { order: 6; }
+.shell > .intelligence-panel { order: 7; }
+.shell > .backend-panel { order: 8; }
 
 .topbar {
   display: flex;

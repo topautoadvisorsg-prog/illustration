@@ -2138,6 +2138,7 @@ function App() {
         </div>
       </section>
 
+      {advancedMode && (
       <section className="panel backend-panel">
         <Field label="Backend URL">
           <div className="inline-form">
@@ -2153,6 +2154,7 @@ function App() {
         </Field>
         <p className="hint">This must be the backend API URL, not the database URL.</p>
       </section>
+      )}
 
       {(message || error) && <section className={`notice ${error ? "error" : ""}`}>{error || message}</section>}
 
@@ -2203,9 +2205,6 @@ function App() {
             <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
               Upload Manuscript
             </button>
-            <button disabled={busy || !activeProjectId} onClick={() => run("Saving project configuration...", saveProjectConfig)}>
-              Save Config
-            </button>
           </div>
           <div
             className={isDragging ? "upload-dropzone dragging" : "upload-dropzone"}
@@ -2246,17 +2245,19 @@ function App() {
               </div>
             ))}
           </div>
+          {advancedMode && (
           <div className="agent-roster">
             <h3>Pipeline Agents</h3>
             {agents.map((agent) => (
               <article className="agent-card" key={agent.id}>
                 <strong>{agent.name}</strong>
                 <span>{agent.mission}</span>
-                {advancedMode && <small>{agent.expertFrame}</small>}
+                <small>{agent.expertFrame}</small>
               </article>
             ))}
             {agents.length === 0 && <p className="empty">Agent roster not loaded yet.</p>}
           </div>
+          )}
         </section>
       </section>
 
