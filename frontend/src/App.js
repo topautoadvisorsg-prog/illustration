@@ -1371,16 +1371,26 @@ Use this entry to prove manuscript to manifest generation.`);
     await refreshProjects();
   }
 
-  async function createProject() {
+  async function createProject(titleOverride) {
+    const title = (typeof titleOverride === "string" && titleOverride.trim()) || projectConfig.title;
+    const config = { ...projectConfig, title };
     const data = await call("/api/projects", {
       method: "POST",
-      body: JSON.stringify({ config: projectConfig }),
+      body: JSON.stringify({ config }),
     });
+    setConfig(["title"], title); // keep the Project Setup form in sync with the new name
     setProjects((current) => [data.project, ...current.filter((project) => project.id !== data.project.id)]);
     setActiveProjectId(data.project.id);
-    setMessage("Project created with the visible configuration.");
+    setMessage(`Project created: ${data.project.title}`);
     appendLog("success", `Project ready: ${data.project.title}`);
     return data.project.id;
+  }
+
+  // Ask for a name first, then create. Used by the "+ New Project" buttons.
+  function createNamedProject() {
+    const name = window.prompt("Name this project / book:", projectConfig.title || "Untitled Book");
+    if (name === null) return; // cancelled — do nothing
+    run("Creating new project...", () => createProject(name.trim() || "Untitled Book"));
   }
 
   async function saveProjectConfig(projectId = activeProjectId) {
@@ -1917,7 +1927,7 @@ Use this entry to prove manuscript to manifest generation.`);
               ))}
               {projects.length === 0 && <span className="empty-inline">No projects yet</span>}
             </div>
-            <button type="button" disabled={busy} onClick={() => run("Creating new project...", createProject)}>
+            <button type="button" disabled={busy} onClick={createNamedProject}>
               + New Project
             </button>
             <span className="hint">{projects.length} project{projects.length === 1 ? "" : "s"}</span>
@@ -1943,7 +1953,7 @@ Use this entry to prove manuscript to manifest generation.`);
           </div>
           <div className="quick-actions">
             <button disabled={busy} onClick={() => run("Checking backend...", refreshHealth)}>Check Backend</button>
-            <button disabled={busy} onClick={() => run("Creating project...", createProject)}>Create Project</button>
+            <button disabled={busy} onClick={createNamedProject}>Create Project</button>
             <button disabled={busy || !activeProjectId} onClick={() => run("Saving project configuration...", saveProjectConfig)}>
               Save Config
             </button>
@@ -2704,7 +2714,7 @@ Use this entry to prove manuscript to manifest generation.`);
           <div className="section-head">
             <h2>1. Project Setup</h2>
             <div className="button-row">
-              <button disabled={busy} onClick={() => run("Creating project...", createProject)}>
+              <button disabled={busy} onClick={createNamedProject}>
                 Create Project
               </button>
               <button disabled={busy || !activeProjectId} onClick={() => run("Saving project configuration...", saveProjectConfig)}>
