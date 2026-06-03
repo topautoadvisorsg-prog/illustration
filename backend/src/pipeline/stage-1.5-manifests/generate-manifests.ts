@@ -1,7 +1,7 @@
 /**
- * Stage 1.5 — Manifest Generation.
+ * Stage 1.5 - Manifest Generation.
  *
- * What it does: reads the stored manuscript ONCE via Claude and produces book,
+ * What it does: reads the stored manuscript structure once, produces book,
  * chapter, and page manifests, then persists them and seeds `pages` rows.
  * After this stage the full manuscript is never loaded again.
  *
@@ -9,7 +9,7 @@
  * Output: { totalChapters, totalEntries, totalPages, totalImagesNeeded } and
  *          persisted manifests + pages.
  *
- * Run locally (Phase 1.5):
+ * Run locally:
  *   POST /api/projects/{id}/manifests
  */
 
@@ -18,17 +18,21 @@ import {
   ManifestGenerationResultSchema,
   type BookManifest,
   type ChapterManifest,
+  type ContentType,
+  type GeneratedEntry,
+  type LayoutTemplateId,
   type ManifestGenerationResult,
   type PageManifest,
   type ProjectConfig,
 } from '@wildlands/shared';
-import { callStructured } from '../../services/claude/claude.js';
 import { persistManifests, type PageSeed } from '../../db/repositories/manifests.repo.js';
 import { logger } from '../../lib/logger.js';
 import {
   assertUsableManuscriptOutline,
   parseManuscriptOutline,
   validateGeneratedChaptersAgainstOutline,
+  type ManuscriptChapterOutline,
+  type ManuscriptEntryOutline,
   type ManuscriptOutline,
 } from '../stage-1-ingestion/parse-manuscript-outline.js';
 
@@ -47,137 +51,192 @@ export interface GenerateManifestsResult {
   pagesWritten: number;
 }
 
-const SYSTEM_PROMPT = `You are the manifest planner for an illustrated field-guide book pipeline.
-You read a complete manuscript written in Markdown and break it into a structured plan.
-
-Manuscript structure:
-- A level-1 heading ("# CHAPTER N — TITLE") starts a chapter.
-- A level-2 heading ("## ENTRY NAME ...") starts an entry. Each entry becomes ONE page.
-- Level-3 headings ("### SECTION") are sections within an entry's body.
-
-For every entry produce:
-- entryTitle: the entry's display name (e.g. "Chanterelle").
-- scientificName: the italicised binomial if present, else omit.
-- category: a short tag if the heading carries one (e.g. "EDIBLE", "TOXIC"), else omit.
-- contentType: the educational page type, one of: SPECIES_PROFILE, ANIMAL_PROFILE,
-  COMPARISON, MULTI_SPECIES_COMPARISON, IDENTIFICATION_GUIDE, DIAGNOSTIC_DIAGRAM,
-  CHAPTER_OPENER, HABITAT_OVERVIEW, PROGRESSION_STUDY, CUTAWAY_ILLUSTRATION,
-  SIDEBAR_FEATURE, REFERENCE_PAGE, WARNING_PAGE, BOTANICAL_PLATE, TERRAIN_ANALYSIS,
-  FIELD_NOTES_PAGE, ENCYCLOPEDIA_ENTRY. Use SPECIES_PROFILE/ANIMAL_PROFILE for a normal
-  single-organism entry; WARNING_PAGE only when the subject itself is toxic/dangerous.
-- imageSubject: a concise, literal description of what the single illustration for this
-  page should depict — the organism/subject only, no style words. One sentence.
-- bodyMarkdown: the full body text of the entry, preserving its section headings.
-- layoutTemplate: choose the best fit from the allowed list; default LAYOUT_1_STANDARD.
-
-Rules:
-- Preserve chapter numbers exactly as written in the manuscript.
-- Do not invent entries. Every "##" heading is exactly one entry.
-- Do not summarise or shorten bodyMarkdown — copy it faithfully.
-- Return your answer ONLY through the emit_manifest tool.`;
-
-// Hand-written JSON Schema mirror of ManifestGenerationResultSchema for the tool.
-const LAYOUT_TEMPLATES = [
-  'LAYOUT_1_STANDARD',
-  'LAYOUT_2_TEXT_HEAVY',
-  'LAYOUT_3_ILLUSTRATION_DOMINANT',
-  'LAYOUT_4_DANGER_WARNING',
-  'LAYOUT_5_CHAPTER_OPENER',
-  'LAYOUT_6_BACK_MATTER',
-  'LAYOUT_7_SCATTERED_VIGNETTES',
-  'LAYOUT_8_MARGIN_ILLUSTRATION',
-  'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
-  'LAYOUT_10_FULL_PAGE_PLATE',
-  'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD',
-  'LAYOUT_12_DIAGNOSTIC_DIAGRAM',
-  'LAYOUT_13_FEATURE_BANNER',
-  'LAYOUT_14_SIDEBAR_FEATURE',
-  'LAYOUT_15_PROGRESSION_STUDY',
-  'LAYOUT_16_CUTAWAY_FEATURE',
-];
-
-const TOOL_JSON_SCHEMA: Record<string, unknown> = {
-  type: 'object',
-  properties: {
-    bookTitle: { type: 'string' },
-    chapters: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          chapterNumber: { type: 'integer', minimum: 1 },
-          chapterTitle: { type: 'string' },
-          entries: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                entryTitle: { type: 'string' },
-                scientificName: { type: 'string' },
-                category: { type: 'string' },
-                contentType: {
-                  type: 'string',
-                  enum: [
-                    'SPECIES_PROFILE', 'ANIMAL_PROFILE', 'COMPARISON', 'MULTI_SPECIES_COMPARISON',
-                    'IDENTIFICATION_GUIDE', 'DIAGNOSTIC_DIAGRAM', 'CHAPTER_OPENER', 'HABITAT_OVERVIEW',
-                    'PROGRESSION_STUDY', 'CUTAWAY_ILLUSTRATION', 'SIDEBAR_FEATURE', 'REFERENCE_PAGE',
-                    'WARNING_PAGE', 'BOTANICAL_PLATE', 'TERRAIN_ANALYSIS', 'FIELD_NOTES_PAGE', 'ENCYCLOPEDIA_ENTRY',
-                  ],
-                },
-                imageSubject: { type: 'string' },
-                layoutTemplate: { type: 'string', enum: LAYOUT_TEMPLATES },
-                bodyMarkdown: { type: 'string' },
-              },
-              required: ['entryTitle', 'imageSubject', 'bodyMarkdown'],
-            },
-          },
-        },
-        required: ['chapterNumber', 'chapterTitle', 'entries'],
-      },
-    },
-  },
-  required: ['bookTitle', 'chapters'],
-};
-
-function outlineForPrompt(outline: ManuscriptOutline): string {
-  return outline.chapters
-    .map((chapter) => {
-      const entries = chapter.entries
-        .map((entry) => `  - ${entry.title} (${entry.wordCount} words, line ${entry.lineStart})`)
-        .join('\n');
-      return `Chapter ${chapter.chapterNumber}: ${chapter.title}\n${entries}`;
-    })
-    .join('\n\n');
-}
-
 function pageKey(chapterNumber: number, pageInChapter: number): string {
   return `CH${String(chapterNumber).padStart(2, '0')}_P${String(pageInChapter).padStart(3, '0')}`;
 }
 
+function stripMarkdown(value: string): string {
+  return value
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*]\([^)]*\)/g, ' ')
+    .replace(/[*_~#>|`]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function signalText(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline): string {
+  return `${chapter.title}\n${entry.title}\n${entry.bodyMarkdown.slice(0, 1600)}`.toLowerCase();
+}
+
+function cleanDisplayTitle(title: string): string {
+  return stripMarkdown(title)
+    .replace(/^\d+\.\s*/, '')
+    .replace(/\s*\|.*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractScientificName(entry: ManuscriptEntryOutline): string | undefined {
+  const candidate = `${entry.title}\n${entry.bodyMarkdown.slice(0, 360)}`;
+  const match = candidate.match(/\*\(?([A-Z][a-z]+(?:\s+(?:[a-z][a-z.-]+|spp\.|var\.)){1,4})\)?\*/);
+  return match?.[1];
+}
+
+function inferCategory(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline): string | undefined {
+  const text = signalText(chapter, entry);
+
+  if (
+    /(deadly|toxic|poisonous|venomous|danger level|lyme disease|tick-borne|tick borne|rabies|anaphylaxis|hypothermia|river crossing|extreme weather|spruce trap)/.test(
+      text,
+    )
+  ) {
+    return 'DANGER';
+  }
+  if (/\bedible\b/.test(text)) return 'EDIBLE';
+  if (/\bmedicinal\b/.test(text)) return 'MEDICINAL';
+  if (/\bexpert review required\b/.test(text)) return 'EXPERT_REVIEW_REQUIRED';
+  if (/(protocol|code|first aid|safety|survival)/.test(text)) return 'REFERENCE';
+  return undefined;
+}
+
+function isDangerEntry(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline, category?: string): boolean {
+  if (category === 'DANGER') return true;
+  const text = signalText(chapter, entry);
+  return /(deadly|toxic|poisonous|venomous|lyme disease|tick-borne|tick borne|hypothermia|river crossing|extreme weather|spruce trap|rabies|anaphylaxis)/.test(
+    text,
+  );
+}
+
+function inferContentType(
+  chapter: ManuscriptChapterOutline,
+  entry: ManuscriptEntryOutline,
+  category?: string,
+): ContentType {
+  const text = signalText(chapter, entry);
+  const title = entry.title.toLowerCase();
+
+  if (isDangerEntry(chapter, entry, category)) return 'WARNING_PAGE';
+  if (/(glossary|index|reference|protocol|code|first aid|survival priorities|decision framework)/.test(text)) return 'REFERENCE_PAGE';
+  if (/(compare|comparison|look-alike|look alike| vs |versus|similar species)/.test(text)) return 'COMPARISON';
+  if (/(life cycle|growth stage|seasonal sequence|progression|development over time)/.test(text)) return 'PROGRESSION_STUDY';
+  if (/(cutaway|cut away|cross-section|cross section|strata|glacial inheritance|layered)/.test(text)) return 'CUTAWAY_ILLUSTRATION';
+  if (/(tracks & sign|tracks and sign|track|scat|signs)/.test(text)) return 'FIELD_NOTES_PAGE';
+  if (/(diagram|diagnostic|identify|identification|how to identify|major features)/.test(title)) return 'DIAGNOSTIC_DIAGRAM';
+  if (chapter.chapterNumber === 1 || chapter.chapterNumber === 6) {
+    if (/(zone|habitat|forest|wetland|boreal|alpine|hardwood)/.test(text)) return 'HABITAT_OVERVIEW';
+    return 'TERRAIN_ANALYSIS';
+  }
+  if (chapter.chapterNumber === 2) return 'ANIMAL_PROFILE';
+  if (chapter.chapterNumber >= 3 && chapter.chapterNumber <= 5) return 'SPECIES_PROFILE';
+  if (chapter.chapterNumber >= 7) return 'REFERENCE_PAGE';
+  return 'ENCYCLOPEDIA_ENTRY';
+}
+
+function chooseManifestTemplate(contentType: ContentType, wordCount: number): LayoutTemplateId {
+  switch (contentType) {
+    case 'WARNING_PAGE':
+    case 'COMPARISON':
+    case 'MULTI_SPECIES_COMPARISON':
+      return 'LAYOUT_4_DANGER_WARNING';
+    case 'REFERENCE_PAGE':
+      return wordCount > 620 ? 'LAYOUT_2_TEXT_HEAVY' : 'LAYOUT_6_BACK_MATTER';
+    case 'FIELD_NOTES_PAGE':
+      return 'LAYOUT_7_SCATTERED_VIGNETTES';
+    case 'DIAGNOSTIC_DIAGRAM':
+    case 'IDENTIFICATION_GUIDE':
+      return 'LAYOUT_12_DIAGNOSTIC_DIAGRAM';
+    case 'HABITAT_OVERVIEW':
+      return wordCount > 180 ? 'LAYOUT_13_FEATURE_BANNER' : 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD';
+    case 'TERRAIN_ANALYSIS':
+      return 'LAYOUT_13_FEATURE_BANNER';
+    case 'PROGRESSION_STUDY':
+      return 'LAYOUT_15_PROGRESSION_STUDY';
+    case 'CUTAWAY_ILLUSTRATION':
+      return 'LAYOUT_16_CUTAWAY_FEATURE';
+    case 'BOTANICAL_PLATE':
+      return 'LAYOUT_10_FULL_PAGE_PLATE';
+    case 'SIDEBAR_FEATURE':
+      return 'LAYOUT_14_SIDEBAR_FEATURE';
+    case 'CHAPTER_OPENER':
+      return 'LAYOUT_5_CHAPTER_OPENER';
+    case 'ANIMAL_PROFILE':
+    case 'SPECIES_PROFILE':
+      if (wordCount > 900) return 'LAYOUT_14_SIDEBAR_FEATURE';
+      if (wordCount > 650) return 'LAYOUT_8_MARGIN_ILLUSTRATION';
+      if (wordCount > 420) return 'LAYOUT_2_TEXT_HEAVY';
+      if (wordCount < 180) return 'LAYOUT_3_ILLUSTRATION_DOMINANT';
+      return 'LAYOUT_1_STANDARD';
+    case 'ENCYCLOPEDIA_ENTRY':
+    default:
+      return 'LAYOUT_2_TEXT_HEAVY';
+  }
+}
+
+function imageSubjectFor(
+  entry: ManuscriptEntryOutline,
+  contentType: ContentType,
+  scientificName?: string,
+): string {
+  const title = cleanDisplayTitle(entry.title);
+  const subject = scientificName ? `${title} (${scientificName})` : title;
+
+  switch (contentType) {
+    case 'WARNING_PAGE':
+      return `field-guide safety illustration for ${subject}`;
+    case 'HABITAT_OVERVIEW':
+      return `${subject} in the New England wilderness landscape`;
+    case 'TERRAIN_ANALYSIS':
+      return `New England terrain feature: ${subject}`;
+    case 'CUTAWAY_ILLUSTRATION':
+      return `cutaway illustration of ${subject}`;
+    case 'PROGRESSION_STUDY':
+      return `seasonal or staged progression of ${subject}`;
+    case 'FIELD_NOTES_PAGE':
+      return `field signs and small visual notes for ${subject}`;
+    case 'REFERENCE_PAGE':
+      return `small supporting wilderness illustration for ${subject}`;
+    default:
+      return subject;
+  }
+}
+
+function buildEntryManifest(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline): GeneratedEntry {
+  const scientificName = extractScientificName(entry);
+  const category = inferCategory(chapter, entry);
+  const contentType = inferContentType(chapter, entry, category);
+  return {
+    entryTitle: entry.title,
+    scientificName,
+    category,
+    contentType,
+    imageSubject: imageSubjectFor(entry, contentType, scientificName),
+    layoutTemplate: chooseManifestTemplate(contentType, entry.wordCount),
+    bodyMarkdown: entry.bodyMarkdown,
+  };
+}
+
+export function buildDeterministicManifestResult(outline: ManuscriptOutline, config: ProjectConfig): ManifestGenerationResult {
+  return ManifestGenerationResultSchema.parse({
+    bookTitle: config.title,
+    chapters: outline.chapters.map((chapter) => ({
+      chapterNumber: chapter.chapterNumber,
+      chapterTitle: chapter.title,
+      entries: chapter.entries.map((entry) => buildEntryManifest(chapter, entry)),
+    })),
+  });
+}
+
 export async function generateManifests(input: GenerateManifestsInput): Promise<GenerateManifestsResult> {
-  logger.info({ projectId: input.projectId }, 'Stage 1.5: generating manifests via Claude');
+  logger.info({ projectId: input.projectId }, 'Stage 1.5: generating deterministic manifests');
 
   const outline = parseManuscriptOutline(input.manuscriptMarkdown);
   assertUsableManuscriptOutline(outline);
 
-  const result: ManifestGenerationResult = await callStructured<ManifestGenerationResult>({
-    system: SYSTEM_PROMPT,
-    user:
-      `Project: "${input.config.title}" (volume ${input.config.volume}).\n\n` +
-      `Deterministic manuscript outline that must be preserved exactly:\n\n${outlineForPrompt(outline)}\n\n` +
-      `Manuscript follows:\n\n${input.manuscriptMarkdown}`,
-    toolName: 'emit_manifest',
-    toolDescription: 'Emit the structured book plan: chapters, each with its entries.',
-    schema: ManifestGenerationResultSchema,
-    jsonSchema: TOOL_JSON_SCHEMA,
-    maxTokens: 16384,
-    projectId: input.projectId,
-    operation: 'stage-1.5-manifest',
-  });
-
+  const result = buildDeterministicManifestResult(outline, input.config);
   validateGeneratedChaptersAgainstOutline(result.chapters, outline);
 
-  // Build page manifests + seeds and the chapter/book summaries.
   const chapterManifests: ChapterManifest[] = [];
   const pageManifests: Array<{ externalId: string; content: PageManifest }> = [];
   const pageSeeds: PageSeed[] = [];
@@ -229,7 +288,7 @@ export async function generateManifests(input: GenerateManifestsInput): Promise<
     totalChapters: result.chapters.length,
     totalEntries,
     totalPages: runningPageNumber,
-    totalImagesNeeded: runningPageNumber, // one illustration per entry/page in V1
+    totalImagesNeeded: runningPageNumber,
     chapters: result.chapters.map((c) => ({
       chapterNumber: c.chapterNumber,
       chapterTitle: c.chapterTitle,
