@@ -113,13 +113,15 @@ const LAYOUT_TEMPLATES = [
 const LAYOUT_LABELS = Object.fromEntries(LAYOUT_TEMPLATES.map(([id, name]) => [id, name]));
 
 const WORKFLOW_STAGES = [
-  { key: "project", label: "Project", action: "Create/select a project" },
-  { key: "manuscript", label: "Manuscript", action: "Upload manuscript" },
-  { key: "breakdown", label: "Breakdown", action: "Review chapters/pages" },
-  { key: "plan", label: "Page Plan", action: "Review layouts and fit" },
-  { key: "images", label: "Images", action: "Generate and approve art" },
-  { key: "preview", label: "Preview", action: "Render PDF proof" },
-  { key: "export", label: "Export", action: "Save final output" },
+  { key: "project", label: "Project Setup", action: "Create or select the book project." },
+  { key: "manuscript", label: "Upload Manuscript", action: "Store the master manuscript." },
+  { key: "breakdown", label: "Review Breakdown", action: "Confirm chapters and pages." },
+  { key: "plan", label: "Review Page Plan", action: "Confirm layout and page flow." },
+  { key: "textfit", label: "Run Text-Fit", action: "Check readability before images." },
+  { key: "layout", label: "Approve Layouts", action: "Lock text-safe chapter layouts." },
+  { key: "images", label: "Manage Images", action: "Generate, reuse, approve art." },
+  { key: "proof", label: "Render Proofs", action: "Review chapter and page PDFs." },
+  { key: "export", label: "Export Book", action: "Save final production output." },
 ];
 
 const VINTAGE_NATURALIST_DNA = `VINTAGE NATURALIST
@@ -1162,6 +1164,7 @@ function App() {
   const [chatBusy, setChatBusy] = useState(false);
   const chatPanelRef = useRef(null);
   const chatLogRef = useRef(null);
+  const chatInputRef = useRef(null);
   const [phase, setPhase] = useState(() => {
     const stored = loadStoredString(ACTIVE_PHASE_KEY, PHASES[0]);
     return PHASES.includes(stored) ? stored : PHASES[0];
@@ -1231,6 +1234,150 @@ function App() {
     () => Array.from(new Set(imageLibrary.assets.map((asset) => asset.source.layoutTemplate).filter(Boolean))).sort(),
     [imageLibrary.assets],
   );
+  const approvedChapterCount = useMemo(
+    () => chapterManifests.filter((chapter) => layoutApprovals[String(chapter.chapterNumber)]).length,
+    [chapterManifests, layoutApprovals],
+  );
+  const hasTextFitProof = Boolean(
+    textFitPreview || selectedChapterApproval?.textFitSummary || Object.values(layoutApprovals).some((approval) => approval?.textFitSummary),
+  );
+  const plannedPageCount = pages.filter((page) => page.layoutTemplate && page.imagePrompt && page.imagePromptSha256).length;
+  const imagePageCount = pages.filter((page) => ["REVIEW", "APPROVED", "PRINT_READY"].includes(page.status)).length;
+  const approvedImagePageCount = pages.filter((page) => ["APPROVED", "PRINT_READY"].includes(page.status)).length;
+  const operatorGuidance = useMemo(() => {
+    if (busy) {
+      return {
+        stageKey: "system",
+        stageLabel: "System Working",
+        status: "Waiting on system",
+        nextAction: "Let the current operation finish, then review the result in the log or preview.",
+        buttonLabel: "Working...",
+        actionKey: null,
+        helpPrompt: "What is the system doing right now, and what should I check when it finishes?",
+      };
+    }
+    if (!activeProjectId) {
+      return {
+        stageKey: "project",
+        stageLabel: "Project Setup",
+        status: "Waiting on you",
+        nextAction: "Create a new project or select an existing book project.",
+        buttonLabel: "+ New Project",
+        actionKey: "create-project",
+        helpPrompt: "Help me start a new Wildlands book project.",
+      };
+    }
+    if (!selectedProject?.manuscriptPath && !manuscript.trim()) {
+      return {
+        stageKey: "manuscript",
+        stageLabel: "Upload Manuscript",
+        status: "Waiting on you",
+        nextAction: "Choose the master manuscript file so the system can store it on the project.",
+        buttonLabel: "Choose Manuscript",
+        actionKey: "choose-manuscript",
+        helpPrompt: "Where do I upload the manuscript, and what happens after upload?",
+      };
+    }
+    if (!selectedProject?.manuscriptPath && manuscript.trim()) {
+      return {
+        stageKey: "manuscript",
+        stageLabel: "Upload Manuscript",
+        status: "Waiting on you",
+        nextAction: "Upload the loaded manuscript to the selected project.",
+        buttonLabel: "Upload Manuscript",
+        actionKey: "upload-manuscript",
+        helpPrompt: "Check whether this manuscript is ready to upload.",
+      };
+    }
+    if (pageManifests.length === 0) {
+      return {
+        stageKey: "breakdown",
+        stageLabel: "Review Breakdown",
+        status: "Waiting on you",
+        nextAction: "Generate the deterministic chapter and page breakdown, then confirm it looks right.",
+        buttonLabel: "Start Breakdown",
+        actionKey: "breakdown",
+        helpPrompt: "Explain the manuscript breakdown step and what I should review.",
+      };
+    }
+    if (plannedPageCount < pages.length || pages.length === 0) {
+      return {
+        stageKey: "plan",
+        stageLabel: "Review Page Plan",
+        status: "Waiting on you",
+        nextAction: "Generate the page plan so every page has a layout, text flow, and image prompt.",
+        buttonLabel: "Generate Page Plan",
+        actionKey: "plan",
+        helpPrompt: "Review the page plan and tell me what needs attention.",
+      };
+    }
+    if (!hasTextFitProof) {
+      return {
+        stageKey: "textfit",
+        stageLabel: "Run Text-Fit",
+        status: "Waiting on you",
+        nextAction: "Run Text-Fit to check readability before approving layouts or spending on images.",
+        buttonLabel: "Run Text-Fit",
+        actionKey: "textfit",
+        helpPrompt: "Review text-fit and tell me whether the chapter is readable.",
+      };
+    }
+    if (!selectedChapterApproval) {
+      return {
+        stageKey: "layout",
+        stageLabel: "Approve Layouts",
+        status: "Waiting on you",
+        nextAction: "Approve the selected chapter layout once text-fit has no blocking readability issues.",
+        buttonLabel: "Approve Layout",
+        actionKey: "approve-layout",
+        helpPrompt: "Should I approve this chapter layout, or is anything still risky?",
+      };
+    }
+    if (!pdfPreview.url) {
+      return {
+        stageKey: "proof",
+        stageLabel: "Render Proofs",
+        status: "Ready for review",
+        nextAction: "Render the selected chapter with placeholders, then click pages to inspect text and layout flow.",
+        buttonLabel: "Render Chapter",
+        actionKey: "render-chapter",
+        helpPrompt: "What should I look for when reviewing this chapter proof?",
+      };
+    }
+    if (imagePageCount < pages.length || approvedImagePageCount < imagePageCount) {
+      return {
+        stageKey: "images",
+        stageLabel: "Manage Images",
+        status: "Waiting on review",
+        nextAction: "If the text/layout proof is acceptable, generate, reuse, approve, or reject image assets page by page.",
+        buttonLabel: "Check Assets",
+        actionKey: "images",
+        helpPrompt: "Which images are missing or need approval, and what should I do next?",
+      };
+    }
+    return {
+      stageKey: "export",
+      stageLabel: "Export Book",
+      status: "Waiting on final proof",
+      nextAction: "Run final proof checks before exporting the production file.",
+      buttonLabel: "Ask Agent",
+      actionKey: "ask-agent",
+      helpPrompt: "Is this book ready to export, and what remains unfinished?",
+    };
+  }, [
+    activeProjectId,
+    approvedImagePageCount,
+    busy,
+    hasTextFitProof,
+    imagePageCount,
+    manuscript,
+    pageManifests.length,
+    pages.length,
+    pdfPreview.url,
+    plannedPageCount,
+    selectedChapterApproval,
+    selectedProject?.manuscriptPath,
+  ]);
 
   function chapterApproval(chapterNumber) {
     return layoutApprovals[String(chapterNumber)] || null;
@@ -1324,6 +1471,55 @@ function App() {
     setDevIssues([]);
     persistDevIssues([]);
     setMessage("Cleared flagged developer issues.");
+  }
+
+  function focusAgentChat(prompt = operatorGuidance.helpPrompt) {
+    setChatInput(prompt || "What should I do next?");
+    chatPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => chatInputRef.current?.focus(), 120);
+  }
+
+  function executeOperatorNextStep() {
+    switch (operatorGuidance.actionKey) {
+      case "create-project":
+        createNamedProject();
+        break;
+      case "choose-manuscript":
+        openManuscriptPicker();
+        break;
+      case "upload-manuscript":
+        run("Uploading manuscript...", uploadManuscript);
+        break;
+      case "breakdown":
+        run("Generating manifests...", generateManifests);
+        break;
+      case "plan":
+        run("Generating page plan...", planPages);
+        break;
+      case "textfit":
+        run("Running text-fit preview...", runTextFitPreview);
+        break;
+      case "approve-layout":
+        run(`Approving Chapter ${selectedChapterNumber || "?"} layout...`, () => approveChapterLayout(selectedChapterNumber));
+        break;
+      case "render-chapter":
+        run("Rendering chapter preview...", () => renderChapterPreview(reviewChapterNumber));
+        break;
+      case "images":
+        run("Loading image library...", () => loadImageLibrary());
+        break;
+      default:
+        focusAgentChat();
+        break;
+    }
+  }
+
+  function operatorReviewStage() {
+    if (operatorGuidance.stageKey === "plan") return "plan";
+    if (operatorGuidance.stageKey === "textfit" || operatorGuidance.stageKey === "layout") return "textfit";
+    if (operatorGuidance.stageKey === "images") return "images";
+    if (operatorGuidance.stageKey === "proof" || operatorGuidance.stageKey === "export") return "render";
+    return "breakdown";
   }
 
   async function uploadLayoutMockup(index, file) {
@@ -2140,12 +2336,15 @@ function App() {
   }
 
   function workflowStageState(key) {
+    if (key === operatorGuidance.stageKey) return "current";
     if (key === "project") return activeProjectId ? "done" : "current";
     if (key === "manuscript") return selectedProject?.manuscriptPath || manuscriptSummary ? "done" : activeProjectId ? "current" : "";
     if (key === "breakdown") return pageManifests.length > 0 ? "done" : selectedProject?.manuscriptPath ? "current" : "";
     if (key === "plan") return plannedPages.length > 0 || pages.some((page) => page.layoutTemplate) ? "done" : pageManifests.length > 0 ? "current" : "";
-    if (key === "images") return pages.some((page) => ["REVIEW", "APPROVED", "PRINT_READY"].includes(page.status)) ? "done" : plannedPages.length > 0 ? "current" : "";
-    if (key === "preview") return pdfPreview.url ? "done" : pages.some((page) => page.status === "PRINT_READY") ? "current" : "";
+    if (key === "textfit") return hasTextFitProof ? "done" : pages.length > 0 ? "current" : "";
+    if (key === "layout") return selectedChapterApproval ? "done" : hasTextFitProof ? "current" : "";
+    if (key === "images") return imagePageCount > 0 ? (approvedImagePageCount === imagePageCount ? "done" : "open") : selectedChapterApproval ? "open" : "";
+    if (key === "proof") return pdfPreview.url ? "done" : selectedChapterApproval ? "open" : "";
     if (key === "export") return selectedProject?.status === "EXPORTED" ? "done" : pdfPreview.url ? "current" : "";
     return "";
   }
@@ -2241,8 +2440,8 @@ function App() {
         <section className="panel command-panel">
           <div className="section-head">
             <div>
-              <h2>AI Publishing Agent Console</h2>
-              <p className="hint">Tell the agent what to do, then review and approve the work it produces.</p>
+              <h2>Project Intake + Activity Log</h2>
+              <p className="hint">Select the book project, upload the manuscript, and watch system activity. Use Chat with the Agent for questions and changes.</p>
             </div>
             <span className="mode-pill">{busy ? "Running" : "Ready"}</span>
           </div>
@@ -2375,6 +2574,7 @@ function App() {
         </div>
         <form className="chat-form" onSubmit={sendChat}>
           <input
+            ref={chatInputRef}
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
             placeholder={activeProjectId ? "Message the agent about this project…" : "Select a project first…"}
@@ -2404,12 +2604,66 @@ function App() {
         <div className="stage-strip">
           {WORKFLOW_STAGES.map((stage, index) => (
             <div className={`stage-card ${workflowStageState(stage.key)}`} key={stage.key}>
-              <span>{index + 1}</span>
+              <div className="stage-card-top">
+                <span>{index + 1}</span>
+                <em>
+                  {workflowStageState(stage.key) === "done"
+                    ? "Done"
+                    : workflowStageState(stage.key) === "current"
+                      ? "Next"
+                      : workflowStageState(stage.key) === "open"
+                        ? "Open"
+                        : "Locked"}
+                </em>
+              </div>
               <strong>{stage.label}</strong>
               <small>{stage.action}</small>
             </div>
           ))}
         </div>
+
+        <section className={`operator-guidance ${operatorGuidance.stageKey}`}>
+          <div className="guidance-main">
+            <span className="mode-pill">{operatorGuidance.status}</span>
+            <h3>{operatorGuidance.stageLabel}</h3>
+            <p>{operatorGuidance.nextAction}</p>
+          </div>
+          <div className="guidance-actions">
+            <button disabled={busy || !operatorGuidance.actionKey} onClick={executeOperatorNextStep}>
+              {operatorGuidance.buttonLabel}
+            </button>
+            <button type="button" className="secondary" disabled={!activeProjectId} onClick={() => focusAgentChat()}>
+              Ask Agent What To Do
+            </button>
+            <button
+              type="button"
+              className="review-button"
+              disabled={chatBusy || !activeProjectId}
+              onClick={() => reviewStage(operatorReviewStage())}
+            >
+              Audit Current Stage
+            </button>
+          </div>
+          <div className="guidance-status-grid">
+            <div>
+              <strong>{pageManifests.length}</strong>
+              <span>pages mapped</span>
+            </div>
+            <div>
+              <strong>{plannedPageCount}</strong>
+              <span>pages planned</span>
+            </div>
+            <div>
+              <strong>{approvedChapterCount}/{chapterManifests.length || 0}</strong>
+              <span>chapters approved</span>
+            </div>
+            <div>
+              <strong>{imagePageCount}</strong>
+              <span>pages with art</span>
+            </div>
+          </div>
+          <p className="agent-help-note">Need changes or fixes? Use chat for project questions, Audit Current Stage for a structured review, and the page/image controls inside each stage for direct edits.</p>
+        </section>
 
         <div className="operator-checkpoints">
           <div>

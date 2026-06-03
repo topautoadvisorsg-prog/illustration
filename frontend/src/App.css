@@ -768,7 +768,7 @@ h3 {
 
 .stage-strip {
   display: grid;
-  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  grid-template-columns: repeat(9, minmax(118px, 1fr));
   gap: 10px;
   margin-top: 14px;
 }
@@ -784,6 +784,13 @@ h3 {
   background: #fffdf8;
 }
 
+.stage-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .stage-card span {
   display: grid;
   width: 26px;
@@ -794,6 +801,14 @@ h3 {
   background: #8a7f71;
   font-size: 0.78rem;
   font-weight: 900;
+}
+
+.stage-card em {
+  color: #6d6258;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .stage-card small {
@@ -816,6 +831,97 @@ h3 {
 
 .stage-card.current span {
   background: #a77a22;
+}
+
+.stage-card.open {
+  border-top-color: #5d7f8f;
+  background: #f4f8fa;
+}
+
+.stage-card.open span {
+  background: #5d7f8f;
+}
+
+.operator-guidance {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.2fr) minmax(220px, 0.62fr);
+  gap: 12px;
+  margin-top: 12px;
+  border: 1px solid #d4c8b8;
+  border-left: 5px solid #a77a22;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff8e8;
+}
+
+.guidance-main {
+  display: grid;
+  gap: 6px;
+}
+
+.guidance-main h3,
+.guidance-main p {
+  margin: 0;
+}
+
+.guidance-main h3 {
+  color: #1b332d;
+  font-size: 1.05rem;
+}
+
+.guidance-main p {
+  max-width: 58rem;
+  color: #3e372f;
+  font-weight: 700;
+  line-height: 1.42;
+}
+
+.guidance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+button.secondary {
+  border-color: #c8c0b4;
+  color: #1b332d;
+  background: #fffdf8;
+}
+
+.guidance-status-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.guidance-status-grid div {
+  display: grid;
+  gap: 2px;
+  border: 1px solid #e0d7ca;
+  border-radius: 6px;
+  padding: 9px 10px;
+  background: rgba(255, 253, 248, 0.78);
+}
+
+.guidance-status-grid strong {
+  color: #1b332d;
+  font-size: 1.15rem;
+}
+
+.guidance-status-grid span {
+  color: #6d6258;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.agent-help-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #6d6258;
+  font-size: 0.88rem;
 }
 
 .operator-checkpoints {
@@ -1570,10 +1676,11 @@ h3 {
   }
 
   .stage-strip {
-    grid-template-columns: repeat(3, minmax(120px, 1fr));
+    grid-template-columns: repeat(3, minmax(150px, 1fr));
   }
 
   .operator-checkpoints,
+  .operator-guidance,
   .library-controls {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
@@ -1613,6 +1720,8 @@ h3 {
   .intelligence-filter,
   .stage-strip,
   .operator-checkpoints,
+  .operator-guidance,
+  .guidance-status-grid,
   .library-controls,
   .image-version,
   .capture-grid,
