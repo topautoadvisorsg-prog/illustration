@@ -1066,19 +1066,10 @@ function App() {
   const [projects, setProjects] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState("");
   const [projectConfig, setProjectConfig] = useState(defaultProjectConfig);
-  const [manuscript, setManuscript] = useState(`# CHAPTER 1 - Forest Floor
-
-## Chanterelle
-
-### Identification
-Golden yellow mushroom with false gills running down the stem.
-
-### Habitat
-Found near hardwoods after summer rain.
-
-### Notes
-Use this entry to prove manuscript to manifest generation.`);
-  const [manuscriptName, setManuscriptName] = useState("manuscript.md");
+  // Start empty so the operator never accidentally uploads demo text. They must
+  // drop a file or paste their real manuscript before Upload is meaningful.
+  const [manuscript, setManuscript] = useState("");
+  const [manuscriptName, setManuscriptName] = useState("");
   const [manuscriptSummary, setManuscriptSummary] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const manuscriptInputRef = useRef(null);
@@ -1439,6 +1430,9 @@ Use this entry to prove manuscript to manifest generation.`);
 
   async function uploadManuscript(projectId = activeProjectId) {
     if (!projectId) throw new Error("Create or select a project first.");
+    if (!manuscript.trim()) {
+      throw new Error("The manuscript box is empty. Drop your .md/.txt file on it or paste your text first.");
+    }
     const data = await call(`/api/projects/${projectId}/manuscript`, {
       method: "POST",
       body: JSON.stringify({ filename: manuscriptName || "manuscript.md", markdown: manuscript }),
@@ -2033,7 +2027,7 @@ Use this entry to prove manuscript to manifest generation.`);
           >
             <strong>{isDragging ? "Drop your manuscript file" : "Drag & drop your manuscript here"}</strong>
             <span>or click to choose a .md / .txt file</span>
-            <span className="file-name-loaded">Loaded: {manuscriptName}</span>
+            <span className="file-name-loaded">{manuscript.trim() ? `Loaded: ${manuscriptName || "pasted text"} (${manuscript.length.toLocaleString()} chars)` : "Nothing loaded yet"}</span>
           </div>
           <div className="operator-log" aria-live="polite">
             {operatorLog.map((entry, index) => (
