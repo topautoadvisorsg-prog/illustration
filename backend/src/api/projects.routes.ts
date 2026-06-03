@@ -765,12 +765,15 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           statusCode: 409,
         });
       }
-      const overflow = chapterPreview.filter((page) => page.fit.status === 'OVERFLOW');
+      // Only genuine planning blockers (missing/unresolved image prompt) hard-block
+      // approval. "Overflow" just means an entry's text spans multiple pages — the
+      // Paged.js render flows it cleanly (verified, no text lost), so it's recorded
+      // as a warning in the summary, not a gate.
       const blockers = chapterPreview.filter((page) => page.blockers.length > 0);
-      if (overflow.length > 0 || blockers.length > 0) {
+      if (blockers.length > 0) {
         return reply.code(409).send({
           error: 'Conflict',
-          message: `Chapter ${chapterNumber} is not ready: ${overflow.length} overflow page(s), ${blockers.length} blocker page(s).`,
+          message: `Chapter ${chapterNumber} is not ready: ${blockers.length} page(s) have planning blockers (missing or unresolved image prompt). Re-run Page Plan.`,
           statusCode: 409,
         });
       }
