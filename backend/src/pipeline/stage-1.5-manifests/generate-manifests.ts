@@ -117,6 +117,10 @@ function inferContentType(
   const text = signalText(chapter, entry);
   const title = entry.title.toLowerCase();
 
+  if (chapter.chapterNumber === 1 || chapter.chapterNumber === 6) {
+    if (/(zone|wilderness zones|habitat|forest|wetland|boreal|alpine|hardwood)/.test(title)) return 'HABITAT_OVERVIEW';
+    if (/(geography|geology|climate|season|first peoples|terrain|navigation|technology)/.test(title)) return 'TERRAIN_ANALYSIS';
+  }
   if (isDangerEntry(chapter, entry, category)) return 'WARNING_PAGE';
   if (/(glossary|index|reference|protocol|code|first aid|survival priorities|decision framework)/.test(text)) return 'REFERENCE_PAGE';
   if (/(compare|comparison|look-alike|look alike| vs |versus|similar species)/.test(text)) return 'COMPARISON';
@@ -148,7 +152,7 @@ function chooseManifestTemplate(contentType: ContentType, wordCount: number): La
     case 'IDENTIFICATION_GUIDE':
       return 'LAYOUT_12_DIAGNOSTIC_DIAGRAM';
     case 'HABITAT_OVERVIEW':
-      return wordCount > 180 ? 'LAYOUT_13_FEATURE_BANNER' : 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD';
+      return wordCount > 140 ? 'LAYOUT_13_FEATURE_BANNER' : 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD';
     case 'TERRAIN_ANALYSIS':
       return 'LAYOUT_13_FEATURE_BANNER';
     case 'PROGRESSION_STUDY':

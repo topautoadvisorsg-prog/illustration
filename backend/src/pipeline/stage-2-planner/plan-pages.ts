@@ -195,7 +195,7 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
         return { template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM', reasons };
       case 'HABITAT_OVERVIEW':
       case 'TERRAIN_ANALYSIS':
-        return { template: wordCount > 180 ? 'LAYOUT_13_FEATURE_BANNER' : 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD', reasons };
+        return { template: wordCount > 140 ? 'LAYOUT_13_FEATURE_BANNER' : 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD', reasons };
       case 'PROGRESSION_STUDY':
         return { template: 'LAYOUT_15_PROGRESSION_STUDY', reasons };
       case 'CUTAWAY_ILLUSTRATION':

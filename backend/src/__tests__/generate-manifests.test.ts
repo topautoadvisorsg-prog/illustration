@@ -21,7 +21,7 @@ Outline-only text does not become a chapter.
 
 ## THE THREE WILDERNESS ZONES
 
-Northern boreal forest, alpine terrain, and mixed hardwood habitat define the region.
+Northern boreal forest, alpine terrain, and mixed hardwood habitat define the region. Spruce traps and hypothermia matter here, but this page is still a zone overview, not a dedicated hazard page.
 
 ## Hazard 1 - Extreme Weather Above Treeline
 

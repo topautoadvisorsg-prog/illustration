@@ -185,4 +185,18 @@ describe('planPage', () => {
     expect(decision.layoutTemplate).toBe('LAYOUT_13_FEATURE_BANNER');
     expect(decision.reasonCodes).toContain('feature_banner_signal');
   });
+
+  it('keeps borderline terrain analysis pages on a text-safe banner layout', () => {
+    const decision = planPage(
+      page({
+        entryTitle: 'When Technology Fails',
+        imageSubject: 'New England navigation without electronics',
+        contentType: 'TERRAIN_ANALYSIS',
+        bodyMarkdown: Array(180).fill('navigation').join(' '),
+      }),
+      baseConfig,
+    );
+
+    expect(decision.layoutTemplate).toBe('LAYOUT_13_FEATURE_BANNER');
+  });
 });
