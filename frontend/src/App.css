@@ -134,6 +134,17 @@ input[type="file"] {
   white-space: nowrap;
 }
 
+.image-version-preview {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border: 1px solid #d4c8b8;
+  border-radius: 6px;
+  background: #fffdf8;
+  margin-bottom: 8px;
+}
+
 .review-button {
   border-color: #7b5a18;
   background: #f3ead2;

@@ -13,6 +13,8 @@ import {
 import { UpscaleBlockedError, upscalePageImage } from '../pipeline/stage-5-upscale/upscale-image.js';
 import { isChromiumAvailable, renderSampleChapterPdf, renderSamplePagePdf } from '../pipeline/stage-6-layout/render-check.js';
 import { getContentTypeGuide } from '../pipeline/stage-2-planner/layered-layout.js';
+import { getActiveImage, getImageVersion } from '../db/repositories/images.repo.js';
+import { LocalStorageService } from '../services/storage/local-storage.js';
 
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
 const ImageVersionParamsSchema = z.object({ pageId: z.string().uuid(), version: z.coerce.number().int().positive() });
@@ -96,6 +98,27 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
       }
     },
   );
+
+  // Serve the actual image bytes so the operator can SEE the art to review it.
+  // ?v=active (default) serves the active version; ?v=<n> a specific version.
+  app.get('/api/pages/:pageId/image', async (request, reply) => {
+    const { pageId } = PageParamsSchema.parse(request.params);
+    const vq = (request.query as { v?: string } | undefined)?.v;
+    const row =
+      vq && vq !== 'active' && Number.isFinite(Number(vq))
+        ? await getImageVersion(pageId, Number(vq))
+        : await getActiveImage(pageId);
+    const path = row?.upscaledPath ?? row?.generatedPath;
+    if (!path) return reply.code(404).send({ error: 'Not Found', message: 'No image for this page.', statusCode: 404 });
+    try {
+      const buf = await new LocalStorageService().readProjectFile(path);
+      reply.header('content-type', 'image/png');
+      reply.header('cache-control', 'no-store');
+      return reply.send(buf);
+    } catch {
+      return reply.code(404).send({ error: 'Not Found', message: 'Image file missing on disk.', statusCode: 404 });
+    }
+  });
 
   // Stage 4 — approve a version: locks it active + APPROVED, page -> APPROVED.
   const ApproveResponseSchema = z.object({ pageStatus: z.string(), version: z.number() });

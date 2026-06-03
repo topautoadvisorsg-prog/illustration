@@ -2534,6 +2534,14 @@ function App() {
             <div className="image-version-list">
               {selectedImages.map((image) => (
                 <article className={image.active ? "image-version active" : "image-version"} key={image.version}>
+                  {selectedPage && image.generatedPath && (
+                    <img
+                      className="image-version-preview"
+                      src={`${apiUrl}/api/pages/${selectedPage.id}/image?v=${image.version}`}
+                      alt={`Version ${image.version} illustration`}
+                      loading="lazy"
+                    />
+                  )}
                   <div>
                     <strong>Version {image.version}</strong>
                     <span>{normalizeStatus(image.status)}{image.active ? " / active" : ""}</span>
