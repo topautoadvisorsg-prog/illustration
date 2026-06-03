@@ -34,16 +34,18 @@ describe('buildTextFitPreview', () => {
     const pages = [
       page('CH01_P001', 1, words(300)), // ~300 words -> LAYOUT_1_STANDARD -> FITS
       page('CH01_P002', 2, words(20)), // short -> illustration-dominant -> UNDERFILLED
-      page('CH01_P003', 3, words(2000)), // very long -> text-heavy -> OVERFLOW
+      page('CH01_P003', 3, words(2000)), // very long -> text-heavy -> continuation flow
     ];
     const preview = buildTextFitPreview(pages, config);
 
     expect(preview.totals.pages).toBe(3);
-    expect(preview.totals.overflow).toBe(1);
+    expect(preview.totals.overflow).toBe(0);
+    expect(preview.totals.tight).toBe(1);
     expect(preview.totals.underfilled).toBe(1);
-    expect(preview.readyForImageSpend).toBe(false);
+    expect(preview.readyForImageSpend).toBe(true);
     expect(preview.geometry.pageWidthIn).toBe(8.625);
     expect(preview.pages).toHaveLength(3);
+    expect(preview.pages[2]!.allocation.estimatedRenderedPages).toBeGreaterThan(1);
   });
 
   it('is ready for image spend when no page overflows', () => {

@@ -239,6 +239,22 @@ export const OutputProfileSchema = z.object({
   pdfTarget: z.string().min(1).default('KDP premium color hardcover'),
 });
 
+export const LayoutApprovalSchema = z.object({
+  status: z.literal('APPROVED'),
+  chapterNumber: z.number().int().positive(),
+  approvedAt: z.string().datetime(),
+  approvedBy: z.string().min(1).default('operator'),
+  pageKeys: z.array(z.string().min(1)),
+  promptSha256ByPage: z.record(z.string().min(1)),
+  textFitSummary: z.object({
+    pages: z.number().int().nonnegative(),
+    fits: z.number().int().nonnegative(),
+    tight: z.number().int().nonnegative(),
+    overflow: z.number().int().nonnegative(),
+    underfilled: z.number().int().nonnegative(),
+  }),
+});
+
 export const ProjectConfigSchema = z.object({
   brand: BrandSchema.default('THE_WILDLANDS'),
   audience: AudienceSchema.default('ADULT'),
@@ -253,6 +269,7 @@ export const ProjectConfigSchema = z.object({
   imageGeneration: ImageGenerationConfigSchema.default({}),
   layoutPolicy: LayoutPolicySchema.default({}),
   layoutPromptAssets: z.array(LayoutPromptAssetSchema).default([]),
+  layoutApprovals: z.record(LayoutApprovalSchema).default({}),
   outputProfile: OutputProfileSchema.default({}),
 });
 

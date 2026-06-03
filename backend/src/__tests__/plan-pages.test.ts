@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { PageManifest, ProjectConfig } from '@wildlands/shared';
+import { ProjectConfigSchema, type PageManifest } from '@wildlands/shared';
 import { countPageWords, planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 
-const baseConfig: ProjectConfig = {
+const baseConfig = ProjectConfigSchema.parse({
   brand: 'THE_WILDLANDS',
   audience: 'ADULT',
   editions: ['PREMIUM', 'KINDLE_EPUB'],
@@ -57,7 +57,7 @@ const baseConfig: ProjectConfig = {
     renderEngine: 'PUPPETEER_PAGEDJS',
     pdfTarget: 'KDP premium color hardcover',
   },
-};
+});
 
 function page(overrides: Partial<PageManifest>): PageManifest {
   return {
@@ -97,6 +97,11 @@ describe('planPage', () => {
     expect(decision.prompt).toContain('golden chanterelle mushroom');
     expect(decision.prompt).toContain('Vintage Naturalist master style DNA.');
     expect(decision.prompt).toContain('LAYOUT SYSTEM RULES');
+    expect(decision.prompt).toContain('ART BRIEF FOR IMAGE GENERATION');
+    expect(decision.prompt).toContain('Recommended minimum source art:');
+    expect(decision.prompt).toContain('Cover/chapter titles are overlaid later by the layout engine.');
+    expect(decision.artBrief.artBox.recommendedWidthPx).toBeGreaterThan(0);
+    expect(decision.artBrief.artBox.recommendedHeightPx).toBeGreaterThan(0);
     expect(decision.prompt).toContain('Generate clean artwork only.');
     expect(decision.prompt).toContain('Render NO text of any kind in the image');
     expect(decision.prompt).not.toContain('{SUBJECT}');
@@ -154,5 +159,30 @@ describe('planPage', () => {
 
     expect(decision.layoutTemplate).toBe('LAYOUT_4_DANGER_WARNING');
     expect(decision.reasonCodes).toContain('danger_or_warning_signal');
+  });
+
+  it('uses explicit content type before generic word-count density', () => {
+    const opener = planPage(page({ contentType: 'CHAPTER_OPENER', bodyMarkdown: Array(80).fill('forest').join(' ') }), baseConfig);
+    const reference = planPage(page({ contentType: 'REFERENCE_PAGE', bodyMarkdown: Array(500).fill('term').join(' ') }), baseConfig);
+    const animal = planPage(page({ contentType: 'ANIMAL_PROFILE', bodyMarkdown: Array(950).fill('moose').join(' ') }), baseConfig);
+
+    expect(opener.layoutTemplate).toBe('LAYOUT_5_CHAPTER_OPENER');
+    expect(reference.layoutTemplate).toBe('LAYOUT_6_BACK_MATTER');
+    expect(animal.layoutTemplate).toBe('LAYOUT_14_SIDEBAR_FEATURE');
+    expect(animal.reasonCodes).toContain('long_profile_sidebar_art');
+  });
+
+  it('routes regional terrain entries to feature-banner layouts', () => {
+    const decision = planPage(
+      page({
+        entryTitle: 'The Bones of the Land - Geography & Geology',
+        imageSubject: 'New England terrain and mountain ranges',
+        bodyMarkdown: Array(800).fill('terrain').join(' '),
+      }),
+      baseConfig,
+    );
+
+    expect(decision.layoutTemplate).toBe('LAYOUT_13_FEATURE_BANNER');
+    expect(decision.reasonCodes).toContain('feature_banner_signal');
   });
 });

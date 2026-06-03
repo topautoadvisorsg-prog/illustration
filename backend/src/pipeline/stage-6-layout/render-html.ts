@@ -199,6 +199,16 @@ function artSlotSizeStyle(slot: ArtSlot, coverage: number, frameHeightIn: number
   return `width:${Math.round(frac * 100)}%;height:${round2(frac * frameHeightIn)}in;`;
 }
 
+function artPlaceholderLabel(template: LayoutTemplateId): string {
+  const profile = getLayoutProfile(template);
+  if (profile.artAreaFraction <= 0.15) return 'PREVIEW - CORNER / EDGE ART SLOT';
+  if (profile.artSlot === 'TOP_BAND') return 'PREVIEW - TOP ILLUSTRATION BAND';
+  if (profile.artSlot === 'SIDEBAR_RIGHT') return 'PREVIEW - SIDE ILLUSTRATION SLOT';
+  if (profile.artSlot === 'SCATTERED') return 'PREVIEW - STUDY / VIGNETTE SLOTS';
+  if (profile.artSlot === 'FULL_PAGE') return 'PREVIEW - FULL PLATE ART SLOT';
+  return 'PREVIEW - ART SLOT';
+}
+
 /** Build the standalone HTML document for one page. */
 export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: RenderHtmlOptions): string {
   const { geometry } = opts;
@@ -207,9 +217,13 @@ export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: R
   const c = config.colorPalette;
   const m = geometry.margins;
 
-  const art = opts.imageDataUri
+  let art = opts.imageDataUri
     ? `<img src="${opts.imageDataUri}" alt="${escapeHtml(page.entryTitle)}">`
     : `<div class="art-placeholder">PREVIEW · ART SLOT (${escapeHtml(page.layoutTemplate)})</div>`;
+
+  if (!opts.imageDataUri) {
+    art = `<div class="art-placeholder">${escapeHtml(artPlaceholderLabel(page.layoutTemplate))}<br>${escapeHtml(page.layoutTemplate)}</div>`;
+  }
 
   const scientific = page.scientificName
     ? `<p class="scientific-name">${escapeHtml(page.scientificName)}</p>`
@@ -299,9 +313,12 @@ export function buildChapterHtml(
     .map((page) => {
       const profile = getLayoutProfile(page.layoutTemplate);
       const danger = page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? ' is-danger' : '';
-      const art = page.imageDataUri
+      let art = page.imageDataUri
         ? `<img src="${page.imageDataUri}" alt="${escapeHtml(page.entryTitle)}">`
         : `<div class="art-placeholder">PREVIEW · ART SLOT (${escapeHtml(page.layoutTemplate)})</div>`;
+      if (!page.imageDataUri) {
+        art = `<div class="art-placeholder">${escapeHtml(artPlaceholderLabel(page.layoutTemplate))}<br>${escapeHtml(page.layoutTemplate)}</div>`;
+      }
       const scientific = page.scientificName
         ? `<p class="scientific-name">${escapeHtml(page.scientificName)}</p>`
         : '';

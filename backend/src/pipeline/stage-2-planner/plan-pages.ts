@@ -23,6 +23,8 @@ import {
 import { getAgentContract } from '../../agents/agent-contracts.js';
 import { includesAny, isDangerPage, signalText } from './content-signals.js';
 import { CONTENT_TYPE_POLICY, classifyContentType, decomposeTemplate } from './layered-layout.js';
+import { computePageGeometry } from '../stage-6-layout/page-geometry.js';
+import { directLayout, type LayoutAllocation } from '../stage-6-layout/layout-director.js';
 
 const REQUIRED_PROMPT_PLACEHOLDERS = ['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'] as const;
 
@@ -90,6 +92,14 @@ export interface PagePlanningDecision {
     bodyFont: string;
     bodyPt: number;
     lineHeight: number;
+  };
+  artBrief: {
+    imagePercent: number;
+    textPercent: number;
+    placement: string;
+    textPlacement: string;
+    architecture: string;
+    artBox: LayoutAllocation['artBox'];
   };
   agent: {
     id: string;
@@ -166,9 +176,61 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
     return { template: 'LAYOUT_4_DANGER_WARNING', reasons };
   }
 
+  if (page.contentType) {
+    reasons.push(`manifest_content_type_${page.contentType.toLowerCase()}`);
+    switch (page.contentType) {
+      case 'CHAPTER_OPENER':
+        return { template: 'LAYOUT_5_CHAPTER_OPENER', reasons };
+      case 'REFERENCE_PAGE':
+        return { template: 'LAYOUT_6_BACK_MATTER', reasons };
+      case 'ENCYCLOPEDIA_ENTRY':
+        return { template: 'LAYOUT_2_TEXT_HEAVY', reasons };
+      case 'WARNING_PAGE':
+        return { template: 'LAYOUT_4_DANGER_WARNING', reasons };
+      case 'COMPARISON':
+      case 'MULTI_SPECIES_COMPARISON':
+        return { template: config.layoutPolicy.comparisonTemplate, reasons };
+      case 'DIAGNOSTIC_DIAGRAM':
+      case 'IDENTIFICATION_GUIDE':
+        return { template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM', reasons };
+      case 'HABITAT_OVERVIEW':
+      case 'TERRAIN_ANALYSIS':
+        return { template: wordCount > 180 ? 'LAYOUT_13_FEATURE_BANNER' : 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD', reasons };
+      case 'PROGRESSION_STUDY':
+        return { template: 'LAYOUT_15_PROGRESSION_STUDY', reasons };
+      case 'CUTAWAY_ILLUSTRATION':
+        return { template: 'LAYOUT_16_CUTAWAY_FEATURE', reasons };
+      case 'FIELD_NOTES_PAGE':
+        return { template: 'LAYOUT_7_SCATTERED_VIGNETTES', reasons };
+      case 'BOTANICAL_PLATE':
+        return { template: 'LAYOUT_10_FULL_PAGE_PLATE', reasons };
+      case 'SIDEBAR_FEATURE':
+        return { template: 'LAYOUT_14_SIDEBAR_FEATURE', reasons };
+      case 'ANIMAL_PROFILE':
+      case 'SPECIES_PROFILE':
+        if (wordCount > 900) return { template: 'LAYOUT_14_SIDEBAR_FEATURE', reasons: [...reasons, 'long_profile_sidebar_art'] };
+        if (wordCount > 650) return { template: 'LAYOUT_8_MARGIN_ILLUSTRATION', reasons: [...reasons, 'long_profile_margin_art'] };
+        if (wordCount > 420) return { template: 'LAYOUT_2_TEXT_HEAVY', reasons: [...reasons, 'dense_profile_corner_art'] };
+        if (wordCount < 180) return { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', reasons: [...reasons, 'short_profile_hero_art'] };
+        return { template: config.layoutPolicy.defaultTemplate, reasons };
+      default:
+        break;
+    }
+  }
+
   if (includesAny(signal, ['chapter opener', 'chapter introduction', 'section introduction', 'opening page', 'opener'])) {
     reasons.push('chapter_opener_signal');
     return { template: 'LAYOUT_5_CHAPTER_OPENER', reasons };
+  }
+
+  if (includesAny(signal, ['glossary', 'index', 'back matter', 'quick reference', 'reference table', 'reference grid'])) {
+    reasons.push('reference_or_back_matter_signal');
+    return { template: 'LAYOUT_6_BACK_MATTER', reasons };
+  }
+
+  if (includesAny(signal, ['hazard', 'extreme weather', 'lyme', 'tick-borne', 'tick borne', 'hypothermia', 'river crossing', 'spruce trap', 'disorientation'])) {
+    reasons.push('hazard_section_signal');
+    return { template: 'LAYOUT_4_DANGER_WARNING', reasons };
   }
 
   if (includesAny(signal, ['life cycle', 'lifecycle', 'growth stage', 'growth stages', 'stage sequence', 'progression', 'development over time', 'seedling', 'sapling', 'mature stage', 'seasonal sequence'])) {
@@ -193,6 +255,11 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
 
   if (includesAny(signal, ['overview', 'region overview', 'feature banner', 'visual header', 'mountain range', 'river system', 'watershed', 'landscape context'])) {
     reasons.push('feature_banner_signal');
+    return { template: 'LAYOUT_13_FEATURE_BANNER', reasons };
+  }
+
+  if (includesAny(signal, ['geography', 'geology', 'climate', 'season', 'seasons', 'wilderness zone', 'wilderness zones', 'terrain', 'ecoregion'])) {
+    reasons.push('terrain_or_region_structure_signal');
     return { template: 'LAYOUT_13_FEATURE_BANNER', reasons };
   }
 
@@ -339,6 +406,23 @@ function labelTextRules(_page: PageManifest): string {
   ].join(' ');
 }
 
+function artBriefText(page: PageManifest, allocation: LayoutAllocation): string {
+  const box = allocation.artBox;
+  return [
+    'ART BRIEF FOR IMAGE GENERATION',
+    `Page subject: ${page.imageSubject}.`,
+    `Layout architecture: ${allocation.architecture}.`,
+    `Image share on opening page: ${allocation.openingPageImagePercent}%. Text share: ${allocation.openingPageTextPercent}%.`,
+    `Image placement: ${allocation.imagePlacement}.`,
+    `Text placement: ${allocation.textPlacement}.`,
+    `Art slot box relative to text frame: x=${box.xIn}in, y=${box.yIn}in, width=${box.widthIn}in, height=${box.heightIn}in.`,
+    `Recommended minimum source art: ${box.recommendedWidthPx}x${box.recommendedHeightPx}px at 300 DPI, aspect ${box.aspectRatio}.`,
+    `Include at least ${box.bleedPaddingPx}px extra usable texture/detail around important subject edges for crop and bleed safety.`,
+    box.overlaySafeArea,
+    'Do not render readable text, titles, labels, captions, page numbers, or typography inside the image. Cover/chapter titles are overlaid later by the layout engine.',
+  ].join('\n');
+}
+
 export function planPage(page: PageManifest, config: ProjectConfig): PagePlanningDecision {
   const agent = getAgentContract('PAGE_PLANNER');
   const wordCount = countPageWords(page.bodyMarkdown);
@@ -352,6 +436,15 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
   const rawAsset = assetForTemplate(config, selected.template);
   const asset = rawAsset ? LayoutPromptAssetSchema.parse(rawAsset) : undefined;
   const capacity = asset ?? DEFAULT_LAYOUT_CAPACITY[selected.template];
+  const bodyPt = asset?.recommendedBodyPt ?? config.typography.bodyPt;
+  const lineHeight = asset?.recommendedLineHeight ?? config.typography.lineHeight;
+  const allocation = directLayout({
+    bodyMarkdown: page.bodyMarkdown,
+    layoutTemplate: selected.template,
+    geometry: computePageGeometry(config.trimSize),
+    bodyPt,
+    lineHeight,
+  });
   const blockers: string[] = [];
   const warnings: string[] = [];
 
@@ -385,6 +478,7 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
     '{SCIENTIFIC_DETAILS}': scientificDetails(page),
     '{COMPOSITION_NOTES}': [
       asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? `Art slot follows ${selected.template}.`,
+      artBriefText(page, allocation),
       labelTextRules(page),
     ].join('\n'),
   });
@@ -434,8 +528,16 @@ export function planPage(page: PageManifest, config: ProjectConfig): PagePlannin
     },
     typography: {
       bodyFont: config.typography.bodyFont,
-      bodyPt: asset?.recommendedBodyPt ?? config.typography.bodyPt,
-      lineHeight: asset?.recommendedLineHeight ?? config.typography.lineHeight,
+      bodyPt,
+      lineHeight,
+    },
+    artBrief: {
+      imagePercent: allocation.openingPageImagePercent,
+      textPercent: allocation.openingPageTextPercent,
+      placement: allocation.imagePlacement,
+      textPlacement: allocation.textPlacement,
+      architecture: allocation.architecture,
+      artBox: allocation.artBox,
     },
     agent: {
       id: agent.id,

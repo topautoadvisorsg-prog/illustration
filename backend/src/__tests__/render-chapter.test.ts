@@ -44,7 +44,7 @@ describe('buildChapterHtml', () => {
     );
     expect(withArt).toContain('<img src="data:image/png;base64,AAAA"');
     const placeholder = buildChapterHtml([pages[0]!], config, { chapterNumber: 1, chapterTitle: 'Fungi' }, { geometry });
-    expect(placeholder).toContain('PREVIEW · ART SLOT');
+    expect(placeholder).toContain('PREVIEW');
   });
 });
 

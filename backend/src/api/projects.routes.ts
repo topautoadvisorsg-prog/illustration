@@ -3,8 +3,10 @@ import { isNativeError } from 'node:util/types';
 import {
   ApiErrorSchema,
   CreateProjectRequestSchema,
+  LayoutApprovalSchema,
   PageManifestSchema,
   ProjectConfigSchema,
+  type ProjectConfig,
   ProjectSchema,
 } from '@wildlands/shared';
 import { z } from 'zod';
@@ -31,6 +33,21 @@ import { countImagesForProject } from '../db/repositories/images.repo.js';
 import { estimateCost } from '../services/cost/estimate.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
+const ChapterLayoutApprovalParamsSchema = z.object({
+  id: z.string().uuid(),
+  chapterNumber: z.coerce.number().int().positive(),
+});
+
+const LayoutApprovalContractSchema = LayoutApprovalSchema;
+const LayoutApprovalsSchema = z.record(LayoutApprovalContractSchema);
+
+function parseProjectConfig(row: ProjectRow): ProjectConfig {
+  return ProjectConfigSchema.parse(row.config);
+}
+
+function getLayoutApprovals(row: ProjectRow): ProjectConfig['layoutApprovals'] {
+  return parseProjectConfig(row).layoutApprovals ?? {};
+}
 
 /**
  * A manuscript upload error caused by the file itself (wrong type, empty, or no
@@ -123,6 +140,7 @@ const PagesListResponseSchema = z.object({
       status: z.string(),
     }),
   ),
+  layoutApprovals: LayoutApprovalsSchema,
 });
 
 const PlanPagesResponseSchema = z.object({
@@ -180,6 +198,24 @@ const PlanPagesResponseSchema = z.object({
         bodyPt: z.number(),
         lineHeight: z.number(),
       }),
+      artBrief: z.object({
+        imagePercent: z.number(),
+        textPercent: z.number(),
+        placement: z.string(),
+        textPlacement: z.string(),
+        architecture: z.string(),
+        artBox: z.object({
+          xIn: z.number(),
+          yIn: z.number(),
+          widthIn: z.number(),
+          heightIn: z.number(),
+          recommendedWidthPx: z.number(),
+          recommendedHeightPx: z.number(),
+          bleedPaddingPx: z.number(),
+          aspectRatio: z.string(),
+          overlaySafeArea: z.string(),
+        }),
+      }),
       agent: z.object({
         id: z.string(),
         name: z.string(),
@@ -222,10 +258,40 @@ const TextFitPreviewResponseSchema = z.object({
         fillRatio: z.number(),
         estimatedLines: z.number(),
         usableLines: z.number(),
+        estimatedRenderedPages: z.number(),
+        notes: z.array(z.string()),
+      }),
+      allocation: z.object({
+        architecture: z.string(),
+        imagePlacement: z.string(),
+        textPlacement: z.string(),
+        openingPageImagePercent: z.number(),
+        openingPageTextPercent: z.number(),
+        continuationPageImagePercent: z.number(),
+        continuationPageTextPercent: z.number(),
+        estimatedRenderedPages: z.number(),
+        wordsPerOpeningPage: z.number(),
+        wordsPerContinuationPage: z.number(),
+        artBox: z.object({
+          xIn: z.number(),
+          yIn: z.number(),
+          widthIn: z.number(),
+          heightIn: z.number(),
+          recommendedWidthPx: z.number(),
+          recommendedHeightPx: z.number(),
+          bleedPaddingPx: z.number(),
+          aspectRatio: z.string(),
+          overlaySafeArea: z.string(),
+        }),
         notes: z.array(z.string()),
       }),
     }),
   ),
+});
+
+const ChapterLayoutApprovalResponseSchema = z.object({
+  approval: LayoutApprovalContractSchema,
+  layoutApprovals: LayoutApprovalsSchema,
 });
 
 export async function registerProjectRoutes(app: FastifyInstance): Promise<void> {
@@ -343,7 +409,13 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     async (request, reply) => {
       const { id } = ProjectParamsSchema.parse(request.params);
       const body = UpdateProjectConfigBodySchema.parse(request.body);
-      const row = await updateProjectConfig(id, body.config);
+      const existing = await getProject(id);
+      if (!existing) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      const existingConfig = parseProjectConfig(existing);
+      const row = await updateProjectConfig(id, {
+        ...body.config,
+        layoutApprovals: existingConfig.layoutApprovals ?? {},
+      });
       if (!row) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
       return { project: toContract(row) };
     },
@@ -490,7 +562,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         });
       }
 
-      const config = project.config as import('@wildlands/shared').ProjectConfig;
+      const config = parseProjectConfig(project);
       const layoutLibrary = validateLayoutLibrary(config);
       const plannedPages = [];
       for (const row of rows) {
@@ -521,11 +593,14 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           layoutInstructions: decision.layoutInstructions,
           capacity: decision.capacity,
           typography: decision.typography,
+          artBrief: decision.artBrief,
           agent: decision.agent,
           textFitStatus: decision.textFitStatus,
         });
       }
 
+      const clearedConfig = { ...config, layoutApprovals: {} };
+      await updateProjectConfig(id, clearedConfig);
       const updated = await setProjectStatus(id, 'PLANNED');
       return { project: toContract(updated ?? project), layoutLibrary, plannedPages };
     },
@@ -533,9 +608,11 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
 
   app.get(
     '/api/projects/:id/pages',
-    { schema: { params: ProjectParamsSchema, response: { 200: PagesListResponseSchema } } },
-    async (request) => {
+    { schema: { params: ProjectParamsSchema, response: { 200: PagesListResponseSchema, 404: ApiErrorSchema } } },
+    async (request, reply) => {
       const { id } = ProjectParamsSchema.parse(request.params);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
       const rows = await listPages(id);
       return {
         pages: rows.map((p) => ({
@@ -548,6 +625,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           imagePromptSha256: p.imagePromptSha256,
           status: p.status,
         })),
+        layoutApprovals: getLayoutApprovals(project),
       };
     },
   );
@@ -573,6 +651,89 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         });
       }
       return previewProjectTextFit(id);
+    },
+  );
+
+  app.post(
+    '/api/projects/:id/chapters/:chapterNumber/layout-approval',
+    {
+      schema: {
+        params: ChapterLayoutApprovalParamsSchema,
+        response: { 200: ChapterLayoutApprovalResponseSchema, 404: ApiErrorSchema, 409: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id, chapterNumber } = ChapterLayoutApprovalParamsSchema.parse(request.params);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+
+      const pageRows = (await listPages(id)).filter((page) => page.chapterNumber === chapterNumber);
+      if (pageRows.length === 0) {
+        return reply.code(404).send({
+          error: 'Not Found',
+          message: `Chapter ${chapterNumber} has no page rows to approve.`,
+          statusCode: 404,
+        });
+      }
+
+      const unplanned = pageRows.filter((page) => !page.layoutTemplate || !page.imagePrompt || !page.imagePromptSha256);
+      if (unplanned.length > 0) {
+        return reply.code(409).send({
+          error: 'Conflict',
+          message: `Chapter ${chapterNumber} still has ${unplanned.length} unplanned page(s). Run Page Plan before approval.`,
+          statusCode: 409,
+        });
+      }
+
+      const preview = await previewProjectTextFit(id);
+      const pageKeys = new Set(pageRows.map((page) => page.pageKey));
+      const chapterPreview = preview.pages.filter((page) => pageKeys.has(page.pageKey));
+      if (chapterPreview.length !== pageRows.length) {
+        return reply.code(409).send({
+          error: 'Conflict',
+          message: `Chapter ${chapterNumber} text-fit preview does not match the persisted page rows. Re-run Page Plan before approval.`,
+          statusCode: 409,
+        });
+      }
+      const overflow = chapterPreview.filter((page) => page.fit.status === 'OVERFLOW');
+      const blockers = chapterPreview.filter((page) => page.blockers.length > 0);
+      if (overflow.length > 0 || blockers.length > 0) {
+        return reply.code(409).send({
+          error: 'Conflict',
+          message: `Chapter ${chapterNumber} is not ready: ${overflow.length} overflow page(s), ${blockers.length} blocker page(s).`,
+          statusCode: 409,
+        });
+      }
+
+      const textFitSummary = chapterPreview.reduce(
+        (totals, page) => {
+          totals.pages += 1;
+          if (page.fit.status === 'FITS') totals.fits += 1;
+          else if (page.fit.status === 'TIGHT') totals.tight += 1;
+          else if (page.fit.status === 'OVERFLOW') totals.overflow += 1;
+          else totals.underfilled += 1;
+          return totals;
+        },
+        { pages: 0, fits: 0, tight: 0, overflow: 0, underfilled: 0 },
+      );
+
+      const config = parseProjectConfig(project);
+      const approval = LayoutApprovalSchema.parse({
+        status: 'APPROVED',
+        chapterNumber,
+        approvedAt: new Date().toISOString(),
+        approvedBy: 'operator',
+        pageKeys: pageRows.map((page) => page.pageKey),
+        promptSha256ByPage: Object.fromEntries(pageRows.map((page) => [page.pageKey, page.imagePromptSha256!])),
+        textFitSummary,
+      });
+      const layoutApprovals = {
+        ...(config.layoutApprovals ?? {}),
+        [String(chapterNumber)]: approval,
+      };
+      await updateProjectConfig(id, { ...config, layoutApprovals });
+
+      return { approval, layoutApprovals };
     },
   );
 

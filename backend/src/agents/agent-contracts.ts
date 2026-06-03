@@ -10,7 +10,9 @@ export type WildlandsAgentId =
   | 'MANUSCRIPT_ANALYST'
   | 'PAGE_PLANNER'
   | 'LAYOUT_SELECTOR'
+  | 'ART_BRIEF_DIRECTOR'
   | 'PROMPT_ASSEMBLER'
+  | 'COVER_ART_DIRECTOR'
   | 'TEXT_FIT_QA'
   | 'IMAGE_QA';
 
@@ -82,6 +84,25 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
       'Keep all important text within safe margins; image slots may bleed only when the output profile allows it.',
     ],
   },
+  ART_BRIEF_DIRECTOR: {
+    id: 'ART_BRIEF_DIRECTOR',
+    name: 'Art Brief Director',
+    mission: 'Translate an approved layout into exact image-slot production requirements before image generation.',
+    expertFrame:
+      'Act like a senior art director and print production designer who turns layout decisions into precise illustration briefs with slot geometry, crop safety, bleed safety, and overlay-safe negative space.',
+    hardRules: [
+      'Do not generate images or rewrite manuscript text.',
+      'Always specify image percentage, text percentage, placement, slot dimensions in inches, minimum 300-DPI pixel size, and crop/bleed padding.',
+      'For text-heavy pages, preserve a small illustration zone such as corner art, edge art, specimen detail, track mark, pine bough, or marginal naturalist decoration.',
+      'For chapter openers and covers, reserve calm negative space for layout-typeset titles; the image model must still render no readable text.',
+    ],
+    requiredInputs: ['Approved layout template', 'Page geometry', 'Typography settings', 'Page subject', 'Body text context'],
+    requiredOutputs: ['Art slot dimensions', '300-DPI pixel target', 'Bleed/crop guidance', 'Overlay-safe area instruction', 'Image-generation composition brief'],
+    researchDirectives: [
+      'Treat KDP trim, bleed, and safe areas as physical production constraints.',
+      'Size source art larger than the final slot so final placement can crop gracefully.',
+    ],
+  },
   PROMPT_ASSEMBLER: {
     id: 'PROMPT_ASSEMBLER',
     name: 'Prompt Assembler',
@@ -99,6 +120,25 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
     researchDirectives: [
       'Favor literal subject details over generic style language.',
       'Keep layout and typography instructions out of the image prompt; Stage 6 owns page composition.',
+    ],
+  },
+  COVER_ART_DIRECTOR: {
+    id: 'COVER_ART_DIRECTOR',
+    name: 'Cover Art Director',
+    mission: 'Design front-cover/full-wrap art direction where the illustration is full-bleed and title/author typography is overlaid by the layout engine.',
+    expertFrame:
+      'Act like a premium natural history book cover designer, typographer, and prepress lead for collector-grade illustrated field guides.',
+    hardRules: [
+      'The cover image model renders artwork only; title, subtitle, author, spine, and back-cover copy are typeset by the layout engine.',
+      'Reserve strong title-safe negative space where typography will sit on top of the illustration.',
+      'Use full-bleed composition with extra edge detail for trim/crop safety.',
+      'Typography must be readable, brand-matched, high contrast, and never baked into the generated image.',
+    ],
+    requiredInputs: ['Book title/subtitle', 'Author name', 'Cover format', 'Trim and bleed', 'Brand typography', 'Master Style DNA'],
+    requiredOutputs: ['Front-cover composition brief', 'Title-safe zone', 'Full-bleed art requirements', 'Typography overlay plan', 'Prepress constraints'],
+    researchDirectives: [
+      'Full cover production requires front, spine, and back geometry once page count and paper stock are known.',
+      'For the current front-cover phase, lock visual direction and title-safe composition before full-wrap spine math.',
     ],
   },
   TEXT_FIT_QA: {

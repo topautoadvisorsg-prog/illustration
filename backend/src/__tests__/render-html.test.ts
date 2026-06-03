@@ -47,7 +47,7 @@ describe('buildPageHtml', () => {
   it('uses a text-free placeholder art slot when no image is supplied', () => {
     const html = buildPageHtml(page(), config, { geometry });
     expect(html).toContain('art-placeholder');
-    expect(html).toContain('PREVIEW · ART SLOT');
+    expect(html).toContain('PREVIEW');
     expect(html).not.toContain('<img');
   });
 

@@ -11,12 +11,14 @@
  */
 
 import { createHash } from 'node:crypto';
+import { ProjectConfigSchema } from '@wildlands/shared';
 import {
   generateImage as defaultGenerateImage,
   type GenerateImageInput,
   type GeneratedImage,
 } from '../../services/openai/openai.js';
 import { getPageById, setPageStatus } from '../../db/repositories/manifests.repo.js';
+import { getProject } from '../../db/repositories/projects.repo.js';
 import { insertImage, listImagesForPage } from '../../db/repositories/images.repo.js';
 import { recordUsage } from '../../db/repositories/usage.repo.js';
 import { recordImageEvent } from '../../db/repositories/image-events.repo.js';
@@ -57,6 +59,34 @@ export function assertGeneratable(page: GeneratablePage): void {
   }
 }
 
+export interface LayoutApprovalGatePage {
+  chapterNumber: number;
+  pageKey: string;
+  imagePromptSha256: string | null;
+}
+
+export function assertLayoutApprovedForImageSpend(
+  page: LayoutApprovalGatePage,
+  approvals: Record<string, { status: string; pageKeys: string[]; promptSha256ByPage: Record<string, string> }>,
+): void {
+  const approval = approvals[String(page.chapterNumber)];
+  if (!approval || approval.status !== 'APPROVED') {
+    throw new GenerationBlockedError(
+      `Chapter ${page.chapterNumber} layout is not approved yet. Approve the chapter layout before image generation.`,
+      'layout_not_approved',
+    );
+  }
+  if (!approval.pageKeys.includes(page.pageKey)) {
+    throw new GenerationBlockedError(`Page ${page.pageKey} is not covered by the approved chapter layout.`, 'layout_not_approved');
+  }
+  if (!page.imagePromptSha256 || approval.promptSha256ByPage[page.pageKey] !== page.imagePromptSha256) {
+    throw new GenerationBlockedError(
+      `Page ${page.pageKey} prompt changed after layout approval. Re-approve the chapter layout before image generation.`,
+      'layout_prompt_changed',
+    );
+  }
+}
+
 /** Next version number given the existing image versions. */
 export function nextImageVersion(existing: Array<{ version: number }>): number {
   return existing.reduce((max, img) => Math.max(max, img.version), 0) + 1;
@@ -94,6 +124,10 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
   if (!page) throw new GenerationBlockedError('Page not found.', 'not_found');
 
   assertGeneratable(page);
+  const project = await getProject(page.projectId);
+  if (!project) throw new GenerationBlockedError('Project not found.', 'not_found');
+  const config = ProjectConfigSchema.parse(project.config);
+  assertLayoutApprovedForImageSpend(page, config.layoutApprovals ?? {});
 
   const existing = await listImagesForPage(page.id);
   const version = nextImageVersion(existing);

@@ -17,6 +17,7 @@ import type { LayoutTemplateId } from '@wildlands/shared';
 import { stripMarkdown } from '../stage-2-planner/plan-pages.js';
 import type { PageGeometry } from './page-geometry.js';
 import { getLayoutProfile } from './layout-profiles.js';
+import { directLayout, type LayoutAllocation } from './layout-director.js';
 
 // Calibrated so the geometric estimate agrees with the planner's per-layout word
 // ranges (e.g. ~720-word entries sit near LAYOUT_2_TEXT_HEAVY capacity) — the two
@@ -47,6 +48,8 @@ export interface TextFitResult {
   capacityChars: number;
   estimatedLines: number;
   fillRatio: number;
+  estimatedRenderedPages: number;
+  allocation: LayoutAllocation;
   status: TextFitStatus;
   fits: boolean;
   notes: string[];
@@ -75,13 +78,19 @@ export function analyzeTextFit(input: TextFitInput): TextFitResult {
   const capacityChars = charsPerLine * usableLines;
   const estimatedLines = Math.ceil(charCount / charsPerLine);
   const fillRatio = capacityChars > 0 ? charCount / capacityChars : Number.POSITIVE_INFINITY;
+  const allocation = directLayout(input);
 
   let status: TextFitStatus;
-  if (fillRatio > 1) {
+  if (fillRatio > 1 && (profile.textLight || (profile.artAreaFraction >= 0.5 && fillRatio > 1.25))) {
     status = 'OVERFLOW';
     notes.push(
       `Body ~${charCount} chars exceeds estimated capacity ~${capacityChars} for ${layoutTemplate}. ` +
-        `Route to a more text-heavy layout or add a continuation page.`,
+        `Route to a more text-heavy layout before spending on art.`,
+    );
+  } else if (fillRatio > 1) {
+    status = 'TIGHT';
+    notes.push(
+      `Body spans about ${allocation.estimatedRenderedPages} rendered pages; this is continuation flow, not lost text.`,
     );
   } else if (fillRatio >= 0.9) {
     status = 'TIGHT';
@@ -104,6 +113,8 @@ export function analyzeTextFit(input: TextFitInput): TextFitResult {
     capacityChars,
     estimatedLines,
     fillRatio: Math.round(fillRatio * 1000) / 1000,
+    estimatedRenderedPages: allocation.estimatedRenderedPages,
+    allocation,
     status,
     fits: status === 'FITS' || status === 'TIGHT',
     notes,

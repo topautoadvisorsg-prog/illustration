@@ -27,12 +27,20 @@ describe('analyzeTextFit', () => {
     expect(r.fits).toBe(true);
   });
 
-  it('flags overflow when body far exceeds capacity', () => {
+  it('treats long text-led entries as continuation flow instead of lost text', () => {
     const r = fit('x'.repeat(5000));
+    expect(r.status).toBe('TIGHT');
+    expect(r.fits).toBe(true);
+    expect(r.fillRatio).toBeGreaterThan(1);
+    expect(r.estimatedRenderedPages).toBeGreaterThan(1);
+    expect(r.notes.join(' ')).toMatch(/continuation flow/);
+  });
+
+  it('still blocks huge copy in an illustration-dominant layout', () => {
+    const r = fit('x'.repeat(5000), 'LAYOUT_3_ILLUSTRATION_DOMINANT');
     expect(r.status).toBe('OVERFLOW');
     expect(r.fits).toBe(false);
-    expect(r.fillRatio).toBeGreaterThan(1);
-    expect(r.notes.join(' ')).toMatch(/exceeds estimated capacity/);
+    expect(r.notes.join(' ')).toMatch(/Route to a more text-heavy layout/);
   });
 
   it('flags a nearly-full page as TIGHT', () => {
@@ -59,5 +67,13 @@ describe('analyzeTextFit', () => {
     const dominant = fit(body, 'LAYOUT_3_ILLUSTRATION_DOMINANT');
     const heavy = fit(body, 'LAYOUT_2_TEXT_HEAVY');
     expect(dominant.capacityChars).toBeLessThan(heavy.capacityChars);
+  });
+
+  it('reports layout allocation for previewing text and image zones', () => {
+    const r = fit('x'.repeat(1500), 'LAYOUT_2_TEXT_HEAVY');
+    expect(r.allocation.openingPageImagePercent).toBe(14);
+    expect(r.allocation.openingPageTextPercent).toBe(86);
+    expect(r.allocation.artBox.recommendedWidthPx).toBeGreaterThan(0);
+    expect(r.allocation.textPlacement).toMatch(/wrap/);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GenerationBlockedError,
+  assertLayoutApprovedForImageSpend,
   assertGeneratable,
   nextImageVersion,
 } from '../pipeline/stage-3-generation/generate-image.js';
@@ -58,5 +59,44 @@ describe('nextImageVersion', () => {
   it('increments past the highest existing version', () => {
     expect(nextImageVersion([{ version: 1 }, { version: 2 }])).toBe(3);
     expect(nextImageVersion([{ version: 3 }, { version: 1 }])).toBe(4);
+  });
+});
+
+describe('assertLayoutApprovedForImageSpend', () => {
+  const page = {
+    chapterNumber: 1,
+    pageKey: 'CH01-P001',
+    imagePromptSha256: 'prompt-hash',
+  };
+  const approvals = {
+    '1': {
+      status: 'APPROVED',
+      pageKeys: ['CH01-P001'],
+      promptSha256ByPage: { 'CH01-P001': 'prompt-hash' },
+    },
+  };
+
+  it('allows image spend only when the approved chapter covers the current prompt hash', () => {
+    expect(() => assertLayoutApprovedForImageSpend(page, approvals)).not.toThrow();
+  });
+
+  it('blocks image spend before chapter layout approval', () => {
+    try {
+      assertLayoutApprovedForImageSpend(page, {});
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(GenerationBlockedError);
+      expect((e as GenerationBlockedError).code).toBe('layout_not_approved');
+    }
+  });
+
+  it('blocks image spend when planning changed after approval', () => {
+    try {
+      assertLayoutApprovedForImageSpend({ ...page, imagePromptSha256: 'new-hash' }, approvals);
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(GenerationBlockedError);
+      expect((e as GenerationBlockedError).code).toBe('layout_prompt_changed');
+    }
   });
 });

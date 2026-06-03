@@ -924,6 +924,7 @@ function defaultProjectConfig() {
       comparisonTemplate: "LAYOUT_4_DANGER_WARNING",
     },
     layoutPromptAssets: defaultLayoutPromptAssets(),
+    layoutApprovals: {},
     outputProfile: {
       printEdition: "PREMIUM",
       ebookEdition: "KINDLE_EPUB",
@@ -1085,6 +1086,7 @@ function App() {
   const [plannedPages, setPlannedPages] = useState([]);
   const [layoutLibraryReport, setLayoutLibraryReport] = useState(null);
   const [textFitPreview, setTextFitPreview] = useState(null);
+  const [layoutApprovals, setLayoutApprovals] = useState({});
   const [pageImages, setPageImages] = useState({});
   const [selectedPageId, setSelectedPageId] = useState("");
   const [imageInstruction, setImageInstruction] = useState("");
@@ -1151,8 +1153,19 @@ function App() {
   const selectedPage = pages.find((page) => page.id === selectedPageId) || pages[0] || null;
   const selectedPageManifest = selectedPage ? pageManifests.find((page) => page.pageId === selectedPage.pageKey) : null;
   const selectedPagePlan = selectedPage ? pagePlanByKey.get(selectedPage.pageKey) : null;
+  const selectedChapterNumber =
+    selectedPageManifest?.chapterNumber || selectedPage?.chapterNumber || chapterManifests[0]?.chapterNumber || null;
+  const selectedChapterApproval = selectedChapterNumber ? layoutApprovals[String(selectedChapterNumber)] : null;
   const selectedImages = selectedPage ? pageImages[selectedPage.id] || [] : [];
   const activeImage = latestActiveVersion(selectedImages);
+
+  function chapterApproval(chapterNumber) {
+    return layoutApprovals[String(chapterNumber)] || null;
+  }
+
+  function chapterPages(chapterNumber) {
+    return pages.filter((page) => page.chapterNumber === chapterNumber);
+  }
 
   function setConfig(path, value) {
     setProjectConfig((current) => {
@@ -1384,6 +1397,7 @@ function App() {
     setTextFitPreview(null);
     setPageImages({});
     setPlannedPages([]);
+    setLayoutApprovals({});
     if (id) run(`Loading project ${id.slice(0, 8)}...`, () => loadArtifacts(id));
   }
 
@@ -1396,6 +1410,7 @@ function App() {
       setActiveProjectId("");
       setSelectedPageId("");
       setPlannedPages([]);
+      setLayoutApprovals({});
       setManifests([]);
       setPages([]);
     }
@@ -1459,6 +1474,7 @@ function App() {
     setManifests(manifestData.manifests || []);
     const incomingPages = pageData.pages || [];
     setPages(incomingPages);
+    setLayoutApprovals(pageData.layoutApprovals || {});
     setSelectedPageId((current) =>
       incomingPages.some((page) => page.id === current) ? current : incomingPages[0]?.id || "",
     );
@@ -1686,6 +1702,18 @@ function App() {
     const overflow = data.totals?.overflow || 0;
     appendLog(overflow > 0 ? "error" : "success", `Text-fit preview complete: ${data.totals?.fits || 0} fit, ${overflow} overflow.`);
     setMessage(`Text-fit preview: ${data.readyForImageSpend ? "ready for image spend" : "needs review"}.`);
+  }
+
+  async function approveChapterLayout(chapterNumber = selectedChapterNumber, projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    if (!chapterNumber) throw new Error("Select a chapter or page first.");
+    const data = await call(`/api/projects/${projectId}/chapters/${chapterNumber}/layout-approval`, {
+      method: "POST",
+    });
+    setLayoutApprovals(data.layoutApprovals || {});
+    appendLog("success", `Approved Chapter ${chapterNumber} layout for image spend.`);
+    await loadArtifacts(projectId);
+    setMessage(`Chapter ${chapterNumber} layout approved. Image generation is now unlocked for that chapter.`);
   }
 
   async function loadPageImages(pageId = selectedPageId) {
@@ -2150,6 +2178,18 @@ function App() {
               {chapterManifests.map((chapter) => (
                 <article className="chapter-card" key={chapter.chapterNumber}>
                   <strong>Chapter {chapter.chapterNumber}: {chapter.chapterTitle}</strong>
+                  <div className="chapter-approval-row">
+                    <span className={chapterApproval(chapter.chapterNumber) ? "approval-pill ok" : "approval-pill warn"}>
+                      {chapterApproval(chapter.chapterNumber) ? "Layout approved" : "Awaiting layout approval"}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy || !activeProjectId || chapterPages(chapter.chapterNumber).length === 0}
+                      onClick={() => run(`Approving Chapter ${chapter.chapterNumber} layout...`, () => approveChapterLayout(chapter.chapterNumber))}
+                    >
+                      Approve Layout
+                    </button>
+                  </div>
                   {(chapter.pageKeys || []).map((pageKey) => {
                     const page = pageManifests.find((candidate) => candidate.pageId === pageKey);
                     return (
@@ -2190,11 +2230,32 @@ function App() {
                 <span>{textFitPreview.totals?.fits || 0} fit / {textFitPreview.totals?.tight || 0} tight / {textFitPreview.totals?.overflow || 0} overflow</span>
               </div>
             )}
+            {selectedChapterNumber && (
+              <div className={`layout-approval-panel ${selectedChapterApproval ? "ok" : "warn"}`}>
+                <div>
+                  <strong>Chapter {selectedChapterNumber} layout checkpoint</strong>
+                  <span>
+                    {selectedChapterApproval
+                      ? `Approved ${new Date(selectedChapterApproval.approvedAt).toLocaleString()}`
+                      : "Approve this chapter layout before any image generation spend."}
+                  </span>
+                </div>
+                <button
+                  disabled={busy || !activeProjectId || chapterPages(selectedChapterNumber).length === 0}
+                  onClick={() => run(`Approving Chapter ${selectedChapterNumber} layout...`, () => approveChapterLayout(selectedChapterNumber))}
+                >
+                  {selectedChapterApproval ? "Re-approve Layout" : "Approve Chapter Layout"}
+                </button>
+              </div>
+            )}
             <div className="page-plan-list">
               {pageManifests.map((page) => {
                 const row = pageByKey.get(page.pageId);
                 const plan = pagePlanByKey.get(page.pageId);
                 const fit = textFitPreview?.pages?.find((candidate) => candidate.pageKey === page.pageId);
+                const allocation = fit?.allocation;
+                const artBrief = plan?.artBrief;
+                const approval = chapterApproval(page.chapterNumber);
                 return (
                   <article className={selectedPage?.pageKey === page.pageId ? "page-plan-card active" : "page-plan-card"} key={page.pageId}>
                     <button type="button" className="select-page-button" onClick={() => setSelectedPageId(row?.id || "")}>
@@ -2205,14 +2266,34 @@ function App() {
                       <span>{plan?.wordCount ?? "?"} words</span>
                       <span>{normalizeStatus(row?.status)}</span>
                       <span>{fit?.fit?.status ? normalizeStatus(fit.fit.status) : normalizeStatus(plan?.textFitStatus || "fit pending")}</span>
+                      <span>{approval ? "layout approved" : "layout pending"}</span>
+                      {allocation && <span>{allocation.estimatedRenderedPages} rendered page(s)</span>}
                       <span>{plan?.blockers?.length || 0} blocker(s)</span>
                     </div>
+                    {allocation && (
+                      <div className="layout-allocation">
+                        <div>
+                          <strong>{allocation.openingPageTextPercent}% text</strong>
+                          <span>{allocation.textPlacement}</span>
+                        </div>
+                        <div>
+                          <strong>{allocation.openingPageImagePercent}% image</strong>
+                          <span>{allocation.imagePlacement}</span>
+                        </div>
+                      </div>
+                    )}
                     {advancedMode && (
                       <details className="advanced-details">
                         <summary>Prompt + layout internals</summary>
                         <p><strong>Purpose:</strong> {plan?.contentTypePurpose || page.contentType || "No purpose loaded"}</p>
                         <p><strong>Coverage:</strong> {formatPercent(plan?.coverage)} / {plan?.architecture || "architecture pending"}</p>
                         <p><strong>Text zone:</strong> {plan?.layoutInstructions?.textZone || "No text-zone note"}</p>
+                        {allocation && <p><strong>Continuation:</strong> {allocation.continuationPageTextPercent}% text / {allocation.continuationPageImagePercent}% image after the opening page.</p>}
+                        {artBrief?.artBox && (
+                          <p>
+                            <strong>Art brief:</strong> {artBrief.imagePercent}% image / {artBrief.textPercent}% text, {artBrief.artBox.widthIn}in x {artBrief.artBox.heightIn}in slot, minimum {artBrief.artBox.recommendedWidthPx} x {artBrief.artBox.recommendedHeightPx}px.
+                          </p>
+                        )}
                         <p><strong>Prompt hash:</strong> {row?.imagePromptSha256 || plan?.promptSha256 || "No prompt hash"}</p>
                         {row?.imagePrompt && <textarea readOnly className="prompt-template" value={row.imagePrompt} />}
                       </details>
@@ -2255,11 +2336,12 @@ function App() {
               <div className="selected-page-summary">
                 <strong>{selectedPage.pageKey} / {selectedPageManifest?.entryTitle || "Untitled"}</strong>
                 <span>{layoutName(selectedPage.layoutTemplate || selectedPagePlan?.layoutTemplate)} / {normalizeStatus(selectedPage.status)}</span>
+                <span>{selectedChapterApproval ? "chapter layout approved" : "chapter layout pending"}</span>
                 <span>{selectedPagePlan?.promptReady ? "prompt ready" : selectedPage.imagePrompt ? "prompt stored" : "prompt pending"}</span>
               </div>
             )}
             <div className="button-row">
-              <button disabled={busy || !selectedPage || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady)} onClick={() => run("Generating selected page image...", generateSelectedPageImage)}>
+              <button disabled={busy || !selectedPage || !selectedChapterApproval || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady)} onClick={() => run("Generating selected page image...", generateSelectedPageImage)}>
                 Generate Image
               </button>
               <button disabled={busy || !selectedPage || selectedPage?.status !== "APPROVED"} onClick={() => run("Upscaling selected page image...", upscaleSelectedPageImage)}>

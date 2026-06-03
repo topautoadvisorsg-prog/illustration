@@ -32,6 +32,31 @@ export interface PageFitPreview {
     fillRatio: number;
     estimatedLines: number;
     usableLines: number;
+    estimatedRenderedPages: number;
+    notes: string[];
+  };
+  allocation: {
+    architecture: string;
+    imagePlacement: string;
+    textPlacement: string;
+    openingPageImagePercent: number;
+    openingPageTextPercent: number;
+    continuationPageImagePercent: number;
+    continuationPageTextPercent: number;
+    estimatedRenderedPages: number;
+    wordsPerOpeningPage: number;
+    wordsPerContinuationPage: number;
+    artBox: {
+      xIn: number;
+      yIn: number;
+      widthIn: number;
+      heightIn: number;
+      recommendedWidthPx: number;
+      recommendedHeightPx: number;
+      bleedPaddingPx: number;
+      aspectRatio: string;
+      overlaySafeArea: string;
+    };
     notes: string[];
   };
 }
@@ -84,8 +109,10 @@ export function buildTextFitPreview(pages: PageManifest[], config: ProjectConfig
         fillRatio: fit.fillRatio,
         estimatedLines: fit.estimatedLines,
         usableLines: fit.usableLines,
+        estimatedRenderedPages: fit.estimatedRenderedPages,
         notes: fit.notes,
       },
+      allocation: fit.allocation,
     });
   }
 

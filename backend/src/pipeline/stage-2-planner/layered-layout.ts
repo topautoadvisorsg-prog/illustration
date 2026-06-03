@@ -205,6 +205,12 @@ export function classifyContentType(page: PageManifest): { contentType: ContentT
   if (/(chapter opener|chapter introduction|section introduction|opening page|opener)/.test(text)) {
     return { contentType: 'CHAPTER_OPENER', reason: 'opener_signal' };
   }
+  if (/(glossary|index|back matter|quick reference|reference table|reference grid)/.test(text)) {
+    return { contentType: 'REFERENCE_PAGE', reason: 'reference_signal' };
+  }
+  if (/(hazard|extreme weather|lyme|tick-borne|tick borne|hypothermia|river crossing|spruce trap|disorientation)/.test(text)) {
+    return { contentType: 'WARNING_PAGE', reason: 'hazard_signal' };
+  }
   if (/(life cycle|lifecycle|growth stage|progression|seasonal sequence|development over time)/.test(text)) {
     return { contentType: 'PROGRESSION_STUDY', reason: 'progression_signal' };
   }
@@ -219,6 +225,9 @@ export function classifyContentType(page: PageManifest): { contentType: ContentT
   }
   if (/(overview|region overview|feature banner|watershed|mountain range|river system|landscape context)/.test(text)) {
     return { contentType: 'HABITAT_OVERVIEW', reason: 'overview_signal' };
+  }
+  if (/(geography|geology|climate|season|seasons|wilderness zone|wilderness zones|terrain|ecoregion)/.test(text)) {
+    return { contentType: 'TERRAIN_ANALYSIS', reason: 'terrain_signal' };
   }
   if (/(track|tracks|scat|signs|trail|habitat scene)/.test(text)) {
     return { contentType: 'FIELD_NOTES_PAGE', reason: 'field_signs_signal' };
