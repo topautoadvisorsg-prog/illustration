@@ -1151,6 +1151,8 @@ function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
+  const chatPanelRef = useRef(null);
+  const chatLogRef = useRef(null);
   const [phase, setPhase] = useState(() => {
     const stored = loadStoredString(ACTIVE_PHASE_KEY, PHASES[0]);
     return PHASES.includes(stored) ? stored : PHASES[0];
@@ -2086,6 +2088,17 @@ function App() {
     storeString(ACTIVE_PHASE_KEY, phase);
   }, [phase]);
 
+  // When the agent responds (chat reply or a Review verdict), bring the chat
+  // panel into view and scroll to the newest message so the operator always
+  // sees the answer instead of hunting for it.
+  useEffect(() => {
+    if (!chatMessages.length) return;
+    const last = chatMessages[chatMessages.length - 1];
+    if (last?.role !== "assistant") return;
+    chatPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (chatLogRef.current) chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight;
+  }, [chatMessages]);
+
   useEffect(() => {
     if (activeProjectId && selectedPageId) {
       storeString(selectedPageKey(activeProjectId), selectedPageId);
@@ -2296,12 +2309,12 @@ function App() {
         </section>
       </section>
 
-      <section className="panel chat-panel">
+      <section className="panel chat-panel" ref={chatPanelRef}>
         <div className="section-head">
           <h2>💬 Chat with the Agent</h2>
-          <span className="hint">Ask what happened, what's wrong, or what to do next — it knows this project's live state.</span>
+          <span className="hint">Ask what happened, what's wrong, or what to do next — it knows this project's live state. Review verdicts appear here too.</span>
         </div>
-        <div className="chat-log">
+        <div className="chat-log" ref={chatLogRef}>
           {chatMessages.length === 0 && (
             <p className="empty">Ask me anything about this project — e.g. “what’s the status?”, “what do I click next?”, “why did that fail?”</p>
           )}
