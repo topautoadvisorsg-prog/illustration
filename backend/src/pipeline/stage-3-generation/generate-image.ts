@@ -157,7 +157,9 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
     widthPx: image.widthPx,
     heightPx: image.heightPx,
     status: 'GENERATED',
-    active: existing.length === 0,
+    // The newest generation becomes the active version, so the preview and render
+    // always show the latest image (insertImage clears the previous active one).
+    active: true,
   });
 
   await setPageStatus(page.id, 'REVIEW');
