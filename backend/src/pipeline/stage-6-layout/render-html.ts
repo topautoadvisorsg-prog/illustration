@@ -185,28 +185,39 @@ function artSlotPositionCss(slot: ArtSlot): string {
  * (a dominant plate, a wide band, a half-page float) — never shrunk into a tiny
  * placeholder. Text still flows beside/below the art, so readability is preserved.
  */
-function artSlotSizeStyle(slot: ArtSlot, coverage: number, frameHeightIn: number): string {
+function artSlotSizeStyle(slot: ArtSlot, coverage: number, geometry: PageGeometry): string {
   const round2 = (n: number) => Math.round(n * 100) / 100;
+  const fh = geometry.textHeightIn;
+  const m = geometry.margins;
+  // Negative margins pull the figure past the text frame, out to the physical
+  // (bleed) page edge — so edge-layout images run to the cut, then bleed off it.
+  const top = `-${m.topIn}in`;
+  const fore = `-${m.rightIn}in`;
+  const bottom = `-${m.bottomIn}in`;
+  const spine = `-${m.gutterIn}in`;
   switch (slot) {
     case 'FULL_PAGE':
-      // Dominant full-page plate: fills the text frame; minimal caption flows after.
-      return `width:100%;height:${round2(frameHeightIn * 0.92)}in;`;
+      // Dominant plate that bleeds top + both sides; title/caption sits below.
+      return `display:block;width:auto;height:${round2(fh * 0.72)}in;margin:${top} ${fore} 12pt ${spine};`;
     case 'TOP_BAND':
+      // Full-bleed banner: runs off the top and both side edges; text flows below.
+      return `display:block;width:auto;height:${round2(Math.max(0.45, coverage) * fh)}in;margin:${top} ${fore} 14pt ${spine};`;
     case 'BOTTOM_BAND':
-      // Generous full-width band (never a thin strip).
-      return `width:100%;height:${round2(Math.max(0.45, coverage) * frameHeightIn)}in;`;
+      return `display:block;width:auto;height:${round2(Math.max(0.45, coverage) * fh)}in;margin:14pt ${fore} ${bottom} ${spine};`;
     case 'SIDEBAR_RIGHT':
-      // Tall ~half-width image column, body runs alongside.
-      return `width:46%;height:${round2(frameHeightIn * 0.96)}in;`;
+      // Tall image column bleeding off the top + fore-edge; body runs on the left.
+      return `float:right;width:48%;height:${round2(fh * 0.98)}in;margin:${top} ${fore} 10pt 18pt;`;
     case 'CENTER_WRAP':
-      return `width:72%;height:${round2(Math.max(0.45, coverage) * frameHeightIn)}in;`;
+      return `display:block;width:72%;height:${round2(Math.max(0.45, coverage) * fh)}in;margin:0 auto 10pt auto;`;
     case 'SCATTERED':
-      return `width:42%;height:${round2(0.34 * frameHeightIn)}in;`;
-    case 'FLOAT_LEFT':
+      return `float:left;width:42%;height:${round2(0.34 * fh)}in;margin:0 14pt 8pt 0;`;
     case 'FLOAT_RIGHT':
+      // Half-page float bleeding off the fore-edge; text wraps to the left.
+      return `float:right;width:48%;height:${round2(Math.max(0.5, coverage) * fh)}in;margin:0 ${fore} 10pt 18pt;`;
+    case 'FLOAT_LEFT':
     default:
-      // Substantial half-page float; title + body wrap around it, then continue.
-      return `width:46%;height:${round2(Math.max(0.5, coverage) * frameHeightIn)}in;`;
+      // Half-page float bleeding off the spine-edge; text wraps to the right.
+      return `float:left;width:48%;height:${round2(Math.max(0.5, coverage) * fh)}in;margin:0 18pt 10pt ${spine};`;
   }
 }
 
@@ -264,7 +275,7 @@ ${fontLinkTags(t)}
 <body>
   <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
   ${scientific}
-  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry.textHeightIn)}">${art}</figure>
+  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry)}">${art}</figure>
   ${bodyToHtml(page.bodyMarkdown)}
   ${polyfill}
 </body>
@@ -354,7 +365,7 @@ export function buildChapterHtml(
       return `<article class="book-page arch-${profile.artSlot}${danger}">
   <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
   ${scientific}
-  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry.textHeightIn)}">${art}</figure>
+  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry)}">${art}</figure>
   ${bodyToHtml(page.bodyMarkdown)}
 </article>`;
     })
@@ -425,7 +436,7 @@ function entryArticleHtml(page: ChapterPageRender, geometry: PageGeometry, ancho
   return `<article class="book-page arch-${profile.artSlot}${danger}"${idAttr}>
   <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
   ${scientific}
-  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry.textHeightIn)}">${art}</figure>
+  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry)}">${art}</figure>
   ${bodyToHtml(page.bodyMarkdown)}
 </article>`;
 }
