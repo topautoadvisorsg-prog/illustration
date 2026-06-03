@@ -9,9 +9,18 @@
  */
 
 import { createHash } from 'node:crypto';
+import WebSocketImpl from 'ws';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getEnv, isPlaceholder } from '../../env.js';
 import { LocalStorageService, type StoredFile } from './local-storage.js';
+
+// supabase-js v2 builds a Realtime client that requires a WebSocket. Node 20 (the
+// backend runtime) has no global WebSocket, so createClient throws even though we
+// only use Storage. Polyfill it once. (Node 22+ would have this natively.)
+const g = globalThis as { WebSocket?: unknown };
+if (typeof g.WebSocket === 'undefined') {
+  g.WebSocket = WebSocketImpl;
+}
 
 export type { StoredFile } from './local-storage.js';
 export { LocalStorageService } from './local-storage.js';
