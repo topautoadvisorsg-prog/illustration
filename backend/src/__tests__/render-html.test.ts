@@ -57,6 +57,14 @@ describe('buildPageHtml', () => {
     expect(html).not.toContain('PREVIEW · ART SLOT');
   });
 
+  it('keeps real art contained in the reserved slot without masking or crop-fill', () => {
+    const html = buildPageHtml(page(), config, { geometry, imageDataUri: 'data:image/png;base64,AAAA' });
+    expect(html).toContain('object-fit: contain');
+    expect(html).toContain('overflow: hidden');
+    expect(html).not.toContain('mask-image');
+    expect(html).not.toContain('object-fit: cover');
+  });
+
   it('omits the Paged.js script unless a polyfill is provided (browser-free HTML)', () => {
     expect(buildPageHtml(page(), config, { geometry })).not.toContain('<script>');
     expect(buildPageHtml(page(), config, { geometry, polyfillJs: 'console.log(1)' })).toContain('<script>console.log(1)</script>');

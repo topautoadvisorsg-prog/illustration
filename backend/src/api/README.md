@@ -19,12 +19,17 @@ Implemented foundation routes:
 | `POST` | `/api/projects/:id/plan` | Run Stage 2 page planning |
 | `GET` | `/api/projects/:id/pages` | Read persisted page rows and planner output fields |
 | `POST` | `/api/projects/:id/text-fit-preview` | Run text-fit preview before image spend |
+| `GET` | `/api/projects/:id/image-library` | Search/filter reusable project image assets |
 | `GET` | `/api/projects/:id/cost-estimate` | Estimate project image cost from generated-image count |
+| `GET` | `/api/projects/:id/chapters/:chapterNumber/operator-intelligence` | Read chapter readiness, blockers, and next action |
 | `POST` | `/api/projects/:id/chapters/:chapterNumber/render` | Render one chapter PDF preview |
+| `POST` | `/api/projects/:id/pages/:pageKey/render` | Render one focused page PDF proof |
 | `POST` | `/api/projects/:id/render-book` | Render/stitch book PDF and run KDP preflight |
 | `GET` | `/api/agents` | Read backend agent contracts for the operator UI |
 | `POST` | `/api/pages/:pageId/generate-image` | Generate one page illustration from its locked prompt |
 | `GET` | `/api/pages/:pageId/images` | List generated image versions for one page |
+| `GET` | `/api/images/:imageId/file` | Stream a generated/upscaled library asset preview |
+| `POST` | `/api/pages/:pageId/images/reuse` | Reuse a library asset as a new version on another page |
 | `POST` | `/api/pages/:pageId/images/:version/approve` | Approve and lock an image version |
 | `POST` | `/api/pages/:pageId/images/:version/reject` | Reject an image version with an optional note |
 | `POST` | `/api/pages/:pageId/images/:version/set-active` | Set a historical version active |

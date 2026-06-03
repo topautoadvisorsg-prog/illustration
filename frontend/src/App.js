@@ -1139,9 +1139,13 @@ function App() {
   const [textFitPreview, setTextFitPreview] = useState(null);
   const [layoutApprovals, setLayoutApprovals] = useState({});
   const [pageImages, setPageImages] = useState({});
+  const [imageLibrary, setImageLibrary] = useState({ total: 0, assets: [] });
+  const [imageLibraryFilter, setImageLibraryFilter] = useState({ q: "", status: "", layout: "", chapter: "" });
   const [selectedPageId, setSelectedPageId] = useState("");
   const [imageInstruction, setImageInstruction] = useState("");
   const [pdfPreview, setPdfPreview] = useState({ title: "", url: "", meta: "" });
+  const [renderedChapterNumber, setRenderedChapterNumber] = useState(null);
+  const [chapterIntelligence, setChapterIntelligence] = useState(null);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [agents, setAgents] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -1211,9 +1215,17 @@ function App() {
   const selectedPagePlan = selectedPage ? pagePlanByKey.get(selectedPage.pageKey) : null;
   const selectedChapterNumber =
     selectedPageManifest?.chapterNumber || selectedPage?.chapterNumber || chapterManifests[0]?.chapterNumber || null;
+  const reviewChapterNumber = renderedChapterNumber || selectedChapterNumber || chapterManifests[0]?.chapterNumber || null;
+  const reviewChapterPages = reviewChapterNumber
+    ? pageManifests.filter((page) => page.chapterNumber === reviewChapterNumber).sort((a, b) => Number(a.pageNumber || 0) - Number(b.pageNumber || 0))
+    : [];
   const selectedChapterApproval = selectedChapterNumber ? layoutApprovals[String(selectedChapterNumber)] : null;
   const selectedImages = selectedPage ? pageImages[selectedPage.id] || [] : [];
   const activeImage = latestActiveVersion(selectedImages);
+  const libraryLayouts = useMemo(
+    () => Array.from(new Set(imageLibrary.assets.map((asset) => asset.source.layoutTemplate).filter(Boolean))).sort(),
+    [imageLibrary.assets],
+  );
 
   function chapterApproval(chapterNumber) {
     return layoutApprovals[String(chapterNumber)] || null;
@@ -1481,6 +1493,7 @@ function App() {
     setSelectedPageId("");
     setTextFitPreview(null);
     setPageImages({});
+    setChapterIntelligence(null);
     setPlannedPages([]);
     setLayoutApprovals({});
     setPdfPreview((current) => {
@@ -1509,6 +1522,7 @@ function App() {
       setActiveProjectId("");
       setSelectedPageId("");
       setPlannedPages([]);
+      setChapterIntelligence(null);
       setLayoutApprovals({});
       setManifests([]);
       setPages([]);
@@ -1885,12 +1899,55 @@ function App() {
     appendLog("success", `Loaded ${data.images?.length || 0} image version(s) for selected page.`);
   }
 
+  async function loadImageLibrary(projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    const params = new URLSearchParams();
+    if (imageLibraryFilter.q.trim()) params.set("q", imageLibraryFilter.q.trim());
+    if (imageLibraryFilter.status) params.set("status", imageLibraryFilter.status);
+    if (imageLibraryFilter.layout) params.set("layout", imageLibraryFilter.layout);
+    if (imageLibraryFilter.chapter) params.set("chapter", imageLibraryFilter.chapter);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    const data = await call(`/api/projects/${projectId}/image-library${suffix}`);
+    setImageLibrary(data);
+    appendLog("success", `Loaded ${data.total || 0} image asset(s) from the project library.`);
+  }
+
+  async function loadChapterIntelligence(chapterNumber = reviewChapterNumber, projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    if (!chapterNumber) throw new Error("Select a chapter first.");
+    const data = await call(`/api/projects/${projectId}/chapters/${chapterNumber}/operator-intelligence`);
+    setChapterIntelligence(data);
+    appendLog(data.status === "BLOCKED" ? "issue" : "success", `Chapter ${chapterNumber} intelligence: ${data.status}.`);
+    return data;
+  }
+
+  async function refreshChapterIntelligenceAfterRender(chapterNumber) {
+    try {
+      await loadChapterIntelligence(chapterNumber);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      appendLog("issue", `Rendered proof, but chapter intelligence could not refresh: ${message}`);
+    }
+  }
+
+  async function reuseImageAsset(sourceImageId) {
+    const page = requireSelectedPage();
+    const data = await call(`/api/pages/${page.id}/images/reuse`, {
+      method: "POST",
+      body: JSON.stringify({ sourceImageId }),
+    });
+    appendLog("success", `Reused library asset as ${page.pageKey} version ${data.version}.`);
+    await loadPageImages(page.id);
+    await loadArtifacts(activeProjectId);
+  }
+
   async function generateSelectedPageImage() {
     const page = requireSelectedPage();
     if (!confirmPaidAction("Generate an image for this page using OpenAI? This may spend API credits.")) return;
     const data = await call(`/api/pages/${page.id}/generate-image`, { method: "POST" });
     appendLog("success", `Generated image version ${data.image.version} for ${page.pageKey}.`);
     await loadPageImages(page.id);
+    await loadImageLibrary(activeProjectId);
     await loadArtifacts(activeProjectId);
   }
 
@@ -1925,6 +1982,7 @@ function App() {
     appendLog("success", `Regenerated ${page.pageKey} image version ${data.image.version}.`);
     setImageInstruction("");
     await loadPageImages(page.id);
+    await loadImageLibrary(activeProjectId);
     await loadArtifacts(activeProjectId);
   }
 
@@ -1942,8 +2000,24 @@ function App() {
     const { blob, headers } = await callPdf(`/api/projects/${activeProjectId}/chapters/${chapterNumber}/render`, {
       method: "POST",
     });
+    setRenderedChapterNumber(chapterNumber);
     setPreviewBlob(`Chapter ${chapterNumber} PDF Preview`, blob, `${headers.get("x-total-pages") || "?"} rendered page(s)`);
     appendLog("success", `Rendered chapter ${chapterNumber} preview.`);
+    await refreshChapterIntelligenceAfterRender(chapterNumber);
+  }
+
+  async function renderPagePreview(pageKey) {
+    if (!activeProjectId) throw new Error("Create or select a project first.");
+    const page = pageManifests.find((candidate) => candidate.pageId === pageKey);
+    const { blob, headers } = await callPdf(`/api/projects/${activeProjectId}/pages/${encodeURIComponent(pageKey)}/render`, {
+      method: "POST",
+    });
+    const row = pageByKey.get(pageKey);
+    if (row?.id) setSelectedPageId(row.id);
+    setRenderedChapterNumber(page?.chapterNumber || renderedChapterNumber);
+    setPreviewBlob(`${pageKey} Page Proof`, blob, `${headers.get("x-total-pages") || "?"} rendered page(s) for ${page?.entryTitle || "selected page"}`);
+    appendLog("success", `Rendered page proof for ${pageKey}.`);
+    if (page?.chapterNumber) await refreshChapterIntelligenceAfterRender(page.chapterNumber);
   }
 
   async function renderBookPreview() {
@@ -2310,7 +2384,7 @@ function App() {
           <div>
             <p className="eyebrow">Operator Review Mode</p>
             <h2>Publishing Workflow Board</h2>
-            <p className="hint">The agent does the work. You review the breakdown, page plan, images, and printable preview.</p>
+            <p className="hint">Work left to right: confirm the book map, approve text-safe layouts, manage art assets, then render proofs.</p>
           </div>
           <div className="button-row">
             <button disabled={busy || !activeProjectId} onClick={() => run("Running manuscript intake...", runManuscriptIntake)}>
@@ -2332,19 +2406,38 @@ function App() {
           ))}
         </div>
 
+        <div className="operator-checkpoints">
+          <div>
+            <strong>1. Book map</strong>
+            <span>Chapters and pages exist in the right order.</span>
+          </div>
+          <div>
+            <strong>2. Layout gate</strong>
+            <span>Text-fit has no overflow before paid image work.</span>
+          </div>
+          <div>
+            <strong>3. Asset desk</strong>
+            <span>Generate, reuse, approve, and upscale images as publishing assets.</span>
+          </div>
+          <div>
+            <strong>4. Proof</strong>
+            <span>Render page-shaped PDFs and inspect readability.</span>
+          </div>
+        </div>
+
         <div className="review-grid">
           <section className="review-card">
             <div className="section-head">
               <div>
                 <h3>1. Manuscript Breakdown</h3>
-                <p className="hint">Review the chapter-to-page structure before downstream spend.</p>
+                <p className="hint">Confirm the manuscript became the right chapter/page map. Layout approval happens in Page Plan.</p>
               </div>
               <div className="button-row">
                 <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
                   Start Breakdown
                 </button>
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("breakdown")}>
-                  🔍 Review
+                  Audit with Agent
                 </button>
               </div>
             </div>
@@ -2357,18 +2450,7 @@ function App() {
               {chapterManifests.map((chapter) => (
                 <article className="chapter-card" key={chapter.chapterNumber}>
                   <strong>Chapter {chapter.chapterNumber}: {chapter.chapterTitle}</strong>
-                  <div className="chapter-approval-row">
-                    <span className={chapterApproval(chapter.chapterNumber) ? "approval-pill ok" : "approval-pill warn"}>
-                      {chapterApproval(chapter.chapterNumber) ? "Layout approved" : "Awaiting layout approval"}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={busy || !activeProjectId || chapterPages(chapter.chapterNumber).length === 0}
-                      onClick={() => run(`Approving Chapter ${chapter.chapterNumber} layout...`, () => approveChapterLayout(chapter.chapterNumber))}
-                    >
-                      Approve Layout
-                    </button>
-                  </div>
+                  <p className="review-note">{chapter.pageKeys?.length || 0} planned page(s). Select a page here, then inspect layout and text-fit in Page Plan.</p>
                   {(chapter.pageKeys || []).map((pageKey) => {
                     const page = pageManifests.find((candidate) => candidate.pageId === pageKey);
                     return (
@@ -2392,14 +2474,14 @@ function App() {
             <div className="section-head">
               <div>
                 <h3>2. Page Plan Review</h3>
-                <p className="hint">Confirm layout choices, text capacity, and readiness without raw prompt clutter.</p>
+                <p className="hint">This is the spend gate: layout, text capacity, and prompt readiness before images.</p>
               </div>
               <div className="button-row">
                 <button disabled={busy || !activeProjectId || pageManifests.length === 0} onClick={() => run("Planning pages...", planPages)}>
                   Generate Page Plan
                 </button>
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("plan")}>
-                  🔍 Review
+                  Audit with Agent
                 </button>
                 <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview)}>
                   Text-Fit
@@ -2410,6 +2492,12 @@ function App() {
               <div className={`fit-summary ${textFitPreview.readyForImageSpend ? "ok" : "warn"}`}>
                 <strong>{textFitPreview.readyForImageSpend ? "Ready for image spend" : "Text-fit needs review"}</strong>
                 <span>{textFitPreview.totals?.fits || 0} fit / {textFitPreview.totals?.tight || 0} tight / {textFitPreview.totals?.overflow || 0} overflow</span>
+              </div>
+            )}
+            {!textFitPreview && pages.length > 0 && (
+              <div className="fit-summary warn">
+                <strong>Text-fit not loaded in this browser session</strong>
+                <span>Run Text-Fit to replace pending labels with fit, tight, underfilled, or overflow.</span>
               </div>
             )}
             {selectedChapterNumber && (
@@ -2491,14 +2579,14 @@ function App() {
             <div className="section-head">
               <div>
                 <h3>3. Image Proofing</h3>
-                <p className="hint">Generate only after the plan/text-fit looks right. Approve, reject, regenerate, then upscale.</p>
+                <p className="hint">Asset desk for the selected page: generate only when layouts are approved, then reuse, approve, reject, or upscale.</p>
               </div>
               <div className="button-row">
                 <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages())}>
                   Load Images
                 </button>
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("images")}>
-                  🔍 Review
+                  Audit with Agent
                 </button>
               </div>
             </div>
@@ -2535,6 +2623,79 @@ function App() {
                 Enhance / Upscale
               </button>
             </div>
+            <details className="asset-library-panel" open>
+              <summary>Project Image Library</summary>
+              <div className="library-controls">
+                <input
+                  value={imageLibraryFilter.q}
+                  onChange={(event) => setImageLibraryFilter((current) => ({ ...current, q: event.target.value }))}
+                  placeholder="Search subject, page, prompt, tags..."
+                />
+                <select value={imageLibraryFilter.status} onChange={(event) => setImageLibraryFilter((current) => ({ ...current, status: event.target.value }))}>
+                  <option value="">Any status</option>
+                  <option value="GENERATED">Generated</option>
+                  <option value="REVIEW">Review</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="PRINT_READY">Print ready</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="FAILED">Failed</option>
+                </select>
+                <select value={imageLibraryFilter.layout} onChange={(event) => setImageLibraryFilter((current) => ({ ...current, layout: event.target.value }))}>
+                  <option value="">Any layout</option>
+                  {libraryLayouts.map((layout) => (
+                    <option key={layout} value={layout}>{layoutName(layout)}</option>
+                  ))}
+                </select>
+                <select value={imageLibraryFilter.chapter} onChange={(event) => setImageLibraryFilter((current) => ({ ...current, chapter: event.target.value }))}>
+                  <option value="">Any chapter</option>
+                  {chapterManifests.map((chapter) => (
+                    <option key={chapter.chapterNumber} value={chapter.chapterNumber}>Chapter {chapter.chapterNumber}</option>
+                  ))}
+                </select>
+                <button disabled={busy || !activeProjectId} onClick={() => run("Loading image library...", () => loadImageLibrary())}>
+                  Load Library
+                </button>
+              </div>
+              <div className="asset-library-summary">
+                <strong>{imageLibrary.total || 0} asset(s)</strong>
+                <span>generated and reusable inside this project</span>
+              </div>
+              <div className="asset-library-grid">
+                {imageLibrary.assets.map((asset) => (
+                  <article className="asset-card" key={asset.imageId}>
+                    <img
+                      src={`${apiUrl}${asset.previewUrl}`}
+                      alt={`${asset.source.pageKey} version ${asset.version}`}
+                      loading="lazy"
+                    />
+                    <div className="asset-card-body">
+                      <strong>{asset.source.pageKey} v{asset.version}</strong>
+                      <span>{asset.source.entryTitle}</span>
+                      <small>{normalizeStatus(asset.status)} / {asset.widthPx || "?"} x {asset.heightPx || "?"} px</small>
+                      <small>{layoutName(asset.source.layoutTemplate)}</small>
+                      <div className="asset-tags">
+                        {asset.compatibility.slice(0, 4).map((tag) => <span key={tag}>{tag}</span>)}
+                      </div>
+                    </div>
+                    <div className="button-row">
+                      <button disabled={busy || !selectedPage || asset.source.pageId === selectedPage.id} onClick={() => run("Reusing image asset...", () => reuseImageAsset(asset.imageId))}>
+                        Reuse on Selected Page
+                      </button>
+                    </div>
+                    {advancedMode && (
+                      <details className="advanced-details">
+                        <summary>Asset details</summary>
+                        <p>Created: {new Date(asset.createdAt).toLocaleString()}</p>
+                        <p>Generated: {asset.generatedPath || "not stored"}</p>
+                        <p>Upscaled: {asset.upscaledPath || "not upscaled"}</p>
+                        <p>Prompt hash: {asset.promptSha256}</p>
+                      </details>
+                    )}
+                  </article>
+                ))}
+                {imageLibrary.assets.length === 0 && <p className="empty">No library assets loaded yet.</p>}
+              </div>
+            </details>
             <Field label="Correction Request">
               <textarea
                 className="notes-field"
@@ -2590,8 +2751,11 @@ function App() {
                 <p className="hint">Open a large PDF proof before final output. Rendering uses placeholders until approved art exists.</p>
               </div>
               <div className="button-row">
-                <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering chapter preview...", () => renderChapterPreview(chapterManifests[0]?.chapterNumber || 1))}>
-                  Render Chapter
+                <button disabled={busy || !reviewChapterNumber} onClick={() => run("Rendering chapter preview...", () => renderChapterPreview(reviewChapterNumber))}>
+                  Render Selected Chapter
+                </button>
+                <button disabled={busy || !reviewChapterNumber} onClick={() => run("Checking chapter intelligence...", () => loadChapterIntelligence(reviewChapterNumber))}>
+                  Check Chapter
                 </button>
                 <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book preview...", renderBookPreview)}>
                   Render Book PDF
@@ -2600,16 +2764,96 @@ function App() {
                   Render Cover
                 </button>
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("render")}>
-                  🔍 Review
+                  Audit with Agent
                 </button>
               </div>
             </div>
             <div className="chapter-render-row">
               {chapterManifests.map((chapter) => (
-                <button key={chapter.chapterNumber} disabled={busy} onClick={() => run(`Rendering chapter ${chapter.chapterNumber}...`, () => renderChapterPreview(chapter.chapterNumber))}>
+                <button
+                  key={chapter.chapterNumber}
+                  className={reviewChapterNumber === chapter.chapterNumber ? "active" : ""}
+                  disabled={busy}
+                  onClick={() => {
+                    setRenderedChapterNumber(chapter.chapterNumber);
+                    setChapterIntelligence(null);
+                    run(`Rendering chapter ${chapter.chapterNumber}...`, () => renderChapterPreview(chapter.chapterNumber));
+                  }}
+                >
                   Chapter {chapter.chapterNumber}
                 </button>
               ))}
+            </div>
+            <div className={`chapter-intelligence ${chapterIntelligence?.status ? chapterIntelligence.status.toLowerCase().replace("_", "-") : ""}`}>
+              <div className="chapter-intelligence-head">
+                <div>
+                  <strong>Chapter Intelligence</strong>
+                  <p className="hint">Production checks for the selected chapter before final image spend or export.</p>
+                </div>
+                <span>{chapterIntelligence?.status ? chapterIntelligence.status.replace("_", " ") : "not checked"}</span>
+              </div>
+              {chapterIntelligence ? (
+                <>
+                  <p className="next-action">{chapterIntelligence.nextAction}</p>
+                  <div className="chapter-intelligence-metrics">
+                    <div>
+                      <strong>{chapterIntelligence.summary.pages}</strong>
+                      <span>pages</span>
+                    </div>
+                    <div>
+                      <strong>{chapterIntelligence.summary.pagesPlanned}</strong>
+                      <span>planned</span>
+                    </div>
+                    <div>
+                      <strong>{chapterIntelligence.summary.pagesWithImages}</strong>
+                      <span>with art</span>
+                    </div>
+                    <div>
+                      <strong>{chapterIntelligence.summary.pagesWithApprovedImages}</strong>
+                      <span>approved art</span>
+                    </div>
+                    <div>
+                      <strong>{chapterIntelligence.summary.placeholderPages}</strong>
+                      <span>placeholders</span>
+                    </div>
+                  </div>
+                  <div className="chapter-findings">
+                    {chapterIntelligence.findings.slice(0, 8).map((finding, index) => (
+                      <div className={`chapter-finding ${finding.severity.toLowerCase()}`} key={`${finding.pageKey || finding.scope}-${finding.category}-${index}`}>
+                        <strong>{finding.severity}</strong>
+                        <span>{finding.pageKey ? `${finding.pageKey}: ` : ""}{finding.message}</span>
+                        <small>{finding.recommendedAction}</small>
+                      </div>
+                    ))}
+                    {chapterIntelligence.findings.length === 0 && <p className="empty">No issues detected for this chapter gate.</p>}
+                    {chapterIntelligence.findings.length > 8 && <p className="hint">{chapterIntelligence.findings.length - 8} more finding(s) hidden to keep this review readable.</p>}
+                  </div>
+                </>
+              ) : (
+                <p className="empty">Run Check Chapter to see layout, image, and proof-readiness blockers for this chapter.</p>
+              )}
+            </div>
+            <div className="render-page-review-list">
+              <div className="section-head compact">
+                <div>
+                  <strong>Review Chapter {reviewChapterNumber || "?"} Pages</strong>
+                  <p className="hint">Click a page to render a focused proof for text flow and layout inspection.</p>
+                </div>
+              </div>
+              <div className="chapter-render-row">
+                {reviewChapterPages.map((page) => (
+                  <button
+                    key={page.pageId}
+                    disabled={busy}
+                    className={selectedPage?.pageKey === page.pageId ? "active" : ""}
+                    onClick={() => run(`Rendering ${page.pageId} page proof...`, () => renderPagePreview(page.pageId))}
+                    title={page.entryTitle}
+                  >
+                    {page.pageId}
+                  </button>
+                ))}
+                {reviewChapterPages.length === 0 && <span className="empty-inline">No pages available for this chapter.</span>}
+              </div>
             </div>
             {pdfPreview.url ? (
               <div className="pdf-preview-frame">
@@ -2618,8 +2862,12 @@ function App() {
                     <strong>{pdfPreview.title}</strong>
                     <p className="hint">{pdfPreview.meta}</p>
                   </div>
-                  <a className="download-link" href={pdfPreview.url} download="wildlands-preview.pdf">Download PDF</a>
+                  <div className="preview-actions">
+                    <a className="download-link secondary" href={pdfPreview.url} target="_blank" rel="noreferrer">Open PDF</a>
+                    <a className="download-link" href={pdfPreview.url} download="wildlands-preview.pdf">Download PDF</a>
+                  </div>
                 </div>
+                <p className="pdf-preview-note">If the embedded preview appears blank, open or download the same rendered proof. The iframe uses a temporary browser PDF blob.</p>
                 <iframe title={pdfPreview.title} src={pdfPreview.url} />
               </div>
             ) : (

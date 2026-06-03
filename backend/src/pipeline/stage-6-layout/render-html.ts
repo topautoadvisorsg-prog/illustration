@@ -97,7 +97,8 @@ function typographyStyleBlock(t: Typography, c: Palette): string {
   .caption { font-family: var(--font-body); font-style: italic; font-size: ${t.captionPt}pt; color: ${c.accent}; }
   .mono { font-family: 'Courier New', monospace; font-size: 0.92em; }
   .art-placeholder { width: 100%; height: 100%; min-height: 2.4in; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #E8D9B0; outline: 1px dashed ${c.accent}; outline-offset: -4px; font-family: var(--font-display); font-style: italic; font-size: ${t.captionPt}pt; color: ${c.accent}; }
-  .art-slot img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%); }`;
+  .art-slot { box-sizing: border-box; overflow: hidden; background: rgba(245, 237, 214, 0.5); }
+  .art-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }`;
 }
 
 /**

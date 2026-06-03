@@ -14,6 +14,7 @@ import {
   approveImageVersion,
   getImageVersion,
   listImagesForPage,
+  reuseImageForPage,
   setActiveImageVersion,
   setImageStatus,
   type ImageRow,
@@ -127,4 +128,24 @@ export async function regeneratePageImage(
   // Stage 3 records the 'generated' audit event (with the addendum note) using
   // the real image row id, so no extra event is written here.
   return generatePageImage({ pageId, promptAddendum, generator });
+}
+
+export async function reuseLibraryImageForPage(
+  pageId: string,
+  sourceImageId: string,
+): Promise<{ pageStatus: string; version: number; imageId: string }> {
+  const page = await loadPageOrThrow(pageId);
+  const row = await reuseImageForPage(page.id, sourceImageId);
+  if (!row) throw new ReviewBlockedError('Source image or target page not found.', 'version_not_found');
+
+  await setPageStatus(page.id, 'REVIEW');
+  await recordImageEvent({
+    imageId: row.id,
+    pageId: page.id,
+    eventType: 'reused',
+    note: `Reused source image ${sourceImageId}`,
+    metadata: { sourceImageId, version: row.version },
+  });
+
+  return { pageStatus: 'REVIEW', version: row.version, imageId: row.id };
 }

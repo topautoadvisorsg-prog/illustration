@@ -8,7 +8,7 @@ import { getDb } from '../client.js';
 import { imageEvents } from '../schema/index.js';
 import { logger } from '../../lib/logger.js';
 
-export type ImageEventType = 'generated' | 'approved' | 'rejected' | 'regenerated' | 'set_active';
+export type ImageEventType = 'generated' | 'approved' | 'rejected' | 'regenerated' | 'set_active' | 'reused';
 
 export interface ImageEventInput {
   imageId: string;

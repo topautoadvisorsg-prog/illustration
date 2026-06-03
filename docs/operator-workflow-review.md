@@ -1,140 +1,84 @@
 # Operator Workflow Review
 
-Date: 2026-06-02
+Date: 2026-06-03
 
-## Product Model
+## Business Model
 
-The platform should feel like an AI publishing agent doing the production work while the human operator reviews, approves, rejects, edits, or requests changes.
+The platform is a production line for turning a master manuscript into a finished, polished illustrated book. The operator should not feel like they are running scripts or chasing records in a database. They should feel like they are managing a publishing desk:
 
-Operator-visible workflow:
+1. Confirm the manuscript map.
+2. Approve page layouts and text-fit before paid image work.
+3. Manage images as reusable publishing assets.
+4. Review page-shaped proofs.
+5. Export final book files only when the proof and assets are ready.
 
-1. Upload manuscript.
-2. Confirm upload.
-3. Agent breaks manuscript into chapters/pages.
-4. Operator reviews the chapter/page breakdown.
-5. Agent creates the page plan and selects layouts.
-6. Operator reviews page plan, layout choices, and text-fit risk.
-7. Agent generates image prompts.
-8. Operator reviews prompts in an advanced/prompt details panel when needed.
-9. Operator triggers paid image generation intentionally.
-10. Operator reviews, approves, rejects, or regenerates images.
-11. Operator triggers upscale when an image is approved.
-12. Operator opens a large page/chapter/book PDF preview.
-13. Operator exports/saves final output.
+The commercial value is repeatability. Every book should leave behind usable assets, decisions, standards, and proofs that make the next book faster and cheaper.
 
-## What Works Now
+## Current Operator Flow
 
-- Backend health and render checks are deployed and working.
-- Manuscript upload accepts Markdown/plain text and stores a parsed outline summary.
-- Deterministic manuscript parsing already finds chapters, entries, word counts, and warnings before any LLM call.
-- Claude-backed manifest generation creates book/chapter/page manifests and page rows.
-- Page planning chooses layouts, creates image-only prompts, tracks blockers/warnings, capacity, typography, and prompt hashes.
-- Text-fit preview exists as a backend route.
-- Image generation, review, approval, rejection, regeneration, and upscale routes exist.
-- Chapter PDF render and full book PDF render routes exist.
-- Chromium/Paged.js render is available through the backend Docker deployment.
-- Publishing Intelligence Center exists as a first-class visible system.
+- Project and manuscript restore now work across refresh.
+- Breakdown creates 8 chapters and 129 page manifests for the current book.
+- Page Plan shows layout choices, blockers, text-fit status, and layout approvals.
+- Text-fit preview can be run before image spend.
+- Image Proofing exposes selected-page generation, page image versions, approval/rejection, regeneration, upscale, and a project image library.
+- The image library can search/filter generated assets and reuse one on the selected page.
+- Render Preview can produce chapter/book/cover proofs and offers Open/Download fallback when the embedded PDF viewer is blank.
 
-## What Is Broken Or Disconnected
+## Issues Found In Operator Review
 
-- The UI does not clearly expose the backend's full workflow in review order.
-- The manuscript breakdown exists in manifest content, but the UI does not show a readable chapter-to-page tree.
-- The page plan view shows internal text-zone details by default, making it feel technical instead of operator-friendly.
-- Text-fit preview exists in the backend but is not exposed as a primary operator action.
-- Image generation/review/upscale backend routes exist but are not exposed in the normal UI.
-- Chapter/book render backend routes exist but are not exposed as large preview controls.
-- Agent contracts exist in the backend, but there is no clear agent roster or operator-facing "what this agent does" view.
-- The command panel is useful, but it currently behaves like a command shortcut box rather than a clear AI publishing agent workspace.
-- The layout prompt library is too prominent for normal operation and should be treated as Advanced configuration.
+- The old stage strip plus the detailed review cards felt redundant because they used similar labels without explaining their different jobs.
+- "Review" buttons were ambiguous. They do not review in place; they ask the agent to audit that stage and report in chat.
+- Breakdown had a layout approval button, which mixed two gates. Breakdown should confirm the book map; layout approval belongs to Page Plan.
+- The image library was a good start, but it needs to become a first-class asset desk, not a detail inside page proofing forever.
+- The render proof can still feel visually blank in the embedded iframe depending on browser PDF support, though Open/Download now makes the result recoverable.
+- Word counts can show as pending when only manifest/page rows are loaded and the richer planning payload is absent.
 
-## Missing UI Controls
+## Fixes Applied
 
-- Start Breakdown / Generate Manifests.
-- Review Breakdown.
-- Generate Page Plan.
-- Run Text-Fit Preview.
-- Review Page Plan.
-- Generate Image for selected page.
-- Load page images.
-- Approve image.
-- Reject image with note.
-- Regenerate image with operator instruction.
-- Upscale approved image.
-- Render chapter preview.
-- Render full book preview.
-- Download rendered PDF.
-- Toggle Advanced details for raw prompts, layout percentages, internal prompt metadata, paths, hashes, and model notes.
+- Renamed stage review buttons to "Audit with Agent" so the operator knows the result is an agent verdict.
+- Added a four-step checkpoint strip: Book map, Layout gate, Asset desk, Proof.
+- Removed layout approval from the Breakdown card to reduce workflow confusion.
+- Clarified Breakdown copy as chapter/page map review only.
+- Clarified Page Plan as the spend gate for layout, text capacity, and prompt readiness.
+- Clarified Image Proofing as the selected-page asset desk.
+- Added project-level image library controls and reuse.
+- Restricted image reuse to assets from the same project for now.
+- Updated rendered-image CSS to contain art in the reserved slot without crop-fill or radial masking.
 
-## Backend Functions Not Exposed In UI
+## Recommended Next Product Improvements
 
-- `POST /api/projects/:id/text-fit-preview`
-- `POST /api/pages/:pageId/generate-image`
-- `GET /api/pages/:pageId/images`
-- `POST /api/pages/:pageId/images/:version/approve`
-- `POST /api/pages/:pageId/images/:version/reject`
-- `POST /api/pages/:pageId/images/:version/set-active`
-- `POST /api/pages/:pageId/regenerate`
-- `POST /api/pages/:pageId/upscale`
-- `POST /api/projects/:id/chapters/:chapterNumber/render`
-- `POST /api/projects/:id/render-book`
+1. Make the board tabbed or stage-focused.
+   Show one active workspace at a time: Breakdown, Page Plan, Assets, Proof. Keep the top progress strip persistent. This reduces scrolling and makes "what do I inspect now?" obvious.
 
-## Hide Or Move To Advanced
+2. Create a true Asset Library page.
+   The current embedded library is useful, but commercial production needs a dedicated asset desk with batch review, tags, notes, quality status, layout compatibility, source prompt, usage history, and reuse targets.
 
-Normal operator view should not show raw prompt engineering unless requested.
+3. Add first-class asset tables.
+   Move from page-version rows only to `image_assets`, `image_asset_usages`, `image_asset_tags`, and `image_asset_reviews`. This enables reuse across pages, chapters, future books, and future projects without duplicating metadata.
 
-Move these behind Advanced:
+4. Add proof-review annotations.
+   Operators need to mark proof issues per page: text cramped, image wrong crop, contrast issue, replace art, typo, approve page. These should become actionable tasks.
 
-- Raw prompt text.
-- Prompt hashes.
-- Layout percentages and internal layout instruction prose.
-- Image slot rules.
-- Placeholder lists.
-- File paths.
-- Schema-like identifiers.
-- Technical model notes.
-- Capacity internals beyond simple fit status.
+5. Add a production dashboard.
+   Show counts that matter commercially: pages planned, pages text-fit clean, pages with approved art, pages print-ready, estimated image spend remaining, proof status, export readiness.
 
-Normal view should show:
+6. Add automated UI audits.
+   There is no Cypress setup in the repo today. Add Playwright or Cypress checks for the critical operator path: load project, run text-fit, load library, render chapter, verify fallback controls, and check no major workflow sections are empty.
 
-- Chapter/page title.
-- Page purpose.
-- Selected layout name.
-- Word count.
-- Fit/readiness status.
-- Image status.
-- Approval status.
-- Preview button.
-- Regenerate/edit/request-change controls.
+7. Promote standards from each book.
+   Good prompts, accepted layout choices, rejected image reasons, and print proof findings should feed the Publishing Intelligence Center automatically so the next title starts smarter.
 
-## Over-Engineered Or Premature
+## Operator Quality Bar
 
-- The full layout prompt library is necessary for setup, but it dominates the UI too early.
-- Publishing Intelligence is valuable, but the main pipeline workflow should appear before knowledge capture during day-to-day operation.
-- Internal prompt metadata belongs to reviewers/developers, not the default operator path.
-- EPUB work is not exposed yet; do not fake it in the UI until a backend endpoint exists.
+The operator should always be able to answer:
 
-## Recommended Build Order
+- What is the next gate?
+- What is blocked?
+- What will spend money?
+- What has been approved?
+- Where is this image stored?
+- Can this image be reused?
+- Does the page proof remain readable?
+- What changed since the last proof?
 
-1. Make the operator workflow visible in order: upload, breakdown, plan, text-fit, prompts, images, preview, export.
-2. Add chapter breakdown review from existing manifest content.
-3. Add page plan review with normal and Advanced modes.
-4. Add text-fit preview button and summary.
-5. Add per-page image actions: generate, load images, approve, reject/regenerate, upscale.
-6. Add large PDF preview for chapter and full book render.
-7. Add agent roster/command context so the operator understands which agent is doing which job.
-8. Move the layout prompt library and raw technical data behind Advanced.
-9. Keep EPUB export marked as "backend not exposed yet" until an endpoint exists.
-10. Update README/testing notes and verify build/tests.
-
-## Immediate Implementation Scope
-
-Implement the shortest clean path to operator usability:
-
-- Add an Advanced toggle.
-- Add an agent/status panel with stage actions.
-- Add breakdown review from manifests.
-- Add page-plan cards with operator-friendly summaries.
-- Add text-fit preview.
-- Add image review/action controls wired to existing backend routes.
-- Add chapter/book PDF preview controls.
-- Keep paid image generation behind explicit confirmation.
+If the UI does not answer those quickly, the workflow is not yet commercial-grade.

@@ -28,11 +28,18 @@ import { UnsupportedManuscriptError } from '../pipeline/stage-1-ingestion/extrac
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
-import { RenderBlockedError, renderBookPdf, renderChapterPdf, renderCoverPdf } from '../pipeline/stage-6-layout/render-chapter.js';
-import { countImagesForProject } from '../db/repositories/images.repo.js';
+import { RenderBlockedError, renderBookPdf, renderChapterPdf, renderCoverPdf, renderPagePdf } from '../pipeline/stage-6-layout/render-chapter.js';
+import { countImagesForProject, listImagesForProject } from '../db/repositories/images.repo.js';
+import { CONTENT_TYPE_POLICY, decomposeTemplate } from '../pipeline/stage-2-planner/layered-layout.js';
 import { estimateCost } from '../services/cost/estimate.js';
+import { getChapterOperatorIntelligence } from '../services/operator-intelligence/operator-intelligence.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
+const ProjectPageParamsSchema = z.object({ id: z.string().uuid(), pageKey: z.string().min(1) });
+const ChapterOperatorIntelligenceParamsSchema = z.object({
+  id: z.string().uuid(),
+  chapterNumber: z.coerce.number().int().positive(),
+});
 const ChapterLayoutApprovalParamsSchema = z.object({
   id: z.string().uuid(),
   chapterNumber: z.coerce.number().int().positive(),
@@ -78,6 +85,23 @@ function toContract(row: ProjectRow) {
 const ProjectListResponseSchema = z.object({ projects: z.array(ProjectSchema) });
 const CreatedProjectResponseSchema = z.object({ project: ProjectSchema });
 const UpdateProjectConfigBodySchema = z.object({ config: ProjectConfigSchema });
+
+function layoutCompatibilityLabels(layoutTemplate: string | null, contentType?: string): string[] {
+  const labels = new Set<string>();
+  if (layoutTemplate) {
+    const composition = decomposeTemplate(layoutTemplate as Parameters<typeof decomposeTemplate>[0]);
+    labels.add(composition.architecture.toLowerCase().replace(/_/g, ' '));
+    labels.add(composition.contentType.toLowerCase().replace(/_/g, ' '));
+    const policy = CONTENT_TYPE_POLICY[composition.contentType];
+    policy.usedFor.forEach((use) => labels.add(use));
+  }
+  if (contentType && contentType in CONTENT_TYPE_POLICY) {
+    const policy = CONTENT_TYPE_POLICY[contentType as keyof typeof CONTENT_TYPE_POLICY];
+    labels.add(policy.purpose);
+    policy.usedFor.forEach((use) => labels.add(use));
+  }
+  return Array.from(labels);
+}
 
 const UploadManuscriptBodySchema = z
   .object({
@@ -141,6 +165,34 @@ const PagesListResponseSchema = z.object({
     }),
   ),
   layoutApprovals: LayoutApprovalsSchema,
+});
+
+const OperatorChapterIntelligenceResponseSchema = z.object({
+  status: z.enum(['READY', 'NEEDS_REVIEW', 'BLOCKED']),
+  nextAction: z.string(),
+  summary: z.object({
+    chapterNumber: z.number(),
+    chapterTitle: z.string(),
+    pages: z.number(),
+    layoutApproved: z.boolean(),
+    pagesPlanned: z.number(),
+    pagesWithImages: z.number(),
+    pagesWithApprovedImages: z.number(),
+    pagesPrintReady: z.number(),
+    missingImages: z.number(),
+    unapprovedImages: z.number(),
+    placeholderPages: z.number(),
+  }),
+  findings: z.array(
+    z.object({
+      severity: z.enum(['BLOCKER', 'WARNING', 'INFO']),
+      category: z.enum(['TEXT_FIT', 'IMAGE', 'LAYOUT', 'PROOF', 'WORKFLOW']),
+      scope: z.enum(['CHAPTER', 'PAGE']),
+      pageKey: z.string().optional(),
+      message: z.string(),
+      recommendedAction: z.string(),
+    }),
+  ),
 });
 
 const PlanPagesResponseSchema = z.object({
@@ -826,6 +878,151 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     },
   );
 
+  const ImageLibraryQuerySchema = z.object({
+    q: z.string().optional(),
+    status: z.string().optional(),
+    layout: z.string().optional(),
+    chapter: z.coerce.number().int().positive().optional(),
+  });
+  const ImageLibraryResponseSchema = z.object({
+    total: z.number(),
+    assets: z.array(
+      z.object({
+        imageId: z.string(),
+        version: z.number(),
+        status: z.string(),
+        active: z.boolean(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+        generatedPath: z.string().nullable(),
+        upscaledPath: z.string().nullable(),
+        previewUrl: z.string(),
+        widthPx: z.number().nullable(),
+        heightPx: z.number().nullable(),
+        dpiW: z.number().nullable(),
+        dpiH: z.number().nullable(),
+        prompt: z.string(),
+        promptSha256: z.string(),
+        source: z.object({
+          pageId: z.string(),
+          pageKey: z.string(),
+          chapterNumber: z.number(),
+          plannedPageNumber: z.number(),
+          entryTitle: z.string(),
+          imageSubject: z.string().nullable(),
+          contentType: z.string().nullable(),
+          layoutTemplate: z.string().nullable(),
+          pageStatus: z.string(),
+        }),
+        compatibility: z.array(z.string()),
+        tags: z.array(z.string()),
+      }),
+    ),
+  });
+  app.get(
+    '/api/projects/:id/image-library',
+    { schema: { params: ProjectParamsSchema, querystring: ImageLibraryQuerySchema, response: { 200: ImageLibraryResponseSchema } } },
+    async (request) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const query = ImageLibraryQuerySchema.parse(request.query ?? {});
+      const rows = await listImagesForProject(id);
+      const q = query.q?.trim().toLowerCase();
+      const assets = rows
+        .map((row) => {
+          const manifest = PageManifestSchema.safeParse(row.manifestContent);
+          const content = manifest.success ? manifest.data : undefined;
+          const entryTitle = content?.entryTitle ?? row.page.pageKey;
+          const imageSubject = content?.imageSubject ?? null;
+          const contentType = content?.contentType ?? null;
+          const layoutTemplate = row.page.layoutTemplate ?? content?.layoutTemplate ?? null;
+          const compatibility = layoutCompatibilityLabels(layoutTemplate, contentType ?? undefined);
+          const tags = [
+            `chapter-${row.page.chapterNumber}`,
+            row.page.pageKey,
+            row.image.status.toLowerCase(),
+            ...(layoutTemplate ? [layoutTemplate] : []),
+            ...(contentType ? [contentType] : []),
+          ];
+          return {
+            imageId: row.image.id,
+            version: row.image.version,
+            status: row.image.status,
+            active: row.image.active,
+            createdAt: row.image.createdAt.toISOString(),
+            updatedAt: row.image.updatedAt.toISOString(),
+            generatedPath: row.image.generatedPath,
+            upscaledPath: row.image.upscaledPath,
+            previewUrl: `/api/images/${row.image.id}/file`,
+            widthPx: row.image.widthPx,
+            heightPx: row.image.heightPx,
+            dpiW: row.image.dpiW,
+            dpiH: row.image.dpiH,
+            prompt: row.image.prompt,
+            promptSha256: row.image.promptSha256,
+            source: {
+              pageId: row.page.id,
+              pageKey: row.page.pageKey,
+              chapterNumber: row.page.chapterNumber,
+              plannedPageNumber: row.page.plannedPageNumber,
+              entryTitle,
+              imageSubject,
+              contentType,
+              layoutTemplate,
+              pageStatus: row.page.status,
+            },
+            compatibility,
+            tags,
+          };
+        })
+        .filter((asset) => {
+          if (query.status && asset.status !== query.status) return false;
+          if (query.layout && asset.source.layoutTemplate !== query.layout) return false;
+          if (query.chapter && asset.source.chapterNumber !== query.chapter) return false;
+          if (!q) return true;
+          const haystack = [
+            asset.source.pageKey,
+            asset.source.entryTitle,
+            asset.source.imageSubject ?? '',
+            asset.source.contentType ?? '',
+            asset.source.layoutTemplate ?? '',
+            asset.status,
+            asset.prompt,
+            asset.compatibility.join(' '),
+            asset.tags.join(' '),
+          ]
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(q);
+        });
+      return { total: assets.length, assets };
+    },
+  );
+
+  app.get(
+    '/api/projects/:id/chapters/:chapterNumber/operator-intelligence',
+    {
+      schema: {
+        params: ChapterOperatorIntelligenceParamsSchema,
+        response: {
+          200: OperatorChapterIntelligenceResponseSchema,
+          404: ApiErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id, chapterNumber } = ChapterOperatorIntelligenceParamsSchema.parse(request.params);
+      const intelligence = await getChapterOperatorIntelligence(id, chapterNumber);
+      if (!intelligence) {
+        return reply.code(404).send({
+          error: 'Chapter Not Found',
+          message: `No chapter ${chapterNumber} manifest exists for this project.`,
+          statusCode: 404,
+        });
+      }
+      return intelligence;
+    },
+  );
+
   function renderErrorStatus(code: string): 404 | 409 | 503 {
     if (code === 'not_found') return 404;
     if (code === 'no_chromium') return 503;
@@ -834,6 +1031,26 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
 
   // Stage 6 — render one chapter to a PDF (uses approved/upscaled art, else clean
   // placeholders so it works before images exist). Returns the PDF binary.
+  app.post('/api/projects/:id/pages/:pageKey/render', async (request, reply) => {
+    const { id, pageKey } = ProjectPageParamsSchema.parse(request.params);
+    try {
+      const { pdf, totalPages } = await renderPagePdf(id, pageKey);
+      if ((request.query as { format?: string } | undefined)?.format === 'json') {
+        return reply.send({ ok: true, pageKey, totalPages, bytes: pdf.byteLength });
+      }
+      reply.header('content-type', 'application/pdf');
+      reply.header('content-disposition', `inline; filename="${pageKey}.pdf"`);
+      reply.header('x-total-pages', String(totalPages));
+      return reply.send(pdf);
+    } catch (error) {
+      if (error instanceof RenderBlockedError) {
+        const status = renderErrorStatus(error.code);
+        return reply.code(status).send({ error: 'Render Blocked', message: error.message, statusCode: status });
+      }
+      throw error;
+    }
+  });
+
   const RenderChapterParamsSchema = z.object({ id: z.string().uuid(), chapterNumber: z.coerce.number().int().positive() });
   app.post('/api/projects/:id/chapters/:chapterNumber/render', async (request, reply) => {
     const { id, chapterNumber } = RenderChapterParamsSchema.parse(request.params);

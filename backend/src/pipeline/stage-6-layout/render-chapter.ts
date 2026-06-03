@@ -27,7 +27,7 @@ import { recordExport } from '../../db/repositories/exports.repo.js';
 import { getProjectStorage, type ProjectStorage } from '../../services/storage/project-storage.js';
 import { logger } from '../../lib/logger.js';
 import { computePageGeometry } from './page-geometry.js';
-import { buildChapterHtml, buildBookHtml, buildCoverHtml, computeCoverDimensions, type ChapterPageRender, type BookChapter } from './render-html.js';
+import { buildChapterHtml, buildBookHtml, buildCoverHtml, buildPageHtml, computeCoverDimensions, type ChapterPageRender, type BookChapter } from './render-html.js';
 import { directLayout } from './layout-director.js';
 import { isChromiumAvailable, loadPagedPolyfill, renderHtmlToPdf } from './render-pdf.js';
 import { preflightBook, type PreflightReport } from '../stage-7-pdf-compile/stitch-book.js';
@@ -97,6 +97,49 @@ export interface ChapterRenderResult {
   chapterNumber: number;
   pdf: Buffer;
   totalPages: number;
+}
+
+export interface PageRenderResult {
+  pageKey: string;
+  chapterNumber: number;
+  pdf: Buffer;
+  totalPages: number;
+}
+
+export async function renderPagePdf(projectId: string, pageKey: string): Promise<PageRenderResult> {
+  if (!isChromiumAvailable()) throw new RenderBlockedError('Chromium is not available on this host.', 'no_chromium');
+
+  const project = await getProject(projectId);
+  if (!project) throw new RenderBlockedError('Project not found.', 'not_found');
+  const config = project.config as ProjectConfig;
+
+  const pageManifest = (await listManifests(projectId, 'PAGE'))
+    .map((r) => PageManifestSchema.parse(r.content))
+    .find((p) => p.pageId === pageKey);
+  if (!pageManifest) throw new RenderBlockedError(`No page manifest found for ${pageKey}.`, 'no_page');
+
+  const storage = getProjectStorage();
+  const pageRows = await listPages(projectId);
+  const pageRow = pageRows.find((row) => row.pageKey === pageKey);
+  const geometry = computePageGeometry(config.trimSize);
+  const renderPage = {
+    ...pageManifest,
+    layoutTemplate: (pageRow?.layoutTemplate ?? pageManifest.layoutTemplate) as PageManifest['layoutTemplate'],
+  };
+  const imageDataUri = await imageDataUriForPage(storage, pageRow?.id, renderImageTargetPx(renderPage, config, geometry));
+  const polyfillJs = await loadPagedPolyfill();
+  const html = buildPageHtml(renderPage, config, {
+    geometry,
+    imageDataUri,
+    polyfillJs,
+    chapterLabel: `Chapter ${renderPage.chapterNumber}`,
+  });
+
+  logger.info({ projectId, pageKey }, 'Stage 6: rendering single page PDF');
+  const { buffer, totalPages } = await renderHtmlToPdf(html, geometry);
+
+  await storage.writeProjectFile(projectId, ['pages', `${pageKey}.pdf`], buffer);
+  return { pageKey, chapterNumber: renderPage.chapterNumber, pdf: buffer, totalPages };
 }
 
 export async function renderChapterPdf(projectId: string, chapterNumber: number): Promise<ChapterRenderResult> {

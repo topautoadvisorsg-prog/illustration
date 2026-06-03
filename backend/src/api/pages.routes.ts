@@ -8,15 +8,17 @@ import {
   listPageImages,
   regeneratePageImage,
   rejectPageImage,
+  reuseLibraryImageForPage,
   setActivePageImage,
 } from '../pipeline/stage-4-review/review-image.js';
 import { UpscaleBlockedError, upscalePageImage } from '../pipeline/stage-5-upscale/upscale-image.js';
 import { isChromiumAvailable, renderSampleChapterPdf, renderSamplePagePdf } from '../pipeline/stage-6-layout/render-check.js';
 import { getContentTypeGuide } from '../pipeline/stage-2-planner/layered-layout.js';
-import { getActiveImage, getImageVersion } from '../db/repositories/images.repo.js';
+import { getActiveImage, getImageById, getImageVersion } from '../db/repositories/images.repo.js';
 import { getProjectStorage } from '../services/storage/project-storage.js';
 
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
+const ImageParamsSchema = z.object({ imageId: z.string().uuid() });
 const ImageVersionParamsSchema = z.object({ pageId: z.string().uuid(), version: z.coerce.number().int().positive() });
 
 const GenerateImageResponseSchema = z.object({
@@ -120,6 +122,22 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // Serve an image as a library asset, independent of the page it was generated for.
+  app.get('/api/images/:imageId/file', async (request, reply) => {
+    const { imageId } = ImageParamsSchema.parse(request.params);
+    const row = await getImageById(imageId);
+    const path = row?.upscaledPath ?? row?.generatedPath;
+    if (!path) return reply.code(404).send({ error: 'Not Found', message: 'No image asset found.', statusCode: 404 });
+    try {
+      const buf = await getProjectStorage().readProjectFile(path);
+      reply.header('content-type', 'image/png');
+      reply.header('cache-control', 'no-store');
+      return reply.send(buf);
+    } catch {
+      return reply.code(404).send({ error: 'Not Found', message: 'Image file missing in storage.', statusCode: 404 });
+    }
+  });
+
   // Stage 4 — approve a version: locks it active + APPROVED, page -> APPROVED.
   const ApproveResponseSchema = z.object({ pageStatus: z.string(), version: z.number() });
   app.post(
@@ -168,6 +186,32 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
       const { pageId, version } = ImageVersionParamsSchema.parse(request.params);
       try {
         return await setActivePageImage(pageId, version);
+      } catch (error) {
+        if (error instanceof ReviewBlockedError) {
+          const status = reviewErrorStatus(error.code);
+          return reply.code(status).send({ error: status === 404 ? 'Not Found' : 'Conflict', message: error.message, statusCode: status });
+        }
+        throw error;
+      }
+    },
+  );
+
+  const ReuseImageBodySchema = z.object({ sourceImageId: z.string().uuid() });
+  const ReuseImageResponseSchema = z.object({ pageStatus: z.string(), version: z.number(), imageId: z.string() });
+  app.post(
+    '/api/pages/:pageId/images/reuse',
+    {
+      schema: {
+        params: PageParamsSchema,
+        body: ReuseImageBodySchema,
+        response: { 200: ReuseImageResponseSchema, 404: ApiErrorSchema, 409: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { pageId } = PageParamsSchema.parse(request.params);
+      const { sourceImageId } = ReuseImageBodySchema.parse(request.body ?? {});
+      try {
+        return await reuseLibraryImageForPage(pageId, sourceImageId);
       } catch (error) {
         if (error instanceof ReviewBlockedError) {
           const status = reviewErrorStatus(error.code);
