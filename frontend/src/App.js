@@ -1097,7 +1097,7 @@ Use this entry to prove manuscript to manifest generation.`);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [commandInput, setCommandInput] = useState("");
-  const [phase, setPhase] = useState("Manifests");
+  const [phase, setPhase] = useState(PHASES[0]);
   const [devIssues, setDevIssues] = useState(loadDevIssues);
   const [intelligenceOverview, setIntelligenceOverview] = useState(null);
   const [intelligenceItems, setIntelligenceItems] = useState([]);
@@ -1329,9 +1329,16 @@ Use this entry to prove manuscript to manifest generation.`);
 
   async function refreshProjects() {
     const data = await call("/api/projects");
-    setProjects(data.projects || []);
-    if (!activeProjectId && data.projects?.[0]) {
-      setActiveProjectId(data.projects[0].id);
+    const list = data.projects || [];
+    setProjects(list);
+    if (!activeProjectId && list.length) {
+      // Prefer the most recently updated project that actually has a manuscript,
+      // so the operator lands on real work instead of an empty draft.
+      const withManuscript = list.filter((p) => p.manuscriptPath);
+      const pick = (withManuscript.length ? withManuscript : list).reduce((newest, p) =>
+        new Date(p.updatedAt || p.createdAt) > new Date(newest.updatedAt || newest.createdAt) ? p : newest,
+      );
+      setActiveProjectId(pick.id);
     }
   }
 
@@ -1347,6 +1354,21 @@ Use this entry to prove manuscript to manifest generation.`);
     setPageImages({});
     setPlannedPages([]);
     if (id) run(`Loading project ${id.slice(0, 8)}...`, () => loadArtifacts(id));
+  }
+
+  async function deleteProjectById(id, label) {
+    if (!id) return;
+    if (!window.confirm(`Permanently delete "${label}" and all its pages/images? This cannot be undone.`)) return;
+    await call(`/api/projects/${id}`, { method: "DELETE" });
+    appendLog("issue", `Deleted project ${id.slice(0, 8)}.`);
+    if (id === activeProjectId) {
+      setActiveProjectId("");
+      setSelectedPageId("");
+      setPlannedPages([]);
+      setManifests([]);
+      setPages([]);
+    }
+    await refreshProjects();
   }
 
   async function createProject() {
@@ -1872,15 +1894,26 @@ Use this entry to prove manuscript to manifest generation.`);
             <label htmlFor="project-select">Project</label>
             <div className="project-picker" id="project-select" role="listbox" aria-label="Projects">
               {projects.map((p) => (
-                <button
-                  type="button"
-                  className={p.id === activeProjectId ? "picker-button active" : "picker-button"}
-                  key={p.id}
-                  onClick={() => selectProject(p.id)}
-                >
-                  <strong>{p.title || "Untitled"}</strong>
-                  <span>{p.id.slice(0, 8)} / {p.manuscriptPath ? "manuscript" : "no manuscript"}</span>
-                </button>
+                <div className="project-item" key={p.id}>
+                  <button
+                    type="button"
+                    className={p.id === activeProjectId ? "picker-button active" : "picker-button"}
+                    onClick={() => selectProject(p.id)}
+                  >
+                    <strong>{p.title || "Untitled"}</strong>
+                    <span>{p.id.slice(0, 8)} · {p.manuscriptPath ? "✓ manuscript" : "no manuscript"} · {p.status}</span>
+                    <span>{p.createdAt ? new Date(p.createdAt).toLocaleString() : ""}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="project-delete"
+                    title="Delete this project permanently"
+                    disabled={busy}
+                    onClick={() => run("Deleting project...", () => deleteProjectById(p.id, p.title || p.id.slice(0, 8)))}
+                  >
+                    ✕
+                  </button>
+                </div>
               ))}
               {projects.length === 0 && <span className="empty-inline">No projects yet</span>}
             </div>

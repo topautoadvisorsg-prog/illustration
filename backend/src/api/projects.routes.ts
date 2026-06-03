@@ -10,6 +10,7 @@ import {
 import { z } from 'zod';
 import {
   createProject,
+  deleteProject,
   getProject,
   listProjects,
   setManuscript,
@@ -254,6 +255,19 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       const row = await getProject(id);
       if (!row) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
       return { project: toContract(row) };
+    },
+  );
+
+  // Permanently delete a project and all its manifests, pages, and images.
+  app.delete(
+    '/api/projects/:id',
+    { schema: { params: ProjectParamsSchema, response: { 200: z.object({ deleted: z.boolean(), id: z.string() }), 404: ApiErrorSchema } } },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const existing = await getProject(id);
+      if (!existing) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      await deleteProject(id);
+      return { deleted: true, id };
     },
   );
 

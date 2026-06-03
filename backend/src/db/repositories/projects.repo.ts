@@ -9,7 +9,7 @@
 import { eq } from 'drizzle-orm';
 import type { ProjectConfig, ProjectStatus } from '@wildlands/shared';
 import { getDb } from '../client.js';
-import { projects } from '../schema/index.js';
+import { manifests, pages, projects } from '../schema/index.js';
 import { getMasterStyleBlock, MIN_REAL_STYLE_BLOCK_CHARS } from '../../services/style/master-style-blocks.js';
 
 export interface NewProjectInput {
@@ -66,6 +66,22 @@ export async function getProject(id: string): Promise<ProjectRow | null> {
   const db = getDb();
   const [row] = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
   return row ?? null;
+}
+
+/**
+ * Permanently delete a project and everything under it. Pages carry a RESTRICT
+ * foreign key to manifests, so pages must be removed before manifests; the
+ * remaining children (images, usage, cost events, etc.) cascade from those.
+ * Runs in one transaction so a failure leaves nothing half-deleted.
+ */
+export async function deleteProject(id: string): Promise<boolean> {
+  const db = getDb();
+  return db.transaction(async (tx) => {
+    await tx.delete(pages).where(eq(pages.projectId, id)); // cascades images + image events
+    await tx.delete(manifests).where(eq(manifests.projectId, id));
+    const deleted = await tx.delete(projects).where(eq(projects.id, id)).returning({ id: projects.id });
+    return deleted.length > 0;
+  });
 }
 
 export async function setManuscript(

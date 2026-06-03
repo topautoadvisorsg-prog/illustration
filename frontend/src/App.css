@@ -99,6 +99,30 @@ input[type="file"] {
   overflow: auto;
 }
 
+.project-item {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.project-item .picker-button {
+  flex: 1;
+}
+
+.project-delete {
+  min-width: 34px;
+  padding: 0 8px;
+  border-color: #c0584e;
+  background: #fff5f3;
+  color: #b23b2e;
+  font-weight: 800;
+}
+
+.project-delete:hover:not(:disabled) {
+  background: #c0392b;
+  color: #fff;
+}
+
 .picker-button {
   display: grid;
   min-height: 44px;
