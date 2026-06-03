@@ -10,6 +10,10 @@ const configuredBackend = process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND_U
 const PHASES = ["Manuscript", "Breakdown", "Page Plan", "Text-Fit", "Images", "Review", "Render", "Export"];
 const PAID_ACTION_WARNING = "This calls a paid external API. Continue?";
 const DEV_ISSUES_KEY = "wildlands_dev_issues";
+const ACTIVE_PROJECT_KEY = "wildlands_active_project_id";
+const ACTIVE_PHASE_KEY = "wildlands_active_phase";
+const SELECTED_PAGE_PREFIX = "wildlands_selected_page:";
+const MANUSCRIPT_CACHE_PREFIX = "wildlands_manuscript:";
 const INTELLIGENCE_TYPES = [
   ["", "All Intelligence"],
   ["EXPERIMENT", "Experiments"],
@@ -37,6 +41,53 @@ function loadDevIssues() {
     return JSON.parse(localStorage.getItem(DEV_ISSUES_KEY) || "[]");
   } catch {
     return [];
+  }
+}
+
+function loadStoredString(key, fallback = "") {
+  try {
+    return localStorage.getItem(key) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function storeString(key, value) {
+  try {
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
+  } catch {
+    /* localStorage unavailable - keep in memory only */
+  }
+}
+
+function manuscriptCacheKey(projectId) {
+  return `${MANUSCRIPT_CACHE_PREFIX}${projectId}`;
+}
+
+function selectedPageKey(projectId) {
+  return `${SELECTED_PAGE_PREFIX}${projectId}`;
+}
+
+function fileNameFromPath(path) {
+  return String(path || "").split(/[\\/]/).filter(Boolean).pop() || "";
+}
+
+function loadManuscriptCache(projectId) {
+  if (!projectId) return null;
+  try {
+    return JSON.parse(localStorage.getItem(manuscriptCacheKey(projectId)) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveManuscriptCache(projectId, cache) {
+  if (!projectId || !cache?.markdown) return;
+  try {
+    localStorage.setItem(manuscriptCacheKey(projectId), JSON.stringify(cache));
+  } catch {
+    /* A manuscript can exceed browser storage; backend state remains source of truth. */
   }
 }
 
@@ -1072,7 +1123,7 @@ function App() {
   const [backendUrl, setBackendUrl] = useState(trimSlash(configuredBackend));
   const [health, setHealth] = useState(null);
   const [projects, setProjects] = useState([]);
-  const [activeProjectId, setActiveProjectId] = useState("");
+  const [activeProjectId, setActiveProjectId] = useState(() => loadStoredString(ACTIVE_PROJECT_KEY));
   const [projectConfig, setProjectConfig] = useState(defaultProjectConfig);
   // Start empty so the operator never accidentally uploads demo text. They must
   // drop a file or paste their real manuscript before Upload is meaningful.
@@ -1100,7 +1151,10 @@ function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
-  const [phase, setPhase] = useState(PHASES[0]);
+  const [phase, setPhase] = useState(() => {
+    const stored = loadStoredString(ACTIVE_PHASE_KEY, PHASES[0]);
+    return PHASES.includes(stored) ? stored : PHASES[0];
+  });
   const [devIssues, setDevIssues] = useState(loadDevIssues);
   const [intelligenceOverview, setIntelligenceOverview] = useState(null);
   const [intelligenceItems, setIntelligenceItems] = useState([]);
@@ -1345,7 +1399,13 @@ function App() {
     const data = await call("/api/projects");
     const list = data.projects || [];
     setProjects(list);
-    if (!activeProjectId && list.length) {
+    if (list.length === 0) {
+      setActiveProjectId("");
+      return;
+    }
+
+    const activeStillExists = activeProjectId && list.some((project) => project.id === activeProjectId);
+    if (!activeStillExists) {
       // Prefer the most recently updated project that actually has a manuscript,
       // so the operator lands on real work instead of an empty draft.
       const withManuscript = list.filter((p) => p.manuscriptPath);
@@ -1398,6 +1458,20 @@ function App() {
     setPageImages({});
     setPlannedPages([]);
     setLayoutApprovals({});
+    setPdfPreview((current) => {
+      if (current.url) URL.revokeObjectURL(current.url);
+      return { title: "", url: "", meta: "" };
+    });
+    const cached = loadManuscriptCache(id);
+    if (cached?.markdown) {
+      setManuscript(cached.markdown);
+      setManuscriptName(cached.filename || "");
+      setManuscriptSummary(cached.summary || null);
+    } else {
+      setManuscript("");
+      setManuscriptName("");
+      setManuscriptSummary(null);
+    }
     if (id) run(`Loading project ${id.slice(0, 8)}...`, () => loadArtifacts(id));
   }
 
@@ -1453,6 +1527,17 @@ function App() {
   async function uploadManuscript(projectId = activeProjectId) {
     if (!projectId) throw new Error("Create or select a project first.");
     if (!manuscript.trim()) {
+      if (selectedProject?.manuscriptPath) {
+        const cached = loadManuscriptCache(projectId);
+        if (cached?.markdown) {
+          setManuscript(cached.markdown);
+          setManuscriptName(cached.filename || "");
+          setManuscriptSummary(cached.summary || null);
+        }
+        setMessage("Manuscript is already uploaded for this project. Continue with Breakdown / Page Plan.");
+        appendLog("success", "Manuscript already exists on the selected project; upload skipped.");
+        return;
+      }
       throw new Error("The manuscript box is empty. Drop your .md/.txt file on it or paste your text first.");
     }
     const data = await call(`/api/projects/${projectId}/manuscript`, {
@@ -1461,6 +1546,12 @@ function App() {
     });
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
     setManuscriptSummary(data.manuscript);
+    saveManuscriptCache(projectId, {
+      filename: manuscriptName || "manuscript.md",
+      markdown: manuscript,
+      summary: data.manuscript,
+      cachedAt: new Date().toISOString(),
+    });
     setMessage(`Manuscript uploaded: ${data.manuscript.sizeBytes} bytes.`);
     appendLog("success", `Manuscript uploaded: ${data.manuscript.totalChapters} chapter(s), ${data.manuscript.totalEntries} page candidate(s).`);
   }
@@ -1475,8 +1566,16 @@ function App() {
     const incomingPages = pageData.pages || [];
     setPages(incomingPages);
     setLayoutApprovals(pageData.layoutApprovals || {});
+    const cached = loadManuscriptCache(projectId);
+    if (cached?.markdown && !manuscript.trim()) {
+      setManuscript(cached.markdown);
+      setManuscriptName(cached.filename || "");
+      setManuscriptSummary(cached.summary || null);
+    }
     setSelectedPageId((current) =>
-      incomingPages.some((page) => page.id === current) ? current : incomingPages[0]?.id || "",
+      incomingPages.some((page) => page.id === current)
+        ? current
+        : incomingPages.find((page) => page.id === loadStoredString(selectedPageKey(projectId)))?.id || incomingPages[0]?.id || "",
     );
     setMessage("Loaded manifests and pages.");
   }
@@ -1669,12 +1768,50 @@ function App() {
 
   async function generateManifests(projectId = activeProjectId) {
     if (!projectId) throw new Error("Create or select a project first.");
-    const data = await call(`/api/projects/${projectId}/manifests`, {
-      method: "POST",
-    });
+    const existing = await call(`/api/projects/${projectId}/manifests`);
+    if (existing.manifests?.some((manifest) => manifest.kind === "PAGE")) {
+      await loadArtifacts(projectId);
+      setMessage("Breakdown already exists for this project. Loaded chapters/pages from the backend.");
+      appendLog("success", "Breakdown already exists; loaded saved manifests/pages.");
+      return;
+    }
+
+    let data;
+    try {
+      data = await call(`/api/projects/${projectId}/manifests`, {
+        method: "POST",
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("already has manifests/pages")) {
+        await loadArtifacts(projectId);
+        setMessage("Breakdown already exists for this project. Loaded chapters/pages from the backend.");
+        appendLog("success", "Breakdown already exists; loaded saved manifests/pages.");
+        return;
+      }
+      if (message.includes("Stored manuscript file is missing")) {
+        const cached = loadManuscriptCache(projectId);
+        if (cached?.markdown) {
+          appendLog("running", "Stored manuscript file was missing on the server; restoring it from browser cache.");
+          const upload = await call(`/api/projects/${projectId}/manuscript`, {
+            method: "POST",
+            body: JSON.stringify({ filename: cached.filename || "manuscript.md", markdown: cached.markdown }),
+          });
+          setProjects((current) => current.map((project) => (project.id === upload.project.id ? upload.project : project)));
+          setManuscript(cached.markdown);
+          setManuscriptName(cached.filename || "");
+          setManuscriptSummary(upload.manuscript);
+          data = await call(`/api/projects/${projectId}/manifests`, { method: "POST" });
+        } else {
+          throw new Error("The server lost the stored manuscript file and this browser has no cached copy. Choose the manuscript file once to restore it.");
+        }
+      } else {
+        throw err;
+      }
+    }
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
     setMessage(`Manifested ${data.summary.totalPages} page(s), ${data.summary.manifestsWritten} manifest row(s).`);
-    appendLog("success", `Claude manifest pass wrote ${data.summary.totalPages} page(s).`);
+    appendLog("success", `Manifest breakdown wrote ${data.summary.totalPages} page(s).`);
     await loadArtifacts(projectId);
   }
 
@@ -1911,6 +2048,37 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    storeString(ACTIVE_PROJECT_KEY, activeProjectId);
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    storeString(ACTIVE_PHASE_KEY, phase);
+  }, [phase]);
+
+  useEffect(() => {
+    if (activeProjectId && selectedPageId) {
+      storeString(selectedPageKey(activeProjectId), selectedPageId);
+    }
+  }, [activeProjectId, selectedPageId]);
+
+  useEffect(() => {
+    if (!apiUrl || !activeProjectId || !projects.some((project) => project.id === activeProjectId)) return;
+    loadArtifacts(activeProjectId).catch((err) => {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      appendLog("error", `Could not restore project output: ${errorMessage}`);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiUrl, activeProjectId, projects]);
+
+  const storedManuscriptName = fileNameFromPath(selectedProject?.manuscriptPath);
+  const manuscriptStatusText = manuscript.trim()
+    ? `Loaded: ${manuscriptName || "pasted text"} (${manuscript.length.toLocaleString()} chars)`
+    : selectedProject?.manuscriptPath
+      ? `Stored on project: ${storedManuscriptName || "manuscript"}`
+      : "Nothing loaded yet";
+  const manuscriptFileLabel = manuscriptName || storedManuscriptName;
+
   return (
     <main className="shell">
       <section className="topbar">
@@ -2062,7 +2230,7 @@ function App() {
           >
             <strong>{isDragging ? "Drop your manuscript file" : "Drag & drop your manuscript here"}</strong>
             <span>or click to choose a .md / .txt file</span>
-            <span className="file-name-loaded">{manuscript.trim() ? `Loaded: ${manuscriptName || "pasted text"} (${manuscript.length.toLocaleString()} chars)` : "Nothing loaded yet"}</span>
+            <span className="file-name-loaded">{manuscriptStatusText}</span>
           </div>
           <div className="operator-log" aria-live="polite">
             {operatorLog.map((entry, index) => (
@@ -2749,7 +2917,7 @@ function App() {
                   event.target.value = "";
                 }}
               />
-              <span className="file-name" title={manuscriptName}>{manuscriptName}</span>
+              <span className="file-name" title={manuscriptFileLabel}>{manuscriptFileLabel}</span>
               <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
                 Upload
               </button>
