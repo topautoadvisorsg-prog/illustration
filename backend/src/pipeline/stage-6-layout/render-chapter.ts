@@ -126,12 +126,17 @@ export async function renderChapterPdf(projectId: string, chapterNumber: number)
 
   const pages: ChapterPageRender[] = [];
   for (const pm of pageManifests) {
-    const imageDataUri = await imageDataUriForPage(storage, rowByKey.get(pm.pageId)?.id, renderImageTargetPx(pm, config, geometry));
+    const pageRow = rowByKey.get(pm.pageId);
+    const renderPage = {
+      ...pm,
+      layoutTemplate: (pageRow?.layoutTemplate ?? pm.layoutTemplate) as PageManifest['layoutTemplate'],
+    };
+    const imageDataUri = await imageDataUriForPage(storage, pageRow?.id, renderImageTargetPx(renderPage, config, geometry));
     pages.push({
-      entryTitle: pm.entryTitle,
-      scientificName: pm.scientificName,
-      bodyMarkdown: pm.bodyMarkdown,
-      layoutTemplate: pm.layoutTemplate,
+      entryTitle: renderPage.entryTitle,
+      scientificName: renderPage.scientificName,
+      bodyMarkdown: renderPage.bodyMarkdown,
+      layoutTemplate: renderPage.layoutTemplate,
       imageDataUri,
     });
   }
