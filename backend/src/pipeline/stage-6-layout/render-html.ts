@@ -97,8 +97,8 @@ function typographyStyleBlock(t: Typography, c: Palette): string {
   .caption { font-family: var(--font-body); font-style: italic; font-size: ${t.captionPt}pt; color: ${c.accent}; }
   .mono { font-family: 'Courier New', monospace; font-size: 0.92em; }
   .art-placeholder { width: 100%; height: 100%; min-height: 2.4in; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #E8D9B0; outline: 1px dashed ${c.accent}; outline-offset: -4px; font-family: var(--font-display); font-style: italic; font-size: ${t.captionPt}pt; color: ${c.accent}; }
-  .art-slot { box-sizing: border-box; overflow: hidden; background: rgba(245, 237, 214, 0.5); }
-  .art-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }`;
+  .art-slot { box-sizing: border-box; overflow: hidden; background: rgba(245, 237, 214, 0.5); border-radius: 2pt; }
+  .art-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }`;
 }
 
 /**
@@ -179,25 +179,35 @@ function artSlotPositionCss(slot: ArtSlot): string {
 }
 
 /**
- * Inline size for the art slot, scaled to the layout's COVERAGE (image share of
- * the page) so the reserved zone matches the final proportions even before any
- * illustration exists.
- *   - full-width bands/plate: width 100%, height = coverage x text-frame height.
- *   - tall sidebar: width = coverage of the column over near-full height.
- *   - floats / scattered / centered: a balanced box whose area ~= coverage.
+ * PRESENTATION size for the rendered illustration. This is deliberately separate
+ * from the planning coverage: the layout's coverage reserves space for text flow,
+ * but the IMAGE itself is rendered at book scale so it has real visual impact
+ * (a dominant plate, a wide band, a half-page float) — never shrunk into a tiny
+ * placeholder. Text still flows beside/below the art, so readability is preserved.
  */
 function artSlotSizeStyle(slot: ArtSlot, coverage: number, frameHeightIn: number): string {
   const round2 = (n: number) => Math.round(n * 100) / 100;
-  if (slot === 'TOP_BAND' || slot === 'BOTTOM_BAND' || slot === 'FULL_PAGE') {
-    return `width:100%;height:${Math.max(0.8, round2(coverage * frameHeightIn))}in;`;
+  switch (slot) {
+    case 'FULL_PAGE':
+      // Dominant full-page plate: fills the text frame; minimal caption flows after.
+      return `width:100%;height:${round2(frameHeightIn * 0.92)}in;`;
+    case 'TOP_BAND':
+    case 'BOTTOM_BAND':
+      // Generous full-width band (never a thin strip).
+      return `width:100%;height:${round2(Math.max(0.45, coverage) * frameHeightIn)}in;`;
+    case 'SIDEBAR_RIGHT':
+      // Tall ~half-width image column, body runs alongside.
+      return `width:46%;height:${round2(frameHeightIn * 0.96)}in;`;
+    case 'CENTER_WRAP':
+      return `width:72%;height:${round2(Math.max(0.45, coverage) * frameHeightIn)}in;`;
+    case 'SCATTERED':
+      return `width:42%;height:${round2(0.34 * frameHeightIn)}in;`;
+    case 'FLOAT_LEFT':
+    case 'FLOAT_RIGHT':
+    default:
+      // Substantial half-page float; title + body wrap around it, then continue.
+      return `width:46%;height:${round2(Math.max(0.5, coverage) * frameHeightIn)}in;`;
   }
-  if (slot === 'SIDEBAR_RIGHT') {
-    const widthPct = Math.min(60, Math.max(18, Math.round((coverage / 0.95) * 100)));
-    return `width:${widthPct}%;height:${round2(frameHeightIn * 0.95)}in;`;
-  }
-  // floats / scattered / center-wrap: balanced rectangle with area ~= coverage.
-  const frac = Math.sqrt(Math.max(0.01, coverage));
-  return `width:${Math.round(frac * 100)}%;height:${round2(frac * frameHeightIn)}in;`;
 }
 
 function artPlaceholderLabel(template: LayoutTemplateId): string {

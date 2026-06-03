@@ -57,12 +57,11 @@ describe('buildPageHtml', () => {
     expect(html).not.toContain('PREVIEW · ART SLOT');
   });
 
-  it('keeps real art contained in the reserved slot without masking or crop-fill', () => {
+  it('fills the art slot at presentation scale (cover, no vignette mask)', () => {
     const html = buildPageHtml(page(), config, { geometry, imageDataUri: 'data:image/png;base64,AAAA' });
-    expect(html).toContain('object-fit: contain');
+    expect(html).toContain('object-fit: cover');
     expect(html).toContain('overflow: hidden');
     expect(html).not.toContain('mask-image');
-    expect(html).not.toContain('object-fit: cover');
   });
 
   it('omits the Paged.js script unless a polyfill is provided (browser-free HTML)', () => {
@@ -102,20 +101,20 @@ describe('buildPageHtml', () => {
     expect(html).toContain('<h3 class="section-header">Where</h3>');
   });
 
-  it('sizes the reserved art slot to the layout coverage (text-frame height 9.25in)', () => {
-    // Full-page plate: 95% coverage, full width -> height = 0.95 * 9.25 = 8.79in.
+  it('renders the illustration at presentation scale (text-frame height 9.25in)', () => {
+    // Full-page plate fills the frame: 0.92 * 9.25 = 8.51in.
     const plate = buildPageHtml(page({ layoutTemplate: 'LAYOUT_10_FULL_PAGE_PLATE' }), config, { geometry });
-    expect(plate).toContain('width:100%;height:8.79in;');
-    // Text-heavy float: 14% coverage -> balanced box sqrt(0.14) ~= 37% width.
+    expect(plate).toContain('width:100%;height:8.51in;');
+    // Text-heavy float: a substantial half-page float (46% wide), at least 0.5 * 9.25 = 4.63in tall.
     const textHeavy = buildPageHtml(page({ layoutTemplate: 'LAYOUT_2_TEXT_HEAVY' }), config, { geometry });
-    expect(textHeavy).toMatch(/<figure class="art-slot" style="width:37%;height:3\.46in;"/);
+    expect(textHeavy).toMatch(/<figure class="art-slot" style="width:46%;height:4\.63in;"/);
   });
 
   it('makes a higher-coverage top band taller than a lower-coverage one', () => {
     const opener = buildPageHtml(page({ layoutTemplate: 'LAYOUT_5_CHAPTER_OPENER' }), config, { geometry }); // 55%
-    const banner = buildPageHtml(page({ layoutTemplate: 'LAYOUT_13_FEATURE_BANNER' }), config, { geometry }); // 40%
+    const banner = buildPageHtml(page({ layoutTemplate: 'LAYOUT_13_FEATURE_BANNER' }), config, { geometry }); // 40% -> floored to 45%
     expect(opener).toContain('height:5.09in;'); // 0.55 * 9.25
-    expect(banner).toContain('height:3.7in;'); // 0.40 * 9.25
+    expect(banner).toContain('height:4.16in;'); // max(0.45, 0.40) * 9.25
   });
 });
 
