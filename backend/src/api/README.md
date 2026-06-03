@@ -18,6 +18,21 @@ Implemented foundation routes:
 | `GET` | `/api/projects/:id/manifests` | Read persisted manifests |
 | `POST` | `/api/projects/:id/plan` | Run Stage 2 page planning |
 | `GET` | `/api/projects/:id/pages` | Read persisted page rows and planner output fields |
+| `POST` | `/api/projects/:id/text-fit-preview` | Run text-fit preview before image spend |
+| `GET` | `/api/projects/:id/cost-estimate` | Estimate project image cost from generated-image count |
+| `POST` | `/api/projects/:id/chapters/:chapterNumber/render` | Render one chapter PDF preview |
+| `POST` | `/api/projects/:id/render-book` | Render/stitch book PDF and run KDP preflight |
+| `GET` | `/api/agents` | Read backend agent contracts for the operator UI |
+| `POST` | `/api/pages/:pageId/generate-image` | Generate one page illustration from its locked prompt |
+| `GET` | `/api/pages/:pageId/images` | List generated image versions for one page |
+| `POST` | `/api/pages/:pageId/images/:version/approve` | Approve and lock an image version |
+| `POST` | `/api/pages/:pageId/images/:version/reject` | Reject an image version with an optional note |
+| `POST` | `/api/pages/:pageId/images/:version/set-active` | Set a historical version active |
+| `POST` | `/api/pages/:pageId/regenerate` | Regenerate one page image with an operator addendum |
+| `POST` | `/api/pages/:pageId/upscale` | Upscale approved art and run the DPI gate |
+| `GET` | `/api/content-types` | Read the content-type guide used by the planner |
+| `GET` | `/api/render-check` | Render one sample PDF page without DB dependency |
+| `GET` | `/api/render-check-chapter` | Render one sample chapter PDF without DB dependency |
 | `GET` | `/api/intelligence/overview` | Read Publishing Intelligence dashboard counts |
 | `GET` | `/api/intelligence/items` | Search/list knowledge records |
 | `POST` | `/api/intelligence/experiments` | Record an experiment |
@@ -35,10 +50,6 @@ Implemented foundation routes:
 
 Routes not implemented yet:
 
-- `POST /api/projects/:id/generate-images`
-- `GET /api/projects/:id/images`
-- image approve/reject/regenerate endpoints
-- PDF export endpoints
 - EPUB export endpoints
 - auth-protected operator sessions
 

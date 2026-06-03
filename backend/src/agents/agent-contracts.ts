@@ -67,7 +67,7 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
   LAYOUT_SELECTOR: {
     id: 'LAYOUT_SELECTOR',
     name: 'Layout Selector',
-    mission: 'Select one of the 9 Wildlands layout templates and attach the matching mockup/prompt asset.',
+    mission: 'Select one of the 16 Wildlands layout templates and attach the matching mockup/prompt asset.',
     expertFrame:
       'Act like a professional art director and book-layout specialist for premium full-color naturalist guides.',
     hardRules: [
@@ -78,7 +78,7 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
     requiredInputs: ['Page word count', 'Content signals', 'Layout prompt assets', 'Layout capacity status'],
     requiredOutputs: ['Selected layout template', 'Layout reference label', 'Capacity range', 'Reason codes', 'Text-fit risk notes'],
     researchDirectives: [
-      'Check layout choices against the approved 9-layout reference set.',
+      'Check layout choices against the approved 16-layout reference set.',
       'Keep all important text within safe margins; image slots may bleed only when the output profile allows it.',
     ],
   },

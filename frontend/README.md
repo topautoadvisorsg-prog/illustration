@@ -1,35 +1,67 @@
-# Frontend — Phase 3, Do Not Touch
+# Frontend
 
-**🛑 STOP. This directory is intentionally frozen.**
-
-Per the locked development philosophy:
-
-> Backend first. UI last. Do not touch the dashboard UI until the backend
-> can take a manuscript in and produce a print-ready PDF out.
-
----
+Operator console for The Wildlands Publishing Platform.
 
 ## Current Status
 
-- **Phase 0 (now):** Risk spikes. CLI-driven. No frontend work.
-- **Phase 1:** Backend foundation + API layer. No frontend work.
-- **Phase 2:** Pipeline implementation. No frontend work.
-- **Phase 3 (future):** Dashboard UI on top of the proven API.
+The UI is no longer a frozen scaffold. It is an operator review surface for the
+backend-first publishing pipeline.
 
-When Phase 3 begins, this directory will be wiped and rebuilt with:
-- Vite + React 18 + TypeScript
-- Tailwind CSS
-- React Query for server state
-- Sentry browser SDK
-- 6 screens per the spec (Home Dashboard, New Project Setup, Book Overview,
-  Image Review, Layout Preview, Export & Download)
+The primary product model is:
 
----
+```text
+AI publishing agents do the work -> operator reviews, corrects, approves, and exports
+```
 
-## If You're A Developer Reading This
+## Main Screens
 
-Go to `/backend`. That's where the work is. Read `/README.md` for the project overview.
+- Backend connection check.
+- AI Publishing Agent Console.
+- Workflow/stage status board.
+- Manuscript upload/paste area.
+- Manuscript breakdown review.
+- Page plan review.
+- Text-fit preview summary.
+- Image proofing controls.
+- Large PDF preview/export panel.
+- Publishing Intelligence Center.
+- Advanced configuration for raw layout prompt assets and internal metadata.
 
-The current contents of this directory are the platform's default scaffold from
-the agent runtime and have no relevance to The Wildlands Publishing Platform.
-They will be deleted when Phase 3 starts.
+## Normal vs Advanced
+
+Normal operator mode should show:
+
+- chapter/page structure
+- selected layout name
+- page purpose
+- word count
+- fit status
+- image approval status
+- preview/export controls
+
+Advanced mode is intentionally opt-in and may show:
+
+- raw prompts
+- prompt hashes
+- layout instruction internals
+- file paths
+- placeholder lists
+- model/prompt setup details
+
+## Commands
+
+```bash
+yarn workspace frontend dev
+yarn workspace frontend build
+```
+
+## Test Notes
+
+The frontend build is part of the root verifier:
+
+```bash
+yarn verify:pipeline
+```
+
+The current UI is intentionally wired to existing backend routes only. EPUB export
+is shown as not wired until a backend endpoint exists.

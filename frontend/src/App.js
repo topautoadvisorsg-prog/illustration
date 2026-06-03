@@ -7,7 +7,8 @@ const DEFAULT_BACKEND_URL = "https://wildlandsbackend-production.up.railway.app"
 const configuredBackend = process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND_URL;
 
 // Pipeline phases you can "talk to" in the operator console.
-const PHASES = ["Ingest", "Manifests", "Plan", "Text-Fit", "Images", "Review", "Render"];
+const PHASES = ["Manuscript", "Breakdown", "Page Plan", "Text-Fit", "Images", "Review", "Render", "Export"];
+const PAID_ACTION_WARNING = "This calls a paid external API. Continue?";
 const DEV_ISSUES_KEY = "wildlands_dev_issues";
 const INTELLIGENCE_TYPES = [
   ["", "All Intelligence"],
@@ -58,6 +59,18 @@ const LAYOUT_TEMPLATES = [
   ["LAYOUT_16_CUTAWAY_FEATURE", "Cutaway Feature", "Layered cutaway illustration over an open educational text area", 180, 300, 440],
 ];
 
+const LAYOUT_LABELS = Object.fromEntries(LAYOUT_TEMPLATES.map(([id, name]) => [id, name]));
+
+const WORKFLOW_STAGES = [
+  { key: "project", label: "Project", action: "Create/select a project" },
+  { key: "manuscript", label: "Manuscript", action: "Upload manuscript" },
+  { key: "breakdown", label: "Breakdown", action: "Review chapters/pages" },
+  { key: "plan", label: "Page Plan", action: "Review layouts and fit" },
+  { key: "images", label: "Images", action: "Generate and approve art" },
+  { key: "preview", label: "Preview", action: "Render PDF proof" },
+  { key: "export", label: "Export", action: "Save final output" },
+];
+
 const VINTAGE_NATURALIST_DNA = `VINTAGE NATURALIST
 
 MASTER STYLE DNA v1.0
@@ -100,7 +113,11 @@ Treat the selected layout as a strong reference template, not a rigid rule. Mino
 
 Preserve future text areas above all else. Do not allow illustrations, background elements, diagrams, labels, decorative details, or environmental elements to consume areas intended for written educational content. When in doubt, leave more negative space.
 
-Generate clean artwork only. The illustration must contain ZERO readable text of any kind: no subject names, labels, captions, titles, headings, paragraphs, article text, fake encyclopedia text, page numbers, headers, reference notes, measurements, callouts, or annotations. Do not draw arrows, leader lines, or pointer marks with text. All labels, names, annotations, arrows, and typography are added later by the layout/composition system — never by the image model.
+Generate clean artwork only. The illustration must contain ZERO readable text of any kind: no subject names, labels, captions, titles, headings, paragraphs, article text, fake encyclopedia text, page numbers, headers, reference notes, measurements, callouts, or annotations. Do not draw arrows, leader lines, or pointer marks with text. All labels, names, annotations, arrows, and typography are added later by the layout/composition system - never by the image model.
+
+Do not generate readable text by default. If a future prompt explicitly supplies an explicit subject-name label, render exactly that supplied label, large and legible, with no extra words. This planner currently supplies no such label text.
+
+Use minimal annotation only when structurally necessary. Limit callouts to 0-2 major, obvious educational features per subject. Avoid dense labeling systems, technical breakdowns, scientific poster layouts, and small-detail callouts.
 
 Do not build scientific-poster layouts, dense labeling systems, or technical breakdowns. The image is pure subject artwork; the educational markup is overlaid afterward.
 
@@ -836,7 +853,28 @@ function defaultLayoutPromptAssets() {
 }
 
 function trimSlash(value) {
-  return value.replace(/\/+$/, "");
+  return (value || "").trim().replace(/\/+$/, "");
+}
+
+function layoutName(templateId) {
+  return LAYOUT_LABELS[templateId] || templateId || "No layout";
+}
+
+function normalizeStatus(value) {
+  return String(value || "pending").replace(/_/g, " ").toLowerCase();
+}
+
+function formatPercent(value) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "n/a";
+  return `${Math.round(value * 100)}%`;
+}
+
+function safeManifestContent(manifest) {
+  return manifest?.content && typeof manifest.content === "object" ? manifest.content : {};
+}
+
+function latestActiveVersion(images = []) {
+  return images.find((image) => image.active) || images[0] || null;
 }
 
 function defaultProjectConfig() {
@@ -1041,12 +1079,20 @@ Found near hardwoods after summer rain.
 ### Notes
 Use this entry to prove manuscript to manifest generation.`);
   const [manuscriptName, setManuscriptName] = useState("manuscript.md");
+  const [manuscriptSummary, setManuscriptSummary] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const manuscriptInputRef = useRef(null);
   const [manifests, setManifests] = useState([]);
   const [pages, setPages] = useState([]);
   const [plannedPages, setPlannedPages] = useState([]);
   const [layoutLibraryReport, setLayoutLibraryReport] = useState(null);
+  const [textFitPreview, setTextFitPreview] = useState(null);
+  const [pageImages, setPageImages] = useState({});
+  const [selectedPageId, setSelectedPageId] = useState("");
+  const [imageInstruction, setImageInstruction] = useState("");
+  const [pdfPreview, setPdfPreview] = useState({ title: "", url: "", meta: "" });
+  const [advancedMode, setAdvancedMode] = useState(false);
+  const [agents, setAgents] = useState([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -1079,6 +1125,33 @@ Use this entry to prove manuscript to manifest generation.`);
 
   const apiUrl = useMemo(() => trimSlash(backendUrl), [backendUrl]);
   const selectedProject = projects.find((project) => project.id === activeProjectId);
+  const bookManifest = useMemo(
+    () => safeManifestContent(manifests.find((manifest) => manifest.kind === "BOOK")),
+    [manifests],
+  );
+  const chapterManifests = useMemo(
+    () =>
+      manifests
+        .filter((manifest) => manifest.kind === "CHAPTER")
+        .map((manifest) => safeManifestContent(manifest))
+        .sort((a, b) => Number(a.chapterNumber || 0) - Number(b.chapterNumber || 0)),
+    [manifests],
+  );
+  const pageManifests = useMemo(
+    () =>
+      manifests
+        .filter((manifest) => manifest.kind === "PAGE")
+        .map((manifest) => safeManifestContent(manifest))
+        .sort((a, b) => Number(a.pageNumber || 0) - Number(b.pageNumber || 0)),
+    [manifests],
+  );
+  const pageByKey = useMemo(() => new Map(pages.map((page) => [page.pageKey, page])), [pages]);
+  const pagePlanByKey = useMemo(() => new Map(plannedPages.map((page) => [page.pageKey, page])), [plannedPages]);
+  const selectedPage = pages.find((page) => page.id === selectedPageId) || pages[0] || null;
+  const selectedPageManifest = selectedPage ? pageManifests.find((page) => page.pageId === selectedPage.pageKey) : null;
+  const selectedPagePlan = selectedPage ? pagePlanByKey.get(selectedPage.pageKey) : null;
+  const selectedImages = selectedPage ? pageImages[selectedPage.id] || [] : [];
+  const activeImage = latestActiveVersion(selectedImages);
 
   function setConfig(path, value) {
     setProjectConfig((current) => {
@@ -1119,7 +1192,7 @@ Use this entry to prove manuscript to manifest generation.`);
     try {
       localStorage.setItem(DEV_ISSUES_KEY, JSON.stringify(next));
     } catch {
-      /* localStorage unavailable — keep in memory only */
+      /* localStorage unavailable - keep in memory only */
     }
   }
 
@@ -1148,14 +1221,14 @@ Use this entry to prove manuscript to manifest generation.`);
   async function copyDeveloperReport() {
     if (devIssues.length === 0) return;
     const lines = devIssues.map(
-      (i) => `- [${i.phase}] (project ${i.projectId}${i.status ? `, status ${i.status}` : ""}) ${i.message}  — ${i.time}`,
+      (i) => `- [${i.phase}] (project ${i.projectId}${i.status ? `, status ${i.status}` : ""}) ${i.message} - ${i.time}`,
     );
     const report = `## Wildlands operator feedback for the developer\nBackend: ${apiUrl || "(unset)"}\nGenerated: ${new Date().toISOString()}\n\n${lines.join("\n")}\n`;
     try {
       await navigator.clipboard.writeText(report);
-      setMessage(`Copied ${devIssues.length} issue(s) — paste this to the developer.`);
+      setMessage(`Copied ${devIssues.length} issue(s) - paste this to the developer.`);
     } catch {
-      setMessage("Copy failed; the report is logged below — copy it manually.");
+      setMessage("Copy failed; the report is logged below - copy it manually.");
       appendLog("issue", report);
     }
   }
@@ -1194,6 +1267,43 @@ Use this entry to prove manuscript to manifest generation.`);
     return readJson(response);
   }
 
+  async function callPdf(path, options = {}) {
+    if (!apiUrl) {
+      throw new Error("Set REACT_APP_BACKEND_URL in Railway or enter the backend URL here.");
+    }
+    const response = await fetch(`${apiUrl}${path}`, { ...options });
+    if (!response.ok) {
+      let message = `${response.status} ${response.statusText}`;
+      try {
+        const data = await response.json();
+        message = data.message || message;
+      } catch {
+        /* PDF endpoint returned non-JSON error text */
+      }
+      throw new Error(message);
+    }
+    return {
+      blob: await response.blob(),
+      headers: response.headers,
+    };
+  }
+
+  function setPreviewBlob(title, blob, meta = "") {
+    setPdfPreview((current) => {
+      if (current.url) URL.revokeObjectURL(current.url);
+      return { title, url: URL.createObjectURL(blob), meta };
+    });
+  }
+
+  function requireSelectedPage() {
+    if (!selectedPage) throw new Error("Select a page first.");
+    return selectedPage;
+  }
+
+  function confirmPaidAction(message = PAID_ACTION_WARNING) {
+    return window.confirm(message);
+  }
+
   async function run(label, fn) {
     setBusy(true);
     setError("");
@@ -1225,8 +1335,17 @@ Use this entry to prove manuscript to manifest generation.`);
     }
   }
 
+  async function refreshAgents() {
+    const data = await call("/api/agents");
+    setAgents(data.agents || []);
+  }
+
   function selectProject(id) {
     setActiveProjectId(id);
+    setSelectedPageId("");
+    setTextFitPreview(null);
+    setPageImages({});
+    setPlannedPages([]);
     if (id) run(`Loading project ${id.slice(0, 8)}...`, () => loadArtifacts(id));
   }
 
@@ -1260,8 +1379,9 @@ Use this entry to prove manuscript to manifest generation.`);
       body: JSON.stringify({ filename: manuscriptName || "manuscript.md", markdown: manuscript }),
     });
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
+    setManuscriptSummary(data.manuscript);
     setMessage(`Manuscript uploaded: ${data.manuscript.sizeBytes} bytes.`);
-    appendLog("success", `Manuscript uploaded: ${data.manuscript.sizeBytes} bytes.`);
+    appendLog("success", `Manuscript uploaded: ${data.manuscript.totalChapters} chapter(s), ${data.manuscript.totalEntries} page candidate(s).`);
   }
 
   async function loadArtifacts(projectId = activeProjectId) {
@@ -1271,7 +1391,11 @@ Use this entry to prove manuscript to manifest generation.`);
       call(`/api/projects/${projectId}/pages`),
     ]);
     setManifests(manifestData.manifests || []);
-    setPages(pageData.pages || []);
+    const incomingPages = pageData.pages || [];
+    setPages(incomingPages);
+    setSelectedPageId((current) =>
+      incomingPages.some((page) => page.id === current) ? current : incomingPages[0]?.id || "",
+    );
     setMessage("Loaded manifests and pages.");
   }
 
@@ -1487,6 +1611,103 @@ Use this entry to prove manuscript to manifest generation.`);
     await loadArtifacts(projectId);
   }
 
+  async function runTextFitPreview(projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    const data = await call(`/api/projects/${projectId}/text-fit-preview`, {
+      method: "POST",
+    });
+    setTextFitPreview(data);
+    const overflow = data.totals?.overflow || 0;
+    appendLog(overflow > 0 ? "error" : "success", `Text-fit preview complete: ${data.totals?.fits || 0} fit, ${overflow} overflow.`);
+    setMessage(`Text-fit preview: ${data.readyForImageSpend ? "ready for image spend" : "needs review"}.`);
+  }
+
+  async function loadPageImages(pageId = selectedPageId) {
+    if (!pageId) throw new Error("Select a page first.");
+    const data = await call(`/api/pages/${pageId}/images`);
+    setPageImages((current) => ({ ...current, [pageId]: data.images || [] }));
+    appendLog("success", `Loaded ${data.images?.length || 0} image version(s) for selected page.`);
+  }
+
+  async function generateSelectedPageImage() {
+    const page = requireSelectedPage();
+    if (!confirmPaidAction("Generate an image for this page using OpenAI? This may spend API credits.")) return;
+    const data = await call(`/api/pages/${page.id}/generate-image`, { method: "POST" });
+    appendLog("success", `Generated image version ${data.image.version} for ${page.pageKey}.`);
+    await loadPageImages(page.id);
+    await loadArtifacts(activeProjectId);
+  }
+
+  async function approveImageVersion(version) {
+    const page = requireSelectedPage();
+    await call(`/api/pages/${page.id}/images/${version}/approve`, { method: "POST" });
+    appendLog("success", `Approved ${page.pageKey} image version ${version}.`);
+    await loadPageImages(page.id);
+    await loadArtifacts(activeProjectId);
+  }
+
+  async function rejectImageVersion(version) {
+    const page = requireSelectedPage();
+    const note = imageInstruction.trim() || "Rejected by operator.";
+    await call(`/api/pages/${page.id}/images/${version}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    });
+    appendLog("issue", `Rejected ${page.pageKey} image version ${version}: ${note}`);
+    await loadPageImages(page.id);
+  }
+
+  async function regenerateSelectedPageImage() {
+    const page = requireSelectedPage();
+    const addendum = imageInstruction.trim();
+    if (!addendum) throw new Error("Write the change request before regenerating.");
+    if (!confirmPaidAction("Regenerate this page image with your instruction? This may spend API credits.")) return;
+    const data = await call(`/api/pages/${page.id}/regenerate`, {
+      method: "POST",
+      body: JSON.stringify({ promptAddendum: addendum }),
+    });
+    appendLog("success", `Regenerated ${page.pageKey} image version ${data.image.version}.`);
+    setImageInstruction("");
+    await loadPageImages(page.id);
+    await loadArtifacts(activeProjectId);
+  }
+
+  async function upscaleSelectedPageImage() {
+    const page = requireSelectedPage();
+    if (!confirmPaidAction("Upscale the approved image through Replicate? This may spend API credits.")) return;
+    const data = await call(`/api/pages/${page.id}/upscale`, { method: "POST" });
+    appendLog(data.passed ? "success" : "error", `Upscale ${data.passed ? "passed" : "failed"}: ${data.dpiW}x${data.dpiH} DPI.`);
+    await loadPageImages(page.id);
+    await loadArtifacts(activeProjectId);
+  }
+
+  async function renderChapterPreview(chapterNumber) {
+    if (!activeProjectId) throw new Error("Create or select a project first.");
+    const { blob, headers } = await callPdf(`/api/projects/${activeProjectId}/chapters/${chapterNumber}/render`, {
+      method: "POST",
+    });
+    setPreviewBlob(`Chapter ${chapterNumber} PDF Preview`, blob, `${headers.get("x-total-pages") || "?"} rendered page(s)`);
+    appendLog("success", `Rendered chapter ${chapterNumber} preview.`);
+  }
+
+  async function renderBookPreview() {
+    if (!activeProjectId) throw new Error("Create or select a project first.");
+    const { blob, headers } = await callPdf(`/api/projects/${activeProjectId}/render-book`, {
+      method: "POST",
+    });
+    setPreviewBlob("Full Book PDF Preview", blob, `${headers.get("x-page-count") || "?"} page(s), preflight ${headers.get("x-preflight-passed") || "unknown"}`);
+    appendLog("success", "Rendered full book PDF preview.");
+  }
+
+  async function renderBookReport() {
+    if (!activeProjectId) throw new Error("Create or select a project first.");
+    const data = await call(`/api/projects/${activeProjectId}/render-book?format=json`, {
+      method: "POST",
+    });
+    appendLog(data.ok ? "success" : "error", `Book render report: ${data.pageCount} page(s), preflight ${data.ok ? "passed" : "failed"}.`);
+    setMessage(`Book render report stored at ${data.storedPath || "unknown path"}.`);
+  }
+
   async function uploadManuscriptFile(file) {
     if (!file) return;
     const text = await readFileAsText(file);
@@ -1507,7 +1728,7 @@ Use this entry to prove manuscript to manifest generation.`);
         return;
       }
     } catch (err) {
-      /* showPicker can throw outside a user gesture — fall through to click */
+      /* showPicker can throw outside a user gesture - fall through to click */
     }
     el.click();
   }
@@ -1547,6 +1768,24 @@ Use this entry to prove manuscript to manifest generation.`);
       await run("Generating manifests...", generateManifests);
     } else if (normalized.includes("plan") || normalized.includes("layout")) {
       await run("Planning pages...", planPages);
+    } else if (normalized.includes("text") && normalized.includes("fit")) {
+      await run("Running text-fit preview...", runTextFitPreview);
+    } else if (normalized.includes("show") && normalized.includes("prompt")) {
+      setAdvancedMode(true);
+      appendLog("system", "Advanced mode enabled. Prompt details are available in the selected page panel.");
+    } else if (normalized.includes("generate") && normalized.includes("image")) {
+      await run("Generating selected page image...", generateSelectedPageImage);
+    } else if (normalized.includes("regenerate")) {
+      await run("Regenerating selected page image...", regenerateSelectedPageImage);
+    } else if (normalized.includes("upscale") || normalized.includes("enhance")) {
+      await run("Upscaling selected page image...", upscaleSelectedPageImage);
+    } else if (normalized.includes("image") || normalized.includes("proof")) {
+      await run("Loading selected page images...", () => loadPageImages());
+    } else if (normalized.includes("render") || normalized.includes("preview")) {
+      const chapter = chapterManifests[0]?.chapterNumber || 1;
+      await run("Rendering chapter preview...", () => renderChapterPreview(chapter));
+    } else if (normalized.includes("export")) {
+      await run("Rendering full book preview...", renderBookPreview);
     } else if (normalized.includes("refresh") || normalized.includes("output")) {
       await run("Loading output...", () => loadArtifacts());
     } else if (normalized.includes("intelligence") || normalized.includes("knowledge") || normalized.includes("standards")) {
@@ -1554,15 +1793,26 @@ Use this entry to prove manuscript to manifest generation.`);
     } else if (normalized.includes("run") || normalized.includes("start")) {
       await run("Running manuscript intake...", runManuscriptIntake);
     } else {
-      appendLog("system", "Try: check backend, create project, upload manuscript, generate manifests, refresh intelligence, refresh output, or run intake.");
+      appendLog("system", "Try: upload manuscript, start breakdown, create page plan, run text-fit, show prompts, generate image, load proof images, render preview, or export.");
     }
+  }
+
+  function workflowStageState(key) {
+    if (key === "project") return activeProjectId ? "done" : "current";
+    if (key === "manuscript") return selectedProject?.manuscriptPath || manuscriptSummary ? "done" : activeProjectId ? "current" : "";
+    if (key === "breakdown") return pageManifests.length > 0 ? "done" : selectedProject?.manuscriptPath ? "current" : "";
+    if (key === "plan") return plannedPages.length > 0 || pages.some((page) => page.layoutTemplate) ? "done" : pageManifests.length > 0 ? "current" : "";
+    if (key === "images") return pages.some((page) => ["REVIEW", "APPROVED", "PRINT_READY"].includes(page.status)) ? "done" : plannedPages.length > 0 ? "current" : "";
+    if (key === "preview") return pdfPreview.url ? "done" : pages.some((page) => page.status === "PRINT_READY") ? "current" : "";
+    if (key === "export") return selectedProject?.status === "EXPORTED" ? "done" : pdfPreview.url ? "current" : "";
+    return "";
   }
 
   useEffect(() => {
     if (!apiUrl) return;
     run("Checking backend...", async () => {
       await refreshHealth();
-      await refreshProjects();
+      await Promise.all([refreshProjects(), refreshAgents()]);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1574,7 +1824,13 @@ Use this entry to prove manuscript to manifest generation.`);
           <p className="eyebrow">The Wildlands Publishing Platform</p>
           <h1>Pipeline Administration</h1>
         </div>
-        <div className={`status ${health?.ok ? "ok" : "warn"}`}>{health?.ok ? "Backend online" : "Backend unchecked"}</div>
+        <div className="topbar-actions">
+          <label className="advanced-toggle">
+            <input type="checkbox" checked={advancedMode} onChange={(event) => setAdvancedMode(event.target.checked)} />
+            Advanced
+          </label>
+          <div className={`status ${health?.ok ? "ok" : "warn"}`}>{health?.ok ? "Backend online" : "Backend unchecked"}</div>
+        </div>
       </section>
 
       <section className="panel backend-panel">
@@ -1599,8 +1855,8 @@ Use this entry to prove manuscript to manifest generation.`);
         <section className="panel command-panel">
           <div className="section-head">
             <div>
-              <h2>Operator Command Center</h2>
-              <p className="hint">Type a command or use the buttons. This is where you drive the pipeline.</p>
+              <h2>AI Publishing Agent Console</h2>
+              <p className="hint">Tell the agent what to do, then review and approve the work it produces.</p>
             </div>
             <span className="mode-pill">{busy ? "Running" : "Ready"}</span>
           </div>
@@ -1608,24 +1864,26 @@ Use this entry to prove manuscript to manifest generation.`);
             <label htmlFor="phase-select">Talking to phase</label>
             <select id="phase-select" value={phase} onChange={(event) => setPhase(event.target.value)}>
               {PHASES.map((p) => (
-                <option key={p} value={p}>{p}</option>
+                <option key={p} value={p} label={p} />
               ))}
             </select>
           </div>
           <div className="phase-row project-row">
             <label htmlFor="project-select">Project</label>
-            <select
-              id="project-select"
-              value={activeProjectId}
-              onChange={(event) => selectProject(event.target.value)}
-            >
-              <option value="">— Select a project —</option>
+            <div className="project-picker" id="project-select" role="listbox" aria-label="Projects">
               {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {(p.title || "Untitled")} · {p.id.slice(0, 8)} {p.manuscriptPath ? "✓ manuscript" : "· no manuscript"}
-                </option>
+                <button
+                  type="button"
+                  className={p.id === activeProjectId ? "picker-button active" : "picker-button"}
+                  key={p.id}
+                  onClick={() => selectProject(p.id)}
+                >
+                  <strong>{p.title || "Untitled"}</strong>
+                  <span>{p.id.slice(0, 8)} / {p.manuscriptPath ? "manuscript" : "no manuscript"}</span>
+                </button>
               ))}
-            </select>
+              {projects.length === 0 && <span className="empty-inline">No projects yet</span>}
+            </div>
             <button type="button" disabled={busy} onClick={() => run("Creating new project...", createProject)}>
               + New Project
             </button>
@@ -1635,7 +1893,7 @@ Use this entry to prove manuscript to manifest generation.`);
             <input
               value={commandInput}
               onChange={(event) => setCommandInput(event.target.value)}
-              placeholder={`Message the ${phase} phase — run an action, or flag an issue for the developer`}
+              placeholder={`Message the ${phase} phase - run an action, or flag an issue for the developer`}
             />
             <button disabled={busy} type="submit">Run</button>
             <button type="button" disabled={!commandInput.trim()} onClick={flagForDeveloper} title="Save this as an issue for the developer to fix">
@@ -1665,6 +1923,18 @@ Use this entry to prove manuscript to manifest generation.`);
             </button>
             <button disabled={busy || !activeProjectId} onClick={() => run("Planning pages...", planPages)}>
               Plan Pages
+            </button>
+            <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview)}>
+              Text-Fit Preview
+            </button>
+            <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages())}>
+              Proof Images
+            </button>
+            <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering chapter preview...", () => renderChapterPreview(chapterManifests[0]?.chapterNumber || 1))}>
+              Render Preview
+            </button>
+            <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book preview...", renderBookPreview)}>
+              Export PDF
             </button>
             <button disabled={busy} onClick={() => run("Running manuscript intake...", runManuscriptIntake)}>
               Run Intake
@@ -1700,30 +1970,278 @@ Use this entry to prove manuscript to manifest generation.`);
         </section>
 
         <section className="panel flow-panel">
-          <h2>What Happens Next</h2>
+          <h2>Agent Workflow</h2>
           <div className="flow-steps">
-            <div className={`flow-step ${activeProjectId ? "done" : "current"}`}>
-              <strong>1. Project</strong>
-              <span>{activeProjectId ? "Created or selected" : "Create/select project first"}</span>
-            </div>
-            <div className={`flow-step ${selectedProject?.manuscriptPath ? "done" : activeProjectId ? "current" : ""}`}>
-              <strong>2. Manuscript</strong>
-              <span>Paste or upload the .md manuscript, then send it to backend storage</span>
-            </div>
-            <div className={`flow-step ${pages.length > 0 ? "done" : selectedProject?.manuscriptPath ? "current" : ""}`}>
-              <strong>3. Manifest</strong>
-              <span>Claude splits chapters/pages and writes manifest rows</span>
-            </div>
-            <div className={`flow-step ${plannedPages.length > 0 ? "done" : pages.length > 0 ? "current" : ""}`}>
-              <strong>4. Layout Fit</strong>
-              <span>Agent selects one of 16 layouts, assembles prompts, then waits for text-fit approval</span>
-            </div>
-            <div className="flow-step">
-              <strong>5. Images + Exports</strong>
-              <span>Approved layout prompts generate final art, then PDF/EPUB stages run</span>
-            </div>
+            {WORKFLOW_STAGES.map((stage, index) => (
+              <div className={`flow-step ${workflowStageState(stage.key)}`} key={stage.key}>
+                <strong>{index + 1}. {stage.label}</strong>
+                <span>{stage.action}</span>
+              </div>
+            ))}
+          </div>
+          <div className="agent-roster">
+            <h3>Pipeline Agents</h3>
+            {agents.map((agent) => (
+              <article className="agent-card" key={agent.id}>
+                <strong>{agent.name}</strong>
+                <span>{agent.mission}</span>
+                {advancedMode && <small>{agent.expertFrame}</small>}
+              </article>
+            ))}
+            {agents.length === 0 && <p className="empty">Agent roster not loaded yet.</p>}
           </div>
         </section>
+      </section>
+
+      <section className="panel review-board">
+        <div className="section-head">
+          <div>
+            <p className="eyebrow">Operator Review Mode</p>
+            <h2>Publishing Workflow Board</h2>
+            <p className="hint">The agent does the work. You review the breakdown, page plan, images, and printable preview.</p>
+          </div>
+          <div className="button-row">
+            <button disabled={busy || !activeProjectId} onClick={() => run("Running manuscript intake...", runManuscriptIntake)}>
+              Run Agent Intake
+            </button>
+            <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview)}>
+              Run Text-Fit
+            </button>
+          </div>
+        </div>
+
+        <div className="stage-strip">
+          {WORKFLOW_STAGES.map((stage, index) => (
+            <div className={`stage-card ${workflowStageState(stage.key)}`} key={stage.key}>
+              <span>{index + 1}</span>
+              <strong>{stage.label}</strong>
+              <small>{stage.action}</small>
+            </div>
+          ))}
+        </div>
+
+        <div className="review-grid">
+          <section className="review-card">
+            <div className="section-head">
+              <div>
+                <h3>1. Manuscript Breakdown</h3>
+                <p className="hint">Review the chapter-to-page structure before downstream spend.</p>
+              </div>
+              <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
+                Start Breakdown
+              </button>
+            </div>
+            <div className="metric-row">
+              <span>{manuscriptSummary?.totalChapters ?? bookManifest.totalChapters ?? 0} chapters</span>
+              <span>{manuscriptSummary?.totalEntries ?? bookManifest.totalEntries ?? 0} pages</span>
+              <span>{manuscriptSummary?.totalWords ? `${manuscriptSummary.totalWords.toLocaleString()} words` : "word count pending"}</span>
+            </div>
+            <div className="chapter-tree">
+              {chapterManifests.map((chapter) => (
+                <article className="chapter-card" key={chapter.chapterNumber}>
+                  <strong>Chapter {chapter.chapterNumber}: {chapter.chapterTitle}</strong>
+                  {(chapter.pageKeys || []).map((pageKey) => {
+                    const page = pageManifests.find((candidate) => candidate.pageId === pageKey);
+                    return (
+                      <button
+                        type="button"
+                        className={selectedPage?.pageKey === pageKey ? "page-chip active" : "page-chip"}
+                        key={pageKey}
+                        onClick={() => setSelectedPageId(pageByKey.get(pageKey)?.id || "")}
+                      >
+                        {pageKey} / {page?.entryTitle || "Untitled page"}
+                      </button>
+                    );
+                  })}
+                </article>
+              ))}
+              {chapterManifests.length === 0 && <p className="empty">No chapter breakdown yet. Upload the manuscript, then start breakdown.</p>}
+            </div>
+          </section>
+
+          <section className="review-card">
+            <div className="section-head">
+              <div>
+                <h3>2. Page Plan Review</h3>
+                <p className="hint">Confirm layout choices, text capacity, and readiness without raw prompt clutter.</p>
+              </div>
+              <div className="button-row">
+                <button disabled={busy || !activeProjectId || pageManifests.length === 0} onClick={() => run("Planning pages...", planPages)}>
+                  Generate Page Plan
+                </button>
+                <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview)}>
+                  Text-Fit
+                </button>
+              </div>
+            </div>
+            {textFitPreview && (
+              <div className={`fit-summary ${textFitPreview.readyForImageSpend ? "ok" : "warn"}`}>
+                <strong>{textFitPreview.readyForImageSpend ? "Ready for image spend" : "Text-fit needs review"}</strong>
+                <span>{textFitPreview.totals?.fits || 0} fit / {textFitPreview.totals?.tight || 0} tight / {textFitPreview.totals?.overflow || 0} overflow</span>
+              </div>
+            )}
+            <div className="page-plan-list">
+              {pageManifests.map((page) => {
+                const row = pageByKey.get(page.pageId);
+                const plan = pagePlanByKey.get(page.pageId);
+                const fit = textFitPreview?.pages?.find((candidate) => candidate.pageKey === page.pageId);
+                return (
+                  <article className={selectedPage?.pageKey === page.pageId ? "page-plan-card active" : "page-plan-card"} key={page.pageId}>
+                    <button type="button" className="select-page-button" onClick={() => setSelectedPageId(row?.id || "")}>
+                      <strong>{page.pageId} / {page.entryTitle}</strong>
+                      <span>{layoutName(row?.layoutTemplate || plan?.layoutTemplate || page.layoutTemplate)}</span>
+                    </button>
+                    <div className="page-plan-meta">
+                      <span>{plan?.wordCount ?? "?"} words</span>
+                      <span>{normalizeStatus(row?.status)}</span>
+                      <span>{fit?.fit?.status ? normalizeStatus(fit.fit.status) : normalizeStatus(plan?.textFitStatus || "fit pending")}</span>
+                      <span>{plan?.blockers?.length || 0} blocker(s)</span>
+                    </div>
+                    {advancedMode && (
+                      <details className="advanced-details">
+                        <summary>Prompt + layout internals</summary>
+                        <p><strong>Purpose:</strong> {plan?.contentTypePurpose || page.contentType || "No purpose loaded"}</p>
+                        <p><strong>Coverage:</strong> {formatPercent(plan?.coverage)} / {plan?.architecture || "architecture pending"}</p>
+                        <p><strong>Text zone:</strong> {plan?.layoutInstructions?.textZone || "No text-zone note"}</p>
+                        <p><strong>Prompt hash:</strong> {row?.imagePromptSha256 || plan?.promptSha256 || "No prompt hash"}</p>
+                        {row?.imagePrompt && <textarea readOnly className="prompt-template" value={row.imagePrompt} />}
+                      </details>
+                    )}
+                  </article>
+                );
+              })}
+              {pageManifests.length === 0 && <p className="empty">No page manifests yet. Start the breakdown first.</p>}
+            </div>
+          </section>
+
+          <section className="review-card">
+            <div className="section-head">
+              <div>
+                <h3>3. Image Proofing</h3>
+                <p className="hint">Generate only after the plan/text-fit looks right. Approve, reject, regenerate, then upscale.</p>
+              </div>
+              <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages())}>
+                Load Images
+              </button>
+            </div>
+            <div className="field">
+              <span>Selected Page</span>
+              <div className="page-picker" role="listbox" aria-label="Pages">
+                {pages.map((page) => (
+                  <button
+                    type="button"
+                    className={page.id === selectedPageId ? "picker-button active" : "picker-button"}
+                    key={page.id}
+                    onClick={() => setSelectedPageId(page.id)}
+                  >
+                    <strong>{page.pageKey}</strong>
+                    <span>{normalizeStatus(page.status)}</span>
+                  </button>
+                ))}
+                {pages.length === 0 && <span className="empty-inline">No pages yet</span>}
+              </div>
+            </div>
+            {selectedPage && (
+              <div className="selected-page-summary">
+                <strong>{selectedPage.pageKey} / {selectedPageManifest?.entryTitle || "Untitled"}</strong>
+                <span>{layoutName(selectedPage.layoutTemplate || selectedPagePlan?.layoutTemplate)} / {normalizeStatus(selectedPage.status)}</span>
+                <span>{selectedPagePlan?.promptReady ? "prompt ready" : selectedPage.imagePrompt ? "prompt stored" : "prompt pending"}</span>
+              </div>
+            )}
+            <div className="button-row">
+              <button disabled={busy || !selectedPage || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady)} onClick={() => run("Generating selected page image...", generateSelectedPageImage)}>
+                Generate Image
+              </button>
+              <button disabled={busy || !selectedPage || selectedPage?.status !== "APPROVED"} onClick={() => run("Upscaling selected page image...", upscaleSelectedPageImage)}>
+                Enhance / Upscale
+              </button>
+            </div>
+            <Field label="Correction Request">
+              <textarea
+                className="notes-field"
+                value={imageInstruction}
+                onChange={(event) => setImageInstruction(event.target.value)}
+                placeholder="Tell the image agent what to fix before rejecting or regenerating."
+              />
+            </Field>
+            <div className="image-version-list">
+              {selectedImages.map((image) => (
+                <article className={image.active ? "image-version active" : "image-version"} key={image.version}>
+                  <div>
+                    <strong>Version {image.version}</strong>
+                    <span>{normalizeStatus(image.status)}{image.active ? " / active" : ""}</span>
+                    <small>{image.widthPx || "?"} x {image.heightPx || "?"} px</small>
+                  </div>
+                  <div className="button-row">
+                    <button disabled={busy || image.status === "REJECTED"} onClick={() => run("Approving image...", () => approveImageVersion(image.version))}>
+                      Approve
+                    </button>
+                    <button disabled={busy} onClick={() => run("Rejecting image...", () => rejectImageVersion(image.version))}>
+                      Reject
+                    </button>
+                  </div>
+                  {advancedMode && (
+                    <details className="advanced-details">
+                      <summary>File details</summary>
+                      <p>Generated: {image.generatedPath || "not stored"}</p>
+                      <p>Upscaled: {image.upscaledPath || "not upscaled"}</p>
+                    </details>
+                  )}
+                </article>
+              ))}
+              {selectedImages.length === 0 && <p className="empty">No image versions loaded for this page yet.</p>}
+            </div>
+            <button disabled={busy || !selectedPage || !imageInstruction.trim()} onClick={() => run("Regenerating selected page image...", regenerateSelectedPageImage)}>
+              Regenerate With Correction
+            </button>
+          </section>
+
+          <section className="review-card preview-review-card">
+            <div className="section-head">
+              <div>
+                <h3>4. Render Preview + Export</h3>
+                <p className="hint">Open a large PDF proof before final output. Rendering uses placeholders until approved art exists.</p>
+              </div>
+              <div className="button-row">
+                <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering chapter preview...", () => renderChapterPreview(chapterManifests[0]?.chapterNumber || 1))}>
+                  Render Chapter
+                </button>
+                <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book preview...", renderBookPreview)}>
+                  Render Book PDF
+                </button>
+              </div>
+            </div>
+            <div className="chapter-render-row">
+              {chapterManifests.map((chapter) => (
+                <button key={chapter.chapterNumber} disabled={busy} onClick={() => run(`Rendering chapter ${chapter.chapterNumber}...`, () => renderChapterPreview(chapter.chapterNumber))}>
+                  Chapter {chapter.chapterNumber}
+                </button>
+              ))}
+            </div>
+            {pdfPreview.url ? (
+              <div className="pdf-preview-frame">
+                <div className="section-head">
+                  <div>
+                    <strong>{pdfPreview.title}</strong>
+                    <p className="hint">{pdfPreview.meta}</p>
+                  </div>
+                  <a className="download-link" href={pdfPreview.url} download="wildlands-preview.pdf">Download PDF</a>
+                </div>
+                <iframe title={pdfPreview.title} src={pdfPreview.url} />
+              </div>
+            ) : (
+              <p className="empty">No PDF preview rendered yet.</p>
+            )}
+            <div className="button-row">
+              <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering book report...", renderBookReport)}>
+                Save Export Report
+              </button>
+              <button disabled title="Backend EPUB export endpoint is not exposed yet.">
+                EPUB Export Not Wired
+              </button>
+            </div>
+          </section>
+        </div>
       </section>
 
       <section className="panel intelligence-panel">
@@ -1781,7 +2299,7 @@ Use this entry to prove manuscript to manifest generation.`);
               onChange={(event) => setIntelligenceFilter((current) => ({ ...current, type: event.target.value }))}
             >
               {INTELLIGENCE_TYPES.map(([value, label]) => (
-                <option key={value || "all"} value={value}>{label}</option>
+                <option key={value || "all"} value={value} label={label} />
               ))}
             </select>
           </Field>
@@ -1975,7 +2493,7 @@ Use this entry to prove manuscript to manifest generation.`);
             <Field label="Relationship">
               <select value={linkDraft.relationType} onChange={(event) => updateDraft(setLinkDraft, "relationType", event.target.value)}>
                 {RELATION_TYPES.map((relation) => (
-                  <option key={relation} value={relation}>{relation}</option>
+                  <option key={relation} value={relation} label={relation} />
                 ))}
               </select>
             </Field>
@@ -2069,6 +2587,7 @@ Use this entry to prove manuscript to manifest generation.`);
           </div>
         </section>
 
+        {advancedMode && (
         <section className="panel">
           <div className="section-head">
             <h2>3. Manifest Output</h2>
@@ -2144,6 +2663,7 @@ Use this entry to prove manuscript to manifest generation.`);
             </div>
           </div>
         </section>
+        )}
       </section>
 
       <section className="workspace-grid">
@@ -2370,7 +2890,7 @@ Use this entry to prove manuscript to manifest generation.`);
                   onChange={(event) => setConfig(["layoutPolicy", "defaultTemplate"], event.target.value)}
                 >
                   {LAYOUT_TEMPLATES.map(([id, name]) => (
-                    <option key={id} value={id}>{`${name} - ${id}`}</option>
+                    <option key={id} value={id} label={`${name} - ${id}`} />
                   ))}
                 </select>
               </Field>
@@ -2380,7 +2900,7 @@ Use this entry to prove manuscript to manifest generation.`);
                   onChange={(event) => setConfig(["layoutPolicy", "longTextTemplate"], event.target.value)}
                 >
                   {LAYOUT_TEMPLATES.map(([id, name]) => (
-                    <option key={id} value={id}>{`${name} - ${id}`}</option>
+                    <option key={id} value={id} label={`${name} - ${id}`} />
                   ))}
                 </select>
               </Field>
@@ -2390,7 +2910,7 @@ Use this entry to prove manuscript to manifest generation.`);
                   onChange={(event) => setConfig(["layoutPolicy", "comparisonTemplate"], event.target.value)}
                 >
                   {LAYOUT_TEMPLATES.map(([id, name]) => (
-                    <option key={id} value={id}>{`${name} - ${id}`}</option>
+                    <option key={id} value={id} label={`${name} - ${id}`} />
                   ))}
                 </select>
               </Field>
@@ -2413,6 +2933,7 @@ Use this entry to prove manuscript to manifest generation.`);
             </div>
           </div>
 
+          {advancedMode && (
           <div className="config-section">
             <h3>Layout Prompt Library</h3>
             <p className="hint">
@@ -2593,6 +3114,7 @@ Use this entry to prove manuscript to manifest generation.`);
               ))}
             </div>
           </div>
+          )}
         </section>
 
         <aside className="side-stack">
@@ -2629,14 +3151,20 @@ Use this entry to prove manuscript to manifest generation.`);
 
           <section className="panel">
             <h2>Active Project</h2>
-            <select value={activeProjectId} onChange={(event) => setActiveProjectId(event.target.value)}>
-              <option value="">No project selected</option>
+            <div className="project-picker compact" role="listbox" aria-label="Active project">
               {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.title} - {project.status}
-                </option>
+                <button
+                  type="button"
+                  className={project.id === activeProjectId ? "picker-button active" : "picker-button"}
+                  key={project.id}
+                  onClick={() => selectProject(project.id)}
+                >
+                  <strong>{project.title}</strong>
+                  <span>{normalizeStatus(project.status)}</span>
+                </button>
               ))}
-            </select>
+              {projects.length === 0 && <span className="empty-inline">No project selected</span>}
+            </div>
             {selectedProject && <p className="meta">Selected: {selectedProject.id}</p>}
           </section>
 

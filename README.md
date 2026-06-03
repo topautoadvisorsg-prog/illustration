@@ -45,9 +45,11 @@ Implemented and testable:
   experiments, decisions, standards, SOPs, cost records, print reviews, lessons,
   evidence, lineage links, version tables, audit events, backend API, and visible
   frontend panels
-- Operator frontend for backend URL, project setup, manuscript upload, manifest
-  generation, page planning, layout prompt assets, Publishing Intelligence, a
-  per-phase feedback console, and output inspection
+- Operator frontend for backend URL, AI agent command console, project setup,
+  manuscript upload, manuscript breakdown review, page planning review, text-fit
+  preview, image proofing actions, chapter/book PDF preview, Publishing
+  Intelligence, and Advanced prompt/layout internals
+- Agent roster endpoint at `/api/agents` for operator-visible agent contracts
 
 Not implemented yet:
 
@@ -177,6 +179,7 @@ yarn workspace frontend dev
 Start with:
 
 - `PIPELINE_ATTACK_PLAN.md`
+- `docs/operator-workflow-review.md`
 - `backend/src/pipeline/README.md`
 - `backend/src/agents/README.md`
 - `backend/src/pipeline/stage-1-ingestion/README.md`
