@@ -24,7 +24,7 @@ import { getProject } from '../../db/repositories/projects.repo.js';
 import { listManifests, listPages } from '../../db/repositories/manifests.repo.js';
 import { getActiveImage } from '../../db/repositories/images.repo.js';
 import { recordExport } from '../../db/repositories/exports.repo.js';
-import { LocalStorageService } from '../../services/storage/local-storage.js';
+import { getProjectStorage, type ProjectStorage } from '../../services/storage/project-storage.js';
 import { logger } from '../../lib/logger.js';
 import { computePageGeometry } from './page-geometry.js';
 import { buildChapterHtml, buildBookHtml, buildCoverHtml, computeCoverDimensions, type ChapterPageRender, type BookChapter } from './render-html.js';
@@ -48,7 +48,7 @@ function pad2(n: number): string {
 }
 
 async function imageDataUriForPage(
-  storage: LocalStorageService,
+  storage: ProjectStorage,
   pageRowId: string | undefined,
   targetPx: { width: number; height: number },
 ): Promise<string | undefined> {
@@ -118,7 +118,7 @@ export async function renderChapterPdf(projectId: string, chapterNumber: number)
     .sort((a, b) => a.pageNumber - b.pageNumber);
   if (pageManifests.length === 0) throw new RenderBlockedError(`Chapter ${chapterNumber} has no pages.`, 'no_pages');
 
-  const storage = new LocalStorageService();
+  const storage = getProjectStorage();
   const pageRows = await listPages(projectId);
   const rowByKey = new Map(pageRows.map((row) => [row.pageKey, row]));
   const geometry = computePageGeometry(config.trimSize);
@@ -196,7 +196,7 @@ async function gatherChapterPages(
   const allPageManifests = (await listManifests(projectId, 'PAGE')).map((r) => PageManifestSchema.parse(r.content));
   const pageRows = await listPages(projectId);
   const rowByKey = new Map(pageRows.map((row) => [row.pageKey, row]));
-  const storage = new LocalStorageService();
+  const storage = getProjectStorage();
 
   const result: BookChapter[] = [];
   for (const chapter of chapters) {
@@ -240,7 +240,7 @@ export async function renderBookPdf(projectId: string): Promise<BookRenderResult
   let matter: { introMarkdown?: string; glossaryMarkdown?: string } = {};
   if (project.manuscriptPath) {
     try {
-      const md = (await new LocalStorageService().readProjectFile(project.manuscriptPath)).toString('utf8');
+      const md = (await getProjectStorage().readProjectFile(project.manuscriptPath)).toString('utf8');
       matter = extractMatterSections(md);
     } catch {
       /* manuscript file missing on ephemeral FS — render without intro/glossary */
@@ -254,7 +254,7 @@ export async function renderBookPdf(projectId: string): Promise<BookRenderResult
 
   const preflight = await preflightBook(pdf, config.trimSize, undefined);
 
-  const storage = new LocalStorageService();
+  const storage = getProjectStorage();
   const stored = await storage.writeProjectFile(projectId, ['editions', 'PREMIUM.pdf'], pdf);
   await recordExport({
     projectId,
@@ -291,7 +291,7 @@ export async function renderCoverPdf(projectId: string): Promise<CoverRenderResu
     pageHeightIn: dims.fullHeightIn,
   } as unknown as ReturnType<typeof computePageGeometry>);
 
-  const storage = new LocalStorageService();
+  const storage = getProjectStorage();
   const stored = await storage.writeProjectFile(projectId, ['editions', 'COVER.pdf'], buffer);
   return { pdf: buffer, storedPath: stored.relativePath };
 }

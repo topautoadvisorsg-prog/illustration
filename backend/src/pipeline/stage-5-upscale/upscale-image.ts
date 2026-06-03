@@ -17,7 +17,7 @@ import { getPageById, setPageStatus } from '../../db/repositories/manifests.repo
 import { getActiveImage, setImageStatus, setUpscaleResult } from '../../db/repositories/images.repo.js';
 import { recordUsage } from '../../db/repositories/usage.repo.js';
 import { getProject } from '../../db/repositories/projects.repo.js';
-import { LocalStorageService } from '../../services/storage/local-storage.js';
+import { getProjectStorage, type ProjectStorage } from '../../services/storage/project-storage.js';
 import { getEnv } from '../../env.js';
 import { logger } from '../../lib/logger.js';
 
@@ -71,7 +71,7 @@ export function assertUpscalable(pageStatus: string, activeImage: { status: stri
 export interface UpscalePageOptions {
   pageId: string;
   upscaler?: Upscaler;
-  storage?: LocalStorageService;
+  storage?: ProjectStorage;
 }
 
 export interface UpscalePageResult {
@@ -101,7 +101,7 @@ export async function upscalePageImage(opts: UpscalePageOptions): Promise<Upscal
   if (!project) throw new UpscaleBlockedError('Project not found.', 'project_not_found');
   const config = project.config as ProjectConfig;
 
-  const storage = opts.storage ?? new LocalStorageService();
+  const storage = opts.storage ?? getProjectStorage();
   const upscaler = opts.upscaler ?? defaultUpscale;
 
   logger.info({ pageId: page.id, pageKey: page.pageKey, version: active!.version }, 'Stage 5: upscaling image');

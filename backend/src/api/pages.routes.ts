@@ -14,7 +14,7 @@ import { UpscaleBlockedError, upscalePageImage } from '../pipeline/stage-5-upsca
 import { isChromiumAvailable, renderSampleChapterPdf, renderSamplePagePdf } from '../pipeline/stage-6-layout/render-check.js';
 import { getContentTypeGuide } from '../pipeline/stage-2-planner/layered-layout.js';
 import { getActiveImage, getImageVersion } from '../db/repositories/images.repo.js';
-import { LocalStorageService } from '../services/storage/local-storage.js';
+import { getProjectStorage } from '../services/storage/project-storage.js';
 
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
 const ImageVersionParamsSchema = z.object({ pageId: z.string().uuid(), version: z.coerce.number().int().positive() });
@@ -111,7 +111,7 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
     const path = row?.upscaledPath ?? row?.generatedPath;
     if (!path) return reply.code(404).send({ error: 'Not Found', message: 'No image for this page.', statusCode: 404 });
     try {
-      const buf = await new LocalStorageService().readProjectFile(path);
+      const buf = await getProjectStorage().readProjectFile(path);
       reply.header('content-type', 'image/png');
       reply.header('cache-control', 'no-store');
       return reply.send(buf);

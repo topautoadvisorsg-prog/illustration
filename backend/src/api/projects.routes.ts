@@ -560,10 +560,10 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         });
       }
 
-      const { LocalStorageService } = await import('../services/storage/local-storage.js');
+      const { getProjectStorage } = await import('../services/storage/project-storage.js');
       let buf: Buffer;
       try {
-        buf = await new LocalStorageService().readProjectFile(project.manuscriptPath);
+        buf = await getProjectStorage().readProjectFile(project.manuscriptPath);
       } catch (error) {
         if (isNativeError(error) && 'code' in error && error.code === 'ENOENT') {
           return reply.code(404).send({

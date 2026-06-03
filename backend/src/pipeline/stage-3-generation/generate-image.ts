@@ -22,7 +22,7 @@ import { getProject } from '../../db/repositories/projects.repo.js';
 import { insertImage, listImagesForPage } from '../../db/repositories/images.repo.js';
 import { recordUsage } from '../../db/repositories/usage.repo.js';
 import { recordImageEvent } from '../../db/repositories/image-events.repo.js';
-import { LocalStorageService } from '../../services/storage/local-storage.js';
+import { getProjectStorage, type ProjectStorage } from '../../services/storage/project-storage.js';
 import { logger } from '../../lib/logger.js';
 
 export type ImageGenerator = (input: GenerateImageInput) => Promise<GeneratedImage>;
@@ -103,7 +103,7 @@ export interface GeneratePageImageOptions {
   pageId: string;
   /** Injectable for tests; defaults to the real OpenAI call. */
   generator?: ImageGenerator;
-  storage?: LocalStorageService;
+  storage?: ProjectStorage;
   /** Optional operator tweak appended to the locked prompt on regeneration. */
   promptAddendum?: string;
 }
@@ -132,7 +132,7 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
   const existing = await listImagesForPage(page.id);
   const version = nextImageVersion(existing);
   const generator = opts.generator ?? defaultGenerateImage;
-  const storage = opts.storage ?? new LocalStorageService();
+  const storage = opts.storage ?? getProjectStorage();
 
   // Each version stores its own exact prompt + hash (a regeneration tweak makes
   // this differ from the page's planned prompt) so generations stay auditable.

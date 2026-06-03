@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LocalStorageService, type StoredFile } from '../../services/storage/local-storage.js';
+import { getProjectStorage, type ProjectStorage, type StoredFile } from '../../services/storage/project-storage.js';
 import { assertUsableManuscriptOutline, parseManuscriptOutline, type ManuscriptOutline } from './parse-manuscript-outline.js';
 import { extractManuscript } from './extract-manuscript.js';
 
@@ -26,7 +26,7 @@ export interface IngestManuscriptResult {
 
 export async function ingestManuscript(
   input: IngestManuscriptInput,
-  storage = new LocalStorageService(),
+  storage: ProjectStorage = getProjectStorage(),
 ): Promise<IngestManuscriptResult> {
   const parsed = IngestManuscriptInputSchema.parse(input);
 

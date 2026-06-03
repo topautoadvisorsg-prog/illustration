@@ -1,0 +1,96 @@
+/**
+ * Project file storage — persistent (Supabase Storage) in production, local disk
+ * for tests/dev. Railway's container disk is ephemeral: anything written locally
+ * is wiped on every redeploy/restart, which silently destroyed generated images
+ * and rendered PDFs. Supabase Storage (already configured) keeps them durable.
+ *
+ * Both implementations share the same interface, and stored paths are identical
+ * ("<projectId>/<segment>/<segment>"), so callers don't care which is active.
+ */
+
+import { createHash } from 'node:crypto';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getEnv, isPlaceholder } from '../../env.js';
+import { LocalStorageService, type StoredFile } from './local-storage.js';
+
+export type { StoredFile } from './local-storage.js';
+export { LocalStorageService } from './local-storage.js';
+
+export interface ProjectStorage {
+  writeProjectFile(projectId: string, parts: string[], data: Buffer | string): Promise<StoredFile>;
+  readProjectFile(relativePath: string): Promise<Buffer>;
+}
+
+const BUCKET = 'project-files';
+
+function contentTypeFor(key: string): string {
+  if (key.endsWith('.pdf')) return 'application/pdf';
+  if (key.endsWith('.png')) return 'image/png';
+  if (key.endsWith('.md') || key.endsWith('.markdown')) return 'text/markdown';
+  if (key.endsWith('.txt')) return 'text/plain';
+  if (key.endsWith('.json')) return 'application/json';
+  return 'application/octet-stream';
+}
+
+/** Persistent storage backed by a private Supabase Storage bucket. */
+export class SupabaseStorageService implements ProjectStorage {
+  private readonly client: SupabaseClient;
+  private bucketReady: Promise<void> | null = null;
+
+  constructor() {
+    const env = getEnv();
+    this.client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+
+  private ensureBucket(): Promise<void> {
+    if (!this.bucketReady) {
+      // Idempotent: createBucket errors if it already exists — that's fine.
+      this.bucketReady = this.client.storage
+        .createBucket(BUCKET, { public: false })
+        .then(() => undefined)
+        .catch(() => undefined);
+    }
+    return this.bucketReady;
+  }
+
+  async writeProjectFile(projectId: string, parts: string[], data: Buffer | string): Promise<StoredFile> {
+    await this.ensureBucket();
+    const safeParts = parts.map((part) => part.replace(/[^a-zA-Z0-9._-]/g, '_'));
+    const key = [projectId, ...safeParts].join('/');
+    const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');
+    const { error } = await this.client.storage
+      .from(BUCKET)
+      .upload(key, buffer, { contentType: contentTypeFor(key), upsert: true });
+    if (error) throw new Error(`Supabase Storage upload failed for ${key}: ${error.message}`);
+    return {
+      relativePath: key,
+      absolutePath: `supabase://${BUCKET}/${key}`,
+      sha256: createHash('sha256').update(buffer).digest('hex'),
+      sizeBytes: buffer.byteLength,
+    };
+  }
+
+  async readProjectFile(relativePath: string): Promise<Buffer> {
+    await this.ensureBucket();
+    const { data, error } = await this.client.storage.from(BUCKET).download(relativePath);
+    if (error || !data) {
+      throw new Error(`Supabase Storage download failed for ${relativePath}: ${error?.message ?? 'no data'}`);
+    }
+    return Buffer.from(await data.arrayBuffer());
+  }
+}
+
+/**
+ * The active project storage: Supabase when configured (production), else local
+ * disk (tests/dev). Callers use this instead of `new LocalStorageService()` so
+ * files persist across redeploys.
+ */
+export function getProjectStorage(): ProjectStorage {
+  const env = getEnv();
+  if (!isPlaceholder(env.SUPABASE_URL) && !isPlaceholder(env.SUPABASE_SERVICE_ROLE_KEY)) {
+    return new SupabaseStorageService();
+  }
+  return new LocalStorageService();
+}
