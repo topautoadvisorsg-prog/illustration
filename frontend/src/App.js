@@ -1043,7 +1043,12 @@ function readFileAsText(file) {
 
 async function readJson(response) {
   const text = await response.text();
-  const data = text ? JSON.parse(text) : {};
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { message: text };
+  }
   if (!response.ok) {
     throw new Error(data.message || `${response.status} ${response.statusText}`);
   }

@@ -135,7 +135,7 @@ describe('Operator Intelligence chapter evaluator', () => {
       pageRows: [first, second],
       imageRows: [imageRow(first, 'REVIEW')],
       layoutApproval,
-      textFitPersisted: false,
+      textFitPersisted: true,
     });
 
     expect(result.status).toBe('NEEDS_REVIEW');
@@ -148,6 +148,7 @@ describe('Operator Intelligence chapter evaluator', () => {
       unapprovedImages: 1,
     });
     expect(result.findings.map((finding) => finding.pageKey)).toContain('CH01_P002');
+    expect(result.findings.some((finding) => finding.category === 'TEXT_FIT')).toBe(false);
   });
 
   it('registers the project chapter intelligence route without database access at boot', async () => {

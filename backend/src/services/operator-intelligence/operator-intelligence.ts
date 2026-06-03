@@ -89,6 +89,7 @@ export function evaluateChapterIntelligence(input: EvaluateChapterIntelligenceIn
     .sort((a, b) => a.pageNumber - b.pageNumber);
   const pageRowsByKey = new Map(input.pageRows.map((page) => [page.pageKey, page]));
   const activeImages = activeImagesByPageId(input.imageRows);
+  const hasTextFitProof = Boolean(input.layoutApproval?.textFitSummary || input.textFitPersisted);
   const findings: OperatorFinding[] = [];
 
   if (pageManifests.length === 0) {
@@ -111,13 +112,13 @@ export function evaluateChapterIntelligence(input: EvaluateChapterIntelligenceIn
     });
   }
 
-  if (!input.textFitPersisted) {
+  if (!hasTextFitProof) {
     findings.push({
       severity: input.layoutApproval ? 'INFO' : 'WARNING',
       category: 'TEXT_FIT',
       scope: 'CHAPTER',
-      message: 'Text-fit preview results are not persisted as a reusable proof record yet.',
-      recommendedAction: 'Run Text-Fit in the current browser session before final image spend or approval.',
+      message: 'No saved text-fit proof is attached to this chapter yet.',
+      recommendedAction: 'Run Text-Fit and approve the chapter layout so the fit summary is recorded.',
     });
   }
 
@@ -238,12 +239,13 @@ export async function getChapterOperatorIntelligence(
   if (!chapter) return undefined;
 
   const config = ProjectConfigSchema.parse(project.config);
+  const layoutApproval = config.layoutApprovals?.[String(chapterNumber)];
   return evaluateChapterIntelligence({
     chapter,
     pageManifests: parsePageManifests(pageManifestRows),
     pageRows,
     imageRows: imageRows.filter((row) => row.page.chapterNumber === chapterNumber),
-    layoutApproval: config.layoutApprovals?.[String(chapterNumber)],
-    textFitPersisted: false,
+    layoutApproval,
+    textFitPersisted: Boolean(layoutApproval?.textFitSummary),
   });
 }
