@@ -2225,6 +2225,17 @@ function App() {
             <span>or click to choose a .md / .txt file</span>
             <span className="file-name-loaded">{manuscriptStatusText}</span>
           </div>
+          <input
+            ref={manuscriptInputRef}
+            type="file"
+            accept=".md,.markdown,.txt,text/markdown,text/plain"
+            style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden", pointerEvents: "none" }}
+            tabIndex={-1}
+            onChange={(event) => {
+              uploadManuscriptFile(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+          />
           <div className="operator-log" aria-live="polite">
             {operatorLog.map((entry, index) => (
               <div className={`log-row ${entry.level}`} key={`${entry.time}-${index}`}>
@@ -2923,39 +2934,6 @@ function App() {
       )}
 
       <section className="pipeline-grid">
-        <section className="panel">
-          <div className="section-head">
-            <h2>Manuscript text</h2>
-            <span className="hint">The same book — paste or edit here. Drop a file or upload from the box at the top.</span>
-          </div>
-          <input
-            ref={manuscriptInputRef}
-            type="file"
-            accept=".md,.markdown,.txt,text/markdown,text/plain"
-            style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden", pointerEvents: "none" }}
-            tabIndex={-1}
-            onChange={(event) => {
-              uploadManuscriptFile(event.target.files?.[0]);
-              event.target.value = "";
-            }}
-          />
-          <div
-            className={isDragging ? "dropzone dragging" : "dropzone"}
-            onDragOver={(event) => {
-              event.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleManuscriptDrop}
-          >
-            <textarea
-              value={manuscript}
-              onChange={(event) => setManuscript(event.target.value)}
-              placeholder="Paste your manuscript here, drop a .md/.txt file, or use Choose file."
-            />
-            {isDragging && <div className="drop-hint">Drop your manuscript file</div>}
-          </div>
-        </section>
 
         {advancedMode && (
         <section className="panel">
