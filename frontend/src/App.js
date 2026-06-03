@@ -2924,34 +2924,20 @@ function App() {
       <section className="pipeline-grid">
         <section className="panel">
           <div className="section-head">
-            <h2>2. Manuscript</h2>
-            <div className="button-row">
-              <button type="button" className="file-button" onClick={openManuscriptPicker}>
-                Choose file
-              </button>
-              <input
-                ref={manuscriptInputRef}
-                type="file"
-                accept=".md,.markdown,.txt,text/markdown,text/plain"
-                style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden", pointerEvents: "none" }}
-                tabIndex={-1}
-                onChange={(event) => {
-                  uploadManuscriptFile(event.target.files?.[0]);
-                  event.target.value = "";
-                }}
-              />
-              <span className="file-name" title={manuscriptFileLabel}>{manuscriptFileLabel}</span>
-              <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
-                Upload
-              </button>
-              <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
-                Generate Manifests
-              </button>
-              <button disabled={busy || !activeProjectId} onClick={() => run("Planning pages...", planPages)}>
-                Plan Pages
-              </button>
-            </div>
+            <h2>Manuscript text</h2>
+            <span className="hint">The same book — paste or edit here. Drop a file or upload from the box at the top.</span>
           </div>
+          <input
+            ref={manuscriptInputRef}
+            type="file"
+            accept=".md,.markdown,.txt,text/markdown,text/plain"
+            style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden", pointerEvents: "none" }}
+            tabIndex={-1}
+            onChange={(event) => {
+              uploadManuscriptFile(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+          />
           <div
             className={isDragging ? "dropzone dragging" : "dropzone"}
             onDragOver={(event) => {
