@@ -102,12 +102,31 @@ export async function renderHtmlToPdf(html: string, geometry: PageGeometry): Pro
     await page.setContent(html, { waitUntil: 'load', timeout });
     // These callbacks run inside the browser; reference DOM via globalThis to
     // avoid pulling the DOM lib into the Node TS build.
+    // 1) Wait for Paged.js to START paginating (first page exists).
     await page.waitForFunction(
       () => {
         const w = globalThis as unknown as { PagedPolyfill?: { pages?: unknown[] }; document: { querySelectorAll: (s: string) => { length: number } } };
         return Boolean(w.PagedPolyfill?.pages?.length) || w.document.querySelectorAll('.pagedjs_page').length > 0;
       },
       { timeout },
+    );
+    // 2) Wait for Paged.js to FINISH. It paginates incrementally, so capturing the
+    // PDF right after the first page appears truncates long content. Poll the page
+    // count until it stops growing (stable across several polls) before rendering.
+    await page.waitForFunction(
+      () => {
+        const w = globalThis as unknown as {
+          document: { querySelectorAll: (s: string) => { length: number } };
+          __pagedStable?: { count: number; streak: number };
+        };
+        const n = w.document.querySelectorAll('.pagedjs_page').length;
+        const state = w.__pagedStable ?? { count: -1, streak: 0 };
+        if (n === state.count && n > 0) state.streak += 1;
+        else { state.count = n; state.streak = 0; }
+        w.__pagedStable = state;
+        return state.streak >= 4; // unchanged across 4 consecutive polls
+      },
+      { timeout, polling: 250 },
     );
     const totalPages = await page.evaluate(() => {
       const w = globalThis as unknown as { document: { querySelectorAll: (s: string) => { length: number } } };
