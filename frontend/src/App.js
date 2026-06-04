@@ -1252,6 +1252,7 @@ function App() {
         stageLabel: "System Working",
         status: "Waiting on system",
         nextAction: "Let the current operation finish, then review the result in the log or preview.",
+        afterAction: "After it finishes, the board will move the next incomplete stage to Next.",
         buttonLabel: "Working...",
         actionKey: null,
         helpPrompt: "What is the system doing right now, and what should I check when it finishes?",
@@ -1263,6 +1264,7 @@ function App() {
         stageLabel: "Project Setup",
         status: "Waiting on you",
         nextAction: "Create a new project or select an existing book project.",
+        afterAction: "After that, upload the master manuscript for this book.",
         buttonLabel: "+ New Project",
         actionKey: "create-project",
         helpPrompt: "Help me start a new Wildlands book project.",
@@ -1274,6 +1276,7 @@ function App() {
         stageLabel: "Upload Manuscript",
         status: "Waiting on you",
         nextAction: "Choose the master manuscript file so the system can store it on the project.",
+        afterAction: "After the file is loaded, click Upload Manuscript.",
         buttonLabel: "Choose Manuscript",
         actionKey: "choose-manuscript",
         helpPrompt: "Where do I upload the manuscript, and what happens after upload?",
@@ -1285,6 +1288,7 @@ function App() {
         stageLabel: "Upload Manuscript",
         status: "Waiting on you",
         nextAction: "Upload the loaded manuscript to the selected project.",
+        afterAction: "After upload, generate the chapter and page breakdown.",
         buttonLabel: "Upload Manuscript",
         actionKey: "upload-manuscript",
         helpPrompt: "Check whether this manuscript is ready to upload.",
@@ -1296,6 +1300,7 @@ function App() {
         stageLabel: "Review Breakdown",
         status: "Waiting on you",
         nextAction: "Generate the deterministic chapter and page breakdown, then confirm it looks right.",
+        afterAction: "After the breakdown is correct, generate the page plan.",
         buttonLabel: "Start Breakdown",
         actionKey: "breakdown",
         helpPrompt: "Explain the manuscript breakdown step and what I should review.",
@@ -1307,6 +1312,7 @@ function App() {
         stageLabel: "Review Page Plan",
         status: "Waiting on you",
         nextAction: "Generate the page plan so every page has a layout, text flow, and image prompt.",
+        afterAction: "After page planning, run Text-Fit before approving layouts.",
         buttonLabel: "Generate Page Plan",
         actionKey: "plan",
         helpPrompt: "Review the page plan and tell me what needs attention.",
@@ -1318,6 +1324,7 @@ function App() {
         stageLabel: "Run Text-Fit",
         status: "Waiting on you",
         nextAction: "Run Text-Fit to check readability before approving layouts or spending on images.",
+        afterAction: "After Text-Fit passes, approve the selected chapter layout.",
         buttonLabel: "Run Text-Fit",
         actionKey: "textfit",
         helpPrompt: "Review text-fit and tell me whether the chapter is readable.",
@@ -1329,6 +1336,7 @@ function App() {
         stageLabel: "Approve Layouts",
         status: "Waiting on you",
         nextAction: "Approve the selected chapter layout once text-fit has no blocking readability issues.",
+        afterAction: "After layout approval, render a chapter proof with placeholders.",
         buttonLabel: "Approve Layout",
         actionKey: "approve-layout",
         helpPrompt: "Should I approve this chapter layout, or is anything still risky?",
@@ -1340,6 +1348,7 @@ function App() {
         stageLabel: "Render Proofs",
         status: "Ready for review",
         nextAction: "Render the selected chapter with placeholders, then click pages to inspect text and layout flow.",
+        afterAction: "After the proof reads cleanly, move into image generation and approval.",
         buttonLabel: "Render Chapter",
         actionKey: "render-chapter",
         helpPrompt: "What should I look for when reviewing this chapter proof?",
@@ -1351,6 +1360,7 @@ function App() {
         stageLabel: "Manage Images",
         status: "Waiting on review",
         nextAction: "If the text/layout proof is acceptable, generate, reuse, approve, or reject image assets page by page.",
+        afterAction: "After all images are approved and print-ready, run final proof/export checks.",
         buttonLabel: "Check Assets",
         actionKey: "images",
         helpPrompt: "Which images are missing or need approval, and what should I do next?",
@@ -1361,6 +1371,7 @@ function App() {
       stageLabel: "Export Book",
       status: "Waiting on final proof",
       nextAction: "Run final proof checks before exporting the production file.",
+      afterAction: "After export, review the saved artifact and record proof findings.",
       buttonLabel: "Ask Agent",
       actionKey: "ask-agent",
       helpPrompt: "Is this book ready to export, and what remains unfinished?",
@@ -2642,6 +2653,7 @@ function App() {
             <span className="mode-pill">{operatorGuidance.status}</span>
             <h3>{operatorGuidance.stageLabel}</h3>
             <p>{operatorGuidance.nextAction}</p>
+            <small>{operatorGuidance.afterAction}</small>
           </div>
           <div className="guidance-actions">
             <button disabled={busy || !operatorGuidance.actionKey} onClick={executeOperatorNextStep}>

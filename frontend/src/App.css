@@ -876,6 +876,12 @@ h3 {
   line-height: 1.42;
 }
 
+.guidance-main small {
+  color: #6d6258;
+  font-size: 0.9rem;
+  line-height: 1.36;
+}
+
 .guidance-actions {
   display: flex;
   flex-wrap: wrap;
