@@ -14,6 +14,7 @@ const ACTIVE_PROJECT_KEY = "wildlands_active_project_id";
 const ACTIVE_PHASE_KEY = "wildlands_active_phase";
 const SELECTED_PAGE_PREFIX = "wildlands_selected_page:";
 const MANUSCRIPT_CACHE_PREFIX = "wildlands_manuscript:";
+const TEXT_FIT_CACHE_PREFIX = "wildlands_text_fit:";
 const INTELLIGENCE_TYPES = [
   ["", "All Intelligence"],
   ["EXPERIMENT", "Experiments"],
@@ -69,6 +70,10 @@ function selectedPageKey(projectId) {
   return `${SELECTED_PAGE_PREFIX}${projectId}`;
 }
 
+function textFitCacheKey(projectId) {
+  return `${TEXT_FIT_CACHE_PREFIX}${projectId}`;
+}
+
 function fileNameFromPath(path) {
   return String(path || "").split(/[\\/]/).filter(Boolean).pop() || "";
 }
@@ -88,6 +93,24 @@ function saveManuscriptCache(projectId, cache) {
     localStorage.setItem(manuscriptCacheKey(projectId), JSON.stringify(cache));
   } catch {
     /* A manuscript can exceed browser storage; backend state remains source of truth. */
+  }
+}
+
+function loadTextFitCache(projectId) {
+  if (!projectId) return null;
+  try {
+    return JSON.parse(localStorage.getItem(textFitCacheKey(projectId)) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveTextFitCache(projectId, preview) {
+  if (!projectId || !preview) return;
+  try {
+    localStorage.setItem(textFitCacheKey(projectId), JSON.stringify({ preview, cachedAt: new Date().toISOString() }));
+  } catch {
+    /* Text-fit can be rerun; browser cache is only an operator convenience. */
   }
 }
 
@@ -1509,6 +1532,16 @@ function App() {
     }[key] || ".review-board";
   }
 
+  function currentStagePrimaryAction() {
+    const label = String(currentStageResult.primaryLabel || "").toLowerCase();
+    const shouldRunStage = ["create", "choose", "upload", "start", "generate", "run", "approve", "render"].some((word) => label.startsWith(word));
+    if (shouldRunStage && operatorGuidance.actionKey) {
+      executeOperatorNextStep();
+      return;
+    }
+    scrollToWorkspaceSection(currentStageResult.artifactSelector, "start");
+  }
+
   function executeOperatorNextStep() {
     switch (operatorGuidance.actionKey) {
       case "create-project":
@@ -1852,6 +1885,12 @@ function App() {
       setManuscriptName(cached.filename || "");
       setManuscriptSummary(cached.summary || null);
     }
+    const cachedTextFit = loadTextFitCache(projectId);
+    const cachedTextFitPageCount = cachedTextFit?.preview?.pages?.length || 0;
+    if (cachedTextFit?.preview && (!cachedTextFitPageCount || cachedTextFitPageCount === incomingPages.length)) {
+      setTextFitPreview(cachedTextFit.preview);
+      appendLog("success", "Restored cached Text-Fit review from this browser.");
+    }
     setSelectedPageId((current) =>
       incomingPages.some((page) => page.id === current)
         ? current
@@ -2128,6 +2167,7 @@ function App() {
       method: "POST",
     });
     setTextFitPreview(data);
+    saveTextFitCache(projectId, data);
     const overflow = data.totals?.overflow || 0;
     appendLog(overflow > 0 ? "error" : "success", `Text-fit preview complete: ${data.totals?.fits || 0} fit, ${overflow} overflow.`);
     setMessage(`Text-fit preview: ${data.readyForImageSpend ? "ready for image spend" : "needs review"}.`);
@@ -2840,7 +2880,7 @@ function App() {
           ))}
         </div>
         <div className="stage-result-actions">
-          <button type="button" onClick={() => scrollToWorkspaceSection(currentStageResult.artifactSelector, "start")}>
+          <button type="button" onClick={currentStagePrimaryAction}>
             {currentStageResult.primaryLabel}
           </button>
           <button
@@ -3413,6 +3453,17 @@ function App() {
                 <span>{layoutName(selectedPage.layoutTemplate || selectedPagePlan?.layoutTemplate)} / {normalizeStatus(selectedPage.status)}</span>
                 <span>{selectedChapterApproval ? "chapter layout approved" : "chapter layout pending"}</span>
                 <span>{selectedPagePlan?.promptReady ? "prompt ready" : selectedPage.imagePrompt ? "prompt stored" : "prompt pending"}</span>
+              </div>
+            )}
+            {selectedPage && !selectedChapterApproval && (
+              <div className="image-lock-notice">
+                <div>
+                  <strong>Images are locked for this chapter</strong>
+                  <span>Approve Chapter {selectedChapterNumber || selectedPage.chapterNumber || "?"} layout after Text-Fit before spending on generated art.</span>
+                </div>
+                <button type="button" className="secondary" onClick={() => scrollToWorkspaceSection(".layout-approval-panel", "center")}>
+                  Review Layout Gate
+                </button>
               </div>
             )}
             <div className="button-row">

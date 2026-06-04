@@ -1853,6 +1853,31 @@ button.secondary {
   font-size: 0.86rem;
 }
 
+.image-lock-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(142, 92, 30, 0.38);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff3d8;
+}
+
+.image-lock-notice div {
+  display: grid;
+  gap: 4px;
+}
+
+.image-lock-notice strong {
+  color: #5f3d12;
+}
+
+.image-lock-notice span {
+  color: #6d4d22;
+  line-height: 1.4;
+}
+
 .approval-pill {
   border: 1px solid #e0d7ca;
   border-radius: 999px;
