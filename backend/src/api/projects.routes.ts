@@ -32,7 +32,10 @@ import { RenderBlockedError, renderBookPdf, renderChapterPdf, renderCoverPdf, re
 import { countImagesForProject, listImagesForProject } from '../db/repositories/images.repo.js';
 import { CONTENT_TYPE_POLICY, decomposeTemplate } from '../pipeline/stage-2-planner/layered-layout.js';
 import { estimateCost } from '../services/cost/estimate.js';
-import { getChapterOperatorIntelligence } from '../services/operator-intelligence/operator-intelligence.js';
+import {
+  getChapterOperatorIntelligence,
+  getProjectProductionDashboard,
+} from '../services/operator-intelligence/operator-intelligence.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 const ProjectPageParamsSchema = z.object({ id: z.string().uuid(), pageKey: z.string().min(1) });
@@ -191,6 +194,84 @@ const OperatorChapterIntelligenceResponseSchema = z.object({
       pageKey: z.string().optional(),
       message: z.string(),
       recommendedAction: z.string(),
+    }),
+  ),
+});
+
+const ProductionDashboardItemSchema = z.object({
+  label: z.string(),
+  count: z.number(),
+  action: z.string(),
+});
+
+const ProductionDashboardResponseSchema = z.object({
+  status: z.enum([
+    'NOT_STARTED',
+    'PLANNING',
+    'LAYOUT_REVIEW',
+    'PROOFING',
+    'IMAGE_PRODUCTION',
+    'READY_FOR_EXPORT',
+    'EXPORTED',
+  ]),
+  nextAction: z.string(),
+  totals: z.object({
+    chapters: z.number(),
+    pages: z.number(),
+    pagesPlanned: z.number(),
+    layoutApprovedChapters: z.number(),
+    pagesWithImages: z.number(),
+    pagesWithApprovedImages: z.number(),
+    pagesPrintReady: z.number(),
+    missingImages: z.number(),
+    unapprovedImages: z.number(),
+    exportsReady: z.number(),
+  }),
+  chapters: z.array(
+    z.object({
+      chapterNumber: z.number(),
+      chapterTitle: z.string(),
+      status: z.enum(['READY', 'NEEDS_REVIEW', 'BLOCKED']),
+      nextAction: z.string(),
+      pages: z.number(),
+      pagesPlanned: z.number(),
+      layoutApproved: z.boolean(),
+      textFitSummary: z
+        .object({
+          pages: z.number(),
+          fits: z.number(),
+          tight: z.number(),
+          overflow: z.number(),
+          underfilled: z.number(),
+        })
+        .optional(),
+      pagesWithImages: z.number(),
+      pagesWithApprovedImages: z.number(),
+      pagesPrintReady: z.number(),
+      missingImages: z.number(),
+      unapprovedImages: z.number(),
+      blockerCount: z.number(),
+      warningCount: z.number(),
+    }),
+  ),
+  waitingOnOperator: z.array(ProductionDashboardItemSchema),
+  waitingOnSystem: z.array(ProductionDashboardItemSchema),
+  blockers: z.array(
+    z.object({
+      severity: z.enum(['BLOCKER', 'WARNING', 'INFO']),
+      category: z.enum(['TEXT_FIT', 'IMAGE', 'LAYOUT', 'PROOF', 'WORKFLOW']),
+      scope: z.enum(['CHAPTER', 'PAGE']),
+      pageKey: z.string().optional(),
+      message: z.string(),
+      recommendedAction: z.string(),
+    }),
+  ),
+  recentExports: z.array(
+    z.object({
+      kind: z.string(),
+      status: z.string(),
+      filePath: z.string().nullable(),
+      createdAt: z.string(),
     }),
   ),
 });
@@ -1020,6 +1101,31 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         });
       }
       return intelligence;
+    },
+  );
+
+  app.get(
+    '/api/projects/:id/production-dashboard',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        response: {
+          200: ProductionDashboardResponseSchema,
+          404: ApiErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const dashboard = await getProjectProductionDashboard(id);
+      if (!dashboard) {
+        return reply.code(404).send({
+          error: 'Project Not Found',
+          message: 'Project not found.',
+          statusCode: 404,
+        });
+      }
+      return dashboard;
     },
   );
 

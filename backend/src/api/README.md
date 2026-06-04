@@ -21,6 +21,7 @@ Implemented foundation routes:
 | `POST` | `/api/projects/:id/text-fit-preview` | Run text-fit preview before image spend |
 | `GET` | `/api/projects/:id/image-library` | Search/filter reusable project image assets |
 | `GET` | `/api/projects/:id/cost-estimate` | Estimate project image cost from generated-image count |
+| `GET` | `/api/projects/:id/production-dashboard` | Read project-wide production status, queues, chapter readiness, and export state |
 | `GET` | `/api/projects/:id/chapters/:chapterNumber/operator-intelligence` | Read chapter readiness, blockers, and next action |
 | `POST` | `/api/projects/:id/chapters/:chapterNumber/render` | Render one chapter PDF preview |
 | `POST` | `/api/projects/:id/pages/:pageKey/render` | Render one focused page PDF proof |

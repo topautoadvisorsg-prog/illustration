@@ -1153,6 +1153,7 @@ function App() {
   const [pdfPreview, setPdfPreview] = useState({ title: "", url: "", meta: "" });
   const [renderedChapterNumber, setRenderedChapterNumber] = useState(null);
   const [chapterIntelligence, setChapterIntelligence] = useState(null);
+  const [productionDashboard, setProductionDashboard] = useState(null);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [agents, setAgents] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -1695,6 +1696,7 @@ function App() {
     setTextFitPreview(null);
     setPageImages({});
     setChapterIntelligence(null);
+    setProductionDashboard(null);
     setPlannedPages([]);
     setLayoutApprovals({});
     setPdfPreview((current) => {
@@ -1724,6 +1726,7 @@ function App() {
       setSelectedPageId("");
       setPlannedPages([]);
       setChapterIntelligence(null);
+      setProductionDashboard(null);
       setLayoutApprovals({});
       setManifests([]);
       setPages([]);
@@ -1818,6 +1821,18 @@ function App() {
         : incomingPages.find((page) => page.id === loadStoredString(selectedPageKey(projectId)))?.id || incomingPages[0]?.id || "",
     );
     setMessage("Loaded manifests and pages.");
+    loadProductionDashboard(projectId).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      appendLog("issue", `Production dashboard not loaded yet: ${message}`);
+    });
+  }
+
+  async function loadProductionDashboard(projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    const data = await call(`/api/projects/${projectId}/production-dashboard`);
+    setProductionDashboard(data);
+    appendLog("success", `Production dashboard refreshed: ${data.status}.`);
+    return data;
   }
 
   async function refreshIntelligence() {
@@ -2663,6 +2678,106 @@ function App() {
             </div>
           </div>
           <p className="agent-help-note">Need changes or fixes? Use chat for project questions, Audit Current Stage for a structured review, and the page/image controls inside each stage for direct edits.</p>
+        </section>
+
+        <section className="production-dashboard">
+          <div className="section-head compact">
+            <div>
+              <p className="eyebrow">Production Dashboard</p>
+              <h3>{productionDashboard?.status ? productionDashboard.status.replaceAll("_", " ") : "Not Loaded"}</h3>
+              <p className="hint">{productionDashboard?.nextAction || "Refresh the dashboard to see book-wide blockers, queues, and chapter readiness."}</p>
+            </div>
+            <div className="button-row">
+              <button disabled={busy || !activeProjectId} onClick={() => run("Refreshing production dashboard...", () => loadProductionDashboard())}>
+                Refresh Dashboard
+              </button>
+              <button type="button" className="secondary" disabled={!activeProjectId} onClick={() => focusAgentChat("Read the production dashboard and tell me what to do next.")}>
+                Ask About Dashboard
+              </button>
+            </div>
+          </div>
+          {productionDashboard ? (
+            <>
+              <div className="production-metrics">
+                <div>
+                  <strong>{productionDashboard.totals.layoutApprovedChapters}/{productionDashboard.totals.chapters}</strong>
+                  <span>chapters approved</span>
+                </div>
+                <div>
+                  <strong>{productionDashboard.totals.pagesPlanned}/{productionDashboard.totals.pages}</strong>
+                  <span>pages planned</span>
+                </div>
+                <div>
+                  <strong>{productionDashboard.totals.pagesWithImages}</strong>
+                  <span>pages with art</span>
+                </div>
+                <div>
+                  <strong>{productionDashboard.totals.pagesWithApprovedImages}</strong>
+                  <span>approved art</span>
+                </div>
+                <div>
+                  <strong>{productionDashboard.totals.pagesPrintReady}</strong>
+                  <span>print ready</span>
+                </div>
+                <div>
+                  <strong>{productionDashboard.totals.exportsReady}</strong>
+                  <span>ready exports</span>
+                </div>
+              </div>
+              <div className="production-queues">
+                <div>
+                  <strong>Waiting On Operator</strong>
+                  {productionDashboard.waitingOnOperator.map((item) => (
+                    <p key={item.label}><span>{item.count}</span> {item.label}: {item.action}</p>
+                  ))}
+                  {productionDashboard.waitingOnOperator.length === 0 && <p className="empty">No operator queue items.</p>}
+                </div>
+                <div>
+                  <strong>Waiting On System</strong>
+                  {productionDashboard.waitingOnSystem.map((item) => (
+                    <p key={item.label}><span>{item.count}</span> {item.label}: {item.action}</p>
+                  ))}
+                  {productionDashboard.waitingOnSystem.length === 0 && <p className="empty">No system queue items.</p>}
+                </div>
+                <div>
+                  <strong>Current Blockers</strong>
+                  {productionDashboard.blockers.slice(0, 5).map((finding, index) => (
+                    <p key={`${finding.message}-${index}`}><span>{finding.severity}</span> {finding.message} {finding.recommendedAction}</p>
+                  ))}
+                  {productionDashboard.blockers.length === 0 && <p className="empty">No blockers detected.</p>}
+                </div>
+              </div>
+              <div className="production-exports">
+                <strong>Recent Exports</strong>
+                {productionDashboard.recentExports.map((item, index) => (
+                  <p key={`${item.kind}-${item.createdAt}-${index}`}>
+                    <span>{item.status}</span> {item.kind} {item.filePath ? `- ${item.filePath}` : ""} <small>{new Date(item.createdAt).toLocaleString()}</small>
+                  </p>
+                ))}
+                {productionDashboard.recentExports.length === 0 && <p className="empty">No exports recorded yet.</p>}
+              </div>
+              <div className="production-chapter-table">
+                <div className="production-chapter-row header">
+                  <span>Chapter</span>
+                  <span>Status</span>
+                  <span>Layout</span>
+                  <span>Art</span>
+                  <span>Next Action</span>
+                </div>
+                {productionDashboard.chapters.map((chapter) => (
+                  <div className={`production-chapter-row ${chapter.status.toLowerCase().replace("_", "-")}`} key={chapter.chapterNumber}>
+                    <span>{chapter.chapterNumber}. {chapter.chapterTitle}</span>
+                    <span>{chapter.status.replace("_", " ")}</span>
+                    <span>{chapter.layoutApproved ? "approved" : "pending"} / {chapter.pagesPlanned}/{chapter.pages} planned</span>
+                    <span>{chapter.pagesWithApprovedImages}/{chapter.pages} approved, {chapter.missingImages} missing</span>
+                    <span>{chapter.nextAction}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="empty">No production dashboard loaded yet.</p>
+          )}
         </section>
 
         <div className="operator-checkpoints">

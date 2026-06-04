@@ -9,6 +9,7 @@ import {
 import { listImagesForProject, type ProjectImageLibraryRow } from '../../db/repositories/images.repo.js';
 import { listManifests, listPages, type ManifestRow, type PageRow } from '../../db/repositories/manifests.repo.js';
 import { getProject } from '../../db/repositories/projects.repo.js';
+import { listExports, type ExportRow } from '../../db/repositories/exports.repo.js';
 
 export type OperatorIntelligenceStatus = 'READY' | 'NEEDS_REVIEW' | 'BLOCKED';
 export type OperatorFindingSeverity = 'BLOCKER' | 'WARNING' | 'INFO';
@@ -42,6 +43,68 @@ export interface OperatorChapterIntelligence {
   nextAction: string;
   summary: OperatorChapterSummary;
   findings: OperatorFinding[];
+}
+
+export type ProductionDashboardStatus =
+  | 'NOT_STARTED'
+  | 'PLANNING'
+  | 'LAYOUT_REVIEW'
+  | 'PROOFING'
+  | 'IMAGE_PRODUCTION'
+  | 'READY_FOR_EXPORT'
+  | 'EXPORTED';
+
+export interface ProductionDashboardChapter {
+  chapterNumber: number;
+  chapterTitle: string;
+  status: OperatorIntelligenceStatus;
+  nextAction: string;
+  pages: number;
+  pagesPlanned: number;
+  layoutApproved: boolean;
+  textFitSummary?: ProjectConfig['layoutApprovals'][string]['textFitSummary'];
+  pagesWithImages: number;
+  pagesWithApprovedImages: number;
+  pagesPrintReady: number;
+  missingImages: number;
+  unapprovedImages: number;
+  blockerCount: number;
+  warningCount: number;
+}
+
+export interface ProductionDashboardItem {
+  label: string;
+  count: number;
+  action: string;
+}
+
+export interface ProductionDashboardExport {
+  kind: string;
+  status: string;
+  filePath: string | null;
+  createdAt: string;
+}
+
+export interface ProjectProductionDashboard {
+  status: ProductionDashboardStatus;
+  nextAction: string;
+  totals: {
+    chapters: number;
+    pages: number;
+    pagesPlanned: number;
+    layoutApprovedChapters: number;
+    pagesWithImages: number;
+    pagesWithApprovedImages: number;
+    pagesPrintReady: number;
+    missingImages: number;
+    unapprovedImages: number;
+    exportsReady: number;
+  };
+  chapters: ProductionDashboardChapter[];
+  waitingOnOperator: ProductionDashboardItem[];
+  waitingOnSystem: ProductionDashboardItem[];
+  blockers: OperatorFinding[];
+  recentExports: ProductionDashboardExport[];
 }
 
 interface EvaluateChapterIntelligenceInput {
@@ -206,6 +269,162 @@ export function evaluateChapterIntelligence(input: EvaluateChapterIntelligenceIn
   };
 }
 
+function dashboardStatus(input: {
+  projectStatus: string;
+  chapters: number;
+  pages: number;
+  pagesPlanned: number;
+  layoutApprovedChapters: number;
+  pagesWithImages: number;
+  pagesWithApprovedImages: number;
+  missingImages: number;
+  unapprovedImages: number;
+}): ProductionDashboardStatus {
+  if (input.projectStatus === 'EXPORTED') return 'EXPORTED';
+  if (input.chapters === 0 || input.pages === 0) return 'NOT_STARTED';
+  if (input.pagesPlanned < input.pages) return 'PLANNING';
+  if (input.layoutApprovedChapters < input.chapters) return 'LAYOUT_REVIEW';
+  if (input.pagesWithImages === 0) return 'PROOFING';
+  if (input.missingImages > 0 || input.unapprovedImages > 0) return 'IMAGE_PRODUCTION';
+  if (input.pagesWithApprovedImages >= input.pages) return 'READY_FOR_EXPORT';
+  return 'IMAGE_PRODUCTION';
+}
+
+function dashboardNextAction(status: ProductionDashboardStatus): string {
+  if (status === 'NOT_STARTED') return 'Upload the manuscript and generate the chapter/page breakdown.';
+  if (status === 'PLANNING') return 'Run Page Plan until every page has a locked layout and prompt.';
+  if (status === 'LAYOUT_REVIEW') return 'Run Text-Fit and approve layouts chapter by chapter before image spend.';
+  if (status === 'PROOFING') return 'Render approved chapters with placeholder art and inspect page-shaped proofs.';
+  if (status === 'IMAGE_PRODUCTION') return 'Generate, reuse, approve, reject, or upscale images for the flagged pages.';
+  if (status === 'READY_FOR_EXPORT') return 'Run final proof checks and export the production PDF.';
+  return 'Book is exported. Review exports and proof records before starting another edition.';
+}
+
+export function evaluateProjectProductionDashboard(input: {
+  projectStatus: string;
+  chapters: ChapterManifest[];
+  pageManifests: PageManifest[];
+  pageRows: PageRow[];
+  imageRows: ProjectImageLibraryRow[];
+  layoutApprovals: ProjectConfig['layoutApprovals'];
+  exports: ExportRow[];
+}): ProjectProductionDashboard {
+  const chapterRows = input.chapters
+    .sort((a, b) => a.chapterNumber - b.chapterNumber)
+    .map((chapter) => {
+      const layoutApproval = input.layoutApprovals?.[String(chapter.chapterNumber)];
+      const intelligence = evaluateChapterIntelligence({
+        chapter,
+        pageManifests: input.pageManifests,
+        pageRows: input.pageRows,
+        imageRows: input.imageRows.filter((row) => row.page.chapterNumber === chapter.chapterNumber),
+        layoutApproval,
+        textFitPersisted: Boolean(layoutApproval?.textFitSummary),
+      });
+      return {
+        status: intelligence.status,
+        nextAction: intelligence.nextAction,
+        ...intelligence.summary,
+        textFitSummary: layoutApproval?.textFitSummary,
+        blockerCount: intelligence.findings.filter((finding) => finding.severity === 'BLOCKER').length,
+        warningCount: intelligence.findings.filter((finding) => finding.severity === 'WARNING').length,
+      };
+    });
+
+  const totals = chapterRows.reduce(
+    (sum, chapter) => {
+      sum.chapters += 1;
+      sum.pages += chapter.pages;
+      sum.pagesPlanned += chapter.pagesPlanned;
+      if (chapter.layoutApproved) sum.layoutApprovedChapters += 1;
+      sum.pagesWithImages += chapter.pagesWithImages;
+      sum.pagesWithApprovedImages += chapter.pagesWithApprovedImages;
+      sum.pagesPrintReady += chapter.pagesPrintReady;
+      sum.missingImages += chapter.missingImages;
+      sum.unapprovedImages += chapter.unapprovedImages;
+      return sum;
+    },
+    {
+      chapters: 0,
+      pages: 0,
+      pagesPlanned: 0,
+      layoutApprovedChapters: 0,
+      pagesWithImages: 0,
+      pagesWithApprovedImages: 0,
+      pagesPrintReady: 0,
+      missingImages: 0,
+      unapprovedImages: 0,
+      exportsReady: input.exports.filter((row) => row.status === 'READY').length,
+    },
+  );
+
+  const waitingOnOperator: ProductionDashboardItem[] = [
+    {
+      label: 'Layout approvals',
+      count: Math.max(0, totals.chapters - totals.layoutApprovedChapters),
+      action: 'Run Text-Fit and approve each chapter layout.',
+    },
+    {
+      label: 'Missing images',
+      count: totals.missingImages,
+      action: 'Generate or reuse art only after text/layout proofing passes.',
+    },
+    {
+      label: 'Unapproved active images',
+      count: totals.unapprovedImages,
+      action: 'Approve, reject, or regenerate image versions.',
+    },
+  ].filter((item) => item.count > 0);
+
+  const waitingOnSystem: ProductionDashboardItem[] = [
+    {
+      label: 'Unplanned pages',
+      count: Math.max(0, totals.pages - totals.pagesPlanned),
+      action: 'Run Page Plan to lock layout/prompt data.',
+    },
+    {
+      label: 'Upscale / print-ready pages',
+      count: Math.max(0, totals.pagesWithApprovedImages - totals.pagesPrintReady),
+      action: 'Upscale approved images before final export when required.',
+    },
+  ].filter((item) => item.count > 0);
+
+  const blockers = chapterRows
+    .flatMap((chapter) => {
+      if (chapter.blockerCount === 0 && chapter.warningCount === 0) return [];
+      return [
+        {
+          severity: chapter.blockerCount > 0 ? 'BLOCKER' as const : 'WARNING' as const,
+          category: chapter.blockerCount > 0 ? 'WORKFLOW' as const : 'IMAGE' as const,
+          scope: 'CHAPTER' as const,
+          message: `Chapter ${chapter.chapterNumber}: ${chapter.blockerCount} blocker(s), ${chapter.warningCount} warning(s).`,
+          recommendedAction: chapter.nextAction,
+        },
+      ];
+    })
+    .slice(0, 12);
+
+  const status = dashboardStatus({ projectStatus: input.projectStatus, ...totals });
+  return {
+    status,
+    nextAction: dashboardNextAction(status),
+    totals,
+    chapters: chapterRows,
+    waitingOnOperator,
+    waitingOnSystem,
+    blockers,
+    recentExports: input.exports
+      .slice(-5)
+      .reverse()
+      .map((row) => ({
+        kind: row.kind,
+        status: row.status,
+        filePath: row.filePath,
+        createdAt: row.createdAt.toISOString(),
+      })),
+  };
+}
+
 function parseChapter(manifests: ManifestRow[], chapterNumber: number): ChapterManifest | undefined {
   for (const manifest of manifests) {
     const parsed = ChapterManifestSchema.safeParse(manifest.content);
@@ -247,5 +466,33 @@ export async function getChapterOperatorIntelligence(
     imageRows: imageRows.filter((row) => row.page.chapterNumber === chapterNumber),
     layoutApproval,
     textFitPersisted: Boolean(layoutApproval?.textFitSummary),
+  });
+}
+
+export async function getProjectProductionDashboard(projectId: string): Promise<ProjectProductionDashboard | undefined> {
+  const project = await getProject(projectId);
+  if (!project) return undefined;
+
+  const [chapterManifestRows, pageManifestRows, pageRows, imageRows, exportRows] = await Promise.all([
+    listManifests(projectId, 'CHAPTER'),
+    listManifests(projectId, 'PAGE'),
+    listPages(projectId),
+    listImagesForProject(projectId),
+    listExports(projectId),
+  ]);
+  const config = ProjectConfigSchema.parse(project.config);
+  const chapters = chapterManifestRows.flatMap((manifest) => {
+    const parsed = ChapterManifestSchema.safeParse(manifest.content);
+    return parsed.success ? [parsed.data] : [];
+  });
+
+  return evaluateProjectProductionDashboard({
+    projectStatus: project.status,
+    chapters,
+    pageManifests: parsePageManifests(pageManifestRows),
+    pageRows,
+    imageRows,
+    layoutApprovals: config.layoutApprovals ?? {},
+    exports: exportRows,
   });
 }

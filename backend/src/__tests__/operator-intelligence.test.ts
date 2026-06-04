@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { ChapterManifest, PageManifest, ProjectConfig } from '@wildlands/shared';
 import type { ProjectImageLibraryRow } from '../db/repositories/images.repo.js';
+import type { ExportRow } from '../db/repositories/exports.repo.js';
 import type { PageRow } from '../db/repositories/manifests.repo.js';
-import { evaluateChapterIntelligence } from '../services/operator-intelligence/operator-intelligence.js';
+import {
+  evaluateChapterIntelligence,
+  evaluateProjectProductionDashboard,
+} from '../services/operator-intelligence/operator-intelligence.js';
 import { buildServer } from '../server.js';
 
 const chapter: ChapterManifest = {
@@ -103,6 +107,21 @@ const layoutApproval: ProjectConfig['layoutApprovals'][string] = {
   },
 };
 
+function exportRow(overrides: Partial<ExportRow> = {}): ExportRow {
+  return {
+    id: 'export-id',
+    projectId: 'project-id',
+    kind: 'PREMIUM_PDF',
+    status: 'READY',
+    filePath: 'exports/book.pdf',
+    sha256: null,
+    fileSizeBytes: 1024,
+    createdAt: new Date('2026-06-03T00:00:00.000Z'),
+    updatedAt: new Date('2026-06-03T00:00:00.000Z'),
+    ...overrides,
+  } as ExportRow;
+}
+
 describe('Operator Intelligence chapter evaluator', () => {
   it('blocks image spend when the layout gate is not approved', () => {
     const result = evaluateChapterIntelligence({
@@ -160,8 +179,46 @@ describe('Operator Intelligence chapter evaluator', () => {
           url: '/api/projects/:id/chapters/:chapterNumber/operator-intelligence',
         }),
       ).toBe(true);
+      expect(
+        app.hasRoute({
+          method: 'GET',
+          url: '/api/projects/:id/production-dashboard',
+        }),
+      ).toBe(true);
     } finally {
       await app.close();
     }
+  });
+
+  it('aggregates project production dashboard queues and chapter readiness', () => {
+    const first = pageRow('CH01_P001');
+    const second = pageRow('CH01_P002');
+    const result = evaluateProjectProductionDashboard({
+      projectStatus: 'PLANNED',
+      chapters: [chapter],
+      pageManifests,
+      pageRows: [first, second],
+      imageRows: [imageRow(first, 'APPROVED')],
+      layoutApprovals: { '1': layoutApproval },
+      exports: [exportRow()],
+    });
+
+    expect(result.status).toBe('IMAGE_PRODUCTION');
+    expect(result.totals).toMatchObject({
+      chapters: 1,
+      pages: 2,
+      pagesPlanned: 2,
+      layoutApprovedChapters: 1,
+      pagesWithImages: 1,
+      pagesWithApprovedImages: 1,
+      missingImages: 1,
+      exportsReady: 1,
+    });
+    expect(result.waitingOnOperator).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: 'Missing images', count: 1 }),
+      ]),
+    );
+    expect(result.chapters[0]).toMatchObject({ chapterNumber: 1, status: 'NEEDS_REVIEW' });
   });
 });
