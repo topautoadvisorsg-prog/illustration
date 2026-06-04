@@ -2452,6 +2452,14 @@ function App() {
   const dashboardWordCount = manuscriptSummary?.totalWords || null;
   const dashboardTitle = selectedProject?.title || projectConfig.title || "Wildlands Book Project";
   const dashboardStatus = normalizeStatus(selectedProject?.status || "Not Started");
+  const printFormatLabel = projectConfig.outputProfile.pdfTarget?.toLowerCase().includes("paperback")
+    ? "Paperback"
+    : projectConfig.outputProfile.pdfTarget?.toLowerCase().includes("hardcover")
+      ? "Hardcover"
+      : "Print edition";
+  const ebookFormatLabel = projectConfig.outputProfile.ebookEdition === "KINDLE_EPUB" ? "Kindle ebook" : "Digital edition";
+  const colorFormatLabel = projectConfig.outputProfile.printEdition === "PREMIUM" ? "Premium color" : "Standard print";
+  const operatorFormatSummary = `${printFormatLabel} + ${ebookFormatLabel}`;
   const sidebarStatusLabel = {
     done: "Complete",
     current: "Now",
@@ -3844,6 +3852,27 @@ function App() {
             </Field>
           </div>
 
+          <div className="config-section operator-format-section">
+            <h3>Book Format</h3>
+            <div className="format-summary-grid">
+              <div>
+                <strong>{printFormatLabel}</strong>
+                <span>{colorFormatLabel} print proof</span>
+              </div>
+              <div>
+                <strong>{ebookFormatLabel}</strong>
+                <span>Digital reading edition</span>
+              </div>
+              <div>
+                <strong>Standards applied</strong>
+                <span>Production standards are preconfigured for this book.</span>
+              </div>
+            </div>
+            <p className="hint">Use Advanced only when you need to change production standards.</p>
+          </div>
+
+          {advancedMode && (
+          <>
           <div className="config-section">
             <h3>Output Profile</h3>
             <div className="form-grid compact">
@@ -4249,6 +4278,8 @@ function App() {
             </div>
           </div>
           )}
+          </>
+          )}
         </section>
 
         <aside className="side-stack">
@@ -4256,7 +4287,7 @@ function App() {
             <h2>Operator Preview</h2>
             <div className="book-preview" style={{ backgroundColor: projectConfig.colorPalette.paper }}>
               <p className="preview-kicker" style={{ color: projectConfig.colorPalette.accent }}>
-                {projectConfig.brand} / {projectConfig.outputProfile.printEdition}
+                {projectConfig.authorName} / {operatorFormatSummary}
               </p>
               <h3 style={{ color: projectConfig.colorPalette.ink, fontFamily: projectConfig.typography.headingFont }}>
                 {projectConfig.title}
@@ -4277,9 +4308,16 @@ function App() {
               <div className="mock-art">subject art slot</div>
             </div>
             <div className="facts">
-              <span>{projectConfig.trimSize.widthIn} x {projectConfig.trimSize.heightIn} in</span>
-              <span>Bleed {projectConfig.trimSize.bleedIn} in</span>
-              <span>{projectConfig.outputProfile.renderEngine}</span>
+              <span>{printFormatLabel}</span>
+              <span>{ebookFormatLabel}</span>
+              <span>{colorFormatLabel}</span>
+              {advancedMode && (
+                <>
+                  <span>{projectConfig.trimSize.widthIn} x {projectConfig.trimSize.heightIn} in</span>
+                  <span>Bleed {projectConfig.trimSize.bleedIn} in</span>
+                  <span>{projectConfig.outputProfile.renderEngine}</span>
+                </>
+              )}
             </div>
           </section>
 

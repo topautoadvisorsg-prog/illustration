@@ -1018,6 +1018,37 @@ h3 {
   border-top: 1px solid #e4dbce;
 }
 
+.operator-format-section {
+  border: 1px solid #e0d7ca;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fffaf0;
+}
+
+.format-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.format-summary-grid div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e0d7ca;
+  border-radius: 7px;
+  padding: 11px 12px;
+  background: #fffdf8;
+}
+
+.format-summary-grid strong {
+  color: #173730;
+}
+
+.format-summary-grid span {
+  color: #6d6258;
+  line-height: 1.38;
+}
+
 .hint,
 .meta,
 .empty,
@@ -2386,6 +2417,7 @@ button.secondary {
 
   .form-grid,
   .form-grid.compact,
+  .format-summary-grid,
   .number-row,
   .swatch-grid,
   .output-grid,
