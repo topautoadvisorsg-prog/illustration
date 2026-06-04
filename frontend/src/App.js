@@ -2425,15 +2425,106 @@ function App() {
       ? `Stored on project: ${storedManuscriptName || "manuscript"}`
       : "Nothing loaded yet";
   const manuscriptFileLabel = manuscriptName || storedManuscriptName;
+  const workflowSnapshot = WORKFLOW_STAGES.map((stage, index) => ({
+    ...stage,
+    index: index + 1,
+    state: workflowStageState(stage.key),
+  }));
+  const completedWorkflowSteps = workflowSnapshot.filter((stage) => stage.state === "done").length;
+  const workflowProgressPercent = Math.round((completedWorkflowSteps / WORKFLOW_STAGES.length) * 100);
+  const dashboardChapterTotal = productionDashboard?.totals?.chapters || chapterManifests.length || bookManifest.totalChapters || 0;
+  const dashboardPageTotal =
+    productionDashboard?.totals?.pages || pageManifests.length || pages.length || manuscriptSummary?.totalEntries || bookManifest.totalEntries || 0;
+  const dashboardPagePlanned = productionDashboard?.totals?.pagesPlanned || plannedPageCount || plannedPages.length || 0;
+  const dashboardImagesGenerated = productionDashboard?.totals?.pagesWithImages || imagePageCount || imageLibrary.total || 0;
+  const dashboardImagesApproved = productionDashboard?.totals?.pagesWithApprovedImages || approvedImagePageCount || 0;
+  const dashboardWordCount = manuscriptSummary?.totalWords || null;
+  const dashboardTitle = selectedProject?.title || projectConfig.title || "Wildlands Book Project";
+  const dashboardStatus = normalizeStatus(selectedProject?.status || "Not Started");
+  const sidebarStatusLabel = {
+    done: "Complete",
+    current: "Now",
+    open: "Open",
+    "": "Locked",
+  };
+  const systemReadyItems = [
+    { label: health?.ok ? "Backend online" : "Backend unchecked", ok: Boolean(health?.ok) },
+    { label: activeProjectId ? "Project selected" : "No project selected", ok: Boolean(activeProjectId) },
+    { label: selectedProject?.manuscriptPath || manuscript.trim() ? "Manuscript ready" : "Manuscript needed", ok: Boolean(selectedProject?.manuscriptPath || manuscript.trim()) },
+    { label: pageManifests.length > 0 ? "Breakdown available" : "Breakdown pending", ok: pageManifests.length > 0 },
+  ];
 
   return (
-    <main className="shell">
+    <main className="app-shell">
+      <aside className="app-sidebar" aria-label="Publishing workspace navigation">
+        <div className="sidebar-brand">
+          <span className="brand-mark">WL</span>
+          <div>
+            <strong>Wildlands</strong>
+            <small>Publishing Platform</small>
+          </div>
+        </div>
+        <button type="button" className="sidebar-primary active" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+          Dashboard
+        </button>
+        <div className="sidebar-section">
+          <span>Publishing Workflow</span>
+          <div className="sidebar-workflow">
+            {workflowSnapshot.map((stage) => (
+              <button
+                type="button"
+                className={`sidebar-stage ${stage.state || "locked"}`}
+                key={stage.key}
+                onClick={() => document.querySelector(".review-board")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              >
+                <em>{stage.index}</em>
+                <strong>{stage.label}</strong>
+                <small>{sidebarStatusLabel[stage.state]}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="sidebar-section">
+          <span>Resources</span>
+          <button type="button" className="sidebar-link" onClick={() => document.querySelector(".asset-library-panel")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+            Asset Desk
+          </button>
+          <button type="button" className="sidebar-link" onClick={() => document.querySelector(".upload-dropzone")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+            Project Files
+          </button>
+          <button type="button" className="sidebar-link" onClick={() => document.querySelector(".operator-log")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+            Activity Log
+          </button>
+          <button
+            type="button"
+            className="sidebar-link"
+            onClick={() => {
+              setAdvancedMode(true);
+              window.setTimeout(() => document.querySelector(".intelligence-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+            }}
+          >
+            Settings
+          </button>
+        </div>
+        <div className="sidebar-help">
+          <strong>Need Help?</strong>
+          <span>The Publishing Agent knows this project state.</span>
+          <button type="button" onClick={() => focusAgentChat()}>
+            Ask Agent
+          </button>
+        </div>
+      </aside>
+
+      <div className="shell">
       <section className="topbar">
         <div>
-          <p className="eyebrow">The Wildlands Publishing Platform</p>
-          <h1>Pipeline Administration</h1>
+          <p className="eyebrow">Wildlands Publishing Workspace</p>
+          <h1>Project Dashboard</h1>
         </div>
         <div className="topbar-actions">
+          <button type="button" className="secondary" disabled={!activeProjectId} onClick={() => focusAgentChat()}>
+            Ask Agent
+          </button>
           <label className="advanced-toggle">
             <input type="checkbox" checked={advancedMode} onChange={(event) => setAdvancedMode(event.target.checked)} />
             Advanced
@@ -2461,6 +2552,56 @@ function App() {
       )}
 
       {(message || error) && <section className={`notice ${error ? "error" : ""}`}>{error || message}</section>}
+
+      <section className="dashboard-hero">
+        <div className="project-cover-card" aria-hidden="true">
+          <span>New England</span>
+          <strong>Wildlands</strong>
+        </div>
+        <div className="dashboard-project">
+          <p className="eyebrow">Current Project</p>
+          <h2>{dashboardTitle}</h2>
+          <div className="dashboard-current-step">
+            <span>{dashboardStatus}</span>
+            <strong>{operatorGuidance.stageLabel}</strong>
+            <small>{operatorGuidance.nextAction}</small>
+          </div>
+        </div>
+        <div className="dashboard-progress">
+          <p className="eyebrow">Overall Progress</p>
+          <strong>{workflowProgressPercent}%</strong>
+          <div className="progress-track" aria-label={`${workflowProgressPercent}% workflow complete`}>
+            <span style={{ width: `${workflowProgressPercent}%` }} />
+          </div>
+          <small>{completedWorkflowSteps} of {WORKFLOW_STAGES.length} steps complete</small>
+        </div>
+        <div className="dashboard-metrics">
+          <div>
+            <strong>{dashboardChapterTotal}</strong>
+            <span>chapters</span>
+          </div>
+          <div>
+            <strong>{dashboardPageTotal}</strong>
+            <span>pages mapped</span>
+          </div>
+          <div>
+            <strong>{dashboardPagePlanned}</strong>
+            <span>pages planned</span>
+          </div>
+          <div>
+            <strong>{dashboardWordCount ? dashboardWordCount.toLocaleString() : "pending"}</strong>
+            <span>words</span>
+          </div>
+        </div>
+        <div className="dashboard-images">
+          <p className="eyebrow">Images</p>
+          <strong>{dashboardImagesGenerated} / {dashboardPageTotal || 0}</strong>
+          <span>{dashboardImagesApproved} approved</span>
+          <button type="button" className="secondary" disabled={!activeProjectId} onClick={() => document.querySelector(".asset-library-panel")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+            View Assets
+          </button>
+        </div>
+      </section>
 
       <section className="operator-grid">
         <section className="panel command-panel">
@@ -4162,6 +4303,48 @@ function App() {
         </aside>
       </section>
 
+      </div>
+
+      <aside className="agent-rail" aria-label="Publishing agent and guidance">
+        <section className="rail-card publishing-agent-card">
+          <p className="eyebrow">Publishing Agent</p>
+          <div className="agent-avatar" aria-hidden="true">AI</div>
+          <strong>Ready to help</strong>
+          <p>Ask for status, next steps, layout fixes, regeneration, or a production recommendation.</p>
+          <button type="button" onClick={() => focusAgentChat()}>
+            Ask Me Anything
+          </button>
+        </section>
+        <section className="rail-card">
+          <p className="eyebrow">Tips & Guidance</p>
+          <div className="rail-tip">
+            <strong>Where am I?</strong>
+            <span>{operatorGuidance.stageLabel}</span>
+          </div>
+          <div className="rail-tip">
+            <strong>What do I do next?</strong>
+            <span>{operatorGuidance.nextAction}</span>
+          </div>
+          <div className="rail-tip">
+            <strong>What happens after that?</strong>
+            <span>{operatorGuidance.afterAction}</span>
+          </div>
+          <div className="rail-tip">
+            <strong>How do I ask for help?</strong>
+            <span>Use Ask Agent here or the chat panel in the workspace.</span>
+          </div>
+        </section>
+        <section className="rail-card">
+          <p className="eyebrow">System Status</p>
+          <div className="system-list">
+            {systemReadyItems.map((item) => (
+              <span className={item.ok ? "ok" : "warn"} key={item.label}>
+                {item.label}
+              </span>
+            ))}
+          </div>
+        </section>
+      </aside>
     </main>
   );
 }
