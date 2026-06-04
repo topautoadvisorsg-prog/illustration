@@ -1495,6 +1495,20 @@ function App() {
     document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block });
   }
 
+  function reviewSelectorForStage(key) {
+    return {
+      project: ".setup-panel",
+      manuscript: ".upload-dropzone",
+      breakdown: ".chapter-tree",
+      plan: ".page-plan-list",
+      textfit: ".fit-summary",
+      layout: ".layout-approval-panel",
+      images: ".asset-library-panel",
+      proof: ".preview-review-card",
+      export: ".production-dashboard",
+    }[key] || ".review-board";
+  }
+
   function executeOperatorNextStep() {
     switch (operatorGuidance.actionKey) {
       case "create-project":
@@ -1504,25 +1518,25 @@ function App() {
         openManuscriptPicker();
         break;
       case "upload-manuscript":
-        run("Uploading manuscript...", uploadManuscript);
+        run("Uploading manuscript...", uploadManuscript, () => scrollToWorkspaceSection(".upload-dropzone", "center"));
         break;
       case "breakdown":
-        run("Generating manifests...", generateManifests);
+        run("Generating manifests...", generateManifests, () => scrollToWorkspaceSection(".chapter-tree"));
         break;
       case "plan":
-        run("Generating page plan...", planPages);
+        run("Generating page plan...", planPages, () => scrollToWorkspaceSection(".page-plan-list"));
         break;
       case "textfit":
-        run("Running text-fit preview...", runTextFitPreview);
+        run("Running text-fit preview...", runTextFitPreview, () => scrollToWorkspaceSection(".fit-summary", "center"));
         break;
       case "approve-layout":
-        run(`Approving Chapter ${selectedChapterNumber || "?"} layout...`, () => approveChapterLayout(selectedChapterNumber));
+        run(`Approving Chapter ${selectedChapterNumber || "?"} layout...`, () => approveChapterLayout(selectedChapterNumber), () => scrollToWorkspaceSection(".layout-approval-panel", "center"));
         break;
       case "render-chapter":
-        run("Rendering chapter preview...", () => renderChapterPreview(reviewChapterNumber));
+        run("Rendering chapter preview...", () => renderChapterPreview(reviewChapterNumber), () => scrollToWorkspaceSection(".pdf-preview-frame"));
         break;
       case "images":
-        run("Loading image library...", () => loadImageLibrary());
+        run("Loading image library...", () => loadImageLibrary(), () => scrollToWorkspaceSection(".asset-library-panel"));
         break;
       default:
         focusAgentChat();
@@ -1603,7 +1617,7 @@ function App() {
     return window.confirm(message);
   }
 
-  async function run(label, fn) {
+  async function run(label, fn, afterSuccess) {
     setBusy(true);
     setError("");
     setMessage(label);
@@ -1611,6 +1625,7 @@ function App() {
     try {
       await fn();
       appendLog("success", label.replace(/\.\.\.$/, " complete."));
+      afterSuccess?.();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(errorMessage);
@@ -2472,6 +2487,178 @@ function App() {
     { label: selectedProject?.manuscriptPath || manuscript.trim() ? "Manuscript ready" : "Manuscript needed", ok: Boolean(selectedProject?.manuscriptPath || manuscript.trim()) },
     { label: pageManifests.length > 0 ? "Breakdown available" : "Breakdown pending", ok: pageManifests.length > 0 },
   ];
+  const layoutDistribution = Array.from(
+    pages.reduce((map, page) => {
+      const key = layoutName(page.layoutTemplate || pagePlanByKey.get(page.pageKey)?.layoutTemplate || "Unassigned");
+      map.set(key, (map.get(key) || 0) + 1);
+      return map;
+    }, new Map()),
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
+  const currentStageResult = (() => {
+    const stageKey = operatorGuidance.stageKey === "system" ? "system" : operatorGuidance.stageKey;
+    const stageMap = {
+      system: {
+        title: "System Working",
+        status: "Running",
+        happened: "The platform is processing the last request.",
+        created: "A result will appear here when the operation finishes.",
+        review: "Wait for the operation to complete, then review the updated stage artifact.",
+        artifactLabel: "Activity log",
+        artifactSelector: ".operator-log",
+        primaryLabel: "Show Activity",
+        secondaryLabel: "Ask Agent",
+        metrics: [{ label: "current task", value: message || "running" }],
+      },
+      project: {
+        title: "Project Setup Result",
+        status: activeProjectId ? "Created" : "Not started",
+        happened: activeProjectId ? "A book project is selected and ready for intake." : "No project has been selected yet.",
+        created: activeProjectId ? "Project workspace, book format, and production standards." : "Create or select the book project to start.",
+        review: "Confirm the project title, imprint, and visible book format.",
+        artifactLabel: "Project setup form",
+        artifactSelector: ".setup-panel",
+        primaryLabel: activeProjectId ? "Review Setup" : "Create Project",
+        secondaryLabel: "Ask Agent",
+        metrics: [
+          { label: "project", value: activeProjectId ? "selected" : "needed" },
+          { label: "format", value: operatorFormatSummary },
+          { label: "standards", value: "applied" },
+        ],
+      },
+      manuscript: {
+        title: "Manuscript Intake Result",
+        status: selectedProject?.manuscriptPath || manuscript.trim() ? "Loaded" : "Waiting",
+        happened: selectedProject?.manuscriptPath ? "The master manuscript is stored on this project." : manuscript.trim() ? "A manuscript file is loaded locally and ready to upload." : "No manuscript has been loaded yet.",
+        created: selectedProject?.manuscriptPath ? "Stored manuscript file and intake record." : "Upload the master manuscript to create the intake record.",
+        review: "Check file name, chapter count, entry count, and word count before breakdown.",
+        artifactLabel: "Manuscript intake",
+        artifactSelector: ".upload-dropzone",
+        primaryLabel: selectedProject?.manuscriptPath ? "Review Intake" : manuscript.trim() ? "Upload Manuscript" : "Choose Manuscript",
+        secondaryLabel: "Ask Agent",
+        metrics: [
+          { label: "file", value: manuscriptFileLabel || "none" },
+          { label: "chapters", value: manuscriptSummary?.totalChapters ?? bookManifest.totalChapters ?? "pending" },
+          { label: "entries", value: manuscriptSummary?.totalEntries ?? bookManifest.totalEntries ?? "pending" },
+          { label: "words", value: manuscriptSummary?.totalWords ? manuscriptSummary.totalWords.toLocaleString() : "pending" },
+        ],
+      },
+      breakdown: {
+        title: "Breakdown Review Object",
+        status: pageManifests.length > 0 ? "Generated" : "Not generated",
+        happened: pageManifests.length > 0 ? "The manuscript has been turned into a chapter and page-entry map." : "The chapter/page breakdown has not been generated yet.",
+        created: pageManifests.length > 0 ? "Chapter map, page entries, and reviewable page chips." : "Generate breakdown to create the chapter map.",
+        review: "Review chapter order, page distribution, and whether page titles match the manuscript.",
+        artifactLabel: "Chapter map",
+        artifactSelector: ".chapter-tree",
+        primaryLabel: pageManifests.length > 0 ? "Review Chapter Map" : "Start Breakdown",
+        secondaryLabel: "Audit Breakdown",
+        metrics: [
+          { label: "chapters", value: chapterManifests.length },
+          { label: "entries", value: pageManifests.length },
+          { label: "selected chapter", value: selectedChapterNumber || "none" },
+        ],
+      },
+      plan: {
+        title: "Page Plan Review Object",
+        status: plannedPageCount >= pages.length && pages.length > 0 ? "Generated" : "Needs plan",
+        happened: plannedPageCount > 0 ? "Pages have layout assignments, text flow, and image prompt readiness." : "Page layouts have not been planned yet.",
+        created: plannedPageCount > 0 ? "Planned page cards, layout assignments, blockers, and prompt readiness." : "Generate page plan to create page-level layout decisions.",
+        review: "Review planned pages, selected layouts, layout distribution, blockers, and prompt readiness.",
+        artifactLabel: "Page plan cards",
+        artifactSelector: ".page-plan-list",
+        primaryLabel: plannedPageCount > 0 ? "Review Page Plan" : "Generate Page Plan",
+        secondaryLabel: "Audit Page Plan",
+        metrics: [
+          { label: "planned pages", value: `${plannedPageCount}/${pages.length || pageManifests.length}` },
+          { label: "layout types", value: layoutDistribution.length || "pending" },
+          { label: "top layout", value: layoutDistribution[0] ? `${layoutDistribution[0][0]} (${layoutDistribution[0][1]})` : "pending" },
+        ],
+      },
+      textfit: {
+        title: "Text-Fit Review Object",
+        status: textFitPreview ? (textFitPreview.readyForImageSpend ? "Passed" : "Needs review") : "Not run",
+        happened: textFitPreview ? "The page plan has been checked for readability and overflow." : "Text-fit has not been run in this session.",
+        created: textFitPreview ? "Fit/tight/overflow summary and per-page text-fit statuses." : "Run Text-Fit to create readability results.",
+        review: "Review overflow, tight pages, density warnings, and any typography risk before approving layouts.",
+        artifactLabel: "Text-fit summary",
+        artifactSelector: ".fit-summary",
+        primaryLabel: textFitPreview ? "Review Text-Fit" : "Run Text-Fit",
+        secondaryLabel: "Audit Text-Fit",
+        metrics: [
+          { label: "fit", value: textFitPreview?.totals?.fits ?? "pending" },
+          { label: "tight", value: textFitPreview?.totals?.tight ?? "pending" },
+          { label: "overflow", value: textFitPreview?.totals?.overflow ?? "pending" },
+        ],
+      },
+      layout: {
+        title: "Layout Approval Review Object",
+        status: selectedChapterApproval ? "Approved" : "Waiting",
+        happened: selectedChapterApproval ? `Chapter ${selectedChapterNumber} layout is approved for image spend.` : "The selected chapter layout has not been approved yet.",
+        created: selectedChapterApproval ? "Approved chapter layout gate and saved text-fit summary." : "Approve the text-safe chapter layout after reviewing text-fit.",
+        review: "Confirm the selected chapter is text-safe before unlocking image generation.",
+        artifactLabel: "Layout approval checkpoint",
+        artifactSelector: ".layout-approval-panel",
+        primaryLabel: selectedChapterApproval ? "Review Approval" : "Approve Layout",
+        secondaryLabel: "Ask Agent",
+        metrics: [
+          { label: "approved chapters", value: `${approvedChapterCount}/${chapterManifests.length || 0}` },
+          { label: "selected chapter", value: selectedChapterNumber || "none" },
+          { label: "text-fit", value: hasTextFitProof ? "available" : "missing" },
+        ],
+      },
+      images: {
+        title: "Image Review Object",
+        status: imagePageCount > 0 ? "Assets available" : "Waiting",
+        happened: imagePageCount > 0 ? "Image assets exist for review, reuse, approval, or enhancement." : "No generated image assets are attached to pages yet.",
+        created: imagePageCount > 0 ? "Project image library, selected-page versions, thumbnails, and status badges." : "Generate or load assets to create the image review queue.",
+        review: "Review thumbnails, prompts, asset compatibility, missing art, and approval status.",
+        artifactLabel: "Image library",
+        artifactSelector: ".asset-library-panel",
+        primaryLabel: "Open Image Review",
+        secondaryLabel: "Load Library",
+        metrics: [
+          { label: "pages with art", value: `${imagePageCount}/${pages.length}` },
+          { label: "approved art", value: approvedImagePageCount },
+          { label: "library assets", value: imageLibrary.total || imageLibrary.assets.length || 0 },
+        ],
+      },
+      proof: {
+        title: "Proof Review Object",
+        status: pdfPreview.url ? "Rendered" : "Not rendered",
+        happened: pdfPreview.url ? "A page-shaped PDF proof has been rendered in this browser." : "No chapter or page proof is rendered yet.",
+        created: pdfPreview.url ? "PDF preview, open/download links, and page proof navigation." : "Render a selected chapter or page to create the proof object.",
+        review: "Review rendered pages, text flow, image placement, and readability at proof size.",
+        artifactLabel: "Proof preview",
+        artifactSelector: ".preview-review-card",
+        primaryLabel: pdfPreview.url ? "Review Proof" : "Render Chapter",
+        secondaryLabel: "Check Chapter",
+        metrics: [
+          { label: "chapter", value: reviewChapterNumber || "none" },
+          { label: "proof", value: pdfPreview.url ? pdfPreview.title : "not rendered" },
+          { label: "pages", value: reviewChapterPages.length || "pending" },
+        ],
+      },
+      export: {
+        title: "Export Review Object",
+        status: selectedProject?.status === "EXPORTED" ? "Exported" : "Not exported",
+        happened: selectedProject?.status === "EXPORTED" ? "The project has a recorded export status." : "Final export has not been completed yet.",
+        created: productionDashboard?.recentExports?.length ? "Recent export records and production readiness summary." : "Run final proof/export checks to create export records.",
+        review: "Review production readiness, generated files, PDF links, and remaining blockers.",
+        artifactLabel: "Production dashboard",
+        artifactSelector: ".production-dashboard",
+        primaryLabel: "Review Export Readiness",
+        secondaryLabel: "Ask Agent",
+        metrics: [
+          { label: "print ready", value: productionDashboard?.totals?.pagesPrintReady ?? 0 },
+          { label: "exports", value: productionDashboard?.totals?.exportsReady ?? 0 },
+          { label: "blockers", value: productionDashboard?.blockers?.length ?? "unknown" },
+        ],
+      },
+    };
+    return stageMap[stageKey] || stageMap.project;
+  })();
 
   return (
     <main className="app-shell">
@@ -2494,7 +2681,7 @@ function App() {
                 type="button"
                 className={`sidebar-stage ${stage.state || "locked"}`}
                 key={stage.key}
-                onClick={() => scrollToWorkspaceSection(".review-board")}
+                onClick={() => scrollToWorkspaceSection(reviewSelectorForStage(stage.key))}
               >
                 <em>{stage.index}</em>
                 <strong>{stage.label}</strong>
@@ -2622,6 +2809,73 @@ function App() {
         </div>
       </section>
 
+      <section className={`current-stage-result ${operatorGuidance.stageKey}`}>
+        <div className="stage-result-head">
+          <div>
+            <p className="eyebrow">Current Stage Result</p>
+            <h2>{currentStageResult.title}</h2>
+          </div>
+          <span className="mode-pill">{currentStageResult.status}</span>
+        </div>
+        <div className="stage-result-body">
+          <div>
+            <strong>What happened?</strong>
+            <p>{currentStageResult.happened}</p>
+          </div>
+          <div>
+            <strong>What was created?</strong>
+            <p>{currentStageResult.created}</p>
+          </div>
+          <div>
+            <strong>What should I review next?</strong>
+            <p>{currentStageResult.review}</p>
+          </div>
+        </div>
+        <div className="stage-result-metrics">
+          {currentStageResult.metrics.map((metric) => (
+            <div key={metric.label}>
+              <strong>{metric.value}</strong>
+              <span>{metric.label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="stage-result-actions">
+          <button type="button" onClick={() => scrollToWorkspaceSection(currentStageResult.artifactSelector, "start")}>
+            {currentStageResult.primaryLabel}
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              if (currentStageResult.secondaryLabel.toLowerCase().includes("audit")) {
+                reviewStage(operatorReviewStage());
+                return;
+              }
+              if (currentStageResult.secondaryLabel.toLowerCase().includes("load library")) {
+                run("Loading image library...", () => loadImageLibrary(), () => scrollToWorkspaceSection(".asset-library-panel"));
+                return;
+              }
+              if (currentStageResult.secondaryLabel.toLowerCase().includes("check chapter")) {
+                run("Checking chapter intelligence...", () => loadChapterIntelligence(reviewChapterNumber), () => scrollToWorkspaceSection(".chapter-intelligence"));
+                return;
+              }
+              focusAgentChat();
+            }}
+            disabled={
+              (currentStageResult.secondaryLabel.toLowerCase().includes("audit") && (!activeProjectId || chatBusy)) ||
+              (currentStageResult.secondaryLabel.toLowerCase().includes("load library") && !activeProjectId) ||
+              (currentStageResult.secondaryLabel.toLowerCase().includes("check chapter") && !reviewChapterNumber)
+            }
+          >
+            {currentStageResult.secondaryLabel}
+          </button>
+          <button type="button" className="review-button" onClick={() => focusAgentChat(`Review this stage result: ${currentStageResult.title}. What should I check next?`)}>
+            Ask What Changed
+          </button>
+          <span>{currentStageResult.artifactLabel}</span>
+        </div>
+      </section>
+
       <section className="operator-grid">
         <section className="panel command-panel">
           <div className="section-head">
@@ -2666,7 +2920,7 @@ function App() {
           <div className="quick-actions">
             <button disabled={busy} onClick={() => run("Checking backend...", refreshHealth)}>Check Backend</button>
             <button disabled={busy} onClick={openManuscriptPicker}>Choose File</button>
-            <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript)}>
+            <button disabled={busy || !activeProjectId} onClick={() => run("Uploading manuscript...", uploadManuscript, () => scrollToWorkspaceSection(".upload-dropzone", "center"))}>
               Upload Manuscript
             </button>
           </div>
@@ -2778,10 +3032,10 @@ function App() {
             <p className="hint">Work left to right: confirm the book map, approve text-safe layouts, manage art assets, then render proofs.</p>
           </div>
           <div className="button-row">
-            <button disabled={busy || !activeProjectId} onClick={() => run("Running manuscript intake...", runManuscriptIntake)}>
+            <button disabled={busy || !activeProjectId} onClick={() => run("Running manuscript intake...", runManuscriptIntake, () => scrollToWorkspaceSection(".page-plan-list"))}>
               Run Agent Intake
             </button>
-            <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview)}>
+            <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview, () => scrollToWorkspaceSection(".fit-summary", "center"))}>
               Run Text-Fit
             </button>
           </div>
@@ -2979,7 +3233,7 @@ function App() {
                 <p className="hint">Confirm the manuscript became the right chapter/page map. Layout approval happens in Page Plan.</p>
               </div>
               <div className="button-row">
-                <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests)}>
+                <button disabled={busy || !activeProjectId} onClick={() => run("Generating manifests...", generateManifests, () => scrollToWorkspaceSection(".chapter-tree"))}>
                   Start Breakdown
                 </button>
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("breakdown")}>
@@ -3023,13 +3277,13 @@ function App() {
                 <p className="hint">This is the spend gate: layout, text capacity, and prompt readiness before images.</p>
               </div>
               <div className="button-row">
-                <button disabled={busy || !activeProjectId || pageManifests.length === 0} onClick={() => run("Planning pages...", planPages)}>
+                <button disabled={busy || !activeProjectId || pageManifests.length === 0} onClick={() => run("Planning pages...", planPages, () => scrollToWorkspaceSection(".page-plan-list"))}>
                   Generate Page Plan
                 </button>
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("plan")}>
                   Audit with Agent
                 </button>
-                <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview)}>
+                <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview, () => scrollToWorkspaceSection(".fit-summary", "center"))}>
                   Text-Fit
                 </button>
               </div>
@@ -3058,7 +3312,7 @@ function App() {
                 </div>
                 <button
                   disabled={busy || !activeProjectId || chapterPages(selectedChapterNumber).length === 0}
-                  onClick={() => run(`Approving Chapter ${selectedChapterNumber} layout...`, () => approveChapterLayout(selectedChapterNumber))}
+                  onClick={() => run(`Approving Chapter ${selectedChapterNumber} layout...`, () => approveChapterLayout(selectedChapterNumber), () => scrollToWorkspaceSection(".layout-approval-panel", "center"))}
                 >
                   {selectedChapterApproval ? "Re-approve Layout" : "Approve Chapter Layout"}
                 </button>
@@ -3128,7 +3382,7 @@ function App() {
                 <p className="hint">Asset desk for the selected page: generate only when layouts are approved, then reuse, approve, reject, or upscale.</p>
               </div>
               <div className="button-row">
-                <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages())}>
+                <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages(), () => scrollToWorkspaceSection(".image-version-list"))}>
                   Load Images
                 </button>
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("images")}>
@@ -3162,10 +3416,10 @@ function App() {
               </div>
             )}
             <div className="button-row">
-              <button disabled={busy || !selectedPage || !selectedChapterApproval || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady)} onClick={() => run("Generating selected page image...", generateSelectedPageImage)}>
+              <button disabled={busy || !selectedPage || !selectedChapterApproval || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady)} onClick={() => run("Generating selected page image...", generateSelectedPageImage, () => scrollToWorkspaceSection(".image-version-list"))}>
                 Generate Image
               </button>
-              <button disabled={busy || !selectedPage || selectedPage?.status !== "APPROVED"} onClick={() => run("Upscaling selected page image...", upscaleSelectedPageImage)}>
+              <button disabled={busy || !selectedPage || selectedPage?.status !== "APPROVED"} onClick={() => run("Upscaling selected page image...", upscaleSelectedPageImage, () => scrollToWorkspaceSection(".image-version-list"))}>
                 Enhance / Upscale
               </button>
             </div>
@@ -3198,7 +3452,7 @@ function App() {
                     <option key={chapter.chapterNumber} value={chapter.chapterNumber}>Chapter {chapter.chapterNumber}</option>
                   ))}
                 </select>
-                <button disabled={busy || !activeProjectId} onClick={() => run("Loading image library...", () => loadImageLibrary())}>
+                <button disabled={busy || !activeProjectId} onClick={() => run("Loading image library...", () => loadImageLibrary(), () => scrollToWorkspaceSection(".asset-library-panel"))}>
                   Load Library
                 </button>
               </div>
@@ -3224,7 +3478,7 @@ function App() {
                       </div>
                     </div>
                     <div className="button-row">
-                      <button disabled={busy || !selectedPage || asset.source.pageId === selectedPage.id} onClick={() => run("Reusing image asset...", () => reuseImageAsset(asset.imageId))}>
+                      <button disabled={busy || !selectedPage || asset.source.pageId === selectedPage.id} onClick={() => run("Reusing image asset...", () => reuseImageAsset(asset.imageId), () => scrollToWorkspaceSection(".image-version-list"))}>
                         Reuse on Selected Page
                       </button>
                     </div>
@@ -3267,7 +3521,7 @@ function App() {
                     <small>{image.widthPx || "?"} x {image.heightPx || "?"} px</small>
                   </div>
                   <div className="button-row">
-                    <button disabled={busy || image.status === "REJECTED"} onClick={() => run("Approving image...", () => approveImageVersion(image.version))}>
+                    <button disabled={busy || image.status === "REJECTED"} onClick={() => run("Approving image...", () => approveImageVersion(image.version), () => scrollToWorkspaceSection(".image-version-list"))}>
                       Approve
                     </button>
                     <button disabled={busy} onClick={() => run("Rejecting image...", () => rejectImageVersion(image.version))}>
@@ -3285,7 +3539,7 @@ function App() {
               ))}
               {selectedImages.length === 0 && <p className="empty">No image versions loaded for this page yet.</p>}
             </div>
-            <button disabled={busy || !selectedPage || !imageInstruction.trim()} onClick={() => run("Regenerating selected page image...", regenerateSelectedPageImage)}>
+            <button disabled={busy || !selectedPage || !imageInstruction.trim()} onClick={() => run("Regenerating selected page image...", regenerateSelectedPageImage, () => scrollToWorkspaceSection(".image-version-list"))}>
               Regenerate With Correction
             </button>
           </section>
@@ -3297,16 +3551,16 @@ function App() {
                 <p className="hint">Open a large PDF proof before final output. Rendering uses placeholders until approved art exists.</p>
               </div>
               <div className="button-row">
-                <button disabled={busy || !reviewChapterNumber} onClick={() => run("Rendering chapter preview...", () => renderChapterPreview(reviewChapterNumber))}>
+                <button disabled={busy || !reviewChapterNumber} onClick={() => run("Rendering chapter preview...", () => renderChapterPreview(reviewChapterNumber), () => scrollToWorkspaceSection(".pdf-preview-frame"))}>
                   Render Selected Chapter
                 </button>
-                <button disabled={busy || !reviewChapterNumber} onClick={() => run("Checking chapter intelligence...", () => loadChapterIntelligence(reviewChapterNumber))}>
+                <button disabled={busy || !reviewChapterNumber} onClick={() => run("Checking chapter intelligence...", () => loadChapterIntelligence(reviewChapterNumber), () => scrollToWorkspaceSection(".chapter-intelligence"))}>
                   Check Chapter
                 </button>
-                <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book preview...", renderBookPreview)}>
+                <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book preview...", renderBookPreview, () => scrollToWorkspaceSection(".pdf-preview-frame"))}>
                   Render Book PDF
                 </button>
-                <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering cover...", renderCoverPreview)}>
+                <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering cover...", renderCoverPreview, () => scrollToWorkspaceSection(".pdf-preview-frame"))}>
                   Render Cover
                 </button>
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("render")}>
@@ -3323,7 +3577,7 @@ function App() {
                   onClick={() => {
                     setRenderedChapterNumber(chapter.chapterNumber);
                     setChapterIntelligence(null);
-                    run(`Rendering chapter ${chapter.chapterNumber}...`, () => renderChapterPreview(chapter.chapterNumber));
+                    run(`Rendering chapter ${chapter.chapterNumber}...`, () => renderChapterPreview(chapter.chapterNumber), () => scrollToWorkspaceSection(".pdf-preview-frame"));
                   }}
                 >
                   Chapter {chapter.chapterNumber}
@@ -3392,7 +3646,7 @@ function App() {
                     key={page.pageId}
                     disabled={busy}
                     className={selectedPage?.pageKey === page.pageId ? "active" : ""}
-                    onClick={() => run(`Rendering ${page.pageId} page proof...`, () => renderPagePreview(page.pageId))}
+                    onClick={() => run(`Rendering ${page.pageId} page proof...`, () => renderPagePreview(page.pageId), () => scrollToWorkspaceSection(".pdf-preview-frame"))}
                     title={page.entryTitle}
                   >
                     {page.pageId}
@@ -3420,7 +3674,7 @@ function App() {
               <p className="empty">No PDF preview rendered yet.</p>
             )}
             <div className="button-row">
-              <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering book report...", renderBookReport)}>
+              <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering book report...", renderBookReport, () => scrollToWorkspaceSection(".production-dashboard"))}>
                 Save Export Report
               </button>
               <button disabled title="Backend EPUB export endpoint is not exposed yet.">
