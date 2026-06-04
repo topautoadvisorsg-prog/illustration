@@ -1491,6 +1491,10 @@ function App() {
     window.setTimeout(() => chatInputRef.current?.focus(), 120);
   }
 
+  function scrollToWorkspaceSection(selector, block = "start") {
+    document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block });
+  }
+
   function executeOperatorNextStep() {
     switch (operatorGuidance.actionKey) {
       case "create-project":
@@ -1653,7 +1657,14 @@ function App() {
     const text = chatInput.trim();
     if (!text || chatBusy) return;
     if (!activeProjectId) {
-      setChatMessages((m) => [...m, { role: "assistant", content: "Select or create a project first so I can see its state and help." }]);
+      setChatMessages((m) => [
+        ...m,
+        { role: "user", content: text },
+        {
+          role: "assistant",
+          content: `${operatorGuidance.stageLabel}: ${operatorGuidance.nextAction}\n\n${operatorGuidance.afterAction}`,
+        },
+      ]);
       setChatInput("");
       return;
     }
@@ -2475,7 +2486,7 @@ function App() {
                 type="button"
                 className={`sidebar-stage ${stage.state || "locked"}`}
                 key={stage.key}
-                onClick={() => document.querySelector(".review-board")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                onClick={() => scrollToWorkspaceSection(".review-board")}
               >
                 <em>{stage.index}</em>
                 <strong>{stage.label}</strong>
@@ -2486,13 +2497,13 @@ function App() {
         </div>
         <div className="sidebar-section">
           <span>Resources</span>
-          <button type="button" className="sidebar-link" onClick={() => document.querySelector(".asset-library-panel")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          <button type="button" className="sidebar-link" onClick={() => scrollToWorkspaceSection(".asset-library-panel")}>
             Asset Desk
           </button>
-          <button type="button" className="sidebar-link" onClick={() => document.querySelector(".upload-dropzone")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+          <button type="button" className="sidebar-link" onClick={() => scrollToWorkspaceSection(".upload-dropzone", "center")}>
             Project Files
           </button>
-          <button type="button" className="sidebar-link" onClick={() => document.querySelector(".operator-log")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+          <button type="button" className="sidebar-link" onClick={() => scrollToWorkspaceSection(".operator-log", "center")}>
             Activity Log
           </button>
           <button
@@ -2500,7 +2511,7 @@ function App() {
             className="sidebar-link"
             onClick={() => {
               setAdvancedMode(true);
-              window.setTimeout(() => document.querySelector(".intelligence-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+              window.setTimeout(() => scrollToWorkspaceSection(".intelligence-panel"), 80);
             }}
           >
             Settings
@@ -2522,7 +2533,7 @@ function App() {
           <h1>Project Dashboard</h1>
         </div>
         <div className="topbar-actions">
-          <button type="button" className="secondary" disabled={!activeProjectId} onClick={() => focusAgentChat()}>
+          <button type="button" className="secondary" onClick={() => focusAgentChat()}>
             Ask Agent
           </button>
           <label className="advanced-toggle">
@@ -2597,7 +2608,7 @@ function App() {
           <p className="eyebrow">Images</p>
           <strong>{dashboardImagesGenerated} / {dashboardPageTotal || 0}</strong>
           <span>{dashboardImagesApproved} approved</span>
-          <button type="button" className="secondary" disabled={!activeProjectId} onClick={() => document.querySelector(".asset-library-panel")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          <button type="button" className="secondary" disabled={!activeProjectId} onClick={() => scrollToWorkspaceSection(".asset-library-panel")}>
             View Assets
           </button>
         </div>
@@ -2744,7 +2755,7 @@ function App() {
             ref={chatInputRef}
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
-            placeholder={activeProjectId ? "Message the agent about this project…" : "Select a project first…"}
+            placeholder={activeProjectId ? "Message the agent about this project..." : "Ask how to get started..."}
             disabled={chatBusy}
           />
           <button type="submit" disabled={chatBusy || !chatInput.trim()}>Send</button>
@@ -2800,7 +2811,7 @@ function App() {
             <button disabled={busy || !operatorGuidance.actionKey} onClick={executeOperatorNextStep}>
               {operatorGuidance.buttonLabel}
             </button>
-            <button type="button" className="secondary" disabled={!activeProjectId} onClick={() => focusAgentChat()}>
+            <button type="button" className="secondary" onClick={() => focusAgentChat()}>
               Ask Agent What To Do
             </button>
             <button
