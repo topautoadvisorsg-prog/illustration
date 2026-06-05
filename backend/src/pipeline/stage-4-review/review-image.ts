@@ -13,7 +13,6 @@
 import {
   approveImageVersion,
   getImageById,
-  getImageVersion,
   listImagesForPage,
   reuseImageForPage,
   setActiveImageVersion,
