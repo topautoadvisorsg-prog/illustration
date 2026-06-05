@@ -10,6 +10,7 @@ Living documentation for the platform.
 | `runbook.md` | What to do when X breaks |
 | `decision-log.md` | Architecture Decision Records (ADRs) |
 | `AGENT_LAYER.md` | What actually runs in the agent/LLM layer + the metadata-not-pixels rule |
+| `PUBLISHING_DIRECTION.md` | Illustration density & page-design guidance (three layers, visual presence, controlled variety) |
 | `publishing-intelligence-center.md` | Standards ledger / knowledge system architecture |
 | `operator-workflow-review.md` | UI workflow audit and implementation order for operator review mode |
 | `ACTION_SCOPE_AUDIT.md` | Operator action scope table, button copy rules, and confirmation policy |

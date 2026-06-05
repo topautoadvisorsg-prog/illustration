@@ -474,6 +474,8 @@ const PageQualityReviewResponseSchema = z.object({
     featurePageTargetPercent: z.object({ min: z.number(), max: z.number() }),
     mixedPageTargetPercent: z.object({ min: z.number(), max: z.number() }),
     textFirstTargetPercent: z.object({ min: z.number(), max: z.number() }),
+    visualPresenceGoal: z.string(),
+    illustrationLayers: z.array(z.object({ layer: z.string(), purpose: z.string(), examples: z.array(z.string()) })),
     principles: z.array(z.string()),
   }),
   totals: z.object({

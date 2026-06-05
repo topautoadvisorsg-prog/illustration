@@ -99,6 +99,17 @@ describe('Page Quality Review publishing director', () => {
     expect(review.distribution.layoutCounts.length).toBeGreaterThan(0);
   });
 
+  it('carries the publishing direction: three illustration layers + visual-presence goal', () => {
+    const review = buildPageQualityReview([page('CH01_P001')], config);
+    expect(review.publishingStyle.illustrationLayers.map((l) => l.layer)).toEqual([
+      'Feature Art',
+      'Supporting Illustration',
+      'Visual Identity',
+    ]);
+    expect(review.publishingStyle.visualPresenceGoal).toContain('visually abandoned');
+    expect(review.publishingStyle.principles.join('\n')).toContain('never let it become mechanical');
+  });
+
   it('counts feature banners as visual landmark pages', () => {
     const review = buildPageQualityReview(
       [

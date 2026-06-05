@@ -25,6 +25,10 @@ export interface PublishingStyleProfile {
   featurePageTargetPercent: { min: number; max: number };
   mixedPageTargetPercent: { min: number; max: number };
   textFirstTargetPercent: { min: number; max: number };
+  /** Plain-English goal for how much visual presence a page should carry. */
+  visualPresenceGoal: string;
+  /** The three illustration layers the publishing direction thinks in. */
+  illustrationLayers: Array<{ layer: string; purpose: string; examples: string[] }>;
   principles: string[];
 }
 
@@ -94,12 +98,36 @@ export const WILDLANDS_PUBLISHING_STYLE: PublishingStyleProfile = {
   featurePageTargetPercent: { min: 5, max: 10 },
   mixedPageTargetPercent: { min: 20, max: 30 },
   textFirstTargetPercent: { min: 60, max: 70 },
+  visualPresenceGoal:
+    'Almost every page carries some visual element so no page feels visually abandoned. Some pages are art-heavy, some text-heavy — all feel intentionally designed. This is a premium illustrated wilderness publication, not an art book and not a textbook.',
+  illustrationLayers: [
+    {
+      layer: 'Feature Art',
+      purpose: 'Visually impressive landmark pages that reset the reader.',
+      examples: ['chapter openers', 'full-page plates', 'major landscapes', 'signature wildlife', 'feature banners'],
+    },
+    {
+      layer: 'Supporting Illustration',
+      purpose: 'Support learning and visual rhythm without dominating the page.',
+      examples: ['50/50 layouts', '25% layouts', 'side/corner art', 'comparison studies', 'reference layouts'],
+    },
+    {
+      layer: 'Visual Identity',
+      purpose: 'Maintain visual quality on text-led pages without requiring major artwork (often a shared, repeating accent).',
+      examples: ['botanical accents', 'naturalist sketches', 'page framing', 'pine branches', 'specimen studies', 'map fragments'],
+    },
+  ],
   principles: [
+    'Every page should contribute visually — never let a page feel visually abandoned, even when it is text-heavy.',
+    'Think in three layers: Feature Art, Supporting Illustration, and Visual Identity accents (corner/edge/botanical ornaments that need no major artwork).',
+    'Alternating illustration and text pages/spreads is a strong default rhythm — use it, but never let it become mechanical.',
+    'Aim for controlled variety, not uniformity: mix feature, comparison, reference, illustration-dominant, and text-dominant layouts as the content earns them.',
+    'Color interiors should read like color pages — make meaningful use of visual design without forcing large illustrations everywhere.',
     'Protect readability before image spend.',
-    'Use visual variety intentionally, not mechanically.',
     'Let important terrain, habitat, safety, and identification moments earn stronger visual treatment.',
     'Avoid orphaned continuation pages that feel like leftovers.',
     'Use empty space when it feels editorial, not when it feels accidental.',
+    'These are guidance, not formulas: apply professional judgment per chapter, never blind rules like "one image every X pages".',
   ],
 };
 
