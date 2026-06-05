@@ -141,6 +141,7 @@ const WORKFLOW_STAGES = [
   { key: "breakdown", label: "Review Breakdown", action: "Confirm chapters and pages." },
   { key: "plan", label: "Review Page Plan", action: "Confirm layout and page flow." },
   { key: "textfit", label: "Text-Fit Check", action: "Check readability before images." },
+  { key: "quality", label: "Page Quality Review", action: "Review rhythm and publishing decisions." },
   { key: "layout", label: "Approve Layouts", action: "Lock text-safe chapter layouts." },
   { key: "images", label: "Manage Images", action: "Generate, reuse, approve art." },
   { key: "proof", label: "Render Proofs", action: "Review chapter and page PDFs." },
@@ -1167,6 +1168,7 @@ function App() {
   const [plannedPages, setPlannedPages] = useState([]);
   const [layoutLibraryReport, setLayoutLibraryReport] = useState(null);
   const [textFitPreview, setTextFitPreview] = useState(null);
+  const [pageQualityReview, setPageQualityReview] = useState(null);
   const [layoutApprovals, setLayoutApprovals] = useState({});
   const [pageImages, setPageImages] = useState({});
   const [imageLibrary, setImageLibrary] = useState({ total: 0, assets: [] });
@@ -1355,6 +1357,18 @@ function App() {
         helpPrompt: "Review text-fit and tell me whether the chapter is readable.",
       };
     }
+    if (!pageQualityReview) {
+      return {
+        stageKey: "quality",
+        stageLabel: "Page Quality Review",
+        status: "Waiting on you",
+        nextAction: "Run the publishing director review to evaluate rhythm, continuation quality, whitespace, and layout variety.",
+        afterAction: "After reviewing recommendations, approve the selected chapter layout or adjust the page plan.",
+        buttonLabel: "Run Page Quality Review",
+        actionKey: "quality",
+        helpPrompt: "Review page quality and tell me what should change before layout approval.",
+      };
+    }
     if (!selectedChapterApproval) {
       return {
         stageKey: "layout",
@@ -1409,6 +1423,7 @@ function App() {
     imagePageCount,
     manuscript,
     pageManifests.length,
+    pageQualityReview,
     pages.length,
     pdfPreview.url,
     plannedPageCount,
@@ -1529,6 +1544,7 @@ function App() {
       breakdown: ".chapter-tree",
       plan: ".page-plan-list",
       textfit: ".fit-summary",
+      quality: ".page-quality-review",
       layout: ".layout-approval-panel",
       images: ".asset-library-panel",
       proof: ".preview-review-card",
@@ -1566,6 +1582,9 @@ function App() {
       case "textfit":
         run("Running Text-Fit for Book...", runTextFitPreview, () => scrollToWorkspaceSection(".fit-summary", "center"));
         break;
+      case "quality":
+        run("Running Page Quality Review...", runPageQualityReview, () => scrollToWorkspaceSection(".page-quality-review", "center"));
+        break;
       case "approve-layout":
         run(`Approving layout for ${selectedChapterLabel}...`, () => approveChapterLayout(selectedChapterNumber), () => scrollToWorkspaceSection(".layout-approval-panel", "center"));
         break;
@@ -1583,7 +1602,7 @@ function App() {
 
   function operatorReviewStage() {
     if (operatorGuidance.stageKey === "plan") return "plan";
-    if (operatorGuidance.stageKey === "textfit" || operatorGuidance.stageKey === "layout") return "textfit";
+    if (operatorGuidance.stageKey === "textfit" || operatorGuidance.stageKey === "quality" || operatorGuidance.stageKey === "layout") return "textfit";
     if (operatorGuidance.stageKey === "images") return "images";
     if (operatorGuidance.stageKey === "proof" || operatorGuidance.stageKey === "export") return "render";
     return "breakdown";
@@ -1773,6 +1792,7 @@ function App() {
     setActiveProjectId(id);
     setSelectedPageId("");
     setTextFitPreview(null);
+    setPageQualityReview(null);
     setPageImages({});
     setChapterIntelligence(null);
     setProductionDashboard(null);
@@ -2165,6 +2185,7 @@ function App() {
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
     setPlannedPages(data.plannedPages || []);
     setLayoutLibraryReport(data.layoutLibrary || null);
+    setPageQualityReview(null);
     const blockers = data.plannedPages?.reduce((total, page) => total + (page.blockers?.length || 0), 0) || 0;
     const plannedCount = data.plannedPages?.length || 0;
     setMessage(`Page plan generated for ${plannedCount} entries. Layout blockers: ${blockers}.`);
@@ -2179,11 +2200,25 @@ function App() {
     });
     setTextFitPreview(data);
     saveTextFitCache(projectId, data);
+    setPageQualityReview(null);
     const overflow = data.totals?.overflow || 0;
     const tight = data.totals?.tight || 0;
     const checked = data.pages?.length || pages.length || pageManifests.length || 0;
     appendLog(overflow > 0 ? "error" : "success", `Text-Fit checked ${checked} pages: ${overflow} overflow, ${tight} tight.`);
     setMessage(`Text-Fit checked ${checked} pages: ${overflow} overflow, ${tight} tight.`);
+  }
+
+  async function runPageQualityReview(projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    const data = await call(`/api/projects/${projectId}/page-quality-review`, {
+      method: "POST",
+    });
+    setPageQualityReview(data);
+    setMessage(`Page Quality Review found ${data.totals?.findings || 0} publishing director recommendation(s).`);
+    appendLog(
+      data.status === "READY" ? "success" : "issue",
+      `Page Quality Review: ${data.totals?.findings || 0} finding(s), ${data.totals?.awkwardContinuations || 0} continuation risk(s), ${data.totals?.underfilledPages || 0} underfilled page(s).`,
+    );
   }
 
   async function approveChapterLayout(chapterNumber = selectedChapterNumber, projectId = activeProjectId) {
@@ -2465,7 +2500,8 @@ function App() {
     if (key === "breakdown") return pageManifests.length > 0 ? "done" : selectedProject?.manuscriptPath ? "current" : "";
     if (key === "plan") return plannedPages.length > 0 || pages.some((page) => page.layoutTemplate) ? "done" : pageManifests.length > 0 ? "current" : "";
     if (key === "textfit") return hasTextFitProof ? "done" : pages.length > 0 ? "current" : "";
-    if (key === "layout") return selectedChapterApproval ? "done" : hasTextFitProof ? "current" : "";
+    if (key === "quality") return pageQualityReview ? "done" : hasTextFitProof ? "current" : "";
+    if (key === "layout") return selectedChapterApproval ? "done" : pageQualityReview ? "current" : "";
     if (key === "images") return imagePageCount > 0 ? (approvedImagePageCount === imagePageCount ? "done" : "open") : selectedChapterApproval ? "open" : "";
     if (key === "proof") return pdfPreview.url ? "done" : selectedChapterApproval ? "open" : "";
     if (key === "export") return selectedProject?.status === "EXPORTED" ? "done" : pdfPreview.url ? "current" : "";
@@ -2661,6 +2697,22 @@ function App() {
           { label: "fit", value: textFitPreview?.totals?.fits ?? "pending" },
           { label: "tight", value: textFitPreview?.totals?.tight ?? "pending" },
           { label: "overflow", value: textFitPreview?.totals?.overflow ?? "pending" },
+        ],
+      },
+      quality: {
+        title: "Page Quality Review Object",
+        status: pageQualityReview ? pageQualityReview.status.replaceAll("_", " ") : "Not run",
+        happened: pageQualityReview ? "The publishing director reviewed page rhythm, whitespace, continuation quality, and layout variety." : "Page quality has not been reviewed yet.",
+        created: pageQualityReview ? "Publishing director recommendations with problem, reason, fix, and expected result." : "Run Page Quality Review to create professional layout recommendations.",
+        review: "Review whether the book feels intentionally designed, not merely text-safe.",
+        artifactLabel: "Publishing director report",
+        artifactSelector: ".page-quality-review",
+        primaryLabel: pageQualityReview ? "Review Page Quality" : "Run Page Quality Review",
+        secondaryLabel: "Ask Agent",
+        metrics: [
+          { label: "findings", value: pageQualityReview?.totals?.findings ?? "pending" },
+          { label: "continuations", value: pageQualityReview?.totals?.awkwardContinuations ?? "pending" },
+          { label: "underfilled", value: pageQualityReview?.totals?.underfilledPages ?? "pending" },
         ],
       },
       layout: {
@@ -3357,6 +3409,9 @@ function App() {
                 <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running Text-Fit for Book...", runTextFitPreview, () => scrollToWorkspaceSection(".fit-summary", "center"))}>
                   Run Text-Fit for Book
                 </button>
+                <button disabled={busy || !activeProjectId || !hasTextFitProof} onClick={() => run("Running Page Quality Review...", runPageQualityReview, () => scrollToWorkspaceSection(".page-quality-review", "center"))}>
+                  Run Page Quality Review
+                </button>
               </div>
             </div>
             {textFitPreview && (
@@ -3371,6 +3426,61 @@ function App() {
                 <span>Run Text-Fit to replace pending labels with fit, tight, underfilled, or overflow.</span>
               </div>
             )}
+            {hasTextFitProof && (
+              <section className={`page-quality-review ${pageQualityReview?.status ? pageQualityReview.status.toLowerCase().replace("_", "-") : "not-run"}`}>
+                <div className="section-head compact">
+                  <div>
+                    <strong>Page Quality Review</strong>
+                    <p className="hint">
+                      Publishing director review for visual rhythm, whitespace, continuation quality, layout variety, and Wildlands style fit.
+                    </p>
+                  </div>
+                  <button disabled={busy || !activeProjectId} onClick={() => run("Running Page Quality Review...", runPageQualityReview, () => scrollToWorkspaceSection(".page-quality-review", "center"))}>
+                    {pageQualityReview ? "Refresh Page Quality Review" : "Run Page Quality Review"}
+                  </button>
+                </div>
+                {pageQualityReview ? (
+                  <>
+                    <div className="quality-style-strip">
+                      <div>
+                        <strong>{pageQualityReview.publishingStyle?.label || "Publishing style"}</strong>
+                        <span>{pageQualityReview.publishingStyle?.editorialIdentity || "Wildlands publishing style"}</span>
+                      </div>
+                      <div>
+                        <strong>{pageQualityReview.totals?.findings || 0}</strong>
+                        <span>recommendations</span>
+                      </div>
+                      <div>
+                        <strong>{pageQualityReview.totals?.awkwardContinuations || 0}</strong>
+                        <span>continuation risks</span>
+                      </div>
+                      <div>
+                        <strong>{pageQualityReview.distribution?.featurePercent ?? 0}%</strong>
+                        <span>feature pages</span>
+                      </div>
+                    </div>
+                    <p className="next-action">{pageQualityReview.nextAction}</p>
+                    <div className="quality-findings">
+                      {(pageQualityReview.findings || []).slice(0, 6).map((finding, index) => (
+                        <article className={`quality-finding ${finding.severity.toLowerCase()}`} key={`${finding.scope}-${finding.pageKey || finding.chapterNumber || "book"}-${index}`}>
+                          <div>
+                            <strong>{finding.pageKey || (finding.chapterNumber ? `Chapter ${finding.chapterNumber}` : "Book")}</strong>
+                            <span>{finding.problem}</span>
+                          </div>
+                          <p><b>Why it matters:</b> {finding.whyItMatters}</p>
+                          <p><b>Recommended fix:</b> {finding.recommendedFix}</p>
+                          <p><b>Expected result:</b> {finding.expectedResult}</p>
+                        </article>
+                      ))}
+                      {(pageQualityReview.findings || []).length === 0 && <p className="empty">No major page-quality issues detected. The plan is ready for layout approval review.</p>}
+                      {(pageQualityReview.findings || []).length > 6 && <p className="hint">{pageQualityReview.findings.length - 6} more recommendation(s) hidden to keep this review focused.</p>}
+                    </div>
+                  </>
+                ) : (
+                  <p className="empty">Run Page Quality Review after Text-Fit. This creates the publishing director report before layout approval.</p>
+                )}
+              </section>
+            )}
             {selectedChapterNumber && (
               <div className={`layout-approval-panel ${selectedChapterApproval ? "ok" : "warn"}`}>
                 <div>
@@ -3378,11 +3488,13 @@ function App() {
                   <span>
                     {selectedChapterApproval
                       ? `Approved ${new Date(selectedChapterApproval.approvedAt).toLocaleString()}`
-                      : "Approve this chapter layout before any image generation spend."}
+                      : pageQualityReview
+                        ? "Approve this chapter layout after reviewing the Page Quality recommendations."
+                        : "Run Page Quality Review before approving this chapter for image generation spend."}
                   </span>
                 </div>
                 <button
-                  disabled={busy || !activeProjectId || chapterPages(selectedChapterNumber).length === 0}
+                  disabled={busy || !activeProjectId || !pageQualityReview || chapterPages(selectedChapterNumber).length === 0}
                   onClick={() => run(`Approving layout for ${selectedChapterLabel}...`, () => approveChapterLayout(selectedChapterNumber), () => scrollToWorkspaceSection(".layout-approval-panel", "center"))}
                 >
                   {selectedChapterApproval ? `Re-approve Layout for ${selectedChapterLabel}` : `Approve Layout for ${selectedChapterLabel}`}

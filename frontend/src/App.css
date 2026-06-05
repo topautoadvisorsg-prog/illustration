@@ -2016,6 +2016,93 @@ button.secondary {
   border-color: #d5aa57;
 }
 
+.page-quality-review {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d4c8b8;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffdf8;
+}
+
+.page-quality-review.ready {
+  border-color: #2f7a57;
+  background: #edf6f0;
+}
+
+.page-quality-review.needs-review,
+.page-quality-review.not-run {
+  border-color: #d5aa57;
+}
+
+.page-quality-review.blocked {
+  border-color: #a33a2f;
+  background: #fff2ed;
+}
+
+.quality-style-strip {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(120px, 0.6fr));
+  gap: 10px;
+}
+
+.quality-style-strip > div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e0d7ca;
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.quality-style-strip span {
+  color: #6d6258;
+  font-size: 0.88rem;
+}
+
+.quality-findings {
+  display: grid;
+  gap: 10px;
+}
+
+.quality-finding {
+  display: grid;
+  gap: 7px;
+  border-left: 4px solid #6d6258;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.quality-finding.warning {
+  border-left-color: #b98222;
+}
+
+.quality-finding.info {
+  border-left-color: #2f6f91;
+}
+
+.quality-finding.blocker {
+  border-left-color: #a33a2f;
+}
+
+.quality-finding > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.quality-finding > div span {
+  color: #4d453d;
+  font-weight: 700;
+}
+
+.quality-finding p {
+  margin: 0;
+  color: #4d453d;
+}
+
 .selected-page-summary {
   display: grid;
   gap: 8px;

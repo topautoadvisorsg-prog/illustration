@@ -36,6 +36,7 @@ import {
   getChapterOperatorIntelligence,
   getProjectProductionDashboard,
 } from '../services/operator-intelligence/operator-intelligence.js';
+import { reviewProjectPageQuality } from '../services/page-quality/page-quality-review.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 const ProjectPageParamsSchema = z.object({ id: z.string().uuid(), pageKey: z.string().min(1) });
@@ -418,6 +419,67 @@ const TextFitPreviewResponseSchema = z.object({
         }),
         notes: z.array(z.string()),
       }),
+    }),
+  ),
+});
+
+const PageQualityReviewResponseSchema = z.object({
+  status: z.enum(['READY', 'NEEDS_REVIEW', 'BLOCKED']),
+  nextAction: z.string(),
+  publishingStyle: z.object({
+    id: z.literal('WILDLANDS_NATURAL_HISTORY'),
+    label: z.string(),
+    editorialIdentity: z.string(),
+    whitespaceTolerance: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+    educationalDensity: z.enum(['MEDIUM', 'HIGH']),
+    visualDensity: z.enum(['MEDIUM']),
+    featurePageTargetPercent: z.object({ min: z.number(), max: z.number() }),
+    mixedPageTargetPercent: z.object({ min: z.number(), max: z.number() }),
+    textFirstTargetPercent: z.object({ min: z.number(), max: z.number() }),
+    principles: z.array(z.string()),
+  }),
+  totals: z.object({
+    pages: z.number(),
+    findings: z.number(),
+    blockers: z.number(),
+    warnings: z.number(),
+    infos: z.number(),
+    awkwardContinuations: z.number(),
+    underfilledPages: z.number(),
+    rhythmFindings: z.number(),
+  }),
+  distribution: z.object({
+    featurePercent: z.number(),
+    mixedPercent: z.number(),
+    textFirstPercent: z.number(),
+    layoutCounts: z.array(z.object({ layoutTemplate: z.string(), count: z.number() })),
+  }),
+  chapters: z.array(
+    z.object({
+      chapterNumber: z.number(),
+      pages: z.number(),
+      featurePercent: z.number(),
+      mixedPercent: z.number(),
+      textFirstPercent: z.number(),
+      dominantLayout: z.string().optional(),
+      dominantLayoutPercent: z.number(),
+      findings: z.number(),
+    }),
+  ),
+  findings: z.array(
+    z.object({
+      severity: z.enum(['BLOCKER', 'WARNING', 'INFO']),
+      scope: z.enum(['BOOK', 'CHAPTER', 'PAGE']),
+      category: z.enum(['CONTINUATION', 'WHITESPACE', 'RHYTHM', 'ILLUSTRATION_BALANCE', 'LAYOUT_DIVERSITY', 'PUBLISHING_STYLE']),
+      pageKey: z.string().optional(),
+      chapterNumber: z.number().optional(),
+      layoutTemplate: z.string().optional(),
+      problem: z.string(),
+      whyItMatters: z.string(),
+      recommendedFix: z.string(),
+      expectedResult: z.string(),
+      alternatives: z.array(z.string()),
+      metrics: z.record(z.union([z.string(), z.number(), z.boolean()])),
     }),
   ),
 });
@@ -854,6 +916,32 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         });
       }
       return previewProjectTextFit(id);
+    },
+  );
+
+  app.post(
+    '/api/projects/:id/page-quality-review',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        response: { 200: PageQualityReviewResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const rows = await listManifests(id, 'PAGE');
+      if (rows.length === 0) {
+        const project = await getProject(id);
+        if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+        return reply.code(400).send({
+          error: 'Bad Request',
+          message: 'No page manifests found. Generate manifests before running Page Quality Review.',
+          statusCode: 400,
+        });
+      }
+      const review = await reviewProjectPageQuality(id);
+      if (!review) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      return review;
     },
   );
 
