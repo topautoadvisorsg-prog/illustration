@@ -17,14 +17,13 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr) 292px;
+  grid-template-columns: 248px minmax(0, 1fr);
   gap: 18px;
   min-height: 100vh;
   padding: 0 18px;
 }
 
-.app-sidebar,
-.agent-rail {
+.app-sidebar {
   position: sticky;
   top: 0;
   align-self: start;
@@ -71,7 +70,6 @@ body {
 
 .sidebar-brand small,
 .sidebar-section > span,
-.sidebar-help span,
 .sidebar-stage small {
   color: rgba(248, 244, 234, 0.72);
 }
@@ -158,101 +156,6 @@ body {
 
 .sidebar-stage.locked {
   opacity: 0.62;
-}
-
-.sidebar-help {
-  display: grid;
-  gap: 8px;
-  margin-top: auto;
-  border: 1px solid rgba(244, 224, 154, 0.2);
-  border-radius: 8px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.sidebar-help button,
-.publishing-agent-card button {
-  border-color: #5b55c8;
-  background: #5b55c8;
-}
-
-.agent-rail {
-  display: grid;
-  align-content: start;
-  gap: 14px;
-  padding: 22px 0 48px;
-}
-
-.rail-card {
-  border: 1px solid #d4c8b8;
-  border-radius: 8px;
-  padding: 16px;
-  background: rgba(255, 253, 248, 0.94);
-  box-shadow: 0 12px 32px rgba(50, 42, 33, 0.08);
-}
-
-.rail-card p {
-  color: #5b5148;
-  line-height: 1.5;
-}
-
-.agent-avatar {
-  display: grid;
-  width: 54px;
-  height: 54px;
-  margin: 6px 0 10px;
-  place-items: center;
-  border: 2px solid #e5d7b5;
-  border-radius: 14px;
-  color: #173730;
-  background: linear-gradient(135deg, #f4e09a, #e5f0ea);
-  font-weight: 900;
-}
-
-.rail-tip {
-  display: grid;
-  gap: 4px;
-  border-top: 1px solid #e0d7ca;
-  padding: 11px 0;
-}
-
-.rail-tip:first-of-type {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.rail-tip span {
-  color: #5b5148;
-  font-size: 0.9rem;
-  line-height: 1.42;
-}
-
-.system-list {
-  display: grid;
-  gap: 8px;
-}
-
-.system-list span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 800;
-}
-
-.system-list span::before {
-  content: "";
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.system-list .ok {
-  color: #2f7a57;
-}
-
-.system-list .warn {
-  color: #8a651d;
 }
 
 button,
@@ -3138,23 +3041,12 @@ button.secondary {
 
 @media (max-width: 1350px) {
   .app-shell {
-    grid-template-columns: 232px minmax(0, 1fr) 270px;
+    grid-template-columns: 232px minmax(0, 1fr);
   }
 
   .app-sidebar {
     padding-left: 8px;
     padding-right: 8px;
-  }
-
-  .agent-rail {
-    position: sticky;
-    grid-column: auto;
-    height: 100vh;
-    padding-top: 22px;
-  }
-
-  .rail-card {
-    padding: 14px;
   }
 
   .sidebar-stage {
@@ -3181,13 +3073,6 @@ button.secondary {
 @media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 248px minmax(0, 1fr);
-  }
-
-  .agent-rail {
-    position: static;
-    grid-column: 2;
-    height: auto;
-    padding-top: 0;
   }
 
   .operator-grid,
@@ -3271,8 +3156,7 @@ button.secondary {
     padding: 0 12px;
   }
 
-  .app-sidebar,
-  .agent-rail {
+  .app-sidebar {
     position: static;
     grid-column: auto;
     height: auto;

@@ -118,21 +118,21 @@ function saveTextFitCache(projectId, preview) {
 
 const LAYOUT_TEMPLATES = [
   ["LAYOUT_1_STANDARD", "Standard", "Balanced text and illustration", 220, 320, 420],
-  ["LAYOUT_2_TEXT_HEAVY", "Text Heavy", "Long entries with smaller art", 420, 560, 720],
-  ["LAYOUT_3_ILLUSTRATION_DOMINANT", "Image Dominant", "Short text with a strong plate", 90, 160, 240],
+  ["LAYOUT_2_TEXT_HEAVY", "Text-Led Page", "Long entries with smaller art", 420, 560, 720],
+  ["LAYOUT_3_ILLUSTRATION_DOMINANT", "Illustration-Led Page", "Short text with a strong plate", 90, 160, 240],
   ["LAYOUT_4_DANGER_WARNING", "Comparison Recognition", "Two related subjects compared for quick visual recognition", 240, 340, 460],
   ["LAYOUT_5_CHAPTER_OPENER", "Chapter Opener", "Atmospheric opening page", 40, 90, 150],
-  ["LAYOUT_6_BACK_MATTER", "Reference Grid", "Three specimen studies with open educational text space", 260, 420, 620],
+  ["LAYOUT_6_BACK_MATTER", "Reference Page", "Three specimen studies with open educational text space", 260, 420, 620],
   ["LAYOUT_7_SCATTERED_VIGNETTES", "Reference Studies", "Three staggered specimen studies with text flow", 160, 240, 340],
   ["LAYOUT_8_MARGIN_ILLUSTRATION", "Margin Art", "Tall plant or side illustration", 300, 430, 580],
-  ["LAYOUT_9_DIAGNOSTIC_DIAGRAM", "Scattered Studies", "Central primary study with supporting studies around it", 180, 280, 400],
-  ["LAYOUT_10_FULL_PAGE_PLATE", "Full Page Plate", "Nearly full-page museum plate illustration", 0, 40, 90],
-  ["LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD", "Continuous Landscape Spread", "Two-page environmental landscape spread", 0, 60, 140],
-  ["LAYOUT_12_DIAGNOSTIC_DIAGRAM", "Diagnostic Diagram", "Central subject diagram with restrained callouts", 180, 280, 400],
-  ["LAYOUT_13_FEATURE_BANNER", "Feature Banner", "Wide horizontal feature illustration over educational text area", 260, 420, 620],
-  ["LAYOUT_14_SIDEBAR_FEATURE", "Sidebar Feature", "Large left-side vertical illustration with open right text area", 300, 460, 640],
-  ["LAYOUT_15_PROGRESSION_STUDY", "Progression Study", "Sequential stages over an open educational text area", 220, 340, 500],
-  ["LAYOUT_16_CUTAWAY_FEATURE", "Cutaway Feature", "Layered cutaway illustration over an open educational text area", 180, 300, 440],
+  ["LAYOUT_9_DIAGNOSTIC_DIAGRAM", "Study Notes Page", "Central primary study with supporting studies around it", 180, 280, 400],
+  ["LAYOUT_10_FULL_PAGE_PLATE", "Full-Art Page", "Nearly full-page museum plate illustration", 0, 40, 90],
+  ["LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD", "Landscape Spread", "Two-page environmental landscape spread", 0, 60, 140],
+  ["LAYOUT_12_DIAGNOSTIC_DIAGRAM", "Identification Diagram", "Central subject diagram with restrained callouts", 180, 280, 400],
+  ["LAYOUT_13_FEATURE_BANNER", "Wide Image + Text", "Wide horizontal illustration over educational text area", 260, 420, 620],
+  ["LAYOUT_14_SIDEBAR_FEATURE", "Side Image + Text", "Large side illustration with open text area", 300, 460, 640],
+  ["LAYOUT_15_PROGRESSION_STUDY", "Sequence Page", "Sequential stages over an open educational text area", 220, 340, 500],
+  ["LAYOUT_16_CUTAWAY_FEATURE", "Cutaway Page", "Layered cutaway illustration over an open educational text area", 180, 300, 440],
 ];
 
 const LAYOUT_LABELS = Object.fromEntries(LAYOUT_TEMPLATES.map(([id, name]) => [id, name]));
@@ -3124,12 +3124,6 @@ function App() {
     open: "Open",
     "": "Locked",
   };
-  const systemReadyItems = [
-    { label: health?.ok ? "Backend online" : "Backend unchecked", ok: Boolean(health?.ok) },
-    { label: activeProjectId ? "Project selected" : "No project selected", ok: Boolean(activeProjectId) },
-    { label: selectedProject?.manuscriptPath || manuscript.trim() ? "Manuscript ready" : "Manuscript needed", ok: Boolean(selectedProject?.manuscriptPath || manuscript.trim()) },
-    { label: pageManifests.length > 0 ? "Breakdown available" : "Breakdown pending", ok: pageManifests.length > 0 },
-  ];
   const layoutDistribution = Array.from(
     pages.reduce((map, page) => {
       const key = layoutName(page.layoutTemplate || pagePlanByKey.get(page.pageKey)?.layoutTemplate || "Unassigned");
@@ -3394,13 +3388,6 @@ function App() {
             }}
           >
             Settings
-          </button>
-        </div>
-        <div className="sidebar-help">
-          <strong>Need Help?</strong>
-          <span>The Publishing Agent knows this project state.</span>
-          <button type="button" onClick={() => focusAgentChat()}>
-            Ask Agent
           </button>
         </div>
       </aside>
@@ -5791,46 +5778,6 @@ function App() {
 
       </div>
 
-      <aside className="agent-rail" aria-label="Publishing agent and guidance">
-        <section className="rail-card publishing-agent-card">
-          <p className="eyebrow">Publishing Agent</p>
-          <div className="agent-avatar" aria-hidden="true">AI</div>
-          <strong>Ready to help</strong>
-          <p>Ask for status, next steps, layout fixes, regeneration, or a production recommendation.</p>
-          <button type="button" onClick={() => focusAgentChat()}>
-            Ask Me Anything
-          </button>
-        </section>
-        <section className="rail-card">
-          <p className="eyebrow">Tips & Guidance</p>
-          <div className="rail-tip">
-            <strong>Where am I?</strong>
-            <span>{operatorGuidance.stageLabel}</span>
-          </div>
-          <div className="rail-tip">
-            <strong>What do I do next?</strong>
-            <span>{operatorGuidance.nextAction}</span>
-          </div>
-          <div className="rail-tip">
-            <strong>What happens after that?</strong>
-            <span>{operatorGuidance.afterAction}</span>
-          </div>
-          <div className="rail-tip">
-            <strong>How do I ask for help?</strong>
-            <span>Use Ask Agent here or the chat panel in the workspace.</span>
-          </div>
-        </section>
-        <section className="rail-card">
-          <p className="eyebrow">System Status</p>
-          <div className="system-list">
-            {systemReadyItems.map((item) => (
-              <span className={item.ok ? "ok" : "warn"} key={item.label}>
-                {item.label}
-              </span>
-            ))}
-          </div>
-        </section>
-      </aside>
     </main>
   );
 }
