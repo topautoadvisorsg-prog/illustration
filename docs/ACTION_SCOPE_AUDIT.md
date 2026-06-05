@@ -12,7 +12,7 @@ Every operator action must answer before click:
 | Action / button copy | Scope | Backend route / function | Result shown after completion | Repeat safe? | Cost / risk | Confirmation |
 |---|---|---|---|---|---|---|
 | New Project | Project-wide | `POST /api/projects` / `createProject` | Selected project workspace is created. | Yes | No paid cost | No |
-| Save Project Configuration | Project-wide | `PATCH /api/projects/:id/config` / `saveProjectConfig` | "Project configuration saved." | Yes | No paid cost | No |
+| Save Project Setup | Project-wide | `PATCH /api/projects/:id/config` / `saveProjectConfig` | "Project setup saved: FORMAT." | Yes | No paid cost | No |
 | Delete Project | Project-wide | `DELETE /api/projects/:id` / `deleteProjectById` | Project disappears from list. | No | Data loss | Yes |
 | Check Backend | Diagnostic only | `GET /health` / `refreshHealth` | Backend health status updates. | Yes | No paid cost | No |
 | Choose File | UI-only | `uploadManuscriptFile` | Manuscript file name and local text are loaded. | Yes | No paid cost | No |
