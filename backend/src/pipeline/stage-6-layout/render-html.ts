@@ -132,6 +132,11 @@ function bodyToHtml(markdown: string): string {
       flushParagraph();
       continue;
     }
+    if (/^([-*_]\s*){3,}$/.test(line)) {
+      flushList();
+      flushParagraph();
+      continue;
+    }
     const heading = line.match(/^(#{2,6})\s+(.*)$/);
     if (heading) {
       flushList();

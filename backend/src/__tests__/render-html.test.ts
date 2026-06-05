@@ -101,6 +101,18 @@ describe('buildPageHtml', () => {
     expect(html).toContain('<h3 class="section-header">Where</h3>');
   });
 
+  it('drops markdown horizontal rules instead of rendering separator fragments', () => {
+    const html = buildPageHtml(
+      page({ bodyMarkdown: 'Opening paragraph.\n\n---\n\nClosing paragraph.\n\n***' }),
+      config,
+      { geometry },
+    );
+    expect(html).toContain('<p class="section-body">Opening paragraph.</p>');
+    expect(html).toContain('<p class="section-body">Closing paragraph.</p>');
+    expect(html).not.toContain('<p class="section-body">---</p>');
+    expect(html).not.toContain('<p class="section-body">***</p>');
+  });
+
   it('renders the illustration at presentation scale and bleeds to the page edge', () => {
     // Full-page plate WITH a real image: 0.72 * 9.25 = 6.66in tall, negative margins bleed off the edges.
     const plate = buildPageHtml(page({ layoutTemplate: 'LAYOUT_10_FULL_PAGE_PLATE' }), config, {

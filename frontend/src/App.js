@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+import "pdfjs-dist/legacy/build/pdf.worker.entry";
 import "@/App.css";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = "";
 
 // Pre-fill the live backend so the admin page is ready to test without hunting for
 // the URL. REACT_APP_BACKEND_URL (set in Railway) overrides this when present.
