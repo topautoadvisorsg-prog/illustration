@@ -1295,6 +1295,7 @@ function App() {
   const [layoutLibraryReport, setLayoutLibraryReport] = useState(null);
   const [textFitPreview, setTextFitPreview] = useState(null);
   const [pageQualityReview, setPageQualityReview] = useState(null);
+  const [publishingDirectorLedger, setPublishingDirectorLedger] = useState(null);
   const [qualityResolutionNotes, setQualityResolutionNotes] = useState({});
   const [qualityBulkNote, setQualityBulkNote] = useState("");
   const [formatCalibration, setFormatCalibration] = useState(null);
@@ -1423,6 +1424,16 @@ function App() {
     () => selectedChapterQualityFindings.filter((finding) => !(finding.resolution || qualityResolutions[finding.findingId])),
     [qualityResolutions, selectedChapterQualityFindings],
   );
+  const selectedChapterLedgerEntries = useMemo(
+    () =>
+      (publishingDirectorLedger?.pages || []).filter(
+        (entry) => Number(entry.chapterNumber) === Number(selectedChapterNumber),
+      ),
+    [publishingDirectorLedger, selectedChapterNumber],
+  );
+  const selectedPageLedgerEntry = selectedPage
+    ? (publishingDirectorLedger?.pages || []).find((entry) => entry.pageKey === selectedPage.pageKey)
+    : null;
   const selectedImages = selectedPage ? pageImages[selectedPage.id] || [] : [];
   const activeImage = latestActiveVersion(selectedImages);
   const libraryLayouts = useMemo(
@@ -2101,6 +2112,7 @@ function App() {
     setProofArtifacts([]);
     setChapterIntelligence(null);
     setProductionDashboard(null);
+    setPublishingDirectorLedger(null);
     setPlannedPages([]);
     setLayoutApprovals({});
     resetProofDesk();
@@ -2134,6 +2146,7 @@ function App() {
       setQualityBulkNote("");
       setChapterIntelligence(null);
       setProductionDashboard(null);
+      setPublishingDirectorLedger(null);
       setLayoutApprovals({});
       setProofArtifacts([]);
       resetProofDesk();
@@ -2253,6 +2266,14 @@ function App() {
       const message = err instanceof Error ? err.message : String(err);
       appendLog("issue", `Production dashboard not loaded yet: ${message}`);
     });
+    if (incomingPages.length > 0) {
+      loadPublishingDirectorLedger(projectId).catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        appendLog("issue", `Publishing Director ledger not loaded yet: ${message}`);
+      });
+    } else {
+      setPublishingDirectorLedger(null);
+    }
   }
 
   async function loadProductionDashboard(projectId = activeProjectId) {
@@ -2260,6 +2281,17 @@ function App() {
     const data = await call(`/api/projects/${projectId}/production-dashboard`);
     setProductionDashboard(data);
     appendLog("success", `Production dashboard refreshed: ${data.status}.`);
+    return data;
+  }
+
+  async function loadPublishingDirectorLedger(projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    const data = await call(`/api/projects/${projectId}/publishing-director/decision-ledger`);
+    setPublishingDirectorLedger(data);
+    appendLog(
+      data.totals?.needsDecision > 0 ? "issue" : "success",
+      `Publishing Director ledger refreshed: ${data.totals?.pages || 0} pages, ${data.totals?.needsDecision || 0} needing decisions.`,
+    );
     return data;
   }
 
@@ -2539,6 +2571,7 @@ function App() {
     setPlannedPages([]);
     setFormatCalibration(null);
     setPageQualityReview(null);
+    setPublishingDirectorLedger(null);
     setMessage(`Breakdown replaced: ${data.summary.totalChapters} chapters, ${data.summary.totalEntries} entries. Re-plan next.`);
     appendLog("success", `Breakdown replaced (${data.summary.totalEntries} entries). Old plan, images, and approvals cleared.`);
     await loadArtifacts(projectId);
@@ -2577,6 +2610,7 @@ function App() {
     setPlannedPages(data.plannedPages || []);
     setLayoutLibraryReport(data.layoutLibrary || null);
     setPageQualityReview(null);
+    setPublishingDirectorLedger(null);
     setFormatCalibration(null);
     const blockers = data.plannedPages?.reduce((total, page) => total + (page.blockers?.length || 0), 0) || 0;
     const plannedCount = data.plannedPages?.length || 0;
@@ -2593,11 +2627,13 @@ function App() {
     setTextFitPreview(data);
     saveTextFitCache(projectId, data);
     setPageQualityReview(null);
+    setPublishingDirectorLedger(null);
     const overflow = data.totals?.overflow || 0;
     const tight = data.totals?.tight || 0;
     const checked = data.pages?.length || pages.length || pageManifests.length || 0;
     appendLog(overflow > 0 ? "error" : "success", `Text-Fit checked ${checked} pages: ${overflow} overflow, ${tight} tight.`);
     setMessage(`Text-Fit checked ${checked} pages: ${overflow} overflow, ${tight} tight.`);
+    await loadPublishingDirectorLedger(projectId);
   }
 
   async function runFormatCalibration(chapterNumber = selectedChapterNumber, projectId = activeProjectId) {
@@ -2618,6 +2654,7 @@ function App() {
       method: "POST",
     });
     setPageQualityReview(data);
+    await loadPublishingDirectorLedger(projectId);
     setProjectConfig((current) => ({
       ...current,
       pageQualityReview: { reviewedAt: new Date().toISOString(), review: data },
@@ -2659,6 +2696,8 @@ function App() {
     if (status === "FIXED") {
       await loadArtifacts(activeProjectId);
       setPageQualityReview(data);
+    } else {
+      await loadPublishingDirectorLedger(activeProjectId);
     }
     appendLog("success", `${status.replace("_", " ")} Page Quality finding: ${finding.pageKey || (finding.chapterNumber ? `Chapter ${finding.chapterNumber}` : "Book")}.`);
   }
@@ -3982,6 +4021,114 @@ function App() {
                 <strong>Text-fit not loaded in this browser session</strong>
                 <span>Run Text-Fit to replace pending labels with fit, tight, underfilled, or overflow.</span>
               </div>
+            )}
+            {pageManifests.length > 0 && (
+              <section className={`decision-ledger ${publishingDirectorLedger?.status ? publishingDirectorLedger.status.toLowerCase().replace("_", "-") : "not-loaded"}`}>
+                <div className="section-head compact">
+                  <div>
+                    <strong>Publishing Director Decision Ledger</strong>
+                    <p className="hint">
+                      Explains why each page looks the way it does: layout choice, text capacity, risks, and recommended publishing fix.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busy || !activeProjectId || pages.length === 0}
+                    onClick={() => run("Refreshing Publishing Director ledger...", loadPublishingDirectorLedger, () => scrollToWorkspaceSection(".decision-ledger", "center"))}
+                  >
+                    Refresh Decision Ledger
+                  </button>
+                </div>
+                {publishingDirectorLedger ? (
+                  <>
+                    <div className="decision-ledger-summary">
+                      <div>
+                        <strong>{publishingDirectorLedger.totals?.pages || 0}</strong>
+                        <span>pages reviewed</span>
+                      </div>
+                      <div>
+                        <strong>{publishingDirectorLedger.totals?.needsDecision || 0}</strong>
+                        <span>need decisions</span>
+                      </div>
+                      <div>
+                        <strong>{publishingDirectorLedger.totals?.automaticFixesAvailable || 0}</strong>
+                        <span>automatic fixes</span>
+                      </div>
+                      <div>
+                        <strong>{publishingDirectorLedger.totals?.continuationRisks || 0}</strong>
+                        <span>continuation risks</span>
+                      </div>
+                      <div>
+                        <strong>{publishingDirectorLedger.totals?.underfilledRisks || 0}</strong>
+                        <span>underfilled</span>
+                      </div>
+                    </div>
+                    {selectedPageLedgerEntry && (
+                      <article className="decision-ledger-focus">
+                        <div>
+                          <strong>{selectedPageLedgerEntry.pageKey} / {selectedPageLedgerEntry.entryTitle}</strong>
+                          <span>{layoutName(selectedPageLedgerEntry.selectedLayout)} / {normalizeStatus(selectedPageLedgerEntry.contentType)}</span>
+                        </div>
+                        <p><b>Why this layout:</b> {selectedPageLedgerEntry.selectedLayoutWhy}</p>
+                        <p><b>Recommended fix:</b> {selectedPageLedgerEntry.recommendedFix}</p>
+                      </article>
+                    )}
+                    <div className="decision-ledger-list">
+                      {(selectedChapterLedgerEntries.length ? selectedChapterLedgerEntries : publishingDirectorLedger.pages).map((entry) => {
+                        const riskValues = Object.entries(entry.risks || {}).filter(([, value]) => value && value !== "NONE");
+                        return (
+                          <article className={`decision-ledger-row ${entry.operatorDecision.toLowerCase().replace("_", "-")}`} key={entry.pageKey}>
+                            <button
+                              type="button"
+                              className="select-page-button"
+                              onClick={() => setSelectedPageId(pageByKey.get(entry.pageKey)?.id || "")}
+                            >
+                              <strong>{entry.pageKey} / {entry.entryTitle}</strong>
+                              <span>{layoutName(entry.selectedLayout)}</span>
+                            </button>
+                            <div className="decision-ledger-metrics">
+                              <span>{normalizeStatus(entry.contentType)}</span>
+                              <span>{entry.wordCount} words</span>
+                              <span>{entry.textCapacityChars} chars cap</span>
+                              <span>{Math.round((entry.fillRatio || 0) * 100)}% fill</span>
+                              <span>{entry.estimatedRenderedPages} rendered page(s)</span>
+                              <span>{normalizeStatus(entry.fixMode)} fix</span>
+                            </div>
+                            <p><b>Why:</b> {entry.selectedLayoutWhy}</p>
+                            <p><b>Fix:</b> {entry.recommendedFix}</p>
+                            <div className="risk-pill-row">
+                              {riskValues.map(([key, value]) => (
+                                <span className={`risk-pill ${String(value).toLowerCase()}`} key={key}>
+                                  {key.replace(/([A-Z])/g, " $1").toLowerCase()}: {normalizeStatus(value)}
+                                </span>
+                              ))}
+                              {riskValues.length === 0 && <span className="risk-pill none">no current risks</span>}
+                              <span className={`risk-pill decision ${entry.operatorDecision.toLowerCase().replace("_", "-")}`}>
+                                {normalizeStatus(entry.operatorDecision)}
+                              </span>
+                            </div>
+                            {entry.currentQualityFindings?.length > 0 && (
+                              <details className="advanced-details">
+                                <summary>Quality findings tied to this decision</summary>
+                                {entry.currentQualityFindings.map((finding) => (
+                                  <p key={finding.findingId}>
+                                    <strong>{finding.problem}</strong> {finding.resolved ? `(resolved: ${normalizeStatus(finding.resolutionStatus)})` : "(needs decision)"}
+                                    <br />
+                                    {finding.whyItMatters}
+                                  </p>
+                                ))}
+                              </details>
+                            )}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <p className="empty">Refresh the ledger to see why layouts were selected and what the Publishing Director recommends for each page.</p>
+                )}
+              </section>
             )}
             {hasTextFitProof && (
               <section className={`page-quality-review ${pageQualityReview?.status ? pageQualityReview.status.toLowerCase().replace("_", "-") : "not-run"}`}>

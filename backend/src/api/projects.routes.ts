@@ -44,6 +44,7 @@ import {
 } from '../services/operator-intelligence/operator-intelligence.js';
 import { reviewProjectPageQuality } from '../services/page-quality/page-quality-review.js';
 import type { PageQualityFinding, PageQualityReview } from '../services/page-quality/page-quality-review.js';
+import { buildPublishingDirectorDecisionLedger } from '../services/publishing-director/decision-ledger.js';
 import { calibrateProjectChapterFormats } from '../services/calibration/format-calibration.js';
 import { getProjectStorage } from '../services/storage/project-storage.js';
 
@@ -635,6 +636,60 @@ const PageQualityReviewResponseSchema = z.object({
   ),
 });
 
+const PublishingDirectorDecisionLedgerResponseSchema = z.object({
+  status: z.enum(['READY', 'NEEDS_REVIEW', 'BLOCKED']),
+  generatedAt: z.string(),
+  totals: z.object({
+    pages: z.number(),
+    needsDecision: z.number(),
+    automaticFixesAvailable: z.number(),
+    continuationRisks: z.number(),
+    underfilledRisks: z.number(),
+    tightTextRisks: z.number(),
+    repeatedLayoutRisks: z.number(),
+  }),
+  pages: z.array(
+    z.object({
+      pageKey: z.string(),
+      chapterNumber: z.number(),
+      entryTitle: z.string(),
+      selectedLayout: z.string(),
+      persistedLayout: z.string().nullable(),
+      contentType: z.string(),
+      wordCount: z.number(),
+      layoutReasonCodes: z.array(z.string()),
+      selectedLayoutWhy: z.string(),
+      textCapacityChars: z.number(),
+      fillRatio: z.number(),
+      estimatedRenderedPages: z.number(),
+      risks: z.object({
+        continuation: z.enum(['NONE', 'LOW', 'WARNING', 'BLOCKER']),
+        underfilled: z.enum(['NONE', 'LOW', 'WARNING', 'BLOCKER']),
+        tightText: z.enum(['NONE', 'LOW', 'WARNING', 'BLOCKER']),
+        repeatedLayout: z.enum(['NONE', 'LOW', 'WARNING', 'BLOCKER']),
+      }),
+      currentQualityFindings: z.array(
+        z.object({
+          findingId: z.string(),
+          scope: z.enum(['BOOK', 'CHAPTER', 'PAGE']),
+          severity: z.enum(['BLOCKER', 'WARNING', 'INFO']),
+          category: z.enum(['CONTINUATION', 'WHITESPACE', 'RHYTHM', 'ILLUSTRATION_BALANCE', 'LAYOUT_DIVERSITY', 'PUBLISHING_STYLE']),
+          problem: z.string(),
+          whyItMatters: z.string(),
+          recommendedFix: z.string(),
+          expectedResult: z.string(),
+          resolved: z.boolean(),
+          resolutionStatus: z.string().optional(),
+        }),
+      ),
+      recommendedFix: z.string(),
+      fixMode: z.enum(['AUTOMATIC', 'MANUAL', 'DECISION_ONLY', 'NONE']),
+      automaticFixAvailable: z.boolean(),
+      operatorDecision: z.enum(['READY', 'NEEDS_DECISION', 'RESOLVED']),
+    }),
+  ),
+});
+
 const ChapterLayoutApprovalResponseSchema = z.object({
   approval: LayoutApprovalContractSchema,
   layoutApprovals: LayoutApprovalsSchema,
@@ -954,8 +1009,14 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         const summary = await generateManifests({ projectId: id, manuscriptMarkdown: markdown, config, replace: force });
         // Re-breakdown invalidates any prior plan + approvals (pages were deleted),
         // so clear the stale plan snapshot and chapter approvals.
-        if (force && (config.planMeta || Object.keys(config.layoutApprovals ?? {}).length > 0)) {
-          await updateProjectConfig(id, { ...config, planMeta: undefined, layoutApprovals: {} });
+        if (force && (config.planMeta || Object.keys(config.layoutApprovals ?? {}).length > 0 || config.pageQualityReview)) {
+          await updateProjectConfig(id, {
+            ...config,
+            planMeta: undefined,
+            layoutApprovals: {},
+            pageQualityReview: undefined,
+            pageQualityResolutions: {},
+          });
         }
         const updated = await setProjectStatus(id, 'MANIFESTED');
 
@@ -1095,7 +1156,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         plannedAt: new Date().toISOString(),
       };
       const layoutApprovals = mode === 'skip-approved' ? (config.layoutApprovals ?? {}) : {};
-      const clearedConfig = { ...config, layoutApprovals, planMeta };
+      const clearedConfig = { ...config, layoutApprovals, planMeta, pageQualityReview: undefined, pageQualityResolutions: {} };
       await updateProjectConfig(id, clearedConfig);
       const updated = await setProjectStatus(id, 'PLANNED');
       return { project: toContract(updated ?? project), layoutLibrary, plannedPages };
@@ -1218,6 +1279,22 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         return withQualityResolutions(review, config);
       }
       return review;
+    },
+  );
+
+  app.get(
+    '/api/projects/:id/publishing-director/decision-ledger',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        response: { 200: PublishingDirectorDecisionLedgerResponseSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const ledger = await buildPublishingDirectorDecisionLedger(id);
+      if (!ledger) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      return ledger;
     },
   );
 

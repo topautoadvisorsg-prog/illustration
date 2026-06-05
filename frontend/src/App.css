@@ -2332,6 +2332,140 @@ button.secondary {
   border-color: #d5aa57;
 }
 
+.decision-ledger {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d4c8b8;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfaf4;
+}
+
+.decision-ledger.ready {
+  border-color: #2f7a57;
+}
+
+.decision-ledger.needs-review,
+.decision-ledger.not-loaded {
+  border-color: #d5aa57;
+}
+
+.decision-ledger.blocked {
+  border-color: #a33a2f;
+  background: #fff3ee;
+}
+
+.decision-ledger-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(105px, 1fr));
+  gap: 8px;
+}
+
+.decision-ledger-summary > div,
+.decision-ledger-focus {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e0d7ca;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fffdf8;
+}
+
+.decision-ledger-summary strong {
+  font-size: 1.25rem;
+}
+
+.decision-ledger-summary span,
+.decision-ledger-focus span,
+.decision-ledger-metrics span {
+  color: #6d6258;
+  font-size: 0.84rem;
+}
+
+.decision-ledger-focus > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.decision-ledger-focus p {
+  margin: 0;
+  color: #4d453d;
+}
+
+.decision-ledger-list {
+  display: grid;
+  gap: 10px;
+  max-height: 560px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.decision-ledger-row {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e0d7ca;
+  border-left: 4px solid #2f7a57;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+}
+
+.decision-ledger-row.needs-decision {
+  border-left-color: #b98222;
+  background: #fff9ed;
+}
+
+.decision-ledger-row.resolved {
+  border-left-color: #5f6f7a;
+}
+
+.decision-ledger-row p {
+  margin: 0;
+  color: #4d453d;
+  font-size: 0.9rem;
+}
+
+.decision-ledger-metrics,
+.risk-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.decision-ledger-metrics span,
+.risk-pill {
+  border: 1px solid #e0d7ca;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #f9f5eb;
+  font-weight: 700;
+}
+
+.risk-pill.warning,
+.risk-pill.low,
+.risk-pill.needs-decision {
+  border-color: #d5aa57;
+  color: #6d4f12;
+  background: #fff6df;
+}
+
+.risk-pill.blocker {
+  border-color: #a33a2f;
+  color: #8b2020;
+  background: #fff0ec;
+}
+
+.risk-pill.none,
+.risk-pill.ready,
+.risk-pill.resolved {
+  border-color: #98c8aa;
+  color: #2f7a57;
+  background: #edf6f0;
+}
+
 .page-quality-review {
   display: grid;
   gap: 12px;
