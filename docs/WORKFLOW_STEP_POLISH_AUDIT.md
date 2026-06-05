@@ -74,7 +74,9 @@ Implemented first pass: Proof Review Gallery now shows per-page proof cards with
 
 Implemented scope fix: PDF previews now carry a visible scope (`page`, `chapter`, `book`, or `cover`). The workflow only treats Proof Review as complete after the selected chapter proof or full-book proof exists, so a focused page proof or cover preview cannot accidentally advance the operator into Images.
 
-Remaining polish opportunity: add actual rendered page thumbnails, selected page large preview, next/previous keyboard navigation, and approve/request changes.
+Implemented second pass: rendered PDF blobs now create a visual proof desk in the browser, with actual rendered page thumbnails, a large selected-page preview, scope/status messaging, and Open/Download PDF fallback.
+
+Remaining polish opportunity: add next/previous keyboard navigation, page approval/request-change actions, and proof annotations.
 
 Why it helps: proofing becomes a publishing desk instead of an iframe.
 
@@ -107,5 +109,5 @@ Why it helps: export becomes a production handoff, not a collection of render bu
 1. Cost visibility in Image Review.
 2. Apply recommended publishing standard from calibration.
 3. Export clarity / Download for KDP.
-4. Actual proof thumbnails and larger page preview.
+4. Proof approval/request-change actions.
 5. Manifest and plan versioning.

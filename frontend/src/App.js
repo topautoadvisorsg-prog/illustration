@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
 import "@/App.css";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = "";
 
 // Pre-fill the live backend so the admin page is ready to test without hunting for
 // the URL. REACT_APP_BACKEND_URL (set in Railway) overrides this when present.
@@ -1296,6 +1299,10 @@ function App() {
   const [selectedPageId, setSelectedPageId] = useState("");
   const [imageInstruction, setImageInstruction] = useState("");
   const [pdfPreview, setPdfPreview] = useState({ title: "", url: "", meta: "", kind: "", chapterNumber: null, pageKey: "" });
+  const [proofThumbnails, setProofThumbnails] = useState([]);
+  const [selectedProofPageNumber, setSelectedProofPageNumber] = useState(1);
+  const [largeProofPage, setLargeProofPage] = useState(null);
+  const [proofDeskStatus, setProofDeskStatus] = useState("");
   const [renderedChapterNumber, setRenderedChapterNumber] = useState(null);
   const [chapterIntelligence, setChapterIntelligence] = useState(null);
   const [productionDashboard, setProductionDashboard] = useState(null);
@@ -1311,6 +1318,8 @@ function App() {
   const chatPanelRef = useRef(null);
   const chatLogRef = useRef(null);
   const chatInputRef = useRef(null);
+  const proofPdfRef = useRef(null);
+  const proofRenderTokenRef = useRef(0);
   const [phase, setPhase] = useState(() => {
     const stored = loadStoredString(ACTIVE_PHASE_KEY, PHASES[0]);
     return PHASES.includes(stored) ? stored : PHASES[0];
@@ -1811,7 +1820,93 @@ function App() {
     };
   }
 
+  function resetProofDesk(status = "") {
+    proofRenderTokenRef.current += 1;
+    const currentPdf = proofPdfRef.current;
+    proofPdfRef.current = null;
+    if (currentPdf?.destroy) {
+      currentPdf.destroy().catch(() => {});
+    }
+    setProofThumbnails([]);
+    setSelectedProofPageNumber(1);
+    setLargeProofPage(null);
+    setProofDeskStatus(status);
+  }
+
+  async function renderPdfPageImage(pdf, pageNumber, maxWidth, imageType = "image/jpeg", imageQuality = 0.86) {
+    const page = await pdf.getPage(pageNumber);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const scale = Math.max(0.1, maxWidth / baseViewport.width);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const context = canvas.getContext("2d", { alpha: false });
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: context, viewport }).promise;
+    const imageUrl = canvas.toDataURL(imageType, imageQuality);
+    page.cleanup?.();
+    return { imageUrl, width: canvas.width, height: canvas.height };
+  }
+
+  async function renderLargeProofPage(pageNumber, pdf = proofPdfRef.current, token = proofRenderTokenRef.current) {
+    if (!pdf) return;
+    setSelectedProofPageNumber(pageNumber);
+    setLargeProofPage({ pageNumber, status: "Rendering page preview..." });
+    try {
+      const image = await renderPdfPageImage(pdf, pageNumber, 920, "image/jpeg", 0.9);
+      if (token !== proofRenderTokenRef.current) return;
+      setLargeProofPage({ pageNumber, status: "ready", ...image });
+      setProofDeskStatus(`Viewing proof page ${pageNumber} of ${pdf.numPages}.`);
+    } catch (err) {
+      if (token !== proofRenderTokenRef.current) return;
+      const message = err instanceof Error ? err.message : String(err);
+      setLargeProofPage({ pageNumber, status: "error", error: message });
+      setProofDeskStatus(`Could not render proof page ${pageNumber}: ${message}`);
+    }
+  }
+
+  async function buildProofDeskFromBlob(blob, details, token) {
+    try {
+      setProofDeskStatus("Building visual proof desk...");
+      const data = new Uint8Array(await blob.arrayBuffer());
+      const loadingTask = pdfjsLib.getDocument({ data, disableWorker: true, useSystemFonts: true });
+      const pdf = await loadingTask.promise;
+      if (token !== proofRenderTokenRef.current) {
+        await pdf.destroy();
+        return;
+      }
+      proofPdfRef.current = pdf;
+      const totalPages = pdf.numPages;
+      const thumbnailLimit = details.kind === "book" ? Math.min(totalPages, 48) : totalPages;
+      const thumbnails = [];
+      for (let pageNumber = 1; pageNumber <= thumbnailLimit; pageNumber += 1) {
+        if (token !== proofRenderTokenRef.current) return;
+        const image = await renderPdfPageImage(pdf, pageNumber, 155, "image/jpeg", 0.78);
+        thumbnails.push({ pageNumber, ...image });
+        if (pageNumber % 4 === 0 || pageNumber === thumbnailLimit) {
+          setProofThumbnails([...thumbnails]);
+          setProofDeskStatus(`Building thumbnails ${pageNumber}/${thumbnailLimit}...`);
+        }
+      }
+      if (token !== proofRenderTokenRef.current) return;
+      setProofDeskStatus(
+        totalPages > thumbnailLimit
+          ? `Showing first ${thumbnailLimit} of ${totalPages} rendered pages. Open the PDF for the full book.`
+          : `${totalPages} rendered page(s) ready for visual review.`,
+      );
+      await renderLargeProofPage(1, pdf, token);
+    } catch (err) {
+      if (token !== proofRenderTokenRef.current) return;
+      const message = err instanceof Error ? err.message : String(err);
+      setProofDeskStatus(`PDF visual preview could not be built. Use Open PDF or Download Current Preview PDF. ${message}`);
+    }
+  }
+
   function setPreviewBlob(title, blob, meta = "", details = {}) {
+    resetProofDesk("Building visual proof desk...");
+    const token = proofRenderTokenRef.current;
     setPdfPreview((current) => {
       if (current.url) URL.revokeObjectURL(current.url);
       return {
@@ -1823,6 +1918,7 @@ function App() {
         pageKey: details.pageKey || "",
       };
     });
+    buildProofDeskFromBlob(blob, details, token);
   }
 
   function requireSelectedPage() {
@@ -1960,6 +2056,7 @@ function App() {
     setProductionDashboard(null);
     setPlannedPages([]);
     setLayoutApprovals({});
+    resetProofDesk();
     setPdfPreview((current) => {
       if (current.url) URL.revokeObjectURL(current.url);
       return { title: "", url: "", meta: "", kind: "", chapterNumber: null, pageKey: "" };
@@ -1989,6 +2086,7 @@ function App() {
       setChapterIntelligence(null);
       setProductionDashboard(null);
       setLayoutApprovals({});
+      resetProofDesk();
       setPdfPreview((current) => {
         if (current.url) URL.revokeObjectURL(current.url);
         return { title: "", url: "", meta: "", kind: "", chapterNumber: null, pageKey: "" };
@@ -4273,7 +4371,40 @@ function App() {
                     <a className="download-link" href={pdfPreview.url} download="wildlands-preview.pdf">Download Current Preview PDF</a>
                   </div>
                 </div>
-                <p className="pdf-preview-note">If the embedded preview appears blank, open or download the same rendered proof. The iframe uses a temporary browser PDF blob.</p>
+                <div className="proof-desk">
+                  <div className="proof-desk-main">
+                    <div className="proof-large-preview">
+                      {largeProofPage?.imageUrl ? (
+                        <img src={largeProofPage.imageUrl} alt={`Rendered proof page ${largeProofPage.pageNumber}`} />
+                      ) : (
+                        <div className="proof-large-empty">
+                          <strong>{largeProofPage?.status || "Building visual preview..."}</strong>
+                          <span>{proofDeskStatus || "The rendered PDF is being converted into review pages."}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="proof-desk-summary">
+                      <strong>Page {selectedProofPageNumber}</strong>
+                      <span>{proofDeskStatus || "Visual proof desk ready."}</span>
+                      <small>Use the thumbnails to inspect the rendered proof without hunting through the embedded PDF controls.</small>
+                    </div>
+                  </div>
+                  <div className="proof-thumbnail-rail" aria-label="Rendered proof page thumbnails">
+                    {proofThumbnails.map((thumb) => (
+                      <button
+                        type="button"
+                        className={thumb.pageNumber === selectedProofPageNumber ? "proof-thumbnail active" : "proof-thumbnail"}
+                        key={thumb.pageNumber}
+                        onClick={() => renderLargeProofPage(thumb.pageNumber)}
+                      >
+                        <img src={thumb.imageUrl} alt={`Proof thumbnail page ${thumb.pageNumber}`} />
+                        <span>{thumb.pageNumber}</span>
+                      </button>
+                    ))}
+                    {proofThumbnails.length === 0 && <span className="empty-inline">Building proof thumbnails...</span>}
+                  </div>
+                </div>
+                <p className="pdf-preview-note">The visual desk is generated from the same PDF blob. If it fails or you need native PDF controls, open or download the current preview below.</p>
                 <iframe title={pdfPreview.title} src={pdfPreview.url} />
               </div>
             ) : (

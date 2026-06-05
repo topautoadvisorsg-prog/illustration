@@ -2546,6 +2546,109 @@ button.secondary {
   background: #f4f1ea;
 }
 
+.proof-desk {
+  display: grid;
+  gap: 14px;
+  margin: 12px 0;
+}
+
+.proof-desk-main {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(220px, 0.34fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.proof-large-preview {
+  display: grid;
+  min-height: 540px;
+  place-items: center;
+  border: 1px solid #c8c0b4;
+  border-radius: 8px;
+  padding: 12px;
+  background: #2b2f2d;
+  overflow: auto;
+}
+
+.proof-large-preview img {
+  display: block;
+  max-width: min(100%, 920px);
+  max-height: 78vh;
+  border-radius: 4px;
+  box-shadow: 0 18px 36px rgba(22, 18, 14, 0.32);
+  background: #fff;
+}
+
+.proof-large-empty {
+  display: grid;
+  gap: 8px;
+  max-width: 360px;
+  color: #f9f5eb;
+  text-align: center;
+}
+
+.proof-large-empty span {
+  color: #d8d0c2;
+}
+
+.proof-desk-summary {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #d4c8b8;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffdf8;
+}
+
+.proof-desk-summary strong {
+  font-size: 1.1rem;
+}
+
+.proof-desk-summary span,
+.proof-desk-summary small {
+  color: #6d6258;
+}
+
+.proof-thumbnail-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 112px;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+}
+
+.proof-thumbnail {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #d4c8b8;
+  border-radius: 8px;
+  padding: 7px;
+  color: #4d453d;
+  background: #fffdf8;
+  text-align: center;
+}
+
+.proof-thumbnail.active {
+  border-color: #2f5d50;
+  box-shadow: 0 0 0 2px rgba(47, 93, 80, 0.18);
+}
+
+.proof-thumbnail img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 7 / 10;
+  object-fit: contain;
+  border: 1px solid #e0d7ca;
+  border-radius: 5px;
+  background: #fff;
+}
+
+.proof-thumbnail span {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .pdf-preview-frame iframe {
   width: 100%;
   height: min(86vh, 920px);
@@ -2905,6 +3008,10 @@ button.secondary {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
 
+  .proof-desk-main {
+    grid-template-columns: 1fr;
+  }
+
   .intelligence-metrics {
     grid-template-columns: repeat(3, minmax(120px, 1fr));
   }
@@ -2994,5 +3101,13 @@ button.secondary {
 
   .chapter-finding small {
     grid-column: auto;
+  }
+
+  .proof-large-preview {
+    min-height: 420px;
+  }
+
+  .proof-thumbnail-rail {
+    grid-auto-columns: 96px;
   }
 }
