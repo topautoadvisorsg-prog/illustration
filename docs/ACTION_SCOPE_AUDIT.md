@@ -52,6 +52,15 @@ Button text should include scope when the action is not obvious:
 - Use "Project" for asset library, configuration, and destructive project operations.
 - Keep paid actions confirmable until cost visibility is shown inline.
 
+## Proof Scope Rule
+
+The current PDF preview must show its scope before the operator reviews it:
+
+- `page`: useful focused proof, but it does not complete the chapter proof stage.
+- `chapter`: completes proof review for the selected chapter.
+- `book`: satisfies proof review at book scope.
+- `cover`: cover-only preview; it does not complete interior proof review.
+
 ## Deferred Batch Actions
 
 Future batch image generation must require confirmation and should show count, estimated cost, and whether it creates new versions or only fills missing images.

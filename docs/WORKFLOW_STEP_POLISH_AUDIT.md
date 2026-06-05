@@ -72,6 +72,8 @@ Current value: renders selected page/chapter/book PDFs and shows the proof objec
 
 Implemented first pass: Proof Review Gallery now shows per-page proof cards with layout, text-fit status, proof-page count, art state, warning count, and one-click focused page proof.
 
+Implemented scope fix: PDF previews now carry a visible scope (`page`, `chapter`, `book`, or `cover`). The workflow only treats Proof Review as complete after the selected chapter proof or full-book proof exists, so a focused page proof or cover preview cannot accidentally advance the operator into Images.
+
 Remaining polish opportunity: add actual rendered page thumbnails, selected page large preview, next/previous keyboard navigation, and approve/request changes.
 
 Why it helps: proofing becomes a publishing desk instead of an iframe.
@@ -102,8 +104,8 @@ Why it helps: export becomes a production handoff, not a collection of render bu
 
 ## Recommended Next Build Order
 
-1. Proof Review Gallery.
-2. Cost visibility in Image Review.
-3. Apply recommended publishing standard from calibration.
-4. Export clarity / Download for KDP.
+1. Cost visibility in Image Review.
+2. Apply recommended publishing standard from calibration.
+3. Export clarity / Download for KDP.
+4. Actual proof thumbnails and larger page preview.
 5. Manifest and plan versioning.

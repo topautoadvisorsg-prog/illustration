@@ -218,8 +218,8 @@ const WORKFLOW_STAGES = [
   { key: "textfit", label: "Text-Fit Check", action: "Check readability before images." },
   { key: "quality", label: "Page Quality Review", action: "Review rhythm and publishing decisions." },
   { key: "layout", label: "Approve Layouts", action: "Lock text-safe chapter layouts." },
-  { key: "images", label: "Manage Images", action: "Generate, reuse, approve art." },
   { key: "proof", label: "Render Proofs", action: "Review chapter and page PDFs." },
+  { key: "images", label: "Manage Images", action: "Generate, reuse, approve art." },
   { key: "export", label: "Export Book", action: "Save final production output." },
 ];
 
@@ -1275,7 +1275,7 @@ function App() {
   const [imageLibraryFilter, setImageLibraryFilter] = useState({ q: "", status: "", layout: "", chapter: "" });
   const [selectedPageId, setSelectedPageId] = useState("");
   const [imageInstruction, setImageInstruction] = useState("");
-  const [pdfPreview, setPdfPreview] = useState({ title: "", url: "", meta: "" });
+  const [pdfPreview, setPdfPreview] = useState({ title: "", url: "", meta: "", kind: "", chapterNumber: null, pageKey: "" });
   const [renderedChapterNumber, setRenderedChapterNumber] = useState(null);
   const [chapterIntelligence, setChapterIntelligence] = useState(null);
   const [productionDashboard, setProductionDashboard] = useState(null);
@@ -1355,6 +1355,10 @@ function App() {
   const reviewChapterPages = reviewChapterNumber
     ? pageManifests.filter((page) => page.chapterNumber === reviewChapterNumber).sort((a, b) => Number(a.pageNumber || 0) - Number(b.pageNumber || 0))
     : [];
+  const hasReviewChapterProof = Boolean(
+    pdfPreview.url &&
+      (pdfPreview.kind === "book" || (pdfPreview.kind === "chapter" && pdfPreview.chapterNumber === reviewChapterNumber)),
+  );
   const selectedChapterApproval = selectedChapterNumber ? layoutApprovals[String(selectedChapterNumber)] : null;
   const selectedImages = selectedPage ? pageImages[selectedPage.id] || [] : [];
   const activeImage = latestActiveVersion(selectedImages);
@@ -1493,7 +1497,7 @@ function App() {
         helpPrompt: "Should I approve this chapter layout, or is anything still risky?",
       };
     }
-    if (!pdfPreview.url) {
+    if (!hasReviewChapterProof) {
       return {
         stageKey: "proof",
         stageLabel: "Render Proofs",
@@ -1532,12 +1536,12 @@ function App() {
     approvedImagePageCount,
     busy,
     hasTextFitProof,
+    hasReviewChapterProof,
     imagePageCount,
     manuscript,
     pageManifests.length,
     pageQualityReview,
     pages.length,
-    pdfPreview.url,
     plannedPageCount,
     projectConfig.publishingStandard?.format,
     selectedChapterApproval,
@@ -1787,10 +1791,17 @@ function App() {
     };
   }
 
-  function setPreviewBlob(title, blob, meta = "") {
+  function setPreviewBlob(title, blob, meta = "", details = {}) {
     setPdfPreview((current) => {
       if (current.url) URL.revokeObjectURL(current.url);
-      return { title, url: URL.createObjectURL(blob), meta };
+      return {
+        title,
+        url: URL.createObjectURL(blob),
+        meta,
+        kind: details.kind || "",
+        chapterNumber: details.chapterNumber || null,
+        pageKey: details.pageKey || "",
+      };
     });
   }
 
@@ -1931,7 +1942,7 @@ function App() {
     setLayoutApprovals({});
     setPdfPreview((current) => {
       if (current.url) URL.revokeObjectURL(current.url);
-      return { title: "", url: "", meta: "" };
+      return { title: "", url: "", meta: "", kind: "", chapterNumber: null, pageKey: "" };
     });
     const cached = loadManuscriptCache(id);
     if (cached?.markdown) {
@@ -1958,6 +1969,10 @@ function App() {
       setChapterIntelligence(null);
       setProductionDashboard(null);
       setLayoutApprovals({});
+      setPdfPreview((current) => {
+        if (current.url) URL.revokeObjectURL(current.url);
+        return { title: "", url: "", meta: "", kind: "", chapterNumber: null, pageKey: "" };
+      });
       setManifests([]);
       setPages([]);
     }
@@ -2502,7 +2517,10 @@ function App() {
     });
     setRenderedChapterNumber(chapterNumber);
     const renderedPages = headers.get("x-total-pages") || "?";
-    setPreviewBlob(`Chapter ${chapterNumber} PDF Preview`, blob, `${renderedPages} rendered page(s)`);
+    setPreviewBlob(`Chapter ${chapterNumber} PDF Preview`, blob, `${renderedPages} rendered page(s)`, {
+      kind: "chapter",
+      chapterNumber,
+    });
     setMessage(`Rendered Chapter ${chapterNumber} proof: ${renderedPages} pages.`);
     appendLog("success", `Rendered Chapter ${chapterNumber} proof: ${renderedPages} pages.`);
     await refreshChapterIntelligenceAfterRender(chapterNumber);
@@ -2518,7 +2536,11 @@ function App() {
     if (row?.id) setSelectedPageId(row.id);
     setRenderedChapterNumber(page?.chapterNumber || renderedChapterNumber);
     const renderedPages = headers.get("x-total-pages") || "?";
-    setPreviewBlob(`${pageKey} Page Proof`, blob, `${renderedPages} rendered page(s) for ${page?.entryTitle || "selected page"}`);
+    setPreviewBlob(`${pageKey} Page Proof`, blob, `${renderedPages} rendered page(s) for ${page?.entryTitle || "selected page"}`, {
+      kind: "page",
+      chapterNumber: page?.chapterNumber || null,
+      pageKey,
+    });
     setMessage(`Rendered selected page proof for ${pageKey}: ${renderedPages} pages.`);
     appendLog("success", `Rendered selected page proof for ${pageKey}: ${renderedPages} pages.`);
     if (page?.chapterNumber) await refreshChapterIntelligenceAfterRender(page.chapterNumber);
@@ -2531,7 +2553,9 @@ function App() {
       method: "POST",
     });
     const pageCount = headers.get("x-page-count") || "?";
-    setPreviewBlob("Full Book PDF Preview", blob, `${pageCount} page(s), preflight ${headers.get("x-preflight-passed") || "unknown"}`);
+    setPreviewBlob("Full Book PDF Preview", blob, `${pageCount} page(s), preflight ${headers.get("x-preflight-passed") || "unknown"}`, {
+      kind: "book",
+    });
     setMessage(`Rendered full book PDF proof: ${pageCount} pages.`);
     appendLog("success", `Rendered full book PDF proof: ${pageCount} pages.`);
   }
@@ -2539,7 +2563,9 @@ function App() {
   async function renderCoverPreview() {
     if (!activeProjectId) throw new Error("Create or select a project first.");
     const { blob } = await callPdf(`/api/projects/${activeProjectId}/render-cover`, { method: "POST" });
-    setPreviewBlob("Cover Preview (full wrap + spine)", blob, "Print-ready cover; spine width from page count");
+    setPreviewBlob("Cover Preview (full wrap + spine)", blob, "Print-ready cover; spine width from page count", {
+      kind: "cover",
+    });
     appendLog("success", "Rendered cover preview.");
   }
 
@@ -2651,9 +2677,9 @@ function App() {
     if (key === "textfit") return hasTextFitProof ? "done" : pages.length > 0 ? "current" : "";
     if (key === "quality") return pageQualityReview || selectedChapterApproval ? "done" : hasTextFitProof ? "current" : "";
     if (key === "layout") return selectedChapterApproval ? "done" : pageQualityReview ? "current" : "";
-    if (key === "images") return imagePageCount > 0 ? (approvedImagePageCount === imagePageCount ? "done" : "open") : selectedChapterApproval ? "open" : "";
-    if (key === "proof") return pdfPreview.url ? "done" : selectedChapterApproval ? "open" : "";
-    if (key === "export") return selectedProject?.status === "EXPORTED" ? "done" : pdfPreview.url ? "current" : "";
+    if (key === "proof") return hasReviewChapterProof ? "done" : selectedChapterApproval ? "open" : "";
+    if (key === "images") return imagePageCount > 0 ? (approvedImagePageCount === imagePageCount ? "done" : "open") : hasReviewChapterProof ? "open" : "";
+    if (key === "export") return selectedProject?.status === "EXPORTED" ? "done" : hasReviewChapterProof ? "current" : "";
     return "";
   }
 
@@ -2915,17 +2941,26 @@ function App() {
       },
       proof: {
         title: "Proof Review Object",
-        status: pdfPreview.url ? "Rendered" : "Not rendered",
-        happened: pdfPreview.url ? "A page-shaped PDF proof has been rendered in this browser." : "No chapter or page proof is rendered yet.",
-        created: pdfPreview.url ? "PDF preview, open/download links, and page proof navigation." : "Render a selected chapter or page to create the proof object.",
+        status: hasReviewChapterProof ? "Chapter proof rendered" : pdfPreview.url ? "Focused preview rendered" : "Not rendered",
+        happened: hasReviewChapterProof
+          ? `${reviewChapterLabel} has a reviewable proof in this browser.`
+          : pdfPreview.url
+            ? `${pdfPreview.title} is open, but ${reviewChapterLabel} still needs a chapter proof.`
+            : "No selected chapter proof is rendered yet.",
+        created: hasReviewChapterProof
+          ? "Chapter PDF preview, open/download links, and page proof navigation."
+          : pdfPreview.url
+            ? "A focused PDF preview exists. Render the selected chapter to complete this stage."
+            : "Render the selected chapter to create the proof review object.",
         review: "Review rendered pages, text flow, image placement, and readability at proof size.",
         artifactLabel: "Proof preview",
         artifactSelector: ".preview-review-card",
-        primaryLabel: pdfPreview.url ? "Review Proof" : `Render ${reviewChapterLabel} Proof`,
+        primaryLabel: hasReviewChapterProof ? "Review Chapter Proof" : `Render ${reviewChapterLabel} Proof`,
         secondaryLabel: `Check ${reviewChapterLabel} Readiness`,
         metrics: [
           { label: "chapter", value: reviewChapterNumber || "none" },
-          { label: "proof", value: pdfPreview.url ? pdfPreview.title : "not rendered" },
+          { label: "current preview", value: pdfPreview.url ? pdfPreview.title : "not rendered" },
+          { label: "scope", value: pdfPreview.kind || "none" },
           { label: "pages", value: reviewChapterPages.length || "pending" },
         ],
       },
@@ -4080,6 +4115,7 @@ function App() {
                   <div>
                     <strong>{pdfPreview.title}</strong>
                     <p className="hint">{pdfPreview.meta}</p>
+                    <span className="mode-pill">Scope: {pdfPreview.kind || "preview"}</span>
                   </div>
                   <div className="preview-actions">
                     <a className="download-link secondary" href={pdfPreview.url} target="_blank" rel="noreferrer">Open PDF</a>
