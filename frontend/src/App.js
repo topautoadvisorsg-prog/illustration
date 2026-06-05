@@ -1295,6 +1295,8 @@ function App() {
   const [layoutLibraryReport, setLayoutLibraryReport] = useState(null);
   const [textFitPreview, setTextFitPreview] = useState(null);
   const [pageQualityReview, setPageQualityReview] = useState(null);
+  const [qualityResolutionNotes, setQualityResolutionNotes] = useState({});
+  const [qualityBulkNote, setQualityBulkNote] = useState("");
   const [formatCalibration, setFormatCalibration] = useState(null);
   const [layoutApprovals, setLayoutApprovals] = useState({});
   const [proofArtifacts, setProofArtifacts] = useState([]);
@@ -2092,6 +2094,8 @@ function App() {
     setSelectedPageId("");
     setTextFitPreview(null);
     setPageQualityReview(null);
+    setQualityResolutionNotes({});
+    setQualityBulkNote("");
     setFormatCalibration(null);
     setPageImages({});
     setProofArtifacts([]);
@@ -2126,6 +2130,8 @@ function App() {
       setActiveProjectId("");
       setSelectedPageId("");
       setPlannedPages([]);
+      setQualityResolutionNotes({});
+      setQualityBulkNote("");
       setChapterIntelligence(null);
       setProductionDashboard(null);
       setLayoutApprovals({});
@@ -2626,9 +2632,13 @@ function App() {
   async function resolvePageQualityFinding(finding, status, note = "") {
     if (!activeProjectId) throw new Error("Create or select a project first.");
     if (!finding?.findingId) throw new Error("Quality finding is missing a stable ID. Refresh Page Quality Review.");
+    const cleanNote = note.trim();
+    if (["DEFERRED", "OVERRIDDEN"].includes(status) && !cleanNote) {
+      throw new Error(`${status === "DEFERRED" ? "Defer" : "Override"} requires a short reason.`);
+    }
     const data = await call(`/api/projects/${activeProjectId}/page-quality-resolutions`, {
       method: "POST",
-      body: JSON.stringify({ findingId: finding.findingId, status, note }),
+      body: JSON.stringify({ findingId: finding.findingId, status, note: cleanNote || undefined }),
     });
     setPageQualityReview(data);
     const resolutions = Object.fromEntries(
@@ -2641,14 +2651,32 @@ function App() {
       pageQualityReview: { reviewedAt: new Date().toISOString(), review: data },
       pageQualityResolutions: { ...(current.pageQualityResolutions || {}), ...resolutions },
     }));
+    setQualityResolutionNotes((current) => {
+      const next = { ...current };
+      delete next[finding.findingId];
+      return next;
+    });
+    if (status === "FIXED") {
+      await loadArtifacts(activeProjectId);
+      setPageQualityReview(data);
+    }
     appendLog("success", `${status.replace("_", " ")} Page Quality finding: ${finding.pageKey || (finding.chapterNumber ? `Chapter ${finding.chapterNumber}` : "Book")}.`);
   }
 
   async function resolveSelectedChapterQualityFindings(status) {
     if (!unresolvedSelectedChapterQualityFindings.length) return false;
-    for (const finding of unresolvedSelectedChapterQualityFindings) {
-      await resolvePageQualityFinding(finding, status, `Bulk ${status.toLowerCase()} for ${selectedChapterLabel}.`);
+    const cleanNote = qualityBulkNote.trim();
+    if (["DEFERRED", "OVERRIDDEN"].includes(status) && !cleanNote) {
+      throw new Error(`${status === "DEFERRED" ? "Defer" : "Override"} all requires a short reason.`);
     }
+    for (const finding of unresolvedSelectedChapterQualityFindings) {
+      await resolvePageQualityFinding(
+        finding,
+        status,
+        cleanNote || `Bulk ${status.toLowerCase()} for ${selectedChapterLabel}.`,
+      );
+    }
+    setQualityBulkNote("");
     setMessage(`${status} ${unresolvedSelectedChapterQualityFindings.length} Page Quality finding(s) for ${selectedChapterLabel}.`);
   }
 
@@ -3997,6 +4025,13 @@ function App() {
                             ? `${unresolvedSelectedChapterQualityFindings.length} finding(s) need an operator decision before layout approval.`
                             : "All current-chapter findings have an operator decision."}
                         </span>
+                        <textarea
+                          className="quality-note-input"
+                          value={qualityBulkNote}
+                          onChange={(event) => setQualityBulkNote(event.target.value)}
+                          placeholder="Optional bulk reason. Required when deferring or overriding all findings."
+                          rows={2}
+                        />
                       </div>
                       <div className="button-row">
                         <button
@@ -4030,11 +4065,27 @@ function App() {
                           <p><b>Why it matters:</b> {finding.whyItMatters}</p>
                           <p><b>Recommended fix:</b> {finding.recommendedFix}</p>
                           <p><b>Expected result:</b> {finding.expectedResult}</p>
+                          {resolution?.note && <p><b>Operator reason:</b> {resolution.note}</p>}
+                          {resolution?.action?.summary && <p><b>Correction applied:</b> {resolution.action.summary}</p>}
+                          {!resolution && (
+                            <textarea
+                              className="quality-note-input"
+                              value={qualityResolutionNotes[finding.findingId] || ""}
+                              onChange={(event) =>
+                                setQualityResolutionNotes((current) => ({
+                                  ...current,
+                                  [finding.findingId]: event.target.value,
+                                }))
+                              }
+                              placeholder="Reason for accept, defer, override, or fix. Required for defer/override."
+                              rows={2}
+                            />
+                          )}
                           <div className="quality-resolution-actions">
-                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Accepting quality finding...", () => resolvePageQualityFinding(finding, "ACCEPTED"))}>Accept</button>
-                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Marking quality finding fixed...", () => resolvePageQualityFinding(finding, "FIXED"))}>Fix</button>
-                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Deferring quality finding...", () => resolvePageQualityFinding(finding, "DEFERRED"))}>Defer</button>
-                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Overriding quality finding...", () => resolvePageQualityFinding(finding, "OVERRIDDEN"))}>Override</button>
+                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Accepting quality finding...", () => resolvePageQualityFinding(finding, "ACCEPTED", qualityResolutionNotes[finding.findingId] || ""))}>Accept</button>
+                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Applying quality fix...", () => resolvePageQualityFinding(finding, "FIXED", qualityResolutionNotes[finding.findingId] || ""))}>Fix</button>
+                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Deferring quality finding...", () => resolvePageQualityFinding(finding, "DEFERRED", qualityResolutionNotes[finding.findingId] || ""))}>Defer</button>
+                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Overriding quality finding...", () => resolvePageQualityFinding(finding, "OVERRIDDEN", qualityResolutionNotes[finding.findingId] || ""))}>Override</button>
                           </div>
                         </article>
                         );

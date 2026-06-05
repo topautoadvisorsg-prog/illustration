@@ -110,6 +110,11 @@ export interface PagePlanningDecision {
   textFitStatus: 'PENDING_PREVIEW' | 'BLOCKED_LAYOUT_LIBRARY';
 }
 
+export interface PlanPageOptions {
+  forcedLayoutTemplate?: LayoutTemplateId;
+  reasonCode?: string;
+}
+
 const DEFAULT_LAYOUT_CAPACITY: Record<LayoutTemplateId, { minWords: number; targetWords: number; maxWords: number }> = {
   LAYOUT_1_STANDARD: { minWords: 220, targetWords: 320, maxWords: 420 },
   LAYOUT_2_TEXT_HEAVY: { minWords: 420, targetWords: 560, maxWords: 720 },
@@ -423,10 +428,15 @@ function artBriefText(page: PageManifest, allocation: LayoutAllocation): string 
   ].join('\n');
 }
 
-export function planPage(page: PageManifest, config: ProjectConfig): PagePlanningDecision {
+export function planPage(page: PageManifest, config: ProjectConfig, options: PlanPageOptions = {}): PagePlanningDecision {
   const agent = getAgentContract('PAGE_PLANNER');
   const wordCount = countPageWords(page.bodyMarkdown);
-  const selected = chooseLayout(page, wordCount, config);
+  const selected = options.forcedLayoutTemplate
+    ? {
+        template: options.forcedLayoutTemplate,
+        reasons: [options.reasonCode ?? 'operator_forced_layout'],
+      }
+    : chooseLayout(page, wordCount, config);
   // Layered model: classify the page's purpose (first-class), and decompose the
   // chosen render template into its coverage + architecture axes so the operator
   // sees what actually renders. Rendering still flows through `selected.template`.

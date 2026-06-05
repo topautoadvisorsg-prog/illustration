@@ -7,9 +7,11 @@ import {
   PageManifestSchema,
   PageQualityResolutionSchema,
   ProofArtifactSchema,
+  LayoutTemplateIdSchema,
   ProjectConfigSchema,
   type ProjectConfig,
   type LayoutTemplateId,
+  type PageQualityResolution,
   ProjectSchema,
 } from '@wildlands/shared';
 import { z } from 'zod';
@@ -104,6 +106,74 @@ function unresolvedChapterQualityFindings(
 ): PageQualityFinding[] {
   const resolutions = config.pageQualityResolutions ?? {};
   return chapterQualityFindings(review, chapterNumber, pageKeys).filter((finding) => !resolutions[finding.findingId]);
+}
+
+function automatedQualityFixLayout(finding: PageQualityFinding): LayoutTemplateId | undefined {
+  if (finding.scope !== 'PAGE' || !finding.pageKey) return undefined;
+  if (finding.category === 'CONTINUATION') return 'LAYOUT_2_TEXT_HEAVY';
+  if (finding.category === 'WHITESPACE') return 'LAYOUT_3_ILLUSTRATION_DOMINANT';
+  return undefined;
+}
+
+async function applyAutomatedPageQualityFix(
+  projectId: string,
+  config: ProjectConfig,
+  finding: PageQualityFinding,
+): Promise<
+  | {
+      config: ProjectConfig;
+      action: {
+        type: string;
+        summary: string;
+        pageKey: string;
+        fromLayoutTemplate: LayoutTemplateId;
+        toLayoutTemplate: LayoutTemplateId;
+      };
+    }
+  | undefined
+> {
+  const toLayoutTemplate = automatedQualityFixLayout(finding);
+  if (!toLayoutTemplate || !finding.pageKey) return undefined;
+  const pageRows = await listPages(projectId);
+  const pageRow = pageRows.find((row) => row.pageKey === finding.pageKey);
+  if (!pageRow?.imagePrompt || !pageRow.imagePromptSha256) return undefined;
+  const fromLayoutTemplate = LayoutTemplateIdSchema.safeParse(pageRow.layoutTemplate).success
+    ? (pageRow.layoutTemplate as LayoutTemplateId)
+    : undefined;
+  if (!fromLayoutTemplate || fromLayoutTemplate === toLayoutTemplate) return undefined;
+
+  const pageManifest = (await listManifests(projectId, 'PAGE'))
+    .map((row) => PageManifestSchema.parse(row.content))
+    .find((page) => page.pageId === finding.pageKey);
+  if (!pageManifest) return undefined;
+
+  const decision = planPage(pageManifest, config, {
+    forcedLayoutTemplate: toLayoutTemplate,
+    reasonCode: `page_quality_fix_${finding.category.toLowerCase()}`,
+  });
+
+  await updatePagePlanning(projectId, finding.pageKey, {
+    layoutTemplate: decision.layoutTemplate,
+    imagePrompt: decision.prompt,
+    imagePromptSha256: decision.promptSha256,
+  });
+
+  const nextLayoutApprovals = { ...(config.layoutApprovals ?? {}) };
+  delete nextLayoutApprovals[String(pageRow.chapterNumber)];
+
+  return {
+    config: { ...config, layoutApprovals: nextLayoutApprovals },
+    action: {
+      type: 'SWITCH_LAYOUT',
+      summary:
+        finding.category === 'CONTINUATION'
+          ? `Switched ${finding.pageKey} from ${fromLayoutTemplate} to ${toLayoutTemplate} to increase text capacity and reduce continuation risk.`
+          : `Switched ${finding.pageKey} from ${fromLayoutTemplate} to ${toLayoutTemplate} so sparse content becomes a stronger illustration-led page.`,
+      pageKey: finding.pageKey,
+      fromLayoutTemplate,
+      toLayoutTemplate,
+    },
+  };
 }
 
 /**
@@ -1157,7 +1227,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       schema: {
         params: ProjectParamsSchema,
         body: ResolvePageQualityFindingBodySchema,
-        response: { 200: PageQualityReviewResponseSchema, 404: ApiErrorSchema },
+        response: { 200: PageQualityReviewResponseSchema, 404: ApiErrorSchema, 409: ApiErrorSchema },
       },
     },
     async (request, reply) => {
@@ -1166,17 +1236,46 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       const project = await getProject(id);
       if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
       const config = parseProjectConfig(project);
+      if ((body.status === 'DEFERRED' || body.status === 'OVERRIDDEN') && !body.note?.trim()) {
+        return reply.code(409).send({
+          error: 'Conflict',
+          message: `${body.status === 'DEFERRED' ? 'Defer' : 'Override'} requires a short operator reason.`,
+          statusCode: 409,
+        });
+      }
+
+      let nextConfig = config;
+      let action: PageQualityResolution['action'];
+      if (body.status === 'FIXED') {
+        const review = await reviewProjectPageQuality(id);
+        const finding = review?.findings.find((candidate) => candidate.findingId === body.findingId);
+        if (!finding) {
+          return reply.code(404).send({ error: 'Not Found', message: 'Page Quality finding not found. Refresh Page Quality Review.', statusCode: 404 });
+        }
+        const fix = await applyAutomatedPageQualityFix(id, config, finding);
+        if (!fix) {
+          return reply.code(409).send({
+            error: 'Conflict',
+            message: 'No automatic fix is available for this finding yet. Accept, defer, override, or adjust the page plan manually.',
+            statusCode: 409,
+          });
+        }
+        nextConfig = fix.config;
+        action = fix.action;
+      }
+
       const resolution = PageQualityResolutionSchema.parse({
         findingId: body.findingId,
         status: body.status,
-        note: body.note,
+        note: body.note?.trim() || undefined,
+        action,
         resolvedAt: new Date().toISOString(),
         resolvedBy: 'operator',
       });
-      const nextConfig = {
-        ...config,
+      nextConfig = {
+        ...nextConfig,
         pageQualityResolutions: {
-          ...(config.pageQualityResolutions ?? {}),
+          ...(nextConfig.pageQualityResolutions ?? {}),
           [body.findingId]: resolution,
         },
       };

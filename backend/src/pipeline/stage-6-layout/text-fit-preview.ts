@@ -10,12 +10,12 @@
  * fully unit-testable; `previewProjectTextFit` is the thin DB-backed wrapper.
  */
 
-import { PageManifestSchema, type PageManifest, type ProjectConfig } from '@wildlands/shared';
+import { LayoutTemplateIdSchema, PageManifestSchema, type LayoutTemplateId, type PageManifest, type ProjectConfig } from '@wildlands/shared';
 import { planPage } from '../stage-2-planner/plan-pages.js';
 import { computePageGeometry, type PageGeometry } from './page-geometry.js';
 import { analyzeTextFit, type TextFitStatus } from './text-fit.js';
 import { getProject } from '../../db/repositories/projects.repo.js';
-import { listManifests } from '../../db/repositories/manifests.repo.js';
+import { listManifests, listPages } from '../../db/repositories/manifests.repo.js';
 
 export interface PageFitPreview {
   pageKey: string;
@@ -74,13 +74,24 @@ export interface ProjectTextFitPreview {
   pages: PageFitPreview[];
 }
 
-export function buildTextFitPreview(pages: PageManifest[], config: ProjectConfig): ProjectTextFitPreview {
+export function buildTextFitPreview(
+  pages: PageManifest[],
+  config: ProjectConfig,
+  layoutOverrides: Record<string, LayoutTemplateId> = {},
+): ProjectTextFitPreview {
   const geometry: PageGeometry = computePageGeometry(config.trimSize);
   const previews: PageFitPreview[] = [];
   const totals = { pages: pages.length, fits: 0, tight: 0, overflow: 0, underfilled: 0 };
 
   for (const page of pages) {
-    const decision = planPage(page, config);
+    const forcedLayoutTemplate = layoutOverrides[page.pageId];
+    const decision = planPage(
+      page,
+      config,
+      forcedLayoutTemplate
+        ? { forcedLayoutTemplate, reasonCode: 'persisted_page_layout_override' }
+        : {},
+    );
     const fit = analyzeTextFit({
       bodyMarkdown: page.bodyMarkdown,
       layoutTemplate: decision.layoutTemplate,
@@ -137,6 +148,13 @@ export async function previewProjectTextFit(projectId: string): Promise<ProjectT
   const pages = manifestRows
     .map((row) => PageManifestSchema.parse(row.content))
     .sort((a, b) => a.pageNumber - b.pageNumber);
+  const pageRows = await listPages(projectId);
+  const layoutOverrides = Object.fromEntries(
+    pageRows.flatMap((row) => {
+      const parsed = LayoutTemplateIdSchema.safeParse(row.layoutTemplate);
+      return parsed.success ? [[row.pageKey, parsed.data]] : [];
+    }),
+  );
 
-  return buildTextFitPreview(pages, project.config as ProjectConfig);
+  return buildTextFitPreview(pages, project.config as ProjectConfig, layoutOverrides);
 }

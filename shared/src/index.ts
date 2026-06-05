@@ -375,6 +375,15 @@ export const PageQualityResolutionSchema = z.object({
   findingId: z.string().min(1),
   status: PageQualityResolutionStatusSchema,
   note: z.string().optional(),
+  action: z
+    .object({
+      type: z.string().min(1),
+      summary: z.string().min(1),
+      pageKey: z.string().min(1).optional(),
+      fromLayoutTemplate: LayoutTemplateIdSchema.optional(),
+      toLayoutTemplate: LayoutTemplateIdSchema.optional(),
+    })
+    .optional(),
   resolvedAt: z.string().datetime(),
   resolvedBy: z.string().min(1).default('operator'),
 });

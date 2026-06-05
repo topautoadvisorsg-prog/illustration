@@ -130,4 +130,21 @@ describe('Page Quality Review publishing director', () => {
     expect(review.distribution.featurePercent).toBe(50);
     expect(review.distribution.textFirstPercent).toBe(50);
   });
+
+  it('honors persisted layout overrides when reviewing page quality', () => {
+    const review = buildPageQualityReview(
+      [
+        page('CH01_P001', {
+          contentType: 'TERRAIN_ANALYSIS',
+          layoutTemplate: 'LAYOUT_13_FEATURE_BANNER',
+          bodyMarkdown: words(340),
+        }),
+      ],
+      config,
+      { CH01_P001: 'LAYOUT_2_TEXT_HEAVY' },
+    );
+
+    expect(review.distribution.layoutCounts[0]).toMatchObject({ layoutTemplate: 'LAYOUT_2_TEXT_HEAVY' });
+    expect(review.findings.some((finding) => finding.category === 'CONTINUATION')).toBe(false);
+  });
 });

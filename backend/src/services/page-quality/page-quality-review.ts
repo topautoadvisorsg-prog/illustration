@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   PageManifestSchema,
+  LayoutTemplateIdSchema,
   ProjectConfigSchema,
   type LayoutTemplateId,
   type PageManifest,
@@ -8,6 +9,7 @@ import {
   type ProjectConfig,
 } from '@wildlands/shared';
 import { listManifests } from '../../db/repositories/manifests.repo.js';
+import { listPages } from '../../db/repositories/manifests.repo.js';
 import { getProject } from '../../db/repositories/projects.repo.js';
 import { buildTextFitPreview, type PageFitPreview } from '../../pipeline/stage-6-layout/text-fit-preview.js';
 import { getLayoutProfile } from '../../pipeline/stage-6-layout/layout-profiles.js';
@@ -428,8 +430,12 @@ function nextActionFor(findings: PageQualityFinding[]): string {
   return 'Page quality review found no major rhythm issues. Approve chapter layouts when the proof looks right.';
 }
 
-export function buildPageQualityReview(pageManifests: PageManifest[], config: ProjectConfig): PageQualityReview {
-  const textFit = buildTextFitPreview(pageManifests, config);
+export function buildPageQualityReview(
+  pageManifests: PageManifest[],
+  config: ProjectConfig,
+  layoutOverrides: Record<string, LayoutTemplateId> = {},
+): PageQualityReview {
+  const textFit = buildTextFitPreview(pageManifests, config, layoutOverrides);
   const rawFindings: Array<Omit<PageQualityFinding, 'findingId'>> = [];
 
   for (const page of textFit.pages) pushPageFindings(rawFindings, page);
@@ -478,5 +484,12 @@ export async function reviewProjectPageQuality(projectId: string): Promise<PageQ
   const pages = rows
     .map((row) => PageManifestSchema.parse(row.content))
     .sort((a, b) => a.pageNumber - b.pageNumber);
-  return buildPageQualityReview(pages, ProjectConfigSchema.parse(project.config));
+  const pageRows = await listPages(projectId);
+  const layoutOverrides = Object.fromEntries(
+    pageRows.flatMap((row) => {
+      const parsed = LayoutTemplateIdSchema.safeParse(row.layoutTemplate);
+      return parsed.success ? [[row.pageKey, parsed.data]] : [];
+    }),
+  );
+  return buildPageQualityReview(pages, ProjectConfigSchema.parse(project.config), layoutOverrides);
 }

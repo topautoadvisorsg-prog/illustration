@@ -2465,6 +2465,17 @@ button.secondary {
   color: #4d453d;
 }
 
+.quality-note-input {
+  width: 100%;
+  min-height: 58px;
+  resize: vertical;
+  border: 1px solid #d4c8b8;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #342c24;
+  background: #fffdf8;
+}
+
 .quality-resolution-actions {
   display: flex;
   flex-wrap: wrap;
