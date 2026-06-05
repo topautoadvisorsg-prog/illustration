@@ -160,6 +160,21 @@ export const TrimSizeSchema = z.object({
   bleedIn: z.number().nonnegative(),
 });
 
+export const PublishingFormatSchema = z.enum([
+  'KINDLE_DIGITAL',
+  'PAPERBACK_6X9',
+  'HARDCOVER_7X10',
+  'LARGE_FORMAT_HARDCOVER_8_5X11',
+  'CUSTOM',
+]);
+
+export const PublishingStandardSchema = z.object({
+  format: PublishingFormatSchema.default('HARDCOVER_7X10'),
+  label: z.string().min(1).default('Hardcover 7 x 10'),
+  typographyPackage: z.string().min(1).default('Wild Lands Default'),
+  status: z.enum(['CONFIGURED', 'CUSTOM']).default('CONFIGURED'),
+});
+
 /**
  * Role-based typography. `headingFont` is the display face (book/chapter/section/
  * entry titles, headings, labels); `bodyFont` is the text face (body + captions).
@@ -263,6 +278,7 @@ export const ProjectConfigSchema = z.object({
   title: z.string().min(1),
   subtitle: z.string().optional(),
   authorName: z.string().min(1),
+  publishingStandard: PublishingStandardSchema.default({}),
   trimSize: TrimSizeSchema.default({ widthIn: 7, heightIn: 10, bleedIn: 0.125 }),
   typography: TypographyConfigSchema.default({}),
   colorPalette: ColorPaletteSchema.default({}),

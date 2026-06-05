@@ -13,5 +13,6 @@ Living documentation for the platform.
 | `operator-workflow-review.md` | UI workflow audit and implementation order for operator review mode |
 | `ACTION_SCOPE_AUDIT.md` | Operator action scope table, button copy rules, and confirmation policy |
 | `PAGE_QUALITY_REVIEW.md` | Publishing director layer for rhythm, continuation quality, whitespace, and layout decisions |
+| `PUBLISHING_STANDARDS_SETUP.md` | Project-creation standards layer for format, trim, typography package, and planning capacity |
 | `phase-0-plan.md` | Risk spike plan + daily checkpoints |
 | `phase-0-reports/` | End-of-day reports during Phase 0 |

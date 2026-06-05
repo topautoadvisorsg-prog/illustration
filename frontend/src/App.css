@@ -1102,6 +1102,19 @@ h3 {
   background: #fffaf0;
 }
 
+.compact-head {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.operator-format-section .field {
+  margin: 12px 0;
+}
+
+.operator-format-section select {
+  max-width: 420px;
+}
+
 .format-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(140px, 1fr));
@@ -1124,6 +1137,13 @@ h3 {
 .format-summary-grid span {
   color: #6d6258;
   line-height: 1.38;
+}
+
+.warning-note {
+  margin: 12px 0 0;
+  color: #7a3f00;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .hint,

@@ -88,6 +88,7 @@ function toContract(row: ProjectRow) {
 
 const ProjectListResponseSchema = z.object({ projects: z.array(ProjectSchema) });
 const CreatedProjectResponseSchema = z.object({ project: ProjectSchema });
+const ProjectConfigResponseSchema = z.object({ config: ProjectConfigSchema });
 const UpdateProjectConfigBodySchema = z.object({ config: ProjectConfigSchema });
 
 function layoutCompatibilityLabels(layoutTemplate: string | null, contentType?: string): string[] {
@@ -517,6 +518,17 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       const row = await getProject(id);
       if (!row) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
       return { project: toContract(row) };
+    },
+  );
+
+  app.get(
+    '/api/projects/:id/config',
+    { schema: { params: ProjectParamsSchema, response: { 200: ProjectConfigResponseSchema, 404: ApiErrorSchema } } },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const row = await getProject(id);
+      if (!row) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      return { config: parseProjectConfig(row) };
     },
   );
 

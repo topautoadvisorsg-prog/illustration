@@ -135,8 +135,83 @@ const LAYOUT_TEMPLATES = [
 
 const LAYOUT_LABELS = Object.fromEntries(LAYOUT_TEMPLATES.map(([id, name]) => [id, name]));
 
+const PUBLISHING_STANDARD_PRESETS = {
+  HARDCOVER_7X10: {
+    format: "HARDCOVER_7X10",
+    label: "Hardcover 7 x 10",
+    description: "Default Wild Lands print format for a premium field-guide book.",
+    typographyPackage: "Wild Lands Default",
+    trimSize: { widthIn: 7, heightIn: 10, bleedIn: 0.125 },
+    typography: { bodyPt: 11, lineHeight: 1.4 },
+    outputProfile: { printEdition: "PREMIUM", ebookEdition: "KINDLE_EPUB", renderEngine: "PUPPETEER_PAGEDJS", pdfTarget: "KDP premium color hardcover 7 x 10" },
+    planningNote: "Balanced page capacity, strong illustration space, and a collectible hardbound feel.",
+  },
+  PAPERBACK_6X9: {
+    format: "PAPERBACK_6X9",
+    label: "Paperback 6 x 9",
+    description: "Compact print edition with tighter page capacity.",
+    typographyPackage: "Wild Lands Default Compact",
+    trimSize: { widthIn: 6, heightIn: 9, bleedIn: 0.125 },
+    typography: { bodyPt: 10.5, lineHeight: 1.35 },
+    outputProfile: { printEdition: "PREMIUM", ebookEdition: "KINDLE_EPUB", renderEngine: "PUPPETEER_PAGEDJS", pdfTarget: "KDP premium color paperback 6 x 9" },
+    planningNote: "More pages, denser typography, and less room for large art.",
+  },
+  LARGE_FORMAT_HARDCOVER_8_5X11: {
+    format: "LARGE_FORMAT_HARDCOVER_8_5X11",
+    label: "Large Format Hardcover 8.5 x 11",
+    description: "Large educational/reference format with generous art and text space.",
+    typographyPackage: "Wild Lands Default Large Format",
+    trimSize: { widthIn: 8.5, heightIn: 11, bleedIn: 0.125 },
+    typography: { bodyPt: 11.5, lineHeight: 1.35 },
+    outputProfile: { printEdition: "PREMIUM", ebookEdition: "KINDLE_EPUB", renderEngine: "PUPPETEER_PAGEDJS", pdfTarget: "KDP premium color hardcover 8.5 x 11" },
+    planningNote: "Fewer pages, wider layouts, and more room for reference art.",
+  },
+  KINDLE_DIGITAL: {
+    format: "KINDLE_DIGITAL",
+    label: "Kindle / Digital Edition",
+    description: "Digital-first planning profile. Fixed proof previews use a readable reference page.",
+    typographyPackage: "Wild Lands Digital",
+    trimSize: { widthIn: 6, heightIn: 9, bleedIn: 0 },
+    typography: { bodyPt: 11, lineHeight: 1.45 },
+    outputProfile: { printEdition: "PREMIUM", ebookEdition: "KINDLE_EPUB", renderEngine: "PUPPETEER_PAGEDJS", pdfTarget: "Kindle digital reference proof" },
+    planningNote: "Prioritizes reading flow; final Kindle export remains reflowable.",
+  },
+};
+
+function applyPublishingStandardPreset(config, format) {
+  const preset = PUBLISHING_STANDARD_PRESETS[format] || PUBLISHING_STANDARD_PRESETS.HARDCOVER_7X10;
+  return {
+    ...config,
+    editions: format === "KINDLE_DIGITAL" ? ["KINDLE_EPUB"] : ["PREMIUM", "KINDLE_EPUB"],
+    publishingStandard: {
+      format: preset.format,
+      label: preset.label,
+      typographyPackage: preset.typographyPackage,
+      status: "CONFIGURED",
+    },
+    trimSize: { ...config.trimSize, ...preset.trimSize },
+    typography: { ...config.typography, ...preset.typography },
+    outputProfile: { ...config.outputProfile, ...preset.outputProfile },
+  };
+}
+
+function publishingStandardFor(config) {
+  const format = config?.publishingStandard?.format || "HARDCOVER_7X10";
+  return PUBLISHING_STANDARD_PRESETS[format] || {
+    format: "CUSTOM",
+    label: config?.publishingStandard?.label || "Custom publishing standard",
+    description: "Custom project standard.",
+    typographyPackage: config?.publishingStandard?.typographyPackage || "Custom",
+    trimSize: config?.trimSize || { widthIn: 7, heightIn: 10, bleedIn: 0.125 },
+    typography: config?.typography || { bodyPt: 11, lineHeight: 1.4 },
+    outputProfile: config?.outputProfile || {},
+    planningNote: "Custom format; confirm text-fit before image spend.",
+  };
+}
+
 const WORKFLOW_STAGES = [
   { key: "project", label: "Project Setup", action: "Create or select the book project." },
+  { key: "standards", label: "Publishing Standards", action: "Choose format before planning." },
   { key: "manuscript", label: "Upload Manuscript", action: "Store the master manuscript." },
   { key: "breakdown", label: "Review Breakdown", action: "Confirm chapters and pages." },
   { key: "plan", label: "Review Page Plan", action: "Confirm layout and page flow." },
@@ -963,6 +1038,12 @@ function defaultProjectConfig() {
     title: "The Wildlands Field Guide",
     subtitle: "New England Volume",
     authorName: "The Wildlands",
+    publishingStandard: {
+      format: "HARDCOVER_7X10",
+      label: "Hardcover 7 x 10",
+      typographyPackage: "Wild Lands Default",
+      status: "CONFIGURED",
+    },
     trimSize: { widthIn: 7, heightIn: 10, bleedIn: 0.125 },
     typography: {
       headingFont: "Cormorant Garamond",
@@ -1008,6 +1089,24 @@ function defaultProjectConfig() {
       renderEngine: "PUPPETEER_PAGEDJS",
       pdfTarget: "KDP premium color hardcover",
     },
+  };
+}
+
+function normalizeProjectConfig(config) {
+  const base = defaultProjectConfig();
+  const incoming = config && typeof config === "object" ? config : {};
+  return {
+    ...base,
+    ...incoming,
+    publishingStandard: { ...base.publishingStandard, ...(incoming.publishingStandard || {}) },
+    trimSize: { ...base.trimSize, ...(incoming.trimSize || {}) },
+    typography: { ...base.typography, ...(incoming.typography || {}) },
+    colorPalette: { ...base.colorPalette, ...(incoming.colorPalette || {}) },
+    imageGeneration: { ...base.imageGeneration, ...(incoming.imageGeneration || {}) },
+    layoutPolicy: { ...base.layoutPolicy, ...(incoming.layoutPolicy || {}) },
+    outputProfile: { ...base.outputProfile, ...(incoming.outputProfile || {}) },
+    layoutPromptAssets: Array.isArray(incoming.layoutPromptAssets) && incoming.layoutPromptAssets.length ? incoming.layoutPromptAssets : base.layoutPromptAssets,
+    layoutApprovals: incoming.layoutApprovals || {},
   };
 }
 
@@ -1297,6 +1396,18 @@ function App() {
         helpPrompt: "Help me start a new Wildlands book project.",
       };
     }
+    if (!projectConfig.publishingStandard?.format) {
+      return {
+        stageKey: "standards",
+        stageLabel: "Publishing Standards",
+        status: "Waiting on you",
+        nextAction: "Choose the target book format before manuscript breakdown or page planning.",
+        afterAction: "After standards are configured, upload the master manuscript.",
+        buttonLabel: "Review Publishing Standards",
+        actionKey: "standards",
+        helpPrompt: "Help me choose the right publishing standard for this book.",
+      };
+    }
     if (!selectedProject?.manuscriptPath && !manuscript.trim()) {
       return {
         stageKey: "manuscript",
@@ -1427,6 +1538,7 @@ function App() {
     pages.length,
     pdfPreview.url,
     plannedPageCount,
+    projectConfig.publishingStandard?.format,
     selectedChapterApproval,
     selectedChapterLabel,
     selectedProject?.manuscriptPath,
@@ -1451,6 +1563,17 @@ function App() {
       target[path[path.length - 1]] = value;
       return next;
     });
+  }
+
+  function selectPublishingStandard(format) {
+    const hasGeneratedPlanning = pageManifests.length > 0 || pages.length > 0 || plannedPages.length > 0;
+    if (hasGeneratedPlanning && !window.confirm("Changing the publishing standard after breakdown/page planning can invalidate page counts, text-fit, and render decisions. Change it anyway?")) {
+      return;
+    }
+    const preset = PUBLISHING_STANDARD_PRESETS[format] || PUBLISHING_STANDARD_PRESETS.HARDCOVER_7X10;
+    setProjectConfig((current) => applyPublishingStandardPreset(current, preset.format));
+    setMessage(`Publishing standard selected: ${preset.label}. Save before planning.`);
+    appendLog("success", `Publishing standard selected: ${preset.label}; text capacity now uses ${preset.trimSize.widthIn} x ${preset.trimSize.heightIn}.`);
   }
 
   function updateDraft(setter, key, value) {
@@ -1540,6 +1663,7 @@ function App() {
   function reviewSelectorForStage(key) {
     return {
       project: ".setup-panel",
+      standards: ".operator-format-section",
       manuscript: ".upload-dropzone",
       breakdown: ".chapter-tree",
       plan: ".page-plan-list",
@@ -1566,6 +1690,9 @@ function App() {
     switch (operatorGuidance.actionKey) {
       case "create-project":
         createNamedProject();
+        break;
+      case "standards":
+        scrollToWorkspaceSection(".operator-format-section", "center");
         break;
       case "choose-manuscript":
         openManuscriptPicker();
@@ -1601,6 +1728,7 @@ function App() {
   }
 
   function operatorReviewStage() {
+    if (operatorGuidance.stageKey === "standards") return "project";
     if (operatorGuidance.stageKey === "plan") return "plan";
     if (operatorGuidance.stageKey === "textfit" || operatorGuidance.stageKey === "quality" || operatorGuidance.stageKey === "layout") return "textfit";
     if (operatorGuidance.stageKey === "images") return "images";
@@ -1862,8 +1990,8 @@ function App() {
       body: JSON.stringify({ config: projectConfig }),
     });
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
-    setMessage("Project configuration saved.");
-    appendLog("success", "Project configuration saved.");
+    setMessage(`Project setup saved: ${activePublishingStandard.label}.`);
+    appendLog("success", `Project setup saved: ${activePublishingStandard.label} publishing standard.`);
   }
 
   async function uploadManuscript(projectId = activeProjectId) {
@@ -1901,10 +2029,13 @@ function App() {
 
   async function loadArtifacts(projectId = activeProjectId) {
     if (!projectId) throw new Error("Create or select a project first.");
-    const [manifestData, pageData] = await Promise.all([
+    const [manifestData, pageData, configData] = await Promise.all([
       call(`/api/projects/${projectId}/manifests`),
       call(`/api/projects/${projectId}/pages`),
+      call(`/api/projects/${projectId}/config`).catch((err) => ({ config: null, error: err instanceof Error ? err.message : String(err) })),
     ]);
+    if (configData?.config) setProjectConfig(normalizeProjectConfig(configData.config));
+    else if (configData?.error) appendLog("issue", `Project standards not loaded yet: ${configData.error}`);
     setManifests(manifestData.manifests || []);
     const incomingPages = pageData.pages || [];
     setPages(incomingPages);
@@ -2496,6 +2627,7 @@ function App() {
   function workflowStageState(key) {
     if (key === operatorGuidance.stageKey) return "current";
     if (key === "project") return activeProjectId ? "done" : "current";
+    if (key === "standards") return activeProjectId && projectConfig.publishingStandard?.format ? "done" : activeProjectId ? "current" : "";
     if (key === "manuscript") return selectedProject?.manuscriptPath || manuscriptSummary ? "done" : activeProjectId ? "current" : "";
     if (key === "breakdown") return pageManifests.length > 0 ? "done" : selectedProject?.manuscriptPath ? "current" : "";
     if (key === "plan") return plannedPages.length > 0 || pages.some((page) => page.layoutTemplate) ? "done" : pageManifests.length > 0 ? "current" : "";
@@ -2574,14 +2706,15 @@ function App() {
   const dashboardWordCount = manuscriptSummary?.totalWords || null;
   const dashboardTitle = selectedProject?.title || projectConfig.title || "Wildlands Book Project";
   const dashboardStatus = normalizeStatus(selectedProject?.status || "Not Started");
+  const activePublishingStandard = publishingStandardFor(projectConfig);
   const printFormatLabel = projectConfig.outputProfile.pdfTarget?.toLowerCase().includes("paperback")
-    ? "Paperback"
+    ? activePublishingStandard.label
     : projectConfig.outputProfile.pdfTarget?.toLowerCase().includes("hardcover")
-      ? "Hardcover"
+      ? activePublishingStandard.label
       : "Print edition";
   const ebookFormatLabel = projectConfig.outputProfile.ebookEdition === "KINDLE_EPUB" ? "Kindle ebook" : "Digital edition";
   const colorFormatLabel = projectConfig.outputProfile.printEdition === "PREMIUM" ? "Premium color" : "Standard print";
-  const operatorFormatSummary = `${printFormatLabel} + ${ebookFormatLabel}`;
+  const operatorFormatSummary = `${activePublishingStandard.label} + ${ebookFormatLabel}`;
   const sidebarStatusLabel = {
     done: "Complete",
     current: "Now",
@@ -2632,6 +2765,22 @@ function App() {
           { label: "project", value: activeProjectId ? "selected" : "needed" },
           { label: "format", value: operatorFormatSummary },
           { label: "standards", value: "applied" },
+        ],
+      },
+      standards: {
+        title: "Publishing Standards Result",
+        status: projectConfig.publishingStandard?.status === "CUSTOM" ? "Custom" : "Configured",
+        happened: `The project is set up as ${activePublishingStandard.label}.`,
+        created: "Book format, page geometry, typography package, and planning capacity rules.",
+        review: "Confirm this is the target format before upload, breakdown, page planning, text-fit, rendering, or export.",
+        artifactLabel: "Publishing standards",
+        artifactSelector: ".operator-format-section",
+        primaryLabel: "Review Publishing Standards",
+        secondaryLabel: "Ask Agent",
+        metrics: [
+          { label: "format", value: activePublishingStandard.label },
+          { label: "trim", value: `${projectConfig.trimSize.widthIn} x ${projectConfig.trimSize.heightIn} in` },
+          { label: "typography", value: projectConfig.publishingStandard?.typographyPackage || activePublishingStandard.typographyPackage },
         ],
       },
       manuscript: {
@@ -4292,7 +4441,7 @@ function App() {
                 Create Project
               </button>
               <button disabled={busy || !activeProjectId} onClick={() => run("Saving project configuration...", saveProjectConfig)}>
-                Save Config
+                Save Project Setup
               </button>
             </div>
           </div>
@@ -4328,22 +4477,41 @@ function App() {
           </div>
 
           <div className="config-section operator-format-section">
-            <h3>Book Format</h3>
+            <div className="section-head compact-head">
+              <div>
+                <h3>Publishing Standards</h3>
+                <p className="hint">Choose this before breakdown and page planning. It controls page geometry, text capacity, and proof rendering.</p>
+              </div>
+              <span className="mode-pill">{projectConfig.publishingStandard?.status === "CUSTOM" ? "Custom" : "Configured"}</span>
+            </div>
+            <Field label="Selected Format">
+              <select
+                value={projectConfig.publishingStandard?.format || "HARDCOVER_7X10"}
+                onChange={(event) => selectPublishingStandard(event.target.value)}
+              >
+                {Object.values(PUBLISHING_STANDARD_PRESETS).map((preset) => (
+                  <option key={preset.format} value={preset.format}>{preset.label}</option>
+                ))}
+              </select>
+            </Field>
             <div className="format-summary-grid">
               <div>
-                <strong>{printFormatLabel}</strong>
-                <span>{colorFormatLabel} print proof</span>
+                <strong>{activePublishingStandard.label}</strong>
+                <span>{activePublishingStandard.description}</span>
               </div>
               <div>
-                <strong>{ebookFormatLabel}</strong>
-                <span>Digital reading edition</span>
+                <strong>{activePublishingStandard.trimSize.widthIn} x {activePublishingStandard.trimSize.heightIn} in</strong>
+                <span>Trim size used by planning, text-fit, render, and export checks</span>
               </div>
               <div>
-                <strong>Standards applied</strong>
-                <span>Production standards are preconfigured for this book.</span>
+                <strong>{projectConfig.publishingStandard?.typographyPackage || activePublishingStandard.typographyPackage}</strong>
+                <span>Typography package; font families remain configurable in Advanced</span>
               </div>
             </div>
-            <p className="hint">Use Advanced only when you need to change production standards.</p>
+            <p className="hint">{activePublishingStandard.planningNote}</p>
+            {(pageManifests.length > 0 || pages.length > 0 || plannedPages.length > 0) && (
+              <p className="warning-note">This project already has generated breakdown/page planning. Changing standards may require regenerating downstream outputs.</p>
+            )}
           </div>
 
           {advancedMode && (
