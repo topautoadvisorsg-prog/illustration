@@ -34,7 +34,7 @@ const EnvSchema = z.object({
   ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-5-20250929'),
 
   OPENAI_API_KEY: z.string().min(1),
-  OPENAI_IMAGE_MODEL: z.string().default('gpt-image-1'),
+  OPENAI_IMAGE_MODEL: z.string().default('gpt-image-2'),
 
   REPLICATE_API_TOKEN: z.string().default(''),
   REPLICATE_UPSCALE_MODEL: z.string().default('nightmareai/real-esrgan'),

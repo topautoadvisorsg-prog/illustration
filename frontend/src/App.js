@@ -1072,7 +1072,7 @@ function defaultProjectConfig() {
       masterStyleBlockVersion: "VINTAGE_NATURALIST_DNA_v1.0",
       masterStyleBlockText: VINTAGE_NATURALIST_DNA,
       styleName: "Vintage Naturalist",
-      imageModel: "gpt-image-1",
+      imageModel: "gpt-image-2",
       upscaleModel: "Replicate Real-ESRGAN",
     },
     layoutPolicy: {
@@ -1202,7 +1202,7 @@ const defaultExperimentDraft = {
 
 const defaultDecisionDraft = {
   title: "Decision: Use OpenAI as primary image generator",
-  decision: "Use OpenAI gpt-image-1 as the primary image generator for v1 testing.",
+  decision: "Use OpenAI gpt-image-2 as the primary image generator for v1 testing.",
   reason: "It produced the strongest style consistency in early smoke tests.",
   ownerName: "Operator",
   tags: "images, generator",
@@ -1231,7 +1231,7 @@ const defaultSopDraft = {
 const defaultCostDraft = {
   title: "Cost: Test image generation",
   provider: "OpenAI",
-  model: "gpt-image-1",
+  model: "gpt-image-2",
   operation: "IMAGE_GENERATION",
   quantity: 1,
   unitCostUsd: 0,
