@@ -1175,7 +1175,10 @@ async function readJson(response) {
     data = { message: text };
   }
   if (!response.ok) {
-    throw new Error(data.message || `${response.status} ${response.statusText}`);
+    const err = new Error(data.message || `${response.status} ${response.statusText}`);
+    err.status = response.status;
+    err.data = data;
+    throw err;
   }
   return data;
 }
@@ -1257,6 +1260,23 @@ function App() {
   const [projectConfig, setProjectConfig] = useState(defaultProjectConfig);
   // Start empty so the operator never accidentally uploads demo text. They must
   // drop a file or paste their real manuscript before Upload is meaningful.
+  // Priority #1 — plan staleness: compare the snapshot taken when the plan was
+  // generated against the current publishing standard / geometry.
+  const planStaleness = useMemo(() => {
+    const pm = projectConfig?.planMeta;
+    if (!pm) return { planned: false, stale: false };
+    const ps = projectConfig.publishingStandard || {};
+    const t = projectConfig.trimSize || {};
+    const ty = projectConfig.typography || {};
+    const stale =
+      pm.format !== ps.format ||
+      pm.trimSize?.widthIn !== t.widthIn ||
+      pm.trimSize?.heightIn !== t.heightIn ||
+      pm.trimSize?.bleedIn !== t.bleedIn ||
+      pm.bodyPt !== ty.bodyPt ||
+      pm.lineHeight !== ty.lineHeight;
+    return { planned: true, stale, plannedLabel: pm.standardLabel, currentLabel: ps.label, plannedAt: pm.plannedAt };
+  }, [projectConfig]);
   const [manuscript, setManuscript] = useState("");
   const [manuscriptName, setManuscriptName] = useState("");
   const [manuscriptSummary, setManuscriptSummary] = useState(null);
@@ -2326,12 +2346,35 @@ function App() {
     await loadArtifacts(projectId);
   }
 
-  async function planPages(projectId = activeProjectId) {
+  async function planPages(projectId = activeProjectId, mode) {
     if (!projectId) throw new Error("Create or select a project first.");
     await saveProjectConfig(projectId);
-    const data = await call(`/api/projects/${projectId}/plan`, {
-      method: "POST",
-    });
+    let data;
+    try {
+      data = await call(`/api/projects/${projectId}/plan`, {
+        method: "POST",
+        ...(mode ? { body: JSON.stringify({ mode }) } : {}),
+      });
+    } catch (err) {
+      // Priority #2 — approval protection: the backend refuses to silently reset
+      // approved work and asks how to proceed.
+      if (err?.status === 409 && err?.data?.needsConfirmation) {
+        const { approvedPages = 0, approvedImages = 0 } = err.data;
+        const proceed = window.confirm(
+          `⚠ WARNING\n\nRe-planning will affect:\n  • ${approvedPages} approved page(s)\n  • ${approvedImages} approved image(s)\n\nOK = choose how to proceed\nCancel = stop and keep everything`,
+        );
+        if (!proceed) {
+          setMessage("Re-plan cancelled — approved work left untouched.");
+          appendLog("success", "Re-plan cancelled; approved work preserved.");
+          return false;
+        }
+        const skip = window.confirm(
+          `Skip the approved pages and keep their work?\n\nOK = SKIP approved pages (re-plan only the rest)\nCancel = RE-PLAN EVERYTHING (resets those approvals + images to review)`,
+        );
+        return planPages(projectId, skip ? "skip-approved" : "replan-all");
+      }
+      throw err;
+    }
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
     setPlannedPages(data.plannedPages || []);
     setLayoutLibraryReport(data.layoutLibrary || null);
@@ -3147,6 +3190,30 @@ function App() {
           </button>
         </div>
       </section>
+
+      {planStaleness.stale && (
+        <div className="stale-plan-banner" role="alert">
+          <strong>⚠ Publishing Standard Changed — plan is stale</strong>
+          <div className="stale-plan-grid">
+            <div>
+              <span>Current plan generated:</span>
+              <strong>{planStaleness.plannedLabel}</strong>
+            </div>
+            <div>
+              <span>Current project:</span>
+              <strong>{planStaleness.currentLabel}</strong>
+            </div>
+          </div>
+          <p>The page plan was built for a different format/geometry. Re-plan so layouts, capacity, and prompts match the current standard.</p>
+          <button
+            type="button"
+            disabled={busy || !activeProjectId || pageManifests.length === 0}
+            onClick={() => run("Re-planning pages...", () => planPages(), () => scrollToWorkspaceSection(".page-plan-list"))}
+          >
+            Re-plan now
+          </button>
+        </div>
+      )}
 
       <section className={`current-stage-result ${operatorGuidance.stageKey}`}>
         <div className="stage-result-head">

@@ -731,6 +731,9 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       const row = await updateProjectConfig(id, {
         ...body.config,
         layoutApprovals: existingConfig.layoutApprovals ?? {},
+        // Preserve the plan snapshot so changing the standard/trim correctly
+        // shows the plan as STALE (Priority #1) instead of silently matching.
+        planMeta: existingConfig.planMeta,
       });
       if (!row) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
       return { project: toContract(row) };
@@ -856,12 +859,22 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     },
   );
 
+  const ReplanConfirmationSchema = z.object({
+    error: z.string(),
+    message: z.string(),
+    statusCode: z.number(),
+    needsConfirmation: z.boolean(),
+    approvedPages: z.number(),
+    approvedImages: z.number(),
+  });
+  const PlanBodySchema = z.object({ mode: z.enum(['skip-approved', 'replan-all']).optional() }).optional();
   app.post(
     '/api/projects/:id/plan',
     {
       schema: {
         params: ProjectParamsSchema,
-        response: { 200: PlanPagesResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
+        body: PlanBodySchema,
+        response: { 200: PlanPagesResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema, 409: ReplanConfirmationSchema },
       },
     },
     async (request, reply) => {
@@ -878,12 +891,37 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         });
       }
 
+      // Priority #2 — Approval protection. Re-planning rewrites every page and
+      // resets status to PLANNED + clears chapter approvals. If approved work
+      // exists, require an explicit choice instead of silently destroying it.
+      const mode = (request.body as { mode?: 'skip-approved' | 'replan-all' } | undefined)?.mode;
+      const existingPages = await listPages(id);
+      const approvedPageRows = existingPages.filter((p) => p.status === 'APPROVED' || p.status === 'PRINT_READY');
+      let approvedImages = 0;
+      if (approvedPageRows.length > 0) {
+        const imgs = await listImagesForProject(id);
+        approvedImages = imgs.filter((r) => r.image.status === 'APPROVED' || r.image.status === 'PRINT_READY').length;
+      }
+      if (approvedPageRows.length > 0 && mode !== 'skip-approved' && mode !== 'replan-all') {
+        return reply.code(409).send({
+          error: 'Conflict',
+          message: `Re-planning will reset ${approvedPageRows.length} approved page(s)${approvedImages ? ` and ${approvedImages} approved image(s)` : ''} back to review. Choose how to proceed.`,
+          statusCode: 409,
+          needsConfirmation: true,
+          approvedPages: approvedPageRows.length,
+          approvedImages,
+        });
+      }
+      const skipApprovedKeys =
+        mode === 'skip-approved' ? new Set(approvedPageRows.map((p) => p.pageKey)) : new Set<string>();
+
       const config = parseProjectConfig(project);
       const layoutLibrary = validateLayoutLibrary(config);
       const plannedPages = [];
       for (const row of rows) {
         const page = PageManifestSchema.parse(row.content);
         const decision = planPage(page, config);
+        if (skipApprovedKeys.has(decision.pageKey)) continue; // leave approved page untouched
         await updatePagePlanning(id, decision.pageKey, {
           layoutTemplate: decision.layoutTemplate,
           imagePrompt: decision.prompt,
@@ -915,7 +953,18 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         });
       }
 
-      const clearedConfig = { ...config, layoutApprovals: {} };
+      // Priority #1 — stamp the planning-relevant config so staleness can be
+      // detected later. Keep chapter approvals only when we skipped approved work.
+      const planMeta = {
+        standardLabel: config.publishingStandard.label,
+        format: config.publishingStandard.format,
+        trimSize: config.trimSize,
+        bodyPt: config.typography.bodyPt,
+        lineHeight: config.typography.lineHeight,
+        plannedAt: new Date().toISOString(),
+      };
+      const layoutApprovals = mode === 'skip-approved' ? (config.layoutApprovals ?? {}) : {};
+      const clearedConfig = { ...config, layoutApprovals, planMeta };
       await updateProjectConfig(id, clearedConfig);
       const updated = await setProjectStatus(id, 'PLANNED');
       return { project: toContract(updated ?? project), layoutLibrary, plannedPages };

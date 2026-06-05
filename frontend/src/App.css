@@ -1402,6 +1402,62 @@ h3 {
   color: #2f5d50 !important;
 }
 
+.stale-plan-banner {
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  border: 2px solid #b4541f;
+  border-left: 8px solid #b4541f;
+  border-radius: 8px;
+  background: #fdf2e9;
+  color: #6d3410;
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 2px 10px rgba(180, 84, 31, 0.18);
+}
+
+.stale-plan-banner > strong {
+  font-size: 1.05rem;
+}
+
+.stale-plan-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.stale-plan-grid span {
+  display: block;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.stale-plan-grid strong {
+  font-size: 1rem;
+}
+
+.stale-plan-banner p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.stale-plan-banner button {
+  justify-self: start;
+  background: #b4541f;
+  color: #fff;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stale-plan-banner button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .asset-repeat-badge {
   margin-left: 8px;
   font-size: 0.66rem;

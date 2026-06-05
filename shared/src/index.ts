@@ -341,6 +341,21 @@ export const LayoutApprovalSchema = z.object({
   }),
 });
 
+/**
+ * Snapshot of the planning-relevant config captured WHEN the page plan was
+ * generated. Used to detect when the publishing standard / geometry has changed
+ * since planning, so the operator is warned the plan is stale (Priority #1).
+ */
+export const PlanMetaSchema = z.object({
+  standardLabel: z.string(),
+  format: PublishingFormatSchema,
+  trimSize: TrimSizeSchema,
+  bodyPt: z.number(),
+  lineHeight: z.number(),
+  plannedAt: z.string(),
+});
+export type PlanMeta = z.infer<typeof PlanMetaSchema>;
+
 export const ProjectConfigSchema = z.object({
   brand: BrandSchema.default('THE_WILDLANDS'),
   audience: AudienceSchema.default('ADULT'),
@@ -358,6 +373,8 @@ export const ProjectConfigSchema = z.object({
   layoutPromptAssets: z.array(LayoutPromptAssetSchema).default([]),
   layoutApprovals: z.record(LayoutApprovalSchema).default({}),
   outputProfile: OutputProfileSchema.default({}),
+  /** Set by Page Plan; compared against current config to detect a stale plan. */
+  planMeta: PlanMetaSchema.optional(),
 });
 
 export const CreateProjectRequestSchema = z.object({
