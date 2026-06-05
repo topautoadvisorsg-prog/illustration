@@ -2406,7 +2406,7 @@ function App() {
     if (!projectId) {
       projectId = await createProject();
     }
-    await uploadManuscript(projectId);
+    if ((await uploadManuscript(projectId)) === false) return false;
     await generateManifests(projectId);
     await planPages(projectId);
   }
