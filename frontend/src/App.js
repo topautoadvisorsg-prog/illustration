@@ -3595,6 +3595,33 @@ function App() {
             </button>
           </section>
 
+          <section className="review-card book-parts-card">
+            <div className="section-head">
+              <div>
+                <h3>Book Parts (auto-assembled)</h3>
+                <p className="hint">Your chapters are the work you review. These parts are generated automatically and included whenever you render the full book — nothing is missing.</p>
+              </div>
+            </div>
+            <div className="book-parts">
+              <div className="part-row"><strong>Front Cover</strong><span>full wrap + spine (sized from page count)</span><span className="part-tag">Render Cover ↓</span></div>
+              <div className="part-row"><strong>Title Page</strong><span>title, subtitle, author</span><span className="part-tag auto">auto</span></div>
+              <div className="part-row"><strong>Copyright Page</strong><span>© year, author, first edition</span><span className="part-tag auto">auto</span></div>
+              <div className="part-row"><strong>Table of Contents</strong><span>chapters + real page numbers</span><span className="part-tag auto">auto</span></div>
+              <div className="part-row"><strong>Introduction</strong><span>pulled from your manuscript front matter, if present</span><span className="part-tag">manuscript</span></div>
+              <div className="part-row"><strong>Chapters ({dashboardChapterTotal})</strong><span>your content — laid out + illustrated</span><span className="part-tag work">your work</span></div>
+              <div className="part-row"><strong>Index</strong><span>alphabetical entries + page numbers</span><span className="part-tag auto">auto</span></div>
+              <div className="part-row"><strong>Back Matter / Colophon</strong><span>about the author / imprint</span><span className="part-tag auto">auto</span></div>
+            </div>
+            <div className="button-row">
+              <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book...", renderBookPreview)}>
+                Render Full Book (all parts)
+              </button>
+              <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering cover...", renderCoverPreview)}>
+                Render Cover
+              </button>
+            </div>
+          </section>
+
           <section className="review-card preview-review-card">
             <div className="section-head">
               <div>

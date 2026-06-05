@@ -1636,6 +1636,43 @@ button.secondary {
   gap: 8px;
 }
 
+.book-parts {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.part-row {
+  display: grid;
+  grid-template-columns: 160px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid #e0d7ca;
+  border-radius: 6px;
+  background: #fffdf8;
+  font-size: 0.9rem;
+}
+
+.part-row span:first-of-type {
+  color: #6d6258;
+  font-size: 0.82rem;
+}
+
+.part-tag {
+  justify-self: end;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef3ef;
+  color: #2f5d50;
+  white-space: nowrap;
+}
+
+.part-tag.auto { background: #e8f3ed; color: #2f7a57; }
+.part-tag.work { background: #f3ead2; color: #6d4f12; }
+
 .chapter-render-row .active {
   border-color: #2f7a57;
   color: #12352c;
