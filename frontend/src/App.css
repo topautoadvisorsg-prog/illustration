@@ -1458,6 +1458,16 @@ h3 {
   cursor: not-allowed;
 }
 
+.danger-text {
+  background: transparent;
+  color: #b4541f;
+  border: 1px solid #d9a78a;
+}
+
+.danger-text:hover:not(:disabled) {
+  background: #fdf2e9;
+}
+
 .asset-repeat-badge {
   margin-left: 8px;
   font-size: 0.66rem;

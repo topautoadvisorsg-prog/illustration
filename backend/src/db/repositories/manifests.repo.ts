@@ -29,6 +29,12 @@ export interface PersistManifestsInput {
   chapters: ChapterManifest[];
   pageManifests: Array<{ externalId: string; content: unknown }>;
   pageSeeds: PageSeed[];
+  /**
+   * Re-breakdown (Priority #3): when true, an existing manifest set is REPLACED.
+   * Existing pages are deleted first (cascading their images + events), then
+   * manifests, before the new set is written — all in one transaction.
+   */
+  replace?: boolean;
 }
 
 export interface PersistManifestsResult {
@@ -59,9 +65,15 @@ export async function persistManifests(input: PersistManifestsInput): Promise<Pe
       .limit(1);
 
     if (existingManifest || existingPage) {
-      throw new Error(
-        'Project already has manifests/pages. Rerun is blocked until explicit manifest versioning is implemented.',
-      );
+      if (!input.replace) {
+        throw new Error(
+          'Project already has manifests/pages. Rerun is blocked until explicit manifest versioning is implemented.',
+        );
+      }
+      // Replace: clear the old breakdown (pages cascade their images + events),
+      // then manifests, before writing the fresh set.
+      await tx.delete(pages).where(eq(pages.projectId, input.projectId));
+      await tx.delete(manifests).where(eq(manifests.projectId, input.projectId));
     }
 
     const rows: Array<{ kind: ManifestKind; externalId: string; content: unknown }> = [

@@ -40,6 +40,8 @@ export interface GenerateManifestsInput {
   projectId: string;
   manuscriptMarkdown: string;
   config: ProjectConfig;
+  /** Re-breakdown (Priority #3): replace an existing manifest set instead of failing. */
+  replace?: boolean;
 }
 
 export interface GenerateManifestsResult {
@@ -306,6 +308,7 @@ export async function generateManifests(input: GenerateManifestsInput): Promise<
     chapters: chapterManifests,
     pageManifests,
     pageSeeds,
+    replace: input.replace,
   });
 
   logger.info(

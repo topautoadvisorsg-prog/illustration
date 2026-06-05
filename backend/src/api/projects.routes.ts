@@ -793,11 +793,13 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     {
       schema: {
         params: ProjectParamsSchema,
+        body: z.object({ force: z.boolean().optional() }).optional(),
         response: { 200: ManifestSummaryResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema, 409: ApiErrorSchema },
       },
     },
     async (request, reply) => {
       const { id } = ProjectParamsSchema.parse(request.params);
+      const force = (request.body as { force?: boolean } | undefined)?.force === true;
       const project = await getProject(id);
       if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
 
@@ -826,8 +828,13 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       const markdown = buf.toString('utf8');
 
       try {
-        const config = project.config as import('@wildlands/shared').ProjectConfig;
-        const summary = await generateManifests({ projectId: id, manuscriptMarkdown: markdown, config });
+        const config = parseProjectConfig(project);
+        const summary = await generateManifests({ projectId: id, manuscriptMarkdown: markdown, config, replace: force });
+        // Re-breakdown invalidates any prior plan + approvals (pages were deleted),
+        // so clear the stale plan snapshot and chapter approvals.
+        if (force && (config.planMeta || Object.keys(config.layoutApprovals ?? {}).length > 0)) {
+          await updateProjectConfig(id, { ...config, planMeta: undefined, layoutApprovals: {} });
+        }
         const updated = await setProjectStatus(id, 'MANIFESTED');
 
         return { project: toContract(updated ?? project), summary };

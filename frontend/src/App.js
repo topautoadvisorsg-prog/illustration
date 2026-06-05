@@ -2346,6 +2346,30 @@ function App() {
     await loadArtifacts(projectId);
   }
 
+  // Priority #3 — manuscript iteration: replace the existing breakdown after the
+  // operator edits + re-uploads the manuscript. Destructive, so hard-confirmed.
+  async function rebreakdownManifests(projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    const ok = window.confirm(
+      "⚠ RE-RUN BREAKDOWN\n\nThis REPLACES the existing chapters/pages and DELETES all generated images, the page plan, and chapter approvals for this project.\n\nUse this after you've edited and re-uploaded the manuscript.\n\nContinue?",
+    );
+    if (!ok) {
+      setMessage("Re-breakdown cancelled — existing breakdown kept.");
+      return false;
+    }
+    const data = await call(`/api/projects/${projectId}/manifests`, {
+      method: "POST",
+      body: JSON.stringify({ force: true }),
+    });
+    setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
+    setPlannedPages([]);
+    setFormatCalibration(null);
+    setPageQualityReview(null);
+    setMessage(`Breakdown replaced: ${data.summary.totalChapters} chapters, ${data.summary.totalEntries} entries. Re-plan next.`);
+    appendLog("success", `Breakdown replaced (${data.summary.totalEntries} entries). Old plan, images, and approvals cleared.`);
+    await loadArtifacts(projectId);
+  }
+
   async function planPages(projectId = activeProjectId, mode) {
     if (!projectId) throw new Error("Create or select a project first.");
     await saveProjectConfig(projectId);
@@ -3651,6 +3675,11 @@ function App() {
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("breakdown")}>
                   Audit with Agent
                 </button>
+                {chapterManifests.length > 0 && (
+                  <button type="button" className="danger-text" disabled={busy || !activeProjectId} onClick={() => run("Re-running breakdown...", () => rebreakdownManifests(), () => scrollToWorkspaceSection(".chapter-tree"))}>
+                    Re-run Breakdown (replace)
+                  </button>
+                )}
               </div>
             </div>
             <div className="metric-row">
