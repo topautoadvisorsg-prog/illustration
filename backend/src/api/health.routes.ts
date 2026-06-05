@@ -37,7 +37,10 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
         db = 'error';
       }
       return {
-        ok: db === 'connected' && storage === 'supabase',
+        // ok = service is up. Durability is reported separately via storageDurable/db
+        // so dev (no keys, ephemeral storage) is still "ok" while production durability
+        // is explicitly checkable.
+        ok: true,
         service: 'wildlands-backend' as const,
         version: '0.1.0',
         placeholderKeys: getPlaceholderKeys(),

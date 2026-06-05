@@ -243,25 +243,149 @@ function artPlaceholderLabel(template: LayoutTemplateId): string {
   return 'PREVIEW - ART SLOT';
 }
 
+// ─── Full-page artwork model ───────────────────────────────────────────────
+// The generated image is the PAGE artwork (full bleed), not a box. Layout
+// percentage / art slot define WHERE the text-safe zone sits, not the image
+// size. The placeholder is a planning-only text-exclusion marker.
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = (hex || '#F5EDD6').replace('#', '').trim();
+  const v = h.length === 3 ? h.split('').map((x) => x + x).join('') : h;
+  return [parseInt(v.slice(0, 2), 16) || 245, parseInt(v.slice(2, 4), 16) || 237, parseInt(v.slice(4, 6), 16) || 214];
+}
+function paperRgba(paper: string, a: number): string {
+  const [r, g, b] = hexToRgb(paper);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+type PriorityEdge = 'top' | 'bottom' | 'left' | 'right' | 'full' | 'center';
+function priorityEdgeFor(slot: ArtSlot): PriorityEdge {
+  switch (slot) {
+    case 'TOP_BAND': return 'top';
+    case 'BOTTOM_BAND': return 'bottom';
+    case 'FLOAT_LEFT': return 'left';
+    case 'FLOAT_RIGHT':
+    case 'SIDEBAR_RIGHT': return 'right';
+    case 'FULL_PAGE': return 'full';
+    default: return 'center';
+  }
+}
+function bandPercent(coverage: number): number {
+  return Math.round(Math.min(0.6, Math.max(0.3, coverage)) * 100);
+}
+/**
+ * Scrim overlaid on the full-page artwork so the image-priority edge stays vivid
+ * and the text-safe region is readable. `strong` = continuation pages (text can
+ * appear anywhere, so scrim harder); first page = lighter (artwork most vivid).
+ */
+function scrimGradient(slot: ArtSlot, coverage: number, paper: string, strong: boolean): string {
+  const scrim = paperRgba(paper, strong ? 0.82 : 0.58);
+  const clear = paperRgba(paper, strong ? 0.22 : 0.04);
+  const p = bandPercent(coverage);
+  switch (priorityEdgeFor(slot)) {
+    case 'top': return `linear-gradient(to bottom, ${clear} 0%, ${clear} ${p - 6}%, ${scrim} ${p + 10}%, ${scrim} 100%)`;
+    case 'bottom': return `linear-gradient(to top, ${clear} 0%, ${clear} ${p - 6}%, ${scrim} ${p + 10}%, ${scrim} 100%)`;
+    case 'left': return `linear-gradient(to right, ${clear} 0%, ${clear} ${p - 6}%, ${scrim} ${p + 10}%, ${scrim} 100%)`;
+    case 'right': return `linear-gradient(to left, ${clear} 0%, ${clear} ${p - 6}%, ${scrim} ${p + 10}%, ${scrim} 100%)`;
+    case 'full': return `linear-gradient(${paperRgba(paper, strong ? 0.32 : 0.16)}, ${paperRgba(paper, strong ? 0.32 : 0.16)})`;
+    default: return `linear-gradient(${paperRgba(paper, strong ? 0.52 : 0.42)}, ${paperRgba(paper, strong ? 0.52 : 0.42)})`;
+  }
+}
+/** The @page rule that makes this entry full-page artwork; `:first` keeps the opening page most vivid. */
+function entryArtworkPageCss(pageName: string, dataUri: string, slot: ArtSlot, coverage: number, paper: string): string {
+  const decl = (grad: string) =>
+    `background-image: ${grad}, url("${dataUri}"); background-size: cover, cover; background-position: center, center; background-repeat: no-repeat, no-repeat;`;
+  return `@page ${pageName} { ${decl(scrimGradient(slot, coverage, paper, true))} }
+  @page ${pageName}:first { ${decl(scrimGradient(slot, coverage, paper, false))} }`;
+}
+/** First-page spacer that clears the image-priority zone so opening text lands in the text-safe region. */
+function prioritySpacerStyle(slot: ArtSlot, coverage: number, geometry: PageGeometry): string {
+  const edge = priorityEdgeFor(slot);
+  if (edge === 'top') return `height:${Math.round((bandPercent(coverage) / 100) * geometry.textHeightIn * 100) / 100}in;`;
+  if (edge === 'full') return `height:${Math.round(0.62 * geometry.textHeightIn * 100) / 100}in;`;
+  return 'display:none;';
+}
+/** For side-priority layouts, keep the text column off the image side. */
+function textSafeStyle(slot: ArtSlot): string {
+  const edge = priorityEdgeFor(slot);
+  if (edge === 'left') return 'padding-left:46%;';
+  if (edge === 'right') return 'padding-right:46%;';
+  return '';
+}
+/** Shared CSS for the full-page artwork model: text-safe layer + planning exclusion marker. */
+function fullPageArtworkCss(t: Typography, c: Palette): string {
+  return `.text-safe { position: relative; z-index: 1; }
+  .art-spacer { width: 100%; }
+  .art-exclusion { width: 100%; min-height: 1.1in; box-sizing: border-box; display: flex; align-items: center; justify-content: center; text-align: center; border: 1px dashed ${c.accent}; color: ${c.accent}; font-family: var(--font-display); font-style: italic; font-size: ${t.captionPt}pt; background: rgba(232, 217, 176, 0.5); margin-bottom: 12pt; padding: 8pt; }`;
+}
+
+interface EntryArtInput {
+  entryTitle: string;
+  scientificName?: string;
+  bodyMarkdown: string;
+  layoutTemplate: LayoutTemplateId;
+  imageDataUri?: string;
+}
+
+/**
+ * One entry as full-page artwork + a text-safe text layer. Returns the article
+ * markup plus the `@page` rule that paints its artwork (empty for placeholders).
+ * Continuation pages reuse the same named page → same artwork as background.
+ */
+function buildEntryArticle(
+  page: EntryArtInput,
+  geometry: PageGeometry,
+  c: Palette,
+  pageName: string,
+  anchorId?: string,
+): { article: string; pageCss: string } {
+  const profile = getLayoutProfile(page.layoutTemplate);
+  const danger = page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? ' is-danger' : '';
+  const idAttr = anchorId ? ` id="${anchorId}"` : '';
+  const scientific = page.scientificName ? `<p class="scientific-name">${escapeHtml(page.scientificName)}</p>` : '';
+  const textSafe = `<div class="text-safe" style="${textSafeStyle(profile.artSlot)}">
+    <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
+    ${scientific}
+    ${bodyToHtml(page.bodyMarkdown)}
+  </div>`;
+
+  if (page.imageDataUri) {
+    const spacer = `<div class="art-spacer" style="${prioritySpacerStyle(profile.artSlot, profile.artAreaFraction, geometry)}"></div>`;
+    const article = `<article class="book-page art-page arch-${profile.artSlot}${danger}"${idAttr} style="page: ${pageName};">
+  ${spacer}
+  ${textSafe}
+</article>`;
+    return { article, pageCss: entryArtworkPageCss(pageName, page.imageDataUri, profile.artSlot, profile.artAreaFraction, c.paper) };
+  }
+
+  // Planning placeholder: no artwork yet — mark the text-exclusion zone and flow
+  // text in the safe zone so the operator reviews layout/text-fit before spend.
+  const exclusion = `<div class="art-exclusion" style="${prioritySpacerStyle(profile.artSlot, profile.artAreaFraction, geometry)}">${escapeHtml(artPlaceholderLabel(page.layoutTemplate))} — text-exclusion zone (planning)<br>${escapeHtml(page.layoutTemplate)}</div>`;
+  const article = `<article class="book-page arch-${profile.artSlot}${danger}"${idAttr}>
+  ${exclusion}
+  ${textSafe}
+</article>`;
+  return { article, pageCss: '' };
+}
+
 /** Build the standalone HTML document for one page. */
 export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: RenderHtmlOptions): string {
   const { geometry } = opts;
-  const profile = getLayoutProfile(page.layoutTemplate);
   const t = config.typography;
   const c = config.colorPalette;
   const m = geometry.margins;
 
-  let art = opts.imageDataUri
-    ? `<img src="${opts.imageDataUri}" alt="${escapeHtml(page.entryTitle)}">`
-    : `<div class="art-placeholder">PREVIEW · ART SLOT (${escapeHtml(page.layoutTemplate)})</div>`;
-
-  if (!opts.imageDataUri) {
-    art = `<div class="art-placeholder">${escapeHtml(artPlaceholderLabel(page.layoutTemplate))}<br>${escapeHtml(page.layoutTemplate)}</div>`;
-  }
-
-  const scientific = page.scientificName
-    ? `<p class="scientific-name">${escapeHtml(page.scientificName)}</p>`
-    : '';
+  const { article, pageCss } = buildEntryArticle(
+    {
+      entryTitle: page.entryTitle,
+      scientificName: page.scientificName,
+      bodyMarkdown: page.bodyMarkdown,
+      layoutTemplate: page.layoutTemplate,
+      imageDataUri: opts.imageDataUri,
+    },
+    geometry,
+    c,
+    'entrypage',
+  );
 
   const polyfill = opts.polyfillJs ? `<script>${opts.polyfillJs}</script>` : '';
   const chapterLabel = opts.chapterLabel ? escapeHtml(opts.chapterLabel) : `Chapter ${page.chapterNumber}`;
@@ -279,16 +403,14 @@ ${fontLinkTags(t)}
     background: ${c.paper};
     ${pageBoxesCss(t, c, chapterLabel)}
   }
+  ${pageCss}
   ${typographyStyleBlock(t, c)}
-  .art-slot { ${artSlotPositionCss(profile.artSlot)} page-break-inside: avoid; }
-  ${page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? `.entry-title{color:${c.warning};} body{border-left:4pt solid ${c.warning};padding-left:10pt;}` : ''}
+  ${fullPageArtworkCss(t, c)}
+  ${page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? `.entry-title{color:${c.warning};} .is-danger .text-safe{border-left:4pt solid ${c.warning};padding-left:10pt;}` : ''}
 </style>
 </head>
 <body>
-  <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
-  ${scientific}
-  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry, Boolean(opts.imageDataUri))}">${art}</figure>
-  ${bodyToHtml(page.bodyMarkdown)}
+  ${article}
   ${polyfill}
 </body>
 </html>`;
@@ -355,33 +477,9 @@ export function buildChapterHtml(
   const m = geometry.margins;
   const chapterLabel = escapeHtml(`Chapter ${chapter.chapterNumber} — ${chapter.chapterTitle}`);
 
-  // Emit scoped CSS for every architecture so any page in the chapter renders.
-  const archCss = (Object.values(LAYOUT_PROFILES).map((p) => p.artSlot) as ArtSlot[])
-    .filter((slot, i, arr) => arr.indexOf(slot) === i)
-    .map(scopedArtSlotCss)
-    .join('\n  ');
-
-  const pagesHtml = pages
-    .map((page) => {
-      const profile = getLayoutProfile(page.layoutTemplate);
-      const danger = page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? ' is-danger' : '';
-      let art = page.imageDataUri
-        ? `<img src="${page.imageDataUri}" alt="${escapeHtml(page.entryTitle)}">`
-        : `<div class="art-placeholder">PREVIEW · ART SLOT (${escapeHtml(page.layoutTemplate)})</div>`;
-      if (!page.imageDataUri) {
-        art = `<div class="art-placeholder">${escapeHtml(artPlaceholderLabel(page.layoutTemplate))}<br>${escapeHtml(page.layoutTemplate)}</div>`;
-      }
-      const scientific = page.scientificName
-        ? `<p class="scientific-name">${escapeHtml(page.scientificName)}</p>`
-        : '';
-      return `<article class="book-page arch-${profile.artSlot}${danger}">
-  <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
-  ${scientific}
-  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry, Boolean(page.imageDataUri))}">${art}</figure>
-  ${bodyToHtml(page.bodyMarkdown)}
-</article>`;
-    })
-    .join('\n');
+  const built = pages.map((page, i) => buildEntryArticle(page, geometry, c, `entry-${chapter.chapterNumber}-${i}`));
+  const pagesHtml = built.map((b) => b.article).join('\n');
+  const entryPageCss = built.map((b) => b.pageCss).filter(Boolean).join('\n  ');
 
   const polyfill = opts.polyfillJs ? `<script>${opts.polyfillJs}</script>` : '';
 
@@ -398,14 +496,14 @@ ${fontLinkTags(t)}
     background: ${c.paper};
     ${pageBoxesCss(t, c, chapterLabel)}
   }
+  ${entryPageCss}
   ${typographyStyleBlock(t, c)}
+  ${fullPageArtworkCss(t, c)}
   .book-page { page-break-after: always; }
   .book-page:last-child { page-break-after: auto; }
   ${opts.proofGuides ? proofGuidesCss(geometry) : ''}
-  ${archCss}
-  .art-slot { page-break-inside: avoid; }
   .is-danger .entry-title { color: ${c.warning}; }
-  .is-danger { border-left: 4pt solid ${c.warning}; padding-left: 10pt; }
+  .is-danger .text-safe { border-left: 4pt solid ${c.warning}; padding-left: 10pt; }
 </style>
 </head>
 <body>

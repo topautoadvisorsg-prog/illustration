@@ -44,24 +44,28 @@ describe('buildPageHtml', () => {
     expect(html).toContain('background: #F5EDD6;');
   });
 
-  it('uses a text-free placeholder art slot when no image is supplied', () => {
+  it('shows a planning text-exclusion marker when no image is supplied (not an image box)', () => {
     const html = buildPageHtml(page(), config, { geometry });
-    expect(html).toContain('art-placeholder');
-    expect(html).toContain('PREVIEW');
+    expect(html).toContain('art-exclusion');
+    expect(html).toContain('text-exclusion zone');
     expect(html).not.toContain('<img');
+    expect(html).not.toContain('background-image:'); // no artwork yet
   });
 
-  it('embeds the illustration when an image data URI is supplied', () => {
+  it('makes the image the full-page artwork (background), not an in-flow image box', () => {
     const html = buildPageHtml(page(), config, { geometry, imageDataUri: 'data:image/png;base64,AAAA' });
-    expect(html).toContain('<img src="data:image/png;base64,AAAA"');
-    expect(html).not.toContain('PREVIEW · ART SLOT');
+    // Artwork is painted as the page background via a named @page rule + text-safe layer.
+    expect(html).toContain('@page entrypage');
+    expect(html).toContain('url("data:image/png;base64,AAAA")');
+    expect(html).toContain('background-size: cover');
+    expect(html).toContain('class="text-safe"');
+    expect(html).not.toContain('<img'); // the image is the page, not a boxed <img>
+    expect(html).not.toContain('text-exclusion zone'); // exclusion marker is planning-only
   });
 
-  it('fills the art slot at presentation scale (cover, no vignette mask)', () => {
+  it('keeps the opening page artwork most vivid via @page :first', () => {
     const html = buildPageHtml(page(), config, { geometry, imageDataUri: 'data:image/png;base64,AAAA' });
-    expect(html).toContain('object-fit: cover');
-    expect(html).toContain('overflow: hidden');
-    expect(html).not.toContain('mask-image');
+    expect(html).toContain('@page entrypage:first');
   });
 
   it('omits the Paged.js script unless a polyfill is provided (browser-free HTML)', () => {
@@ -113,35 +117,22 @@ describe('buildPageHtml', () => {
     expect(html).not.toContain('<p class="section-body">***</p>');
   });
 
-  it('renders the illustration at presentation scale and bleeds to the page edge', () => {
-    // Full-page plate WITH a real image: 0.72 * 9.25 = 6.66in tall, negative margins bleed off the edges.
+  it('layout percentage controls the text-safe zone, not the image size (artwork always full page)', () => {
+    // FULL_PAGE plate and a text-heavy entry both get full-page artwork (background-size: cover).
+    // The difference is WHERE text sits, expressed as the priority spacer / text-safe inset.
     const plate = buildPageHtml(page({ layoutTemplate: 'LAYOUT_10_FULL_PAGE_PLATE' }), config, {
       geometry,
       imageDataUri: 'data:image/png;base64,AAAA',
     });
-    expect(plate).toContain('height:6.66in');
-    expect(plate).toContain('-1.25in'); // negative margin pulls real art past the trim to the bleed edge
-    // Text-heavy float: a substantial half-page float (48% wide), at least 0.5 * 9.25 = 4.63in tall.
-    const textHeavy = buildPageHtml(page({ layoutTemplate: 'LAYOUT_2_TEXT_HEAVY' }), config, {
+    expect(plate).toContain('background-size: cover');
+    expect(plate).toContain('class="text-safe"');
+    // Top-band/banner pushes opening text into the lower text-safe zone via a spacer.
+    const banner = buildPageHtml(page({ layoutTemplate: 'LAYOUT_13_FEATURE_BANNER' }), config, {
       geometry,
       imageDataUri: 'data:image/png;base64,AAAA',
     });
-    expect(textHeavy).toContain('width:48%;height:4.63in');
-  });
-
-  it('keeps the PLANNING placeholder a clean in-page reserved zone (no bleed)', () => {
-    // No image yet = planning. The placeholder reserves space and flows text around it,
-    // but must NOT bleed off the page — bleed is reserved for the real presentation image.
-    const plate = buildPageHtml(page({ layoutTemplate: 'LAYOUT_10_FULL_PAGE_PLATE' }), config, { geometry });
-    expect(plate).toContain('art-placeholder');
-    expect(plate).not.toContain('-1.25in'); // placeholder stays inside the text frame
-  });
-
-  it('makes a higher-coverage top band taller than a lower-coverage one', () => {
-    const opener = buildPageHtml(page({ layoutTemplate: 'LAYOUT_5_CHAPTER_OPENER' }), config, { geometry }); // 55%
-    const banner = buildPageHtml(page({ layoutTemplate: 'LAYOUT_13_FEATURE_BANNER' }), config, { geometry }); // 40% -> floored to 45%
-    expect(opener).toContain('height:5.09in;'); // 0.55 * 9.25
-    expect(banner).toContain('height:4.16in;'); // max(0.45, 0.40) * 9.25
+    expect(banner).toContain('class="art-spacer"');
+    expect(banner).toMatch(/art-spacer" style="height:[\d.]+in;?"/); // spacer reserves the image-priority band
   });
 });
 

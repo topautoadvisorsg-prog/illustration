@@ -35,16 +35,19 @@ describe('buildChapterHtml', () => {
     expect(html).toContain('size: 8.625in 11.25in;');
   });
 
-  it('uses placeholders when no image is supplied, real art when it is', () => {
+  it('paints full-page artwork when an image is supplied, a planning exclusion marker when not', () => {
     const withArt = buildChapterHtml(
       [{ ...pages[0]!, imageDataUri: 'data:image/png;base64,AAAA' }],
       config,
       { chapterNumber: 1, chapterTitle: 'Fungi' },
       { geometry },
     );
-    expect(withArt).toContain('<img src="data:image/png;base64,AAAA"');
+    // Image is the page artwork (named @page background), not an in-flow <img> box.
+    expect(withArt).toContain('url("data:image/png;base64,AAAA")');
+    expect(withArt).toContain('class="text-safe"');
+    expect(withArt).not.toContain('<img');
     const placeholder = buildChapterHtml([pages[0]!], config, { chapterNumber: 1, chapterTitle: 'Fungi' }, { geometry });
-    expect(placeholder).toContain('PREVIEW');
+    expect(placeholder).toContain('text-exclusion zone');
   });
 });
 
