@@ -4016,22 +4016,61 @@ function App() {
             <div className="render-page-review-list">
               <div className="section-head compact">
                 <div>
-                  <strong>Review Chapter {reviewChapterNumber || "?"} Pages</strong>
-                  <p className="hint">Click a page to render a focused proof for text flow and layout inspection.</p>
+                  <strong>Proof Review Gallery</strong>
+                  <p className="hint">Scan page status, warnings, art state, and text fit. Open any page as a focused proof.</p>
                 </div>
               </div>
-              <div className="chapter-render-row">
-                {reviewChapterPages.map((page) => (
-                  <button
-                    key={page.pageId}
-                    disabled={busy}
-                    className={selectedPage?.pageKey === page.pageId ? "active" : ""}
-                    onClick={() => run(`Rendering ${page.pageId} page proof...`, () => renderPagePreview(page.pageId), () => scrollToWorkspaceSection(".pdf-preview-frame"))}
-                    title={page.entryTitle}
-                  >
-                    {page.pageId}
-                  </button>
-                ))}
+              <div className="proof-gallery">
+                {reviewChapterPages.map((page) => {
+                  const row = pageByKey.get(page.pageId);
+                  const fit = textFitPreview?.pages?.find((candidate) => candidate.pageKey === page.pageId);
+                  const qualityFindings = (pageQualityReview?.findings || []).filter((finding) => finding.pageKey === page.pageId);
+                  const chapterFindings = (chapterIntelligence?.findings || []).filter((finding) => finding.pageKey === page.pageId);
+                  const findingCount = qualityFindings.length + chapterFindings.length;
+                  const hasApprovedArt = row && ["APPROVED", "PRINT_READY"].includes(row.status);
+                  const hasGeneratedArt = row && ["REVIEW", "APPROVED", "PRINT_READY"].includes(row.status);
+                  const isSelected = selectedPage?.pageKey === page.pageId;
+                  return (
+                    <article className={`proof-page-card ${isSelected ? "active" : ""}`} key={page.pageId}>
+                      <div className="proof-page-head">
+                        <div>
+                          <strong>{page.pageId}</strong>
+                          <span>{page.entryTitle}</span>
+                        </div>
+                        <span className={`proof-status ${fit?.fit?.status ? fit.fit.status.toLowerCase() : "pending"}`}>
+                          {fit?.fit?.status ? normalizeStatus(fit.fit.status) : "fit pending"}
+                        </span>
+                      </div>
+                      <div className="proof-page-meta">
+                        <span>{layoutName(row?.layoutTemplate || page.layoutTemplate)}</span>
+                        <span>{fit?.allocation?.estimatedRenderedPages || 1} proof page(s)</span>
+                        <span>{hasApprovedArt ? "approved art" : hasGeneratedArt ? "art in review" : "placeholder art"}</span>
+                        <span>{findingCount} warning(s)</span>
+                      </div>
+                      {findingCount > 0 && (
+                        <p className="proof-warning">
+                          {[...qualityFindings, ...chapterFindings][0]?.problem || [...qualityFindings, ...chapterFindings][0]?.message || "Review this page before approval."}
+                        </p>
+                      )}
+                      <div className="button-row">
+                        <button
+                          disabled={busy}
+                          onClick={() => run(`Rendering ${page.pageId} page proof...`, () => renderPagePreview(page.pageId), () => scrollToWorkspaceSection(".pdf-preview-frame"))}
+                        >
+                          Open Page Proof
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={!row?.id}
+                          onClick={() => setSelectedPageId(row?.id || "")}
+                        >
+                          Select Page
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
                 {reviewChapterPages.length === 0 && <span className="empty-inline">No pages available for this chapter.</span>}
               </div>
             </div>

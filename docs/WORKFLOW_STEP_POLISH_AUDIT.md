@@ -70,7 +70,9 @@ Why it helps: the system can distinguish technical layout approval from visual p
 
 Current value: renders selected page/chapter/book PDFs and shows the proof object.
 
-Polish opportunity: build the Proof Review Gallery: page thumbnails, selected page large preview, page warnings, next/previous, approve/request changes.
+Implemented first pass: Proof Review Gallery now shows per-page proof cards with layout, text-fit status, proof-page count, art state, warning count, and one-click focused page proof.
+
+Remaining polish opportunity: add actual rendered page thumbnails, selected page large preview, next/previous keyboard navigation, and approve/request changes.
 
 Why it helps: proofing becomes a publishing desk instead of an iframe.
 
