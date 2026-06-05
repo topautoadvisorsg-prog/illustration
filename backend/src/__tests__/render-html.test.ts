@@ -44,23 +44,24 @@ describe('buildPageHtml', () => {
     expect(html).toContain('background: #F5EDD6;');
   });
 
-  it('shows a planning text-exclusion marker when no image is supplied (not an image box)', () => {
+  it('marks the IMAGE ZONE as text-exclusion when no image is supplied (planning)', () => {
     const html = buildPageHtml(page(), config, { geometry });
     expect(html).toContain('art-exclusion');
-    expect(html).toContain('text-exclusion zone');
+    expect(html).toContain('IMAGE ZONE');
     expect(html).not.toContain('<img');
-    expect(html).not.toContain('background-image:'); // no artwork yet
   });
 
-  it('makes the image the full-page artwork (sheet background), not an in-flow image box', () => {
+  it('puts the image in its own bleed zone with text in a separate clean area (no overlap)', () => {
     const html = buildPageHtml(page(), config, { geometry, imageDataUri: 'data:image/png;base64,AAAA' });
-    // Artwork is painted on the Paged.js sheet (a real div, supports data-URI bg) + a text-safe layer.
-    expect(html).toContain('.pagedjs_sheet {');
-    expect(html).toContain('url("data:image/png;base64,AAAA")');
-    expect(html).toContain('background-size: cover');
-    expect(html).toContain('class="text-safe"');
-    expect(html).not.toContain('<img'); // the image is the page, not a boxed <img>
-    expect(html).not.toContain('text-exclusion zone'); // exclusion marker is planning-only
+    // The image is a real <img> filling its bleed zone — NOT behind the text.
+    expect(html).toContain('class="page-art"');
+    expect(html).toContain('<img src="data:image/png;base64,AAAA"');
+    expect(html).toContain('object-fit: cover');
+    // Title + body are NOT overlaid on the image (no text-safe scrim layer).
+    expect(html).not.toContain('class="text-safe"');
+    expect(html).not.toContain('IMAGE ZONE'); // exclusion marker is planning-only
+    // The image figure comes before the title so a top band bleeds the top edge.
+    expect(html.indexOf('class="page-art"')).toBeLessThan(html.indexOf('class="entry-title"'));
   });
 
   it('omits the Paged.js script unless a polyfill is provided (browser-free HTML)', () => {
@@ -112,22 +113,21 @@ describe('buildPageHtml', () => {
     expect(html).not.toContain('<p class="section-body">***</p>');
   });
 
-  it('layout percentage controls the text-safe zone, not the image size (artwork always full page)', () => {
-    // FULL_PAGE plate and a text-heavy entry both get full-page artwork (background-size: cover).
-    // The difference is WHERE text sits, expressed as the priority spacer / text-safe inset.
+  it('sizes the image zone by coverage and bleeds it to the page edge', () => {
+    // FULL_PAGE plate: image zone ~full page (taller image zone than a banner).
     const plate = buildPageHtml(page({ layoutTemplate: 'LAYOUT_10_FULL_PAGE_PLATE' }), config, {
       geometry,
       imageDataUri: 'data:image/png;base64,AAAA',
     });
-    expect(plate).toContain('background-size: cover');
-    expect(plate).toContain('class="text-safe"');
-    // Top-band/banner pushes opening text into the lower text-safe zone via a spacer.
     const banner = buildPageHtml(page({ layoutTemplate: 'LAYOUT_13_FEATURE_BANNER' }), config, {
       geometry,
       imageDataUri: 'data:image/png;base64,AAAA',
     });
-    expect(banner).toContain('class="art-spacer"');
-    expect(banner).toMatch(/art-spacer" style="height:[\d.]+in;?"/); // spacer reserves the image-priority band
+    const heightOf = (html: string): number => Number(/height:([\d.]+)in/.exec(html)?.[1] ?? '0');
+    expect(heightOf(plate)).toBeGreaterThan(heightOf(banner)); // 95% plate taller than 40% banner zone
+    // Image zone bleeds to the page edge (negative margin past the trim).
+    expect(banner).toMatch(/margin:-[\d.]+in/);
+    expect(banner).toContain('class="page-art"');
   });
 });
 

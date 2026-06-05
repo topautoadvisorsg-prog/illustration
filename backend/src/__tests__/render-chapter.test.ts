@@ -42,12 +42,11 @@ describe('buildChapterHtml', () => {
       { chapterNumber: 1, chapterTitle: 'Fungi' },
       { geometry },
     );
-    // Image is the page artwork (named @page background), not an in-flow <img> box.
-    expect(withArt).toContain('url("data:image/png;base64,AAAA")');
-    expect(withArt).toContain('class="text-safe"');
-    expect(withArt).not.toContain('<img');
+    // Image fills its bleed zone as a real <img>; text is separate (not on the image).
+    expect(withArt).toContain('<img src="data:image/png;base64,AAAA"');
+    expect(withArt).toContain('class="page-art"');
     const placeholder = buildChapterHtml([pages[0]!], config, { chapterNumber: 1, chapterTitle: 'Fungi' }, { geometry });
-    expect(placeholder).toContain('text-exclusion zone');
+    expect(placeholder).toContain('IMAGE ZONE');
   });
 });
 
