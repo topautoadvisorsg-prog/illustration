@@ -1174,6 +1174,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
             textPercent: z.number(),
             placement: z.string(),
             placementLabel: z.string(),
+            repeatable: z.boolean(),
             summary: z.string(),
           })
           .nullable(),

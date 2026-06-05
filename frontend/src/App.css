@@ -1402,6 +1402,18 @@ h3 {
   color: #2f5d50 !important;
 }
 
+.asset-repeat-badge {
+  margin-left: 8px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #f3ead2;
+  color: #6d4f12;
+}
+
 .stage-strip {
   display: grid;
   grid-template-columns: repeat(9, minmax(118px, 1fr));

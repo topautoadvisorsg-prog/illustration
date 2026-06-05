@@ -35,6 +35,15 @@ describe('layoutCoverageMeta (metadata, not pixels)', () => {
       expect(meta.imagePercent + meta.textPercent).toBe(100);
     }
   });
+
+  it('flags text-dominant border layouts as repeatable (shared asset) and unique layouts as not', () => {
+    expect(layoutCoverageMeta('LAYOUT_8_MARGIN_ILLUSTRATION').repeatable).toBe(true);
+    expect(layoutCoverageMeta('LAYOUT_6_BACK_MATTER').repeatable).toBe(true);
+    expect(layoutCoverageMeta('LAYOUT_2_TEXT_HEAVY').repeatable).toBe(true);
+    expect(layoutCoverageMeta('LAYOUT_10_FULL_PAGE_PLATE').repeatable).toBe(false);
+    expect(layoutCoverageMeta('LAYOUT_13_FEATURE_BANNER').repeatable).toBe(false);
+    expect(layoutCoverageMeta('LAYOUT_8_MARGIN_ILLUSTRATION').summary).toContain('repeating');
+  });
 });
 
 function page(overrides: Partial<PageManifest> = {}): PageManifest {

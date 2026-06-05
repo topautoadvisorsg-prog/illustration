@@ -12,6 +12,7 @@
 
 import {
   approveImageVersion,
+  getImageById,
   getImageVersion,
   listImagesForPage,
   reuseImageForPage,
@@ -19,7 +20,7 @@ import {
   setImageStatus,
   type ImageRow,
 } from '../../db/repositories/images.repo.js';
-import { getPageById, setPageStatus, type PageRow } from '../../db/repositories/manifests.repo.js';
+import { getPageById, listPages, setPageStatus, type PageRow } from '../../db/repositories/manifests.repo.js';
 import { recordImageEvent } from '../../db/repositories/image-events.repo.js';
 import {
   generatePageImage,
@@ -148,4 +149,58 @@ export async function reuseLibraryImageForPage(
   });
 
   return { pageStatus: 'REVIEW', version: row.version, imageId: row.id };
+}
+
+export interface ApplySharedImageResult {
+  layoutTemplate: string;
+  sourceImageId: string;
+  /** Pages that received the shared image (the source page is left untouched). */
+  applied: number;
+  appliedPageKeys: string[];
+  /** Total pages in the project using this layout (incl. the source page). */
+  totalLayoutPages: number;
+}
+
+/**
+ * Repeating-asset reuse: take one generated image and apply it to EVERY page in
+ * the project that uses the same layout. For a recurring border/full-text page,
+ * this means "generate once, reuse everywhere" instead of regenerating a
+ * near-identical border per page. The source image's own page is skipped.
+ */
+export async function applySharedImageToLayout(
+  projectId: string,
+  layoutTemplate: string,
+  sourceImageId: string,
+): Promise<ApplySharedImageResult> {
+  const source = await getImageById(sourceImageId);
+  if (!source) throw new ReviewBlockedError('Source image not found.', 'version_not_found');
+
+  const layoutPages = (await listPages(projectId)).filter((p) => p.layoutTemplate === layoutTemplate);
+  if (layoutPages.length === 0) {
+    throw new ReviewBlockedError(`No pages use layout ${layoutTemplate}.`, 'page_not_found');
+  }
+
+  const appliedPageKeys: string[] = [];
+  for (const page of layoutPages) {
+    if (page.id === source.pageId) continue; // leave the source page as-is
+    const row = await reuseImageForPage(page.id, sourceImageId);
+    if (!row) continue;
+    await setPageStatus(page.id, 'REVIEW');
+    await recordImageEvent({
+      imageId: row.id,
+      pageId: page.id,
+      eventType: 'reused',
+      note: `Shared repeating-layout image applied to all ${layoutTemplate} pages`,
+      metadata: { sourceImageId, version: row.version, sharedLayout: layoutTemplate },
+    });
+    appliedPageKeys.push(page.pageKey);
+  }
+
+  return {
+    layoutTemplate,
+    sourceImageId,
+    applied: appliedPageKeys.length,
+    appliedPageKeys,
+    totalLayoutPages: layoutPages.length,
+  };
 }

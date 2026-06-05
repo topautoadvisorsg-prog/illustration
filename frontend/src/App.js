@@ -2451,6 +2451,21 @@ function App() {
     await loadArtifacts(activeProjectId);
   }
 
+  async function applySharedImage(asset) {
+    const layout = asset?.source?.layoutTemplate;
+    if (!layout) return false;
+    if (!confirmPaidAction(`Reuse this one image on EVERY "${layoutName(layout)}" page in the book? This regenerates nothing — it copies the same image to all pages of that layout (free).`)) return false;
+    const data = await call(`/api/projects/${activeProjectId}/layouts/${encodeURIComponent(layout)}/apply-shared-image`, {
+      method: "POST",
+      body: JSON.stringify({ sourceImageId: asset.imageId }),
+    });
+    setMessage(`Applied shared image to ${data.applied} of ${data.totalLayoutPages} "${layoutName(layout)}" page(s).`);
+    appendLog("success", `Shared image applied to ${data.applied} page(s): ${data.appliedPageKeys.slice(0, 8).join(", ")}${data.appliedPageKeys.length > 8 ? "…" : ""}`);
+    await loadImageLibrary(activeProjectId);
+    await loadArtifacts(activeProjectId);
+    if (selectedPage) await loadPageImages(selectedPage.id);
+  }
+
   async function generateSelectedPageImage() {
     const page = requireSelectedPage();
     if (!confirmPaidAction(`Generate Image for Selected Page (${page.pageKey})? This creates one paid OpenAI image version for this page.`)) return false;
@@ -3874,7 +3889,12 @@ function App() {
                       <span>{asset.source.entryTitle}</span>
                       <small>{normalizeStatus(asset.status)} / {asset.widthPx || "?"} x {asset.heightPx || "?"} px</small>
                       <small>{layoutName(asset.source.layoutTemplate)}</small>
-                      {asset.coverage && <small className="asset-coverage">{asset.coverage.summary}</small>}
+                      {asset.coverage && (
+                        <small className="asset-coverage">
+                          {asset.coverage.summary}
+                          {asset.coverage.repeatable && <span className="asset-repeat-badge">repeating page</span>}
+                        </small>
+                      )}
                       <div className="asset-tags">
                         {asset.compatibility.slice(0, 4).map((tag) => <span key={tag}>{tag}</span>)}
                       </div>
@@ -3883,6 +3903,11 @@ function App() {
                       <button disabled={busy || !selectedPage || asset.source.pageId === selectedPage.id} onClick={() => run("Reusing image asset...", () => reuseImageAsset(asset.imageId), () => scrollToWorkspaceSection(".image-version-list"))}>
                         Reuse Image on Selected Page
                       </button>
+                      {asset.coverage?.repeatable && (
+                        <button className="secondary" disabled={busy || !activeProjectId} onClick={() => run("Applying shared image to all matching pages...", () => applySharedImage(asset), () => scrollToWorkspaceSection(".asset-library-panel"))}>
+                          Reuse on ALL {layoutName(asset.source.layoutTemplate)} pages
+                        </button>
+                      )}
                     </div>
                     {advancedMode && (
                       <details className="advanced-details">

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { GenerationBlockedError, generatePageImage } from '../pipeline/stage-3-generation/generate-image.js';
 import {
   ReviewBlockedError,
+  applySharedImageToLayout,
   approvePageImage,
   listPageImages,
   regeneratePageImage,
@@ -212,6 +213,41 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
       const { sourceImageId } = ReuseImageBodySchema.parse(request.body ?? {});
       try {
         return await reuseLibraryImageForPage(pageId, sourceImageId);
+      } catch (error) {
+        if (error instanceof ReviewBlockedError) {
+          const status = reviewErrorStatus(error.code);
+          return reply.code(status).send({ error: status === 404 ? 'Not Found' : 'Conflict', message: error.message, statusCode: status });
+        }
+        throw error;
+      }
+    },
+  );
+
+  // Repeating-asset reuse — apply ONE generated image to every page in the
+  // project that uses the same layout (e.g. a recurring full-text border page),
+  // so the operator generates the border once and reuses it everywhere.
+  const ApplySharedParamsSchema = z.object({ id: z.string().uuid(), layout: z.string().min(1) });
+  const ApplySharedImageResponseSchema = z.object({
+    layoutTemplate: z.string(),
+    sourceImageId: z.string(),
+    applied: z.number(),
+    appliedPageKeys: z.array(z.string()),
+    totalLayoutPages: z.number(),
+  });
+  app.post(
+    '/api/projects/:id/layouts/:layout/apply-shared-image',
+    {
+      schema: {
+        params: ApplySharedParamsSchema,
+        body: ReuseImageBodySchema,
+        response: { 200: ApplySharedImageResponseSchema, 404: ApiErrorSchema, 409: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id, layout } = ApplySharedParamsSchema.parse(request.params);
+      const { sourceImageId } = ReuseImageBodySchema.parse(request.body ?? {});
+      try {
+        return await applySharedImageToLayout(id, layout, sourceImageId);
       } catch (error) {
         if (error instanceof ReviewBlockedError) {
           const status = reviewErrorStatus(error.code);

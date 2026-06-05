@@ -56,6 +56,23 @@ export function getLayoutProfile(template: LayoutTemplateId): LayoutProfile {
   return LAYOUT_PROFILES[template] ?? LAYOUT_PROFILES.LAYOUT_1_STANDARD;
 }
 
+/**
+ * Layouts whose illustration is a SHARED, subject-agnostic decoration (a thin
+ * edge/margin border on a text-dominant page) that recurs throughout the book.
+ * For these, the operator can generate the art ONCE and reuse the same asset on
+ * every page of that layout instead of paying to regenerate a near-identical
+ * border per page. Every other layout is a unique, subject-specific illustration.
+ */
+const REPEATABLE_LAYOUTS = new Set<LayoutTemplateId>([
+  'LAYOUT_2_TEXT_HEAVY',
+  'LAYOUT_6_BACK_MATTER',
+  'LAYOUT_8_MARGIN_ILLUSTRATION',
+]);
+
+export function isRepeatableLayout(template: LayoutTemplateId): boolean {
+  return REPEATABLE_LAYOUTS.has(template);
+}
+
 /** Human-readable placement label for each art slot. */
 const ART_SLOT_LABELS: Record<ArtSlot, string> = {
   FLOAT_LEFT: 'inset left',
@@ -78,6 +95,8 @@ export interface LayoutCoverageMeta {
   textPercent: number;
   placement: ArtSlot;
   placementLabel: string;
+  /** True when one shared border image can serve every page of this layout. */
+  repeatable: boolean;
   /** e.g. "80% image · 20% text · top band" */
   summary: string;
 }
@@ -87,11 +106,13 @@ export function layoutCoverageMeta(template: LayoutTemplateId): LayoutCoverageMe
   const imagePercent = Math.round(profile.artAreaFraction * 100);
   const textPercent = Math.max(0, 100 - imagePercent);
   const placementLabel = ART_SLOT_LABELS[profile.artSlot] ?? profile.artSlot.toLowerCase().replace(/_/g, ' ');
+  const repeatable = REPEATABLE_LAYOUTS.has(template);
   return {
     imagePercent,
     textPercent,
     placement: profile.artSlot,
     placementLabel,
-    summary: `${imagePercent}% image · ${textPercent}% text · ${placementLabel}`,
+    repeatable,
+    summary: `${imagePercent}% image · ${textPercent}% text · ${placementLabel}${repeatable ? ' · repeating' : ''}`,
   };
 }
