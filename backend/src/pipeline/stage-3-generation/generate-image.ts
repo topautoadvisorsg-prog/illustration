@@ -11,7 +11,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { ProjectConfigSchema } from '@wildlands/shared';
+import { LayoutTemplateIdSchema, ProjectConfigSchema } from '@wildlands/shared';
 import {
   generateImage as defaultGenerateImage,
   type GenerateImageInput,
@@ -24,6 +24,7 @@ import { recordUsage } from '../../db/repositories/usage.repo.js';
 import { recordImageEvent } from '../../db/repositories/image-events.repo.js';
 import { getProjectStorage, type ProjectStorage } from '../../services/storage/project-storage.js';
 import { logger } from '../../lib/logger.js';
+import { appendImageShapeInstruction, imageShapeForLayout } from './image-shape.js';
 
 export type ImageGenerator = (input: GenerateImageInput) => Promise<GeneratedImage>;
 
@@ -92,10 +93,11 @@ export function nextImageVersion(existing: Array<{ version: number }>): number {
   return existing.reduce((max, img) => Math.max(max, img.version), 0) + 1;
 }
 
-/** Build the exact prompt + hash for a version (a regeneration addendum is appended). */
-export function finalizePrompt(basePrompt: string, addendum?: string): { prompt: string; sha256: string } {
+/** Build the exact prompt + hash for a version (shape rules + regeneration addendum are appended). */
+export function finalizePrompt(basePrompt: string, addendum?: string, layoutInstruction?: string): { prompt: string; sha256: string } {
+  const shapedPrompt = layoutInstruction ? `${basePrompt.trim()}\n\n${layoutInstruction.trim()}` : basePrompt;
   const trimmed = addendum?.trim();
-  const prompt = trimmed ? `${basePrompt}\n\n${trimmed}` : basePrompt;
+  const prompt = trimmed ? `${shapedPrompt}\n\n${trimmed}` : shapedPrompt;
   return { prompt, sha256: createHash('sha256').update(prompt, 'utf8').digest('hex') };
 }
 
@@ -136,11 +138,14 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
 
   // Each version stores its own exact prompt + hash (a regeneration tweak makes
   // this differ from the page's planned prompt) so generations stay auditable.
-  const { prompt: finalPrompt, sha256: promptSha256 } = finalizePrompt(page.imagePrompt!, opts.promptAddendum);
+  const layoutTemplate = LayoutTemplateIdSchema.catch('LAYOUT_1_STANDARD').parse(page.layoutTemplate);
+  const imageShape = imageShapeForLayout(layoutTemplate);
+  const layoutAwarePrompt = appendImageShapeInstruction(page.imagePrompt!, imageShape);
+  const { prompt: finalPrompt, sha256: promptSha256 } = finalizePrompt(layoutAwarePrompt, opts.promptAddendum);
 
-  logger.info({ pageId: page.id, pageKey: page.pageKey, version }, 'Stage 3: generating image');
+  logger.info({ pageId: page.id, pageKey: page.pageKey, version, imageSize: imageShape.size, imageShape: imageShape.shape }, 'Stage 3: generating image');
 
-  const image = await generator({ prompt: finalPrompt });
+  const image = await generator({ prompt: finalPrompt, size: imageShape.size });
 
   const stored = await storage.writeProjectFile(
     page.projectId,
