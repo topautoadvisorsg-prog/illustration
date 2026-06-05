@@ -185,16 +185,23 @@ function artSlotPositionCss(slot: ArtSlot): string {
  * (a dominant plate, a wide band, a half-page float) — never shrunk into a tiny
  * placeholder. Text still flows beside/below the art, so readability is preserved.
  */
-function artSlotSizeStyle(slot: ArtSlot, coverage: number, geometry: PageGeometry): string {
+function artSlotSizeStyle(
+  slot: ArtSlot,
+  coverage: number,
+  geometry: PageGeometry,
+  hasImage: boolean,
+): string {
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const fh = geometry.textHeightIn;
   const m = geometry.margins;
-  // Negative margins pull the figure past the text frame, out to the physical
-  // (bleed) page edge — so edge-layout images run to the cut, then bleed off it.
-  const top = `-${m.topIn}in`;
-  const fore = `-${m.rightIn}in`;
-  const bottom = `-${m.bottomIn}in`;
-  const spine = `-${m.gutterIn}in`;
+  // Bleed (negative margins out to the physical page edge) is PRESENTATION — it
+  // applies only once a real image exists. The PLANNING placeholder stays a clean
+  // in-page reserved zone (text flows around it) so the operator can review the
+  // layout / text-fit before any artwork is generated.
+  const top = hasImage ? `-${m.topIn}in` : '0';
+  const fore = hasImage ? `-${m.rightIn}in` : '0';
+  const bottom = hasImage ? `-${m.bottomIn}in` : '0';
+  const spine = hasImage ? `-${m.gutterIn}in` : '0';
   switch (slot) {
     case 'FULL_PAGE':
       // Dominant plate that bleeds top + both sides; title/caption sits below.
@@ -275,7 +282,7 @@ ${fontLinkTags(t)}
 <body>
   <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
   ${scientific}
-  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry)}">${art}</figure>
+  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry, Boolean(opts.imageDataUri))}">${art}</figure>
   ${bodyToHtml(page.bodyMarkdown)}
   ${polyfill}
 </body>
@@ -365,7 +372,7 @@ export function buildChapterHtml(
       return `<article class="book-page arch-${profile.artSlot}${danger}">
   <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
   ${scientific}
-  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry)}">${art}</figure>
+  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry, Boolean(page.imageDataUri))}">${art}</figure>
   ${bodyToHtml(page.bodyMarkdown)}
 </article>`;
     })
@@ -436,7 +443,7 @@ function entryArticleHtml(page: ChapterPageRender, geometry: PageGeometry, ancho
   return `<article class="book-page arch-${profile.artSlot}${danger}"${idAttr}>
   <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
   ${scientific}
-  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry)}">${art}</figure>
+  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry, Boolean(page.imageDataUri))}">${art}</figure>
   ${bodyToHtml(page.bodyMarkdown)}
 </article>`;
 }

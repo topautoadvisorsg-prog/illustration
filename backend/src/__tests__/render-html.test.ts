@@ -102,13 +102,27 @@ describe('buildPageHtml', () => {
   });
 
   it('renders the illustration at presentation scale and bleeds to the page edge', () => {
-    // Full-page plate: 0.72 * 9.25 = 6.66in tall, with negative margins bleeding off the edges.
-    const plate = buildPageHtml(page({ layoutTemplate: 'LAYOUT_10_FULL_PAGE_PLATE' }), config, { geometry });
+    // Full-page plate WITH a real image: 0.72 * 9.25 = 6.66in tall, negative margins bleed off the edges.
+    const plate = buildPageHtml(page({ layoutTemplate: 'LAYOUT_10_FULL_PAGE_PLATE' }), config, {
+      geometry,
+      imageDataUri: 'data:image/png;base64,AAAA',
+    });
     expect(plate).toContain('height:6.66in');
-    expect(plate).toContain('-1.25in'); // negative margin pulls art past the trim to the bleed edge
+    expect(plate).toContain('-1.25in'); // negative margin pulls real art past the trim to the bleed edge
     // Text-heavy float: a substantial half-page float (48% wide), at least 0.5 * 9.25 = 4.63in tall.
-    const textHeavy = buildPageHtml(page({ layoutTemplate: 'LAYOUT_2_TEXT_HEAVY' }), config, { geometry });
+    const textHeavy = buildPageHtml(page({ layoutTemplate: 'LAYOUT_2_TEXT_HEAVY' }), config, {
+      geometry,
+      imageDataUri: 'data:image/png;base64,AAAA',
+    });
     expect(textHeavy).toContain('width:48%;height:4.63in');
+  });
+
+  it('keeps the PLANNING placeholder a clean in-page reserved zone (no bleed)', () => {
+    // No image yet = planning. The placeholder reserves space and flows text around it,
+    // but must NOT bleed off the page — bleed is reserved for the real presentation image.
+    const plate = buildPageHtml(page({ layoutTemplate: 'LAYOUT_10_FULL_PAGE_PLATE' }), config, { geometry });
+    expect(plate).toContain('art-placeholder');
+    expect(plate).not.toContain('-1.25in'); // placeholder stays inside the text frame
   });
 
   it('makes a higher-coverage top band taller than a lower-coverage one', () => {
