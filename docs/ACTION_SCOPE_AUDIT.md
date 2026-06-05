@@ -18,6 +18,7 @@ Every operator action must answer before click:
 | Choose File | UI-only | `uploadManuscriptFile` | Manuscript file name and local text are loaded. | Yes | No paid cost | No |
 | Upload Manuscript | Project-wide | `POST /api/projects/:id/manuscript` / `uploadManuscript` | Manuscript intake stats and storage status. | Yes, but review outputs after replacing | Can invalidate review assumptions | Yes when breakdown/page plan exists |
 | Start Breakdown | Book-wide | `POST /api/projects/:id/manifests` / `generateManifests` | Chapter map and page-entry chips. | Currently loads existing if already present | No paid cost | No |
+| Compare Standards for Chapter N | Chapter-wide diagnostic | `POST /api/projects/:id/chapters/:chapterNumber/format-calibration` / `runFormatCalibration` | "Format calibration complete for Chapter N: FORMAT recommended." | Yes | No paid cost | No |
 | Generate Page Plan | Book-wide | `POST /api/projects/:id/plan` / `planPages` | "Page plan generated for X entries." | Yes | No paid cost | No |
 | Run Text-Fit for Book | Book-wide | `POST /api/projects/:id/text-fit-preview` / `runTextFitPreview` | "Text-Fit checked X pages: Y overflow, Z tight." | Yes | No paid cost | No |
 | Approve Layout for Chapter N | Chapter-wide | `POST /api/projects/:id/chapters/:chapter/layout-approval` / `approveChapterLayout` | "Layout approved for Chapter N. Image generation unlocked for X pages." | Yes | Unlocks paid image work | No |

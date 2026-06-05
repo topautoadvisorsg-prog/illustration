@@ -1268,6 +1268,7 @@ function App() {
   const [layoutLibraryReport, setLayoutLibraryReport] = useState(null);
   const [textFitPreview, setTextFitPreview] = useState(null);
   const [pageQualityReview, setPageQualityReview] = useState(null);
+  const [formatCalibration, setFormatCalibration] = useState(null);
   const [layoutApprovals, setLayoutApprovals] = useState({});
   const [pageImages, setPageImages] = useState({});
   const [imageLibrary, setImageLibrary] = useState({ total: 0, assets: [] });
@@ -1572,6 +1573,7 @@ function App() {
     }
     const preset = PUBLISHING_STANDARD_PRESETS[format] || PUBLISHING_STANDARD_PRESETS.HARDCOVER_7X10;
     setProjectConfig((current) => applyPublishingStandardPreset(current, preset.format));
+    setFormatCalibration(null);
     setMessage(`Publishing standard selected: ${preset.label}. Save before planning.`);
     appendLog("success", `Publishing standard selected: ${preset.label}; text capacity now uses ${preset.trimSize.widthIn} x ${preset.trimSize.heightIn}.`);
   }
@@ -1921,6 +1923,7 @@ function App() {
     setSelectedPageId("");
     setTextFitPreview(null);
     setPageQualityReview(null);
+    setFormatCalibration(null);
     setPageImages({});
     setChapterIntelligence(null);
     setProductionDashboard(null);
@@ -2302,6 +2305,7 @@ function App() {
       }
     }
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
+    setFormatCalibration(null);
     setMessage(`Broke down into ${data.summary.totalPages} entries, ${data.summary.manifestsWritten} manifest row(s).`);
     appendLog("success", `Breakdown wrote ${data.summary.totalPages} entries (rendered page count is determined at render time as text flows).`);
     await loadArtifacts(projectId);
@@ -2317,6 +2321,7 @@ function App() {
     setPlannedPages(data.plannedPages || []);
     setLayoutLibraryReport(data.layoutLibrary || null);
     setPageQualityReview(null);
+    setFormatCalibration(null);
     const blockers = data.plannedPages?.reduce((total, page) => total + (page.blockers?.length || 0), 0) || 0;
     const plannedCount = data.plannedPages?.length || 0;
     setMessage(`Page plan generated for ${plannedCount} entries. Layout blockers: ${blockers}.`);
@@ -2337,6 +2342,18 @@ function App() {
     const checked = data.pages?.length || pages.length || pageManifests.length || 0;
     appendLog(overflow > 0 ? "error" : "success", `Text-Fit checked ${checked} pages: ${overflow} overflow, ${tight} tight.`);
     setMessage(`Text-Fit checked ${checked} pages: ${overflow} overflow, ${tight} tight.`);
+  }
+
+  async function runFormatCalibration(chapterNumber = selectedChapterNumber, projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    if (!chapterNumber) throw new Error("Select a chapter before running format calibration.");
+    const data = await call(`/api/projects/${projectId}/chapters/${chapterNumber}/format-calibration`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    setFormatCalibration(data);
+    setMessage(`Format calibration complete for Chapter ${chapterNumber}: ${data.recommendedLabel} recommended.`);
+    appendLog("success", `Format calibration compared ${data.options?.length || 0} standards for Chapter ${chapterNumber}; recommended ${data.recommendedLabel}.`);
   }
 
   async function runPageQualityReview(projectId = activeProjectId) {
@@ -4512,6 +4529,52 @@ function App() {
             {(pageManifests.length > 0 || pages.length > 0 || plannedPages.length > 0) && (
               <p className="warning-note">This project already has generated breakdown/page planning. Changing standards may require regenerating downstream outputs.</p>
             )}
+            <div className="format-calibration-panel">
+              <div className="section-head compact-head">
+                <div>
+                  <strong>First Chapter Calibration</strong>
+                  <p className="hint">Compare publishing standards against the selected chapter before committing to full-book planning decisions.</p>
+                </div>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={busy || !activeProjectId || pageManifests.length === 0 || !selectedChapterNumber}
+                  onClick={() => run(`Calibrating ${selectedChapterLabel} formats...`, () => runFormatCalibration(selectedChapterNumber), () => scrollToWorkspaceSection(".format-calibration-panel", "center"))}
+                >
+                  Compare Standards for {selectedChapterLabel}
+                </button>
+              </div>
+              {formatCalibration ? (
+                <div className="calibration-results">
+                  <div className="calibration-recommendation">
+                    <span>Recommended</span>
+                    <strong>{formatCalibration.recommendedLabel}</strong>
+                    <p>{formatCalibration.nextAction}</p>
+                  </div>
+                  <div className="calibration-options">
+                    {(formatCalibration.options || []).map((option) => (
+                      <article className={`calibration-option ${option.verdict.toLowerCase().replace("_", "-")}`} key={option.format}>
+                        <div>
+                          <strong>{option.label}</strong>
+                          <span>{option.verdict.replace("_", " ")}</span>
+                        </div>
+                        <p>{option.operatorSummary}</p>
+                        <div className="calibration-metrics">
+                          <span>{option.score} score</span>
+                          <span>{option.estimatedProofPages} proof pages</span>
+                          <span>{option.averageFillPercent}% avg fill</span>
+                          <span>{option.tight} tight</span>
+                          <span>{option.overflow} overflow</span>
+                        </div>
+                        {option.tradeoffs?.length > 0 && <small>{option.tradeoffs.slice(0, 2).join(" ")}</small>}
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="empty">{pageManifests.length > 0 ? "Run calibration to compare formats on the selected chapter." : "Generate the chapter breakdown first, then compare formats before page planning."}</p>
+              )}
+            </div>
           </div>
 
           {advancedMode && (

@@ -37,6 +37,7 @@ import {
   getProjectProductionDashboard,
 } from '../services/operator-intelligence/operator-intelligence.js';
 import { reviewProjectPageQuality } from '../services/page-quality/page-quality-review.js';
+import { calibrateProjectChapterFormats } from '../services/calibration/format-calibration.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 const ProjectPageParamsSchema = z.object({ id: z.string().uuid(), pageKey: z.string().min(1) });
@@ -45,6 +46,10 @@ const ChapterOperatorIntelligenceParamsSchema = z.object({
   chapterNumber: z.coerce.number().int().positive(),
 });
 const ChapterLayoutApprovalParamsSchema = z.object({
+  id: z.string().uuid(),
+  chapterNumber: z.coerce.number().int().positive(),
+});
+const ChapterFormatCalibrationParamsSchema = z.object({
   id: z.string().uuid(),
   chapterNumber: z.coerce.number().int().positive(),
 });
@@ -420,6 +425,36 @@ const TextFitPreviewResponseSchema = z.object({
         }),
         notes: z.array(z.string()),
       }),
+    }),
+  ),
+});
+
+const FormatCalibrationResponseSchema = z.object({
+  chapterNumber: z.number(),
+  chapterTitle: z.string(),
+  currentFormat: z.string(),
+  recommendedFormat: z.string(),
+  recommendedLabel: z.string(),
+  nextAction: z.string(),
+  options: z.array(
+    z.object({
+      format: z.string(),
+      label: z.string(),
+      typographyPackage: z.string(),
+      trim: z.string(),
+      bodyPt: z.number(),
+      lineHeight: z.number(),
+      entries: z.number(),
+      estimatedProofPages: z.number(),
+      fits: z.number(),
+      tight: z.number(),
+      overflow: z.number(),
+      underfilled: z.number(),
+      averageFillPercent: z.number(),
+      score: z.number(),
+      verdict: z.enum(['BEST_FIT', 'GOOD', 'RISKY', 'NOT_RECOMMENDED']),
+      operatorSummary: z.string(),
+      tradeoffs: z.array(z.string()),
     }),
   ),
 });
@@ -928,6 +963,42 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         });
       }
       return previewProjectTextFit(id);
+    },
+  );
+
+  app.post(
+    '/api/projects/:id/chapters/:chapterNumber/format-calibration',
+    {
+      schema: {
+        params: ChapterFormatCalibrationParamsSchema,
+        response: { 200: FormatCalibrationResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id, chapterNumber } = ChapterFormatCalibrationParamsSchema.parse(request.params);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+
+      const rows = await listManifests(id, 'PAGE');
+      if (rows.length === 0) {
+        return reply.code(400).send({
+          error: 'Bad Request',
+          message: 'Generate the chapter/page breakdown before running format calibration.',
+          statusCode: 400,
+        });
+      }
+      const chapterRows = rows.filter((row) => PageManifestSchema.parse(row.content).chapterNumber === chapterNumber);
+      if (chapterRows.length === 0) {
+        return reply.code(404).send({
+          error: 'Not Found',
+          message: `Chapter ${chapterNumber} has no page entries to calibrate.`,
+          statusCode: 404,
+        });
+      }
+
+      const report = await calibrateProjectChapterFormats(id, chapterNumber);
+      if (!report) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      return report;
     },
   );
 

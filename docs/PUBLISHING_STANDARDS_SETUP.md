@@ -54,3 +54,19 @@ Publishing standards affect:
 Choose and save the publishing standard before generating breakdown/page planning.
 
 If a standard changes after breakdown or page planning, downstream results may need to be regenerated because page counts, text-fit, and layout decisions were made against the previous geometry.
+
+## First Chapter Calibration
+
+After chapter/page breakdown exists, the operator can run First Chapter Calibration.
+
+This compares the selected chapter across the supported standards without changing the project:
+
+- estimated proof pages
+- fit/tight/overflow/underfilled counts
+- average text fill
+- format score
+- recommendation and tradeoffs
+
+This is an early decision aid. It should help answer: "Does this manuscript want to be a 7x10 hardcover, a compact paperback, a large reference hardcover, or a digital-first edition?"
+
+Calibration does not generate images, render PDFs, or mutate saved project settings.

@@ -167,6 +167,7 @@ export const PublishingFormatSchema = z.enum([
   'LARGE_FORMAT_HARDCOVER_8_5X11',
   'CUSTOM',
 ]);
+export type PublishingFormat = z.infer<typeof PublishingFormatSchema>;
 
 export const PublishingStandardSchema = z.object({
   format: PublishingFormatSchema.default('HARDCOVER_7X10'),
@@ -174,6 +175,76 @@ export const PublishingStandardSchema = z.object({
   typographyPackage: z.string().min(1).default('Wild Lands Default'),
   status: z.enum(['CONFIGURED', 'CUSTOM']).default('CONFIGURED'),
 });
+
+export const PUBLISHING_STANDARD_PRESETS = {
+  HARDCOVER_7X10: {
+    format: 'HARDCOVER_7X10',
+    label: 'Hardcover 7 x 10',
+    typographyPackage: 'Wild Lands Default',
+    trimSize: { widthIn: 7, heightIn: 10, bleedIn: 0.125 },
+    typography: { bodyPt: 11, lineHeight: 1.4 },
+    outputProfile: {
+      printEdition: 'PREMIUM',
+      ebookEdition: 'KINDLE_EPUB',
+      renderEngine: 'PUPPETEER_PAGEDJS',
+      pdfTarget: 'KDP premium color hardcover 7 x 10',
+    },
+  },
+  PAPERBACK_6X9: {
+    format: 'PAPERBACK_6X9',
+    label: 'Paperback 6 x 9',
+    typographyPackage: 'Wild Lands Default Compact',
+    trimSize: { widthIn: 6, heightIn: 9, bleedIn: 0.125 },
+    typography: { bodyPt: 10.5, lineHeight: 1.35 },
+    outputProfile: {
+      printEdition: 'PREMIUM',
+      ebookEdition: 'KINDLE_EPUB',
+      renderEngine: 'PUPPETEER_PAGEDJS',
+      pdfTarget: 'KDP premium color paperback 6 x 9',
+    },
+  },
+  LARGE_FORMAT_HARDCOVER_8_5X11: {
+    format: 'LARGE_FORMAT_HARDCOVER_8_5X11',
+    label: 'Large Format Hardcover 8.5 x 11',
+    typographyPackage: 'Wild Lands Default Large Format',
+    trimSize: { widthIn: 8.5, heightIn: 11, bleedIn: 0.125 },
+    typography: { bodyPt: 11.5, lineHeight: 1.35 },
+    outputProfile: {
+      printEdition: 'PREMIUM',
+      ebookEdition: 'KINDLE_EPUB',
+      renderEngine: 'PUPPETEER_PAGEDJS',
+      pdfTarget: 'KDP premium color hardcover 8.5 x 11',
+    },
+  },
+  KINDLE_DIGITAL: {
+    format: 'KINDLE_DIGITAL',
+    label: 'Kindle / Digital Edition',
+    typographyPackage: 'Wild Lands Digital',
+    trimSize: { widthIn: 6, heightIn: 9, bleedIn: 0 },
+    typography: { bodyPt: 11, lineHeight: 1.45 },
+    outputProfile: {
+      printEdition: 'PREMIUM',
+      ebookEdition: 'KINDLE_EPUB',
+      renderEngine: 'PUPPETEER_PAGEDJS',
+      pdfTarget: 'Kindle digital reference proof',
+    },
+  },
+} as const satisfies Record<
+  Exclude<PublishingFormat, 'CUSTOM'>,
+  {
+    format: Exclude<PublishingFormat, 'CUSTOM'>;
+    label: string;
+    typographyPackage: string;
+    trimSize: { widthIn: number; heightIn: number; bleedIn: number };
+    typography: { bodyPt: number; lineHeight: number };
+    outputProfile: {
+      printEdition: 'PREMIUM';
+      ebookEdition: 'KINDLE_EPUB';
+      renderEngine: 'PUPPETEER_PAGEDJS';
+      pdfTarget: string;
+    };
+  }
+>;
 
 /**
  * Role-based typography. `headingFont` is the display face (book/chapter/section/

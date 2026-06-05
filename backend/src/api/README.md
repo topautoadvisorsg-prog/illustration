@@ -23,6 +23,7 @@ Implemented foundation routes:
 | `GET` | `/api/projects/:id/cost-estimate` | Estimate project image cost from generated-image count |
 | `GET` | `/api/projects/:id/production-dashboard` | Read project-wide production status, queues, chapter readiness, and export state |
 | `GET` | `/api/projects/:id/chapters/:chapterNumber/operator-intelligence` | Read chapter readiness, blockers, and next action |
+| `POST` | `/api/projects/:id/chapters/:chapterNumber/format-calibration` | Compare publishing standards against one chapter without mutating the project |
 | `POST` | `/api/projects/:id/chapters/:chapterNumber/render` | Render one chapter PDF preview |
 | `POST` | `/api/projects/:id/pages/:pageKey/render` | Render one focused page PDF proof |
 | `POST` | `/api/projects/:id/render-book` | Render/stitch book PDF and run KDP preflight |

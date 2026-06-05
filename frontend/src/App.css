@@ -1146,6 +1146,92 @@ h3 {
   font-weight: 700;
 }
 
+.format-calibration-panel {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e0d7ca;
+}
+
+.calibration-results {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.calibration-recommendation {
+  border: 1px solid #c8dac5;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f2fbef;
+}
+
+.calibration-recommendation span,
+.calibration-option span,
+.calibration-option small {
+  color: #6d6258;
+}
+
+.calibration-recommendation strong {
+  display: block;
+  margin-top: 4px;
+  color: #173730;
+  font-size: 1.05rem;
+}
+
+.calibration-recommendation p {
+  margin: 6px 0 0;
+}
+
+.calibration-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.calibration-option {
+  border: 1px solid #e0d7ca;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffdf8;
+}
+
+.calibration-option.best-fit {
+  border-color: #7cad75;
+  background: #f5fbf1;
+}
+
+.calibration-option.not-recommended,
+.calibration-option.risky {
+  border-color: #dec09a;
+  background: #fff8ef;
+}
+
+.calibration-option div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.calibration-option p {
+  margin: 8px 0;
+  color: #3c342d;
+}
+
+.calibration-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.calibration-metrics span {
+  border: 1px solid #e0d7ca;
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: #fffaf0;
+  font-size: 0.78rem;
+}
+
 .hint,
 .meta,
 .empty,

@@ -191,6 +191,12 @@ describe('Operator Intelligence chapter evaluator', () => {
           url: '/api/projects/:id/page-quality-review',
         }),
       ).toBe(true);
+      expect(
+        app.hasRoute({
+          method: 'POST',
+          url: '/api/projects/:id/chapters/:chapterNumber/format-calibration',
+        }),
+      ).toBe(true);
     } finally {
       await app.close();
     }
