@@ -1397,6 +1397,11 @@ h3 {
   color: #8a8174 !important;
 }
 
+.asset-coverage {
+  font-weight: 600;
+  color: #2f5d50 !important;
+}
+
 .stage-strip {
   display: grid;
   grid-template-columns: repeat(9, minmax(118px, 1fr));

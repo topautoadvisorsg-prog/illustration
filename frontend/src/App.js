@@ -3874,6 +3874,7 @@ function App() {
                       <span>{asset.source.entryTitle}</span>
                       <small>{normalizeStatus(asset.status)} / {asset.widthPx || "?"} x {asset.heightPx || "?"} px</small>
                       <small>{layoutName(asset.source.layoutTemplate)}</small>
+                      {asset.coverage && <small className="asset-coverage">{asset.coverage.summary}</small>}
                       <div className="asset-tags">
                         {asset.compatibility.slice(0, 4).map((tag) => <span key={tag}>{tag}</span>)}
                       </div>

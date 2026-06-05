@@ -7,6 +7,7 @@ import {
   PageManifestSchema,
   ProjectConfigSchema,
   type ProjectConfig,
+  type LayoutTemplateId,
   ProjectSchema,
 } from '@wildlands/shared';
 import { z } from 'zod';
@@ -31,6 +32,7 @@ import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-previ
 import { RenderBlockedError, renderBookPdf, renderChapterPdf, renderCoverPdf, renderPagePdf } from '../pipeline/stage-6-layout/render-chapter.js';
 import { countImagesForProject, listImagesForProject } from '../db/repositories/images.repo.js';
 import { CONTENT_TYPE_POLICY, decomposeTemplate } from '../pipeline/stage-2-planner/layered-layout.js';
+import { layoutCoverageMeta } from '../pipeline/stage-6-layout/layout-profiles.js';
 import { estimateCost } from '../services/cost/estimate.js';
 import {
   getChapterOperatorIntelligence,
@@ -1166,6 +1168,15 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           layoutTemplate: z.string().nullable(),
           pageStatus: z.string(),
         }),
+        coverage: z
+          .object({
+            imagePercent: z.number(),
+            textPercent: z.number(),
+            placement: z.string(),
+            placementLabel: z.string(),
+            summary: z.string(),
+          })
+          .nullable(),
         compatibility: z.array(z.string()),
         tags: z.array(z.string()),
       }),
@@ -1188,6 +1199,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           const contentType = content?.contentType ?? null;
           const layoutTemplate = row.page.layoutTemplate ?? content?.layoutTemplate ?? null;
           const compatibility = layoutCompatibilityLabels(layoutTemplate, contentType ?? undefined);
+          const coverage = layoutTemplate ? layoutCoverageMeta(layoutTemplate as LayoutTemplateId) : null;
           const tags = [
             `chapter-${row.page.chapterNumber}`,
             row.page.pageKey,
@@ -1222,6 +1234,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
               layoutTemplate,
               pageStatus: row.page.status,
             },
+            coverage,
             compatibility,
             tags,
           };

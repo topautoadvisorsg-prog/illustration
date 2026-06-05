@@ -8,10 +8,34 @@ import {
   decomposeTemplate,
   getContentTypeGuide,
 } from '../pipeline/stage-2-planner/layered-layout.js';
-import { LAYOUT_PROFILES, getLayoutProfile } from '../pipeline/stage-6-layout/layout-profiles.js';
+import { LAYOUT_PROFILES, getLayoutProfile, layoutCoverageMeta } from '../pipeline/stage-6-layout/layout-profiles.js';
 
 const ALL_TEMPLATES = LayoutTemplateIdSchema.options;
 const ALL_CONTENT_TYPES = ContentTypeSchema.options;
+
+describe('layoutCoverageMeta (metadata, not pixels)', () => {
+  it('reports image/text split + placement for a full-page plate', () => {
+    const meta = layoutCoverageMeta('LAYOUT_10_FULL_PAGE_PLATE'); // artAreaFraction 0.95, FULL_PAGE
+    expect(meta.imagePercent).toBe(95);
+    expect(meta.textPercent).toBe(5);
+    expect(meta.placement).toBe('FULL_PAGE');
+    expect(meta.summary).toBe('95% image · 5% text · full page');
+  });
+
+  it('reports a text-heavy float as mostly text', () => {
+    const meta = layoutCoverageMeta('LAYOUT_2_TEXT_HEAVY'); // artAreaFraction 0.14, FLOAT_LEFT
+    expect(meta.imagePercent).toBe(14);
+    expect(meta.textPercent).toBe(86);
+    expect(meta.placementLabel).toBe('inset left');
+  });
+
+  it('every template yields percentages that sum to 100', () => {
+    for (const template of ALL_TEMPLATES) {
+      const meta = layoutCoverageMeta(template);
+      expect(meta.imagePercent + meta.textPercent).toBe(100);
+    }
+  });
+});
 
 function page(overrides: Partial<PageManifest> = {}): PageManifest {
   return {

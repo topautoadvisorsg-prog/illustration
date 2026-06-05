@@ -55,3 +55,43 @@ export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
 export function getLayoutProfile(template: LayoutTemplateId): LayoutProfile {
   return LAYOUT_PROFILES[template] ?? LAYOUT_PROFILES.LAYOUT_1_STANDARD;
 }
+
+/** Human-readable placement label for each art slot. */
+const ART_SLOT_LABELS: Record<ArtSlot, string> = {
+  FLOAT_LEFT: 'inset left',
+  FLOAT_RIGHT: 'inset right',
+  TOP_BAND: 'top band',
+  BOTTOM_BAND: 'bottom band',
+  FULL_PAGE: 'full page',
+  SIDEBAR_RIGHT: 'right sidebar',
+  SCATTERED: 'scattered studies',
+  CENTER_WRAP: 'center wrap',
+};
+
+/**
+ * Coverage metadata an agent or operator can read WITHOUT looking at pixels:
+ * how much of the page is image vs text, and where the art sits. Derived from
+ * the layout profile so reuse/QA reason over numbers, not the artwork itself.
+ */
+export interface LayoutCoverageMeta {
+  imagePercent: number;
+  textPercent: number;
+  placement: ArtSlot;
+  placementLabel: string;
+  /** e.g. "80% image · 20% text · top band" */
+  summary: string;
+}
+
+export function layoutCoverageMeta(template: LayoutTemplateId): LayoutCoverageMeta {
+  const profile = getLayoutProfile(template);
+  const imagePercent = Math.round(profile.artAreaFraction * 100);
+  const textPercent = Math.max(0, 100 - imagePercent);
+  const placementLabel = ART_SLOT_LABELS[profile.artSlot] ?? profile.artSlot.toLowerCase().replace(/_/g, ' ');
+  return {
+    imagePercent,
+    textPercent,
+    placement: profile.artSlot,
+    placementLabel,
+    summary: `${imagePercent}% image · ${textPercent}% text · ${placementLabel}`,
+  };
+}
