@@ -1357,7 +1357,7 @@ function App() {
         helpPrompt: "Review text-fit and tell me whether the chapter is readable.",
       };
     }
-    if (!pageQualityReview) {
+    if (!pageQualityReview && !selectedChapterApproval) {
       return {
         stageKey: "quality",
         stageLabel: "Page Quality Review",
@@ -2500,7 +2500,7 @@ function App() {
     if (key === "breakdown") return pageManifests.length > 0 ? "done" : selectedProject?.manuscriptPath ? "current" : "";
     if (key === "plan") return plannedPages.length > 0 || pages.some((page) => page.layoutTemplate) ? "done" : pageManifests.length > 0 ? "current" : "";
     if (key === "textfit") return hasTextFitProof ? "done" : pages.length > 0 ? "current" : "";
-    if (key === "quality") return pageQualityReview ? "done" : hasTextFitProof ? "current" : "";
+    if (key === "quality") return pageQualityReview || selectedChapterApproval ? "done" : hasTextFitProof ? "current" : "";
     if (key === "layout") return selectedChapterApproval ? "done" : pageQualityReview ? "current" : "";
     if (key === "images") return imagePageCount > 0 ? (approvedImagePageCount === imagePageCount ? "done" : "open") : selectedChapterApproval ? "open" : "";
     if (key === "proof") return pdfPreview.url ? "done" : selectedChapterApproval ? "open" : "";

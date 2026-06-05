@@ -1,4 +1,4 @@
-import { PageManifestSchema, type LayoutTemplateId, type PageManifest, type ProjectConfig } from '@wildlands/shared';
+import { PageManifestSchema, ProjectConfigSchema, type LayoutTemplateId, type PageManifest, type ProjectConfig } from '@wildlands/shared';
 import { listManifests } from '../../db/repositories/manifests.repo.js';
 import { getProject } from '../../db/repositories/projects.repo.js';
 import { buildTextFitPreview, type PageFitPreview } from '../../pipeline/stage-6-layout/text-fit-preview.js';
@@ -107,6 +107,7 @@ const FEATURE_LAYOUTS = new Set<LayoutTemplateId>([
   'LAYOUT_5_CHAPTER_OPENER',
   'LAYOUT_10_FULL_PAGE_PLATE',
   'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD',
+  'LAYOUT_13_FEATURE_BANNER',
 ]);
 
 const TEXT_FIRST_LAYOUTS = new Set<LayoutTemplateId>([
@@ -411,5 +412,5 @@ export async function reviewProjectPageQuality(projectId: string): Promise<PageQ
   const pages = rows
     .map((row) => PageManifestSchema.parse(row.content))
     .sort((a, b) => a.pageNumber - b.pageNumber);
-  return buildPageQualityReview(pages, project.config as ProjectConfig);
+  return buildPageQualityReview(pages, ProjectConfigSchema.parse(project.config));
 }

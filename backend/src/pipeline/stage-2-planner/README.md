@@ -135,8 +135,13 @@ otherwise                     -> LAYOUT_1_STANDARD
 - Layout reference images are captured in project config, but not yet stored as
   durable standalone layout-library records.
 - Measured capacity still needs to be filled in from real mockup tests.
-- Stage 6 text-fit preview is not implemented yet.
-- Continuation-page splitting for overflow text is not implemented yet.
+- Stage 6 text-fit preview exists and is the required fit gate before layout
+  approval.
+- Page Quality Review now runs after Text-Fit to flag visual rhythm,
+  whitespace, continuation, and publishing-style concerns before layout
+  approval.
+- Automatic continuation-page rewriting is not implemented yet; quality review
+  recommends fixes, but does not silently rewrite page plans.
 - Human approval locks are not implemented yet.
 - Stage 3 image-generation jobs are not enqueued from this stage yet.
 

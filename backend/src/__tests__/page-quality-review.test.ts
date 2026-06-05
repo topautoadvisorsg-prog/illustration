@@ -98,4 +98,25 @@ describe('Page Quality Review publishing director', () => {
     expect(review.publishingStyle.featurePageTargetPercent).toEqual({ min: 5, max: 10 });
     expect(review.distribution.layoutCounts.length).toBeGreaterThan(0);
   });
+
+  it('counts feature banners as visual landmark pages', () => {
+    const review = buildPageQualityReview(
+      [
+        page('CH01_P001', {
+          contentType: 'TERRAIN_ANALYSIS',
+          layoutTemplate: 'LAYOUT_13_FEATURE_BANNER',
+          bodyMarkdown: words(320),
+        }),
+        page('CH01_P002', {
+          contentType: 'ENCYCLOPEDIA_ENTRY',
+          layoutTemplate: 'LAYOUT_2_TEXT_HEAVY',
+          bodyMarkdown: words(420),
+        }),
+      ],
+      config,
+    );
+
+    expect(review.distribution.featurePercent).toBe(50);
+    expect(review.distribution.textFirstPercent).toBe(50);
+  });
 });
