@@ -791,9 +791,10 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
   app.post(
     '/api/projects/:id/manifests',
     {
+      // No body schema: must accept a bodyless POST (normal breakdown) and an
+      // optional { force } for re-breakdown. force is read manually below.
       schema: {
         params: ProjectParamsSchema,
-        body: z.object({ force: z.boolean().optional() }).optional(),
         response: { 200: ManifestSummaryResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema, 409: ApiErrorSchema },
       },
     },
@@ -874,13 +875,15 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     approvedPages: z.number(),
     approvedImages: z.number(),
   });
-  const PlanBodySchema = z.object({ mode: z.enum(['skip-approved', 'replan-all']).optional() }).optional();
   app.post(
     '/api/projects/:id/plan',
     {
+      // No body schema on purpose: this route must accept a bodyless POST (the
+      // common "just plan" call) as well as an optional { mode } for re-plan
+      // confirmation. A strict body schema rejects a null body. mode is read
+      // manually below.
       schema: {
         params: ProjectParamsSchema,
-        body: PlanBodySchema,
         response: { 200: PlanPagesResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema, 409: ReplanConfirmationSchema },
       },
     },
