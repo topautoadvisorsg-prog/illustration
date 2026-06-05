@@ -4,6 +4,33 @@
 
 ---
 
+## ⚠ PRODUCTION REQUIREMENT: durable storage (read first)
+
+**Images and assets MUST use durable Supabase Storage in production.** Local
+ephemeral storage is acceptable **only** for local development and must **never**
+be used in production — Railway's container disk is wiped on every redeploy, so
+anything written locally (generated images, rendered PDFs) is silently lost.
+
+Enforced in code:
+- `getProjectStorage()` (`backend/src/services/storage/project-storage.ts`) uses
+  Supabase when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are set. In
+  `NODE_ENV=production` it **throws** rather than silently falling back to local
+  disk.
+- Boot log states the active backend every deploy ("durable (Supabase)" vs
+  "EPHEMERAL local disk").
+- **`GET /health`** reports `storage`, `storageDurable`, `db`, and `projectCount`.
+
+**Confirm durability after any deploy with one call:**
+```
+GET https://<backend>/health
+=> { "storage": "supabase", "storageDurable": true, "db": "connected", ... }
+```
+If `storageDurable` is `true` and `storage` is `supabase`, the library is safe
+across redeploys. If it shows `local-ephemeral`, set the missing Supabase env
+vars (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) on the backend service.
+
+---
+
 ## "All smoke tests SKIPPED"
 
 **Cause:** `.env` still has `your_*_here` placeholders.
