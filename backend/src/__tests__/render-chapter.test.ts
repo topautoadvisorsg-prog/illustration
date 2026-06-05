@@ -42,9 +42,10 @@ describe('buildChapterHtml', () => {
       { chapterNumber: 1, chapterTitle: 'Fungi' },
       { geometry },
     );
-    // Image fills its bleed zone as a real <img>; text is separate (not on the image).
-    expect(withArt).toContain('<img src="data:image/png;base64,AAAA"');
-    expect(withArt).toContain('class="page-art"');
+    // Image IS the page (painted on the sheet); title on art + body on a readable panel.
+    expect(withArt).toContain('url("data:image/png;base64,AAAA")');
+    expect(withArt).toContain('class="text-panel"');
+    expect(withArt).not.toContain('<img');
     const placeholder = buildChapterHtml([pages[0]!], config, { chapterNumber: 1, chapterTitle: 'Fungi' }, { geometry });
     expect(placeholder).toContain('IMAGE ZONE');
   });

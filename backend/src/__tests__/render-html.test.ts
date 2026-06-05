@@ -51,17 +51,17 @@ describe('buildPageHtml', () => {
     expect(html).not.toContain('<img');
   });
 
-  it('puts the image in its own bleed zone with text in a separate clean area (no overlap)', () => {
+  it('makes the image the full page (sheet artwork) with a readable title + body panel', () => {
     const html = buildPageHtml(page(), config, { geometry, imageDataUri: 'data:image/png;base64,AAAA' });
-    // The image is a real <img> filling its bleed zone — NOT behind the text.
-    expect(html).toContain('class="page-art"');
-    expect(html).toContain('<img src="data:image/png;base64,AAAA"');
-    expect(html).toContain('object-fit: cover');
-    // Title + body are NOT overlaid on the image (no text-safe scrim layer).
-    expect(html).not.toContain('class="text-safe"');
+    // Artwork IS the page (painted on the sheet); not an in-flow <img> box.
+    expect(html).toContain('.pagedjs_sheet {');
+    expect(html).toContain('url("data:image/png;base64,AAAA")');
+    expect(html).not.toContain('<img');
+    // Title sits on the art (readable via paper halo); body sits on a readable panel.
+    expect(html).toContain('class="entry-title"');
+    expect(html).toContain('class="text-panel"');
+    expect(html).toContain('text-shadow'); // title readability halo
     expect(html).not.toContain('IMAGE ZONE'); // exclusion marker is planning-only
-    // The image figure comes before the title so a top band bleeds the top edge.
-    expect(html.indexOf('class="page-art"')).toBeLessThan(html.indexOf('class="entry-title"'));
   });
 
   it('omits the Paged.js script unless a polyfill is provided (browser-free HTML)', () => {
@@ -113,8 +113,9 @@ describe('buildPageHtml', () => {
     expect(html).not.toContain('<p class="section-body">***</p>');
   });
 
-  it('sizes the image zone by coverage and bleeds it to the page edge', () => {
-    // FULL_PAGE plate: image zone ~full page (taller image zone than a banner).
+  it('drops the body panel further down for image-heavier layouts (text-safe zone tracks coverage)', () => {
+    // FULL_PAGE plate reserves more of the page for image → body panel pushed down more
+    // than a feature banner. The spacer height encodes the image-priority zone.
     const plate = buildPageHtml(page({ layoutTemplate: 'LAYOUT_10_FULL_PAGE_PLATE' }), config, {
       geometry,
       imageDataUri: 'data:image/png;base64,AAAA',
@@ -123,11 +124,8 @@ describe('buildPageHtml', () => {
       geometry,
       imageDataUri: 'data:image/png;base64,AAAA',
     });
-    const heightOf = (html: string): number => Number(/height:([\d.]+)in/.exec(html)?.[1] ?? '0');
-    expect(heightOf(plate)).toBeGreaterThan(heightOf(banner)); // 95% plate taller than 40% banner zone
-    // Image zone bleeds to the page edge (negative margin past the trim).
-    expect(banner).toMatch(/margin:-[\d.]+in/);
-    expect(banner).toContain('class="page-art"');
+    const spacerOf = (html: string): number => Number(/art-spacer" style="height:([\d.]+)in/.exec(html)?.[1] ?? '0');
+    expect(spacerOf(plate)).toBeGreaterThan(spacerOf(banner));
   });
 });
 

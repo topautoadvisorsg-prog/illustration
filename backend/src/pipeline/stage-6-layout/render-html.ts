@@ -269,48 +269,39 @@ function priorityEdgeFor(slot: ArtSlot): PriorityEdge {
     default: return 'center';
   }
 }
-function bandPercent(coverage: number): number {
-  return Math.round(Math.min(0.6, Math.max(0.3, coverage)) * 100);
+/** Sheet background = full-page artwork under a light unifying veil. The image IS the page. */
+function artworkSheetCss(selector: string, dataUri: string, paper: string): string {
+  const veil = `linear-gradient(${paperRgba(paper, 0.12)}, ${paperRgba(paper, 0.12)})`;
+  return `${selector} { background-image: ${veil}, url("${dataUri}") !important; background-size: cover, cover !important; background-position: center, center !important; background-repeat: no-repeat, no-repeat !important; }`;
+}
+/** Spacer that drops the body panel into the text-safe zone, clearing the image-priority area. */
+function bodyZoneSpacer(slot: ArtSlot, coverage: number, geometry: PageGeometry): string {
+  const th = geometry.textHeightIn;
+  const edge = priorityEdgeFor(slot);
+  if (edge === 'top') return `height:${Math.round(Math.max(0.28, Math.min(0.6, coverage)) * th * 100) / 100}in;`;
+  if (edge === 'full') return `height:${Math.round(0.74 * th * 100) / 100}in;`;
+  return 'height:0.12in;';
+}
+/** For side-priority layouts, keep the body panel off the image side. */
+function bodyPanelSideStyle(slot: ArtSlot): string {
+  const edge = priorityEdgeFor(slot);
+  if (edge === 'left') return 'margin-left:46%;';
+  if (edge === 'right') return 'margin-right:46%;';
+  return '';
 }
 /**
- * IMAGE-ZONE geometry. The generated image fills its zone and BLEEDS to the
- * outer page edges; the complementary clean area is the text-safe zone. Layout
- * coverage = the fraction of the page that is image (text-excluded). Text is
- * NEVER placed on the image — it flows in the remaining clean (paper) zone.
- */
-function imageZoneStyle(slot: ArtSlot, coverage: number, geometry: PageGeometry): string {
-  const r2 = (n: number) => Math.round(n * 100) / 100;
-  const ph = geometry.pageHeightIn;
-  const m = geometry.margins;
-  const top = `-${m.topIn}in`;
-  const fore = `-${m.rightIn}in`;
-  const spine = `-${m.gutterIn}in`;
-  const bottom = `-${m.bottomIn}in`;
-  const frac = Math.min(0.95, Math.max(0.3, coverage));
-  switch (priorityEdgeFor(slot)) {
-    case 'full':
-      return `display:block;width:auto;height:${r2(0.97 * ph)}in;margin:${top} ${fore} 10pt ${spine};`;
-    case 'bottom':
-      return `display:block;width:auto;height:${r2(frac * ph)}in;margin:16pt ${fore} ${bottom} ${spine};`;
-    case 'left':
-      return `float:left;width:46%;height:${r2(Math.max(0.6, frac) * ph)}in;margin:${top} 18pt 8pt ${spine};`;
-    case 'right':
-      return `float:right;width:46%;height:${r2(Math.max(0.6, frac) * ph)}in;margin:${top} ${fore} 8pt 18pt;`;
-    case 'center':
-      return `display:block;width:74%;height:${r2(0.5 * ph)}in;margin:${top} auto 14pt auto;`;
-    case 'top':
-    default:
-      return `display:block;width:auto;height:${r2(frac * ph)}in;margin:${top} ${fore} 16pt ${spine};`;
-  }
-}
-/**
- * Shared CSS: the image zone (a real <img> that bleeds, with NO text on it) and
- * the planning exclusion marker. Text sits on clean paper, never on the image.
+ * Shared CSS for the full-page artwork model. The artwork IS the page (painted on
+ * the sheet). The TITLE sits on the art, bold with a paper halo so it is readable.
+ * The BODY sits on a near-opaque paper panel so small text is always legible. Text
+ * on the image is allowed when readable — never a hard ban, never lost on busy art.
  */
 function fullPageArtworkCss(t: Typography, c: Palette): string {
-  return `.page-art { box-sizing: border-box; overflow: hidden; page-break-inside: avoid; background: rgba(245, 237, 214, 0.35); border-radius: 2pt; }
-  .page-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .art-exclusion { box-sizing: border-box; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8pt; page-break-inside: avoid; border: 1px dashed ${c.accent}; color: ${c.accent}; font-family: var(--font-display); font-style: italic; font-size: ${t.captionPt}pt; background: rgba(232, 217, 176, 0.5); margin-bottom: 14pt; }`;
+  return `.pagedjs_pagebox, .pagedjs_area { background: transparent !important; }
+  .entry-title { position: relative; z-index: 2; font-weight: 700; text-shadow: 0 0 8px ${c.paper}, 0 0 8px ${c.paper}, 0 0 14px ${c.paper}, 0 2px 3px rgba(0,0,0,0.35); }
+  .scientific-name { position: relative; z-index: 2; text-shadow: 0 0 8px ${c.paper}, 0 0 8px ${c.paper}; }
+  .art-spacer { width: 100%; }
+  .text-panel { position: relative; z-index: 2; background: ${paperRgba(c.paper, 0.86)}; padding: 14pt 16pt; border-radius: 4pt; box-shadow: 0 1px 6px rgba(0,0,0,0.12); }
+  .art-exclusion { box-sizing: border-box; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8pt; page-break-inside: avoid; border: 1px dashed ${c.accent}; color: ${c.accent}; font-family: var(--font-display); font-style: italic; font-size: ${t.captionPt}pt; background: rgba(232, 217, 176, 0.5); margin-bottom: 12pt; }`;
 }
 
 interface EntryArtInput {
@@ -322,35 +313,48 @@ interface EntryArtInput {
 }
 
 /**
- * One entry as full-page artwork + a text-safe text layer. Returns the article
- * markup plus the `@page` rule that paints its artwork (empty for placeholders).
- * Continuation pages reuse the same named page → same artwork as background.
+ * One entry as full-page artwork (the image IS the page) with a bold readable
+ * title over the art and the body on a readable paper panel in the text-safe
+ * zone. Returns the article markup + the sheet CSS that paints the artwork
+ * (continuation pages reuse the same artwork — rule i).
  */
 function buildEntryArticle(
   page: EntryArtInput,
   geometry: PageGeometry,
   c: Palette,
+  pageName: string,
+  perEntry: boolean,
   anchorId?: string,
-): { article: string } {
+): { article: string; css: string } {
   const profile = getLayoutProfile(page.layoutTemplate);
   const danger = page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? ' is-danger' : '';
   const idAttr = anchorId ? ` id="${anchorId}"` : '';
   const scientific = page.scientificName ? `<p class="scientific-name">${escapeHtml(page.scientificName)}</p>` : '';
-  const zoneStyle = imageZoneStyle(profile.artSlot, profile.artAreaFraction, geometry);
+  const title = `<h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>`;
+  const panelStyle = bodyPanelSideStyle(profile.artSlot);
+  const spacer = `<div class="art-spacer" style="${bodyZoneSpacer(profile.artSlot, profile.artAreaFraction, geometry)}"></div>`;
 
-  // The image fills its bleed zone FIRST (so a top band bleeds the top edge), then
-  // the title + body flow in the clean text zone — text is never placed on the image.
-  const zone = page.imageDataUri
-    ? `<figure class="page-art" style="${zoneStyle}"><img src="${page.imageDataUri}" alt="${escapeHtml(page.entryTitle)}"></figure>`
-    : `<figure class="art-exclusion" style="${zoneStyle}">${escapeHtml(artPlaceholderLabel(page.layoutTemplate))} · IMAGE ZONE — keep text out (planning)<br>${escapeHtml(page.layoutTemplate)}</figure>`;
-
-  const article = `<article class="book-page arch-${profile.artSlot}${danger}"${idAttr}>
-  ${zone}
-  <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
-  ${scientific}
-  ${bodyToHtml(page.bodyMarkdown)}
+  if (page.imageDataUri) {
+    const sheetSel = perEntry ? `.pagedjs_${pageName}_page .pagedjs_sheet` : '.pagedjs_sheet';
+    const register = perEntry ? `@page ${pageName} {}\n  ` : '';
+    const pageAttr = perEntry ? ` style="page: ${pageName};"` : '';
+    const article = `<article class="book-page art-page arch-${profile.artSlot}${danger}"${idAttr}${pageAttr}>
+  ${title}
+  ${spacer}
+  <div class="text-panel" style="${panelStyle}">${scientific}${bodyToHtml(page.bodyMarkdown)}</div>
 </article>`;
-  return { article };
+    return { article, css: register + artworkSheetCss(sheetSel, page.imageDataUri, c.paper) };
+  }
+
+  // Planning placeholder: mark the IMAGE zone (text-exclusion) so the operator
+  // reviews text flow before any image is generated. Body sits on its panel.
+  const exclusion = `<div class="art-exclusion" style="${bodyZoneSpacer(profile.artSlot, profile.artAreaFraction, geometry)}">${escapeHtml(artPlaceholderLabel(page.layoutTemplate))} · IMAGE ZONE (planning)<br>${escapeHtml(page.layoutTemplate)}</div>`;
+  const article = `<article class="book-page arch-${profile.artSlot}${danger}"${idAttr}>
+  ${title}
+  ${exclusion}
+  <div class="text-panel" style="${panelStyle}">${scientific}${bodyToHtml(page.bodyMarkdown)}</div>
+</article>`;
+  return { article, css: '' };
 }
 
 /** Build the standalone HTML document for one page. */
@@ -360,7 +364,7 @@ export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: R
   const c = config.colorPalette;
   const m = geometry.margins;
 
-  const { article } = buildEntryArticle(
+  const { article, css } = buildEntryArticle(
     {
       entryTitle: page.entryTitle,
       scientificName: page.scientificName,
@@ -370,6 +374,8 @@ export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: R
     },
     geometry,
     c,
+    'entrypage',
+    false,
   );
 
   const polyfill = opts.polyfillJs ? `<script>${opts.polyfillJs}</script>` : '';
@@ -388,9 +394,10 @@ ${fontLinkTags(t)}
     background: ${c.paper};
     ${pageBoxesCss(t, c, chapterLabel)}
   }
+  ${css}
   ${typographyStyleBlock(t, c)}
   ${fullPageArtworkCss(t, c)}
-  ${page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? `.entry-title{color:${c.warning};} .is-danger{border-left:4pt solid ${c.warning};padding-left:10pt;}` : ''}
+  ${page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? `.entry-title{color:${c.warning};}` : ''}
 </style>
 </head>
 <body>
@@ -461,7 +468,9 @@ export function buildChapterHtml(
   const m = geometry.margins;
   const chapterLabel = escapeHtml(`Chapter ${chapter.chapterNumber} — ${chapter.chapterTitle}`);
 
-  const pagesHtml = pages.map((page) => buildEntryArticle(page, geometry, c).article).join('\n');
+  const built = pages.map((page, i) => buildEntryArticle(page, geometry, c, `entryC${chapter.chapterNumber}E${i}`, true));
+  const pagesHtml = built.map((b) => b.article).join('\n');
+  const entryCss = built.map((b) => b.css).filter(Boolean).join('\n  ');
 
   const polyfill = opts.polyfillJs ? `<script>${opts.polyfillJs}</script>` : '';
 
@@ -478,13 +487,13 @@ ${fontLinkTags(t)}
     background: ${c.paper};
     ${pageBoxesCss(t, c, chapterLabel)}
   }
+  ${entryCss}
   ${typographyStyleBlock(t, c)}
   ${fullPageArtworkCss(t, c)}
   .book-page { page-break-after: always; }
   .book-page:last-child { page-break-after: auto; }
   ${opts.proofGuides ? proofGuidesCss(geometry) : ''}
   .is-danger .entry-title { color: ${c.warning}; }
-  .is-danger { border-left: 4pt solid ${c.warning}; padding-left: 10pt; }
 </style>
 </head>
 <body>
