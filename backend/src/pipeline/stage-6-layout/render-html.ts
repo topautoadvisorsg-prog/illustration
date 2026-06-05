@@ -300,7 +300,12 @@ function fullPageArtworkCss(t: Typography, c: Palette): string {
   .entry-title { position: relative; z-index: 2; font-weight: 700; text-shadow: 0 0 8px ${c.paper}, 0 0 8px ${c.paper}, 0 0 14px ${c.paper}, 0 2px 3px rgba(0,0,0,0.35); }
   .scientific-name { position: relative; z-index: 2; text-shadow: 0 0 8px ${c.paper}, 0 0 8px ${c.paper}; }
   .art-spacer { width: 100%; }
-  .text-panel { position: relative; z-index: 2; background: ${paperRgba(c.paper, 0.86)}; padding: 14pt 16pt; border-radius: 4pt; box-shadow: 0 1px 6px rgba(0,0,0,0.12); }
+  /* Text sits DIRECTLY on the artwork in the reserved text-safe zone — no opaque
+     card. A soft, edgeless scrim (transparent at the top, gently feathering in)
+     plus a light paper halo on the glyphs keeps it readable while staying part of
+     the image. No border, no radius, no box — it must feel integrated, not glued on. */
+  .text-panel { position: relative; z-index: 2; padding: 0 2pt; background: linear-gradient(to bottom, ${paperRgba(c.paper, 0)} 0%, ${paperRgba(c.paper, 0.4)} 16%, ${paperRgba(c.paper, 0.46)} 100%); }
+  .text-panel p, .text-panel li, .text-panel h3, .text-panel strong, .text-panel .section-header, .text-panel .section-body { text-shadow: 0 0 3px ${c.paper}, 0 0 5px ${c.paper}; }
   .art-exclusion { box-sizing: border-box; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8pt; page-break-inside: avoid; border: 1px dashed ${c.accent}; color: ${c.accent}; font-family: var(--font-display); font-style: italic; font-size: ${t.captionPt}pt; background: rgba(232, 217, 176, 0.5); margin-bottom: 12pt; }`;
 }
 
