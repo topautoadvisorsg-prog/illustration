@@ -1,5 +1,5 @@
-/**
- * Stage 3 — image generation (gpt-image-1).
+﻿/**
+ * Stage 3 â€” image generation (gpt-image-2).
  *
  * What it does: for a single planned page, calls OpenAI with the locked image-only
  * prompt, stores the PNG as a new immutable version, records the row + cost, and

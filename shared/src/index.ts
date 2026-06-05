@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 export const SHARED_VERSION = '0.1.0';
 
@@ -100,7 +100,7 @@ export const LayoutTemplateIdSchema = z.enum([
   'LAYOUT_16_CUTAWAY_FEATURE',
 ]);
 
-// ── Layered layout model (Phase 1) ─────────────────────────────────────────
+// â”€â”€ Layered layout model (Phase 1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Content Type -> Coverage -> Architecture -> Master Style -> Subject.
 // These axes are orthogonal: a content type has default coverage + architecture,
 // but each can be overridden independently. They sit ABOVE the 15 named layout
@@ -281,7 +281,7 @@ export const ImageGenerationConfigSchema = z.object({
   masterStyleBlockVersion: z.string().min(1).default('VINTAGE_NATURALIST_DNA_v1.0'),
   masterStyleBlockText: z.string().min(1).default('Vintage Naturalist master visual identity.'),
   styleName: z.string().min(1).default('Vintage Naturalist'),
-  imageModel: z.string().min(1).default('gpt-image-1'),
+  imageModel: z.string().min(1).default('gpt-image-2'),
   upscaleModel: z.string().min(1).default('Replicate Real-ESRGAN'),
 });
 
@@ -441,7 +441,7 @@ export const PageManifestSchema = z.object({
   pageNumber: z.number().int().positive(),
   entryTitle: z.string().min(1),
   scientificName: z.string().optional(),
-  /** Entry classification from Stage 1.5 (e.g. EDIBLE, TOXIC) — drives danger layout. */
+  /** Entry classification from Stage 1.5 (e.g. EDIBLE, TOXIC) â€” drives danger layout. */
   category: z.string().optional(),
   /** First-class educational page type (Phase 1 layered model). */
   contentType: ContentTypeSchema.optional(),
@@ -453,7 +453,7 @@ export const PageManifestSchema = z.object({
   warnings: z.array(z.string()).default([]),
 });
 
-// ── Manifest generation (Stage 1.5) ────────────────────────────────────────
+// â”€â”€ Manifest generation (Stage 1.5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Schema Claude returns via tool-call. Kept deliberately flat and simple so the
 // model produces it reliably; the pipeline maps it into book/chapter/page rows.
 

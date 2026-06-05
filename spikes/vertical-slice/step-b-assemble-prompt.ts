@@ -1,5 +1,5 @@
-/**
- * Spike 2 Step B — Assemble Image Generation Prompt
+﻿/**
+ * Spike 2 Step B â€” Assemble Image Generation Prompt
  *
  * Deterministically combines:
  *   - Master Style Block (active version for brand)
@@ -28,21 +28,21 @@ const LAYOUT_HINTS: Record<string, string> = {
   LAYOUT_1_STANDARD:
     'The illustration occupies the upper-left quadrant of an imaginary page, with text flowing around it. The subject is single and centered within its quadrant.',
   LAYOUT_2_TEXT_HEAVY:
-    'The illustration is small — top-left corner only, ~15% of page area. Minimal, jewel-like.',
+    'The illustration is small â€” top-left corner only, ~15% of page area. Minimal, jewel-like.',
   LAYOUT_3_ILLUSTRATION_DOMINANT:
     'The illustration is large and visually striking, occupying the right two-thirds of the imaginary page and fading softly into the parchment on the left.',
   LAYOUT_4_DANGER_WARNING:
     'Two comparison subjects side by side in the upper area: the toxic species and its safe look-alike. Composition is comparison-focused.',
   LAYOUT_5_CHAPTER_OPENER:
-    'A cinematic landscape painting filling the top half of the page — sweeping, atmospheric, with depth and distance. No specific subject; this is the setting.',
+    'A cinematic landscape painting filling the top half of the page â€” sweeping, atmospheric, with depth and distance. No specific subject; this is the setting.',
   LAYOUT_6_BACK_MATTER:
     'Two-panel comparison layout: safe species on the left, toxic look-alike on the right, with equal weight.',
   LAYOUT_7_SCATTERED_VIGNETTES:
-    'Three small organic vignettes scattered across the page asymmetrically — each showing a different facet of the subject (e.g., track patterns in different gaits).',
+    'Three small organic vignettes scattered across the page asymmetrically â€” each showing a different facet of the subject (e.g., track patterns in different gaits).',
   LAYOUT_8_MARGIN_ILLUSTRATION:
-    'One tall narrow illustration running down the full right margin of the page — used for vertical subjects like trees.',
+    'One tall narrow illustration running down the full right margin of the page â€” used for vertical subjects like trees.',
   LAYOUT_9_DIAGNOSTIC_DIAGRAM:
-    '2–3 precise scientific diagrams in the upper half — identification-focused, labeled with hand-lettered field notes.',
+    '2â€“3 precise scientific diagrams in the upper half â€” identification-focused, labeled with hand-lettered field notes.',
 };
 
 interface StyleBlock {
@@ -58,10 +58,10 @@ async function loadActiveStyleBlock(brand: string): Promise<StyleBlock> {
   const md = await readFile(filePath, 'utf8');
 
   // Extract the verbatim code blocks under "MASTER STYLE BLOCK" and "NEGATIVE RULES".
-  const positiveMatch = md.match(/## MASTER STYLE BLOCK — v1[^\n]*\n+```\n([\s\S]+?)\n```/);
-  const negativeMatch = md.match(/## NEGATIVE RULES — v1[^\n]*\n+```\n([\s\S]+?)\n```/);
+  const positiveMatch = md.match(/## MASTER STYLE BLOCK â€” v1[^\n]*\n+```\n([\s\S]+?)\n```/);
+  const negativeMatch = md.match(/## NEGATIVE RULES â€” v1[^\n]*\n+```\n([\s\S]+?)\n```/);
   if (!positiveMatch?.[1] || !negativeMatch?.[1]) {
-    throw new Error('Failed to extract style block sections — check master-style-blocks/THE_WILDLANDS_v1.md');
+    throw new Error('Failed to extract style block sections â€” check master-style-blocks/THE_WILDLANDS_v1.md');
   }
   return {
     positive: positiveMatch[1].trim(),
@@ -119,10 +119,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const manifest = await stepA_loadManifest();
     const result = await stepB_assemblePrompt(manifest);
     // eslint-disable-next-line no-console
-    console.log(`✓ Step B — assembled prompt (${result.charCount} chars, overLimit=${result.overLimit})`);
+    console.log(`âœ“ Step B â€” assembled prompt (${result.charCount} chars, overLimit=${result.overLimit})`);
     if (result.overLimit) {
       // eslint-disable-next-line no-console
-      console.error('  WARN: prompt exceeds 4000 chars — gpt-image-1 will reject.');
+      console.error('  WARN: prompt exceeds 4000 chars â€” gpt-image-2 will reject.');
     }
     // eslint-disable-next-line no-console
     console.log('\n--- BEGIN PROMPT ---\n');
@@ -132,7 +132,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log('\n--- END PROMPT ---\n');
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.error(`✗ Step B — ${(e as Error).message}`);
+    console.error(`âœ— Step B â€” ${(e as Error).message}`);
     process.exit(1);
   }
 }

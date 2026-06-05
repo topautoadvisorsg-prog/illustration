@@ -1,8 +1,8 @@
-# Stage 3 — Image Generation
+﻿# Stage 3 â€” Image Generation
 
-**Status:** Phase 0 — scaffold only. Spike 2 calls gpt-image-1 directly (no BullMQ); BullMQ worker integration in Phase 3.
+**Status:** Phase 0 â€” scaffold only. Spike 2 calls gpt-image-2 directly (no BullMQ); BullMQ worker integration in Phase 3.
 
-**What it does:** Consumes the BullMQ `image-generation` queue, calls OpenAI gpt-image-1 with the assembled prompt, stores the raw PNG, records a new version row.
+**What it does:** Consumes the BullMQ `image-generation` queue, calls OpenAI gpt-image-2 with the assembled prompt, stores the raw PNG, records a new version row.
 
 **Input:**
 - Page manifest with locked `image_prompt`
@@ -23,9 +23,9 @@ curl -X POST http://localhost:8001/api/pages/{page_id}/generate-image \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-**OpenAI gpt-image-1 config:**
-- Model: `gpt-image-1`
-- Size: `1792x1024` or `1024x1792` (vertical for portrait pages) — confirm in Spike 2
+**OpenAI gpt-image-2 config:**
+- Model: `gpt-image-2`
+- Size: `1792x1024` or `1024x1792` (vertical for portrait pages) â€” confirm in Spike 2
 - Quality: `high`
 - Format: PNG, base64 returned and decoded server-side
 
@@ -33,13 +33,13 @@ curl -X POST http://localhost:8001/api/pages/{page_id}/generate-image \
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| 403 `model_not_found` | Org not verified for gpt-image-1 | Complete OpenAI org verification |
-| 400 `prompt_too_long` | Prompt > 4000 chars | Stage 2 should have caught this — investigate |
+| 403 `model_not_found` | Org not verified for gpt-image-2 | Complete OpenAI org verification |
+| 400 `prompt_too_long` | Prompt > 4000 chars | Stage 2 should have caught this â€” investigate |
 | 429 rate limit | Concurrency too high | Lower BullMQ concurrency; check OpenAI tier RPM |
 | Silent timeout > 60s | API stalled | Worker timeout 90s; sentry alert on retry exhaustion |
-| Image is text-rendered ("This is a [subject]") | Prompt instructed model to render text | Master Style Block has "NO TEXT" rule — review prompt assembly |
+| Image is text-rendered ("This is a [subject]") | Prompt instructed model to render text | Master Style Block has "NO TEXT" rule â€” review prompt assembly |
 
 **Design notes:**
 - Every generation gets a new version number. Never overwrite.
-- `prompt_hash` (SHA-256 of full prompt) is stored — re-running same prompt is deduped at the worker level if `idempotency_key` matches.
+- `prompt_hash` (SHA-256 of full prompt) is stored â€” re-running same prompt is deduped at the worker level if `idempotency_key` matches.
 - Failed jobs go to dead-letter queue after 3 retries with exp backoff (5s, 30s, 120s). Sentry alert fires on DLQ entry.

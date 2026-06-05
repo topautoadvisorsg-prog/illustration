@@ -1,13 +1,13 @@
-/**
+﻿/**
  * Simple cost estimate.
  *
  * Deliberately dead-simple: estimated cost = (images generated) x (flat average
- * cost per image). No per-call ledger, no provider math — just a running estimate
+ * cost per image). No per-call ledger, no provider math â€” just a running estimate
  * the operator can trust at a glance. Adjust AVG_COST_PER_IMAGE_USD as real spend
  * settles.
  */
 
-/** Flat average $/image (gpt-image-1 generation + Real-ESRGAN upscale, rounded). */
+/** Flat average $/image (gpt-image-2 generation + Real-ESRGAN upscale, rounded). */
 export const AVG_COST_PER_IMAGE_USD = 0.05;
 
 export interface CostEstimate {

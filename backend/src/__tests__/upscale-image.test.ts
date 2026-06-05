@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import {
   MIN_PRINT_DPI,
   UpscaleBlockedError,
@@ -8,7 +8,7 @@ import {
 
 describe('computeDpiGate', () => {
   it('passes when both axes clear 300 DPI for an 8.5x11 page', () => {
-    // gpt-image-1 1024x1536 upscaled 4x -> 4096x6144
+    // gpt-image-2 1024x1536 upscaled 4x -> 4096x6144
     const r = computeDpiGate(4096, 6144, 8.5, 11);
     expect(r.dpiW).toBe(Math.floor(4096 / 8.5)); // 481
     expect(r.dpiH).toBe(Math.floor(6144 / 11)); // 558

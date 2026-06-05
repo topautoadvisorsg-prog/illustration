@@ -1,4 +1,4 @@
-# Backend - Wildlands Publishing Platform
+﻿# Backend - Wildlands Publishing Platform
 
 The backend owns the pipeline, API, database schema, workers, and durable
 Publishing Intelligence records.
@@ -17,7 +17,7 @@ src/
   pipeline/           The 8-stage publishing pipeline
   services/           External clients and domain services
     claude/           Anthropic Claude SDK wrapper
-    openai/           OpenAI gpt-image-1 wrapper
+    openai/           OpenAI gpt-image-2 wrapper
     publishing-intelligence/
                       Experiments, decisions, standards, SOPs, costs,
                       print reviews, lessons, evidence, lineage

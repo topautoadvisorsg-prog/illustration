@@ -1,4 +1,4 @@
-# Wildlands Pipeline Attack Plan
+﻿# Wildlands Pipeline Attack Plan
 
 Last updated: 2026-06-01
 
@@ -11,7 +11,7 @@ paid APIs are dependency-injected so they never run in tests):
 project -> stored manuscript -> deterministic outline -> Claude manifests
   -> locked manifest persistence -> PAGE rows -> deterministic page plans (Stage 2)
   -> text-fit preview gate (Stage 6, browser-free analysis)
-  -> image generation (Stage 3, gpt-image-1, spend-gated)
+  -> image generation (Stage 3, gpt-image-2, spend-gated)
   -> human review: approve/reject/regenerate/set-active (Stage 4)
   -> upscale + 300 DPI print gate (Stage 5, Real-ESRGAN)
 ```

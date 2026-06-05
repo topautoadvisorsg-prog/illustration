@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema, type PageManifest } from '@wildlands/shared';
 import { countPageWords, planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 
@@ -16,7 +16,7 @@ const baseConfig = ProjectConfigSchema.parse({
     masterStyleBlockVersion: 'VINTAGE_NATURALIST_DNA_v1.0',
     masterStyleBlockText: 'Vintage Naturalist master style DNA.',
     styleName: 'Vintage Naturalist',
-    imageModel: 'gpt-image-1',
+    imageModel: 'gpt-image-2',
     upscaleModel: 'Replicate Real-ESRGAN',
   },
   layoutPolicy: {

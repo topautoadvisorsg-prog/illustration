@@ -1,7 +1,7 @@
-/**
- * Spike 2 Step C — Generate Image via OpenAI gpt-image-1
+﻿/**
+ * Spike 2 Step C â€” Generate Image via OpenAI gpt-image-2
  *
- * Requires: OPENAI_API_KEY with org verified for gpt-image-1.
+ * Requires: OPENAI_API_KEY with org verified for gpt-image-2.
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -31,7 +31,7 @@ export async function stepC_generateImage(
   await mkdir(OUTPUT_DIR, { recursive: true });
   const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
-  // gpt-image-1: portrait orientation for book pages. Closest supported size to 8.5x11 ratio is 1024x1536.
+  // gpt-image-2: portrait orientation for book pages. Closest supported size to 8.5x11 ratio is 1024x1536.
   const response = await client.images.generate({
     model: env.OPENAI_IMAGE_MODEL,
     prompt,
@@ -61,10 +61,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const { prompt } = await stepB_assemblePrompt(manifest);
     const result = await stepC_generateImage(prompt, manifest.manifest_id);
     // eslint-disable-next-line no-console
-    console.log(`✓ Step C — generated image at ${result.path} (${(result.sizeBytes / 1024).toFixed(1)} KB)`);
+    console.log(`âœ“ Step C â€” generated image at ${result.path} (${(result.sizeBytes / 1024).toFixed(1)} KB)`);
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.error(`✗ Step C — ${(e as Error).message}`);
+    console.error(`âœ— Step C â€” ${(e as Error).message}`);
     process.exit(1);
   }
 }

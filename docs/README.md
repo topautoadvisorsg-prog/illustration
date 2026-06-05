@@ -1,15 +1,19 @@
 # Docs
 
-Living documentation for the platform.
+Living documentation for the platform. **Start with `RENDER_MODEL.md`,
+`AGENT_LAYER.md`, and `PUBLISHING_DIRECTION.md` — they describe how the system
+actually works today.**
 
 | File | Purpose |
 |---|---|
+| `RENDER_MODEL.md` | **How pages render** — full-page artwork + text-safe zones (current, authoritative) |
 | `architecture.md` | System diagram, data flow, component map |
 | `pipeline-spec.md` | Distilled pipeline contract — single source of truth for behavior |
-| `api-contracts.md` | Auto-generated from Zod (Phase 1+); see `/api/docs` at runtime |
-| `runbook.md` | What to do when X breaks |
+| `runbook.md` | What to do when X breaks + the production durable-storage requirement |
 | `decision-log.md` | Architecture Decision Records (ADRs) |
 | `AGENT_LAYER.md` | What actually runs in the agent/LLM layer + the metadata-not-pixels rule |
+| `TYPOGRAPHY_SPEC.md` | Role-based typography (Cormorant + EB Garamond), default 7×10 |
+| `LAYERED_LAYOUT.md` / `LAYOUT_ALLOCATION_MAP.md` | Content type → coverage → architecture; per-layout coverage map |
 | `PUBLISHING_DIRECTION.md` | Illustration density & page-design guidance (three layers, visual presence, controlled variety) |
 | `publishing-intelligence-center.md` | Standards ledger / knowledge system architecture |
 | `operator-workflow-review.md` | UI workflow audit and implementation order for operator review mode |

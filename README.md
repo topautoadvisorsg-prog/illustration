@@ -1,199 +1,124 @@
 # The Wildlands Publishing Platform
 
-Automated book publishing pipeline for The Wildlands field-guide series:
+Turns a finished manuscript into a print-ready, fully illustrated KDP book:
 
 ```text
-manuscript.md -> manuscript outline -> manifests -> page plan
-  -> layout/text-fit approval -> image prompts -> generated art
-  -> upscale/DPI gate -> PDF/EPUB exports
+manuscript.md -> breakdown (chapters/entries) -> page plan (layout + image prompt)
+  -> text-fit -> page quality review -> layout approval
+  -> image generation -> proof render -> book + cover -> KDP
 ```
 
-## Current Status
+Live backend: `https://wildlandsbackend-production.up.railway.app`
+Live frontend: `https://frontend-production-f65d.up.railway.app`
 
-Phase 1 backend foundation is now underway. This repo is no longer only Phase 0
-spikes.
+---
 
-Implemented and testable:
+## Read these first (authoritative, current)
 
-- Fastify backend with health/API routes
-- Supabase Postgres schema and migrations
-- Project creation with visible project config
-- Manuscript upload and local storage
-- Deterministic Markdown outline parser
-- Claude Stage 1.5 manifest generation
-- Locked manifest persistence
-- Page rows linked to PAGE manifests
-- Stage 2 deterministic page planner
-- Stage 2 layout-library validation with written layout metadata
-- 16 Vintage Naturalist layout reference templates with local mockup images
-- Autonomous pipeline verifier for build/test/layout-library self-audit
-- Vintage Naturalist Master Style DNA stored in project config and injected into
-  layout prompts
-- Agent behavior contracts
-- Layered layout model: Content Type -> Coverage -> Architecture -> Master Style
-  -> Subject, with a content-type catalog at `/api/content-types`
-- Stage 6 text-fit analyzer (proves manuscript text fits the chosen layout before
-  any image spend)
-- Stage 3 image generation via OpenAI `gpt-image-1`, spend-gated and
-  dependency-injected so tests never call the paid API
-- Stage 4 image review endpoints: approve / reject / regenerate / set-active, with
-  an `image_events` audit log
-- Stage 5 upscale + 300 DPI print gate (Replicate Real-ESRGAN)
-- Stage 6/7 chapter render + book stitch + KDP preflight (Puppeteer + Paged.js;
-  Chromium provided via `Dockerfile.backend`), producing a bleed-spec interior PDF
-- Publishing Intelligence Center foundation:
-  experiments, decisions, standards, SOPs, cost records, print reviews, lessons,
-  evidence, lineage links, version tables, audit events, backend API, and visible
-  frontend panels
-- Operator frontend for backend URL, AI agent command console, project setup,
-  manuscript upload, manuscript breakdown review, page planning review, text-fit
-  preview, image proofing actions, chapter/book PDF preview, Publishing
-  Intelligence, and Advanced prompt/layout internals
-- Agent roster endpoint at `/api/agents` for operator-visible agent contracts
-
-Not implemented yet:
-
-- Kindle EPUB export (Stage 8)
-- AI-generated covers (front / full-wrap / back) and spine-width math
-- BullMQ background workers (pipeline stages currently run synchronously per request)
-- Object storage for generated art (local FS is ephemeral on Railway)
-- Full single-user auth enforcement
-- Advanced full-text/trigram/vector search for the Publishing Intelligence Center
-- ANNOTATION_COMPOSITOR (diagram labels/arrows) and COVER_ART_DIRECTOR agents
-
-## V1 Scope
-
-- Brand: `THE_WILDLANDS`
-- Audience: adult only
-- Outputs: premium 8.5 x 11 full-color PDF and Kindle EPUB
-- Storage: local file storage for v1
-- Auth: single-user Supabase Auth planned
-- No mid-tier, no economic, no large print, no kids edition in v1
-
-## Tech Stack
-
-| Layer | Choice |
+| Doc | What it covers |
 |---|---|
-| Backend | Node.js + TypeScript + Fastify |
-| Frontend | React + TypeScript |
-| Validation | Zod |
-| Database | Supabase Postgres + Drizzle ORM |
-| Queue | BullMQ + Upstash Redis |
-| LLM | Anthropic Claude |
-| Image generation | OpenAI `gpt-image-1` |
-| Upscale | Replicate Real-ESRGAN |
-| PDF engine | Puppeteer + Paged.js |
-| EPUB | `epub-gen-memory` |
-| Logging | Pino |
+| `docs/RENDER_MODEL.md` | How pages render — **full-page artwork + text-safe zones** (the model that matters most) |
+| `docs/AGENT_LAYER.md` | What actually runs in the agent/LLM layer + the **metadata-not-pixels** rule |
+| `docs/PUBLISHING_DIRECTION.md` | Illustration density / page-design guidance (three layers, controlled variety) |
+| `docs/runbook.md` | Operations — including the **production durable-storage requirement** + `/health` check |
+| `docs/TYPOGRAPHY_SPEC.md` | Cormorant Garamond + EB Garamond, role-based, default 7×10 |
+| `docs/LAYERED_LAYOUT.md` / `docs/LAYOUT_ALLOCATION_MAP.md` | Content type → coverage → architecture; per-layout coverage map |
 
-## Repo Layout
+## The render model (the thing to understand)
 
-```text
-backend/   API, DB, pipeline stages, services, workers
-frontend/  Operator console
-shared/    Zod schemas and shared TypeScript contracts
-spikes/    Phase 0 spike/proof code
-docs/      Architecture notes and decisions
-memory/    Project memory
+The generated image **IS the page** — full-bleed artwork painted on the Paged.js
+sheet, not a boxed `<img>`. Layout coverage describes **where the text-safe zone
+is**, not how big the image is.
+
+- **Title** sits on the artwork, bold, with a paper halo so it stays readable.
+- **Body** sits **directly on the artwork** in the reserved text-safe zone, kept
+  legible by a soft, edgeless scrim + light glyph halo — **no opaque paper card**.
+- Text on the image is allowed **when it's readable** — not a ban, a readability rule.
+- Continuation pages reuse the same entry artwork (visually unified).
+- The **placeholder** is planning-only: it marks the IMAGE zone (text-exclusion) so
+  the operator reviews text flow before any image is generated. It is never the
+  image's frame.
+
+Code: `backend/src/pipeline/stage-6-layout/render-html.ts` (`buildEntryArticle`,
+`artworkSheetCss`, `fullPageArtworkCss`). Render via Paged.js + Chromium
+(`Dockerfile.backend`).
+
+## Workflow state safety (don't regress these)
+
+- **Plan staleness:** Page Plan stamps a `planMeta` snapshot; the UI shows a banner
+  when the publishing standard / trim / typography changed since planning.
+- **Approval protection:** re-planning refuses to silently reset approved pages/
+  images — operator chooses *skip approved*, *re-plan all*, or *cancel*.
+- **Manuscript iteration:** re-upload → **Re-run Breakdown (replace)** clears the old
+  breakdown/plan/approvals/images and rebuilds. (Plain re-run is still blocked.)
+
+## Durable storage (production requirement)
+
+Generated images and rendered PDFs **must** use Supabase Storage. In production the
+backend **fails loud** rather than silently falling back to ephemeral local disk
+(which Railway wipes on redeploy). Confirm any deploy with one call:
+
+```
+GET /health  =>  { "storage": "supabase", "storageDurable": true, "db": "connected" }
 ```
 
-## Current Testable Flow
+## What's implemented
 
-1. Create a project.
-2. Upload/paste a `.md` manuscript.
-3. Stage 1 parses the manuscript locally into chapters, entries, sections,
-   word counts, source lines, and warnings.
-4. Stage 1.5 calls Claude to generate book/chapter/page manifests.
-5. Manifest output is locked and persisted.
-6. Stage 2 plans pages:
-   - counts words
-   - classifies content signals
-   - selects one of the configured layout templates
-   - validates the written layout library metadata
-   - applies layout typography/capacity metadata
-   - classifies the content type and decomposes layout into coverage + architecture
-   - assembles the image-only prompt (clean art: no text baked into the image)
-   - reports blockers/warnings before image spend
-   - stores `layout_template`, `image_prompt`, and `image_prompt_sha256`
-7. `POST /api/projects/:id/text-fit-preview` checks every page's text fits its
-   layout before any image is generated.
-8. `POST /api/pages/:pageId/generate-image` generates the illustration
-   (spend-gated) -> page status `REVIEW`.
-9. Review: approve / reject / regenerate / set-active per image version.
-10. `POST /api/pages/:pageId/upscale` upscales the approved image and runs the
-    300 DPI print gate.
-11. `POST /api/projects/:id/chapters/:n/render` renders a chapter PDF; 
-    `POST /api/projects/:id/render-book` stitches the book and runs KDP preflight.
-    (`GET /api/render-check` / `/api/render-check-chapter` render samples with no DB.)
+- Fastify backend; Supabase Postgres + Drizzle migrations; durable Supabase Storage.
+- Project setup with **publishing standards** (Hardcover 7×10 / Paperback 6×9 /
+  Large 8.5×11 / Kindle) + first-chapter format calibration.
+- Manuscript upload (md/txt/docx/pdf) → **deterministic** breakdown (no LLM) →
+  deterministic Stage-2 page plan (layout + locked, hashed image prompt).
+- Text-Fit + advisory **Page Quality Review** (rhythm, continuations, balance).
+- Per-chapter layout approval gate.
+- Stage-3 image generation via OpenAI **`gpt-image-2`** (spend-gated, layout-aware
+  aspect, dependency-injected so tests never call the paid API).
+- Stage-4 image review (approve / reject / regenerate / set-active / reuse), plus
+  **repeating shared assets** (one border image reused across a layout's pages).
+- Stage-5 upscale + 300 DPI print gate (Replicate Real-ESRGAN).
+- Stage-6/7 full-page-artwork chapter/page proof render + book stitch + KDP
+  preflight + full-wrap cover (spine from page count).
+- Operator console: guided next-step engine, per-stage review (advisory agent),
+  image library with coverage metadata, proof preview, Book Parts panel.
 
-## Railway
+## Not implemented yet
 
-Current live backend:
+- Kindle EPUB export (button hidden/disabled).
+- Batch image generation (one-by-one today).
+- BullMQ background workers (pipeline runs synchronously per request).
+- Single-user auth enforcement.
 
-```text
-https://wildlandsbackend-production.up.railway.app
-```
+## The two live LLM agents (everything else is deterministic)
 
-The backend requires `DATABASE_URL` to use the Supabase shared pooler URL:
+Only **OPERATOR_ADVISER** (chat) and **STAGE_REVIEWER** (per-stage verdict) call
+Claude — both text-only, read-only, capped. No agent reads image pixels (see
+`docs/AGENT_LAYER.md`). The 8 design contracts in `agent-contracts.ts` are enforced
+by deterministic code, not running agents.
 
-```text
-postgresql://postgres.<project-ref>:PASSWORD@aws-1-us-west-2.pooler.supabase.com:6543/postgres
-```
+## Tech stack
 
-The frontend uses:
-
-```text
-REACT_APP_BACKEND_URL=https://wildlandsbackend-production.up.railway.app
-```
+Node + TypeScript + Fastify · React · Zod · Supabase Postgres + Drizzle · Anthropic
+Claude · OpenAI gpt-image-2 · Replicate Real-ESRGAN · Puppeteer + Paged.js · Pino.
 
 ## Commands
 
 ```bash
 yarn install
-yarn verify:pipeline
-yarn audit:layouts
-yarn workspace @wildlands/shared typecheck
-yarn workspace @wildlands/backend typecheck
-yarn workspace @wildlands/backend test
+yarn workspace @wildlands/shared build
+yarn workspace @wildlands/backend run typecheck
+yarn workspace @wildlands/backend run test
 yarn workspace frontend build
 ```
 
-`yarn verify:pipeline` is the main pre-review command. It builds shared
-contracts, typechecks the backend, runs the backend test suite, builds the
-frontend, and audits every layout reference template/image/prompt safety rule.
+Run locally: `yarn workspace @wildlands/backend dev` · `yarn workspace frontend dev`.
 
-Run backend locally:
+## Deploy / Railway gotchas
 
-```bash
-yarn workspace @wildlands/backend dev
-```
-
-Run frontend locally:
-
-```bash
-yarn workspace frontend dev
-```
-
-## Handoff Notes For Review
-
-Start with:
-
-- `PIPELINE_ATTACK_PLAN.md`
-- `docs/operator-workflow-review.md`
-- `backend/src/pipeline/README.md`
-- `backend/src/agents/README.md`
-- `backend/src/pipeline/stage-1-ingestion/README.md`
-- `backend/src/pipeline/stage-1.5-manifests/README.md`
-- `backend/src/pipeline/stage-2-planner/README.md`
-- `docs/publishing-intelligence-center.md`
-- `backend/src/services/publishing-intelligence/README.md`
-- `backend/src/api/README.md`
-
-The highest-value review target is Stage 2 correctness: layout selection,
-prompt assembly, missing placeholder detection, capacity risk reporting, and
-operator-visible page planning output.
-
-The highest-value business-process review target is the Publishing Intelligence
-Center: verify the `Experiment -> Decision -> Standard -> SOP Update` lineage,
-evidence/audit behavior, and visible operator workflow before real proof-copy
-testing begins.
+- Backend builds via `Dockerfile.backend` (node:20 + chromium); ~5–6 min deploys.
+- Each push restarts the build — the latest push wins.
+- API POSTs need a JSON body or send `{}` — bodyless POST + `content-type:
+  application/json` is rejected by Fastify. `/plan` and `/manifests` accept a
+  bodyless POST (no body schema) by design.
+- `generate-image` takes the page **UUID**, not the page key.
+- PowerShell: `$pid` is reserved — never use it as a variable. Commit with separate
+  `git add` / `git commit` / `if ($?) { git push }` (not chained `| Out-Null`).

@@ -1,11 +1,11 @@
-/**
- * services/openai — typed wrapper around OpenAI image generation (gpt-image-1).
+﻿/**
+ * services/openai â€” typed wrapper around OpenAI image generation (gpt-image-2).
  *
  * What it does: single entry point for image-generation calls. Returns the raw
  * PNG bytes. Pipeline code must never touch the SDK directly.
  *
  * Clean-art contract: the prompt is assembled by Stage 2 and must contain NO
- * instruction to render text — all typography is added later by the layout engine.
+ * instruction to render text â€” all typography is added later by the layout engine.
  */
 
 import OpenAI from 'openai';
@@ -23,7 +23,7 @@ function getClient(): OpenAI {
   return client;
 }
 
-/** gpt-image-1 sizes. Book pages are portrait, so 1024x1536 is the default. */
+/** gpt-image-2 sizes. Book pages are portrait, so 1024x1536 is the default. */
 export type ImageSize = '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
 export type ImageQuality = 'low' | 'medium' | 'high' | 'auto';
 
@@ -53,7 +53,7 @@ export async function generateImage(input: GenerateImageInput): Promise<Generate
   const size: ImageSize = input.size ?? '1024x1536';
   const quality: ImageQuality = input.quality ?? 'high';
 
-  // gpt-image-1 sizes/quality differ from the DALL-E type union; cast the params.
+  // gpt-image-2 sizes/quality differ from the DALL-E type union; cast the params.
   const params = {
     model: env.OPENAI_IMAGE_MODEL,
     prompt: input.prompt,
