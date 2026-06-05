@@ -96,10 +96,31 @@ export class SupabaseStorageService implements ProjectStorage {
  * disk (tests/dev). Callers use this instead of `new LocalStorageService()` so
  * files persist across redeploys.
  */
+export function isSupabaseStorageConfigured(): boolean {
+  const env = getEnv();
+  return !isPlaceholder(env.SUPABASE_URL) && !isPlaceholder(env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/** 'supabase' = durable; 'local-ephemeral' = wiped on every Railway redeploy. */
+export function activeStorageKind(): 'supabase' | 'local-ephemeral' {
+  return isSupabaseStorageConfigured() ? 'supabase' : 'local-ephemeral';
+}
+
 export function getProjectStorage(): ProjectStorage {
   const env = getEnv();
-  if (!isPlaceholder(env.SUPABASE_URL) && !isPlaceholder(env.SUPABASE_SERVICE_ROLE_KEY)) {
+  if (isSupabaseStorageConfigured()) {
     return new SupabaseStorageService();
+  }
+  // Local disk is EPHEMERAL on Railway — anything written is lost on the next
+  // redeploy/restart, which silently destroyed the image library before. Never
+  // fall back to it in production: fail loudly so the misconfiguration is caught
+  // immediately instead of being discovered later as a vanished library.
+  if (env.NODE_ENV === 'production') {
+    throw new Error(
+      'PERSISTENT STORAGE NOT CONFIGURED: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are missing or placeholders in ' +
+        'production. Refusing to use ephemeral local disk because generated images and rendered PDFs would be lost on ' +
+        'the next redeploy. Set the Supabase Storage env vars on the backend service.',
+    );
   }
   return new LocalStorageService();
 }
