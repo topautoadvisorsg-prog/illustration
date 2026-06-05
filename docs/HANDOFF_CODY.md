@@ -27,10 +27,9 @@ The placeholder-vs-image distinction is the thing that mattered most, and it now
 
 ## Agreed next build order (do NOT reorder without owner OK)
 1. **Current Stage Result visibility** — harden the top result panel.
-2. **Workflow ordering cleanup** — the guided state machine (`operatorGuidance`, `App.js:1271`) puts render-proof BEFORE images, but the page lays out "3. Image Proofing" BEFORE "4. Render Preview" + there are 3 separate places to render (top next-step, Book Parts, Render Preview). De-duplicate to one canonical render block and match the guided order.
-3. **Cost visibility** — endpoint `GET /api/projects/:id/cost-estimate` EXISTS but is never called in the UI. Just SHOW the number on the image stage. Owner does NOT want a spend-blocking gate.
-4. **Export clarity** — currently "export" = download the last-rendered PDF blob (`wildlands-preview.pdf`); EPUB button is disabled. Build ONE "Download for KDP" giving interior PDF + cover PDF. Either build EPUB or hide the dead button.
-5. **Manifest versioning** — re-breakdown is HARD-BLOCKED (`backend/src/db/repositories/manifests.repo.ts:63` "already has manifests/pages"). This blocks any edit-after-upload loop. Add versioning so a re-uploaded/edited manuscript can re-break-down.
+2. **Cost visibility** — endpoint `GET /api/projects/:id/cost-estimate` EXISTS but is not yet surfaced in the image stage. Just SHOW the number on the image stage. Owner does NOT want a spend-blocking gate.
+3. **Export clarity** — currently "export" = download the last-rendered PDF blob (`wildlands-preview.pdf`); EPUB button is disabled. Build ONE "Download for KDP" giving interior PDF + cover PDF. Either build EPUB or hide the dead button.
+4. **Manifest versioning** — re-breakdown is HARD-BLOCKED (`backend/src/db/repositories/manifests.repo.ts:63` "already has manifests/pages"). This blocks any edit-after-upload loop. Add versioning so a re-uploaded/edited manuscript can re-break-down.
 
 ## Do NOT build yet (owner's call)
 - Batch image generation (wait until prompts are dialed).

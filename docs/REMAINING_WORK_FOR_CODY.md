@@ -8,7 +8,7 @@
 
 | Thing | Where | Proof |
 |---|---|---|
-| **Chapter reviewer** | `frontend/src/App.js` §"4. Render Preview + Export" → `.pdf-preview-frame` **iframe** (86vh) + Download link + per-chapter buttons | Renders the chapter PDF inline; browser gives page thumbnails + page nav + zoom. **It is the reviewer.** |
+| **Chapter reviewer** | `frontend/src/App.js` §"3. Render Proof Review" → `.pdf-preview-frame` **iframe** (86vh) + Download link + per-chapter buttons | Renders the chapter PDF inline; browser gives page thumbnails + page nav + zoom. **It is the reviewer.** |
 | **Multi-page content flow** | `render-html.ts` `buildChapterHtml` + Paged.js | A 1,839-word entry rendered to **4 pages, zero text lost** (live test). Content already drives page count at render time. |
 | **Image generation** | `POST /api/pages/:id/generate-image` → `stage-3-generation` → OpenAI `gpt-image-2` | Reaches OpenAI, authenticates, correct model. **Only blocked by the user's OpenAI account billing limit — NOT a code bug.** |
 | **Typography role system + config-driven fonts** | `shared` `TypographyConfigSchema`, `render-html.ts` `googleFontsHref`/`typographyStyleBlock` | Cormorant Garamond (display) + EB Garamond (body), 7×10 default. Done this session. |

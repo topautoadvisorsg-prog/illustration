@@ -1734,6 +1734,18 @@ button.secondary {
   background: #fffdf8;
 }
 
+.preview-review-card {
+  order: 3;
+}
+
+.image-review-card {
+  order: 4;
+}
+
+.book-parts-card {
+  order: 5;
+}
+
 .metric-row,
 .page-plan-meta,
 .chapter-render-row {

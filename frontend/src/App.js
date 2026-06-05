@@ -3505,12 +3505,12 @@ function App() {
             <span>Text-fit has no overflow before paid image work.</span>
           </div>
           <div>
-            <strong>3. Asset desk</strong>
-            <span>Generate, reuse, approve, and upscale images as publishing assets.</span>
+            <strong>3. Proof</strong>
+            <span>Render page-shaped PDFs and inspect readability before image spend.</span>
           </div>
           <div>
-            <strong>4. Proof</strong>
-            <span>Render page-shaped PDFs and inspect readability.</span>
+            <strong>4. Asset desk</strong>
+            <span>Generate, reuse, approve, and upscale images as publishing assets.</span>
           </div>
         </div>
 
@@ -3724,11 +3724,11 @@ function App() {
             </div>
           </section>
 
-          <section className="review-card">
+          <section className="review-card image-review-card">
             <div className="section-head">
               <div>
-                <h3>3. Image Proofing</h3>
-                <p className="hint">Asset desk for the selected page: generate only when layouts are approved, then reuse, approve, reject, or upscale.</p>
+                <h3>4. Image Review</h3>
+                <p className="hint">Asset desk for the selected page: generate only after the chapter proof reads cleanly, then reuse, approve, reject, or upscale.</p>
               </div>
               <div className="button-row">
                 <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages(), () => scrollToWorkspaceSection(".image-version-list"))}>
@@ -3907,7 +3907,7 @@ function App() {
           <section className="review-card book-parts-card">
             <div className="section-head">
               <div>
-                <h3>Book Parts (auto-assembled)</h3>
+                <h3>5. Book Parts + Export Assembly</h3>
                 <p className="hint">Your chapters are the work you review. These parts are generated automatically and included whenever you render the full book — nothing is missing.</p>
               </div>
             </div>
@@ -3921,20 +3921,13 @@ function App() {
               <div className="part-row"><strong>Index</strong><span>alphabetical entries + page numbers</span><span className="part-tag auto">auto</span></div>
               <div className="part-row"><strong>Back Matter / Colophon</strong><span>about the author / imprint</span><span className="part-tag auto">auto</span></div>
             </div>
-            <div className="button-row">
-              <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book proof...", renderBookPreview)}>
-                Render Full Book PDF Proof
-              </button>
-              <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering cover...", renderCoverPreview)}>
-                Render Cover
-              </button>
-            </div>
+            <p className="hint">Render full book and cover proofs from the Render Proof Review panel so proof actions stay in one place.</p>
           </section>
 
           <section className="review-card preview-review-card">
             <div className="section-head">
               <div>
-                <h3>4. Render Preview + Export</h3>
+                <h3>3. Render Proof Review</h3>
                 <p className="hint">Open a large PDF proof before final output. Rendering uses placeholders until approved art exists.</p>
               </div>
               <div className="button-row">

@@ -14,5 +14,6 @@ Living documentation for the platform.
 | `ACTION_SCOPE_AUDIT.md` | Operator action scope table, button copy rules, and confirmation policy |
 | `PAGE_QUALITY_REVIEW.md` | Publishing director layer for rhythm, continuation quality, whitespace, and layout decisions |
 | `PUBLISHING_STANDARDS_SETUP.md` | Project-creation standards layer for format, trim, typography package, and planning capacity |
+| `WORKFLOW_STEP_POLISH_AUDIT.md` | Step-by-step operator polish audit and recommended next build order |
 | `phase-0-plan.md` | Risk spike plan + daily checkpoints |
 | `phase-0-reports/` | End-of-day reports during Phase 0 |

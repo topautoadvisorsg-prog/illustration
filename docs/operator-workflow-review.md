@@ -8,8 +8,8 @@ The platform is a production line for turning a master manuscript into a finishe
 
 1. Confirm the manuscript map.
 2. Approve page layouts and text-fit before paid image work.
-3. Manage images as reusable publishing assets.
-4. Review page-shaped proofs.
+3. Review page-shaped proofs.
+4. Manage images as reusable publishing assets.
 5. Export final book files only when the proof and assets are ready.
 
 The commercial value is repeatability. Every book should leave behind usable assets, decisions, standards, and proofs that make the next book faster and cheaper.
@@ -20,9 +20,9 @@ The commercial value is repeatability. Every book should leave behind usable ass
 - Breakdown creates 8 chapters and 129 page manifests for the current book.
 - Page Plan shows layout choices, blockers, text-fit status, and layout approvals.
 - Text-fit preview can be run before image spend.
-- Image Proofing exposes selected-page generation, page image versions, approval/rejection, regeneration, upscale, and a project image library.
+- Render Proof Review can produce chapter/book/cover proofs and offers Open/Download fallback when the embedded PDF viewer is blank.
+- Image Review exposes selected-page generation, page image versions, approval/rejection, regeneration, upscale, and a project image library after proof review.
 - The image library can search/filter generated assets and reuse one on the selected page.
-- Render Preview can produce chapter/book/cover proofs and offers Open/Download fallback when the embedded PDF viewer is blank.
 
 ## Issues Found In Operator Review
 
@@ -36,11 +36,11 @@ The commercial value is repeatability. Every book should leave behind usable ass
 ## Fixes Applied
 
 - Renamed stage review buttons to "Audit with Agent" so the operator knows the result is an agent verdict.
-- Added a four-step checkpoint strip: Book map, Layout gate, Asset desk, Proof.
+- Added a four-step checkpoint strip: Book map, Layout gate, Proof, Asset desk.
 - Removed layout approval from the Breakdown card to reduce workflow confusion.
 - Clarified Breakdown copy as chapter/page map review only.
 - Clarified Page Plan as the spend gate for layout, text capacity, and prompt readiness.
-- Clarified Image Proofing as the selected-page asset desk.
+- Clarified Image Review as the selected-page asset desk after proof review.
 - Added project-level image library controls and reuse.
 - Restricted image reuse to assets from the same project for now.
 - Updated rendered-image CSS to contain art in the reserved slot without crop-fill or radial masking.
