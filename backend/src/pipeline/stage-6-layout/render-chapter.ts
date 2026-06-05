@@ -17,10 +17,13 @@ import { createHash } from 'node:crypto';
 import {
   ChapterManifestSchema,
   PageManifestSchema,
+  ProofArtifactSchema,
+  ProjectConfigSchema,
   type PageManifest,
+  type ProofArtifact,
   type ProjectConfig,
 } from '@wildlands/shared';
-import { getProject } from '../../db/repositories/projects.repo.js';
+import { getProject, updateProjectConfig } from '../../db/repositories/projects.repo.js';
 import { listManifests, listPages } from '../../db/repositories/manifests.repo.js';
 import { getActiveImage } from '../../db/repositories/images.repo.js';
 import { recordExport } from '../../db/repositories/exports.repo.js';
@@ -97,6 +100,7 @@ export interface ChapterRenderResult {
   chapterNumber: number;
   pdf: Buffer;
   totalPages: number;
+  artifact?: ProofArtifact;
 }
 
 export interface PageRenderResult {
@@ -104,6 +108,48 @@ export interface PageRenderResult {
   chapterNumber: number;
   pdf: Buffer;
   totalPages: number;
+  artifact?: ProofArtifact;
+}
+
+function proofArtifactId(kind: ProofArtifact['kind'], scope: string, sha256: string): string {
+  return `${kind.toLowerCase()}-${scope}-${sha256.slice(0, 12)}`;
+}
+
+async function recordProofArtifact(
+  projectId: string,
+  config: ProjectConfig,
+  input: {
+    kind: ProofArtifact['kind'];
+    title: string;
+    storagePath: string;
+    sha256: string;
+    fileSizeBytes: number;
+    totalPages: number;
+    chapterNumber?: number;
+    pageKey?: string;
+  },
+): Promise<ProofArtifact> {
+  const scope = input.pageKey ?? (input.chapterNumber ? `ch${pad2(input.chapterNumber)}` : input.kind.toLowerCase());
+  const artifact = ProofArtifactSchema.parse({
+    id: proofArtifactId(input.kind, scope, input.sha256),
+    kind: input.kind,
+    title: input.title,
+    chapterNumber: input.chapterNumber,
+    pageKey: input.pageKey,
+    storagePath: input.storagePath,
+    sha256: input.sha256,
+    fileSizeBytes: input.fileSizeBytes,
+    totalPages: input.totalPages,
+    createdAt: new Date().toISOString(),
+  });
+  const latestProject = await getProject(projectId);
+  const latestConfig = latestProject ? ProjectConfigSchema.parse(latestProject.config) : config;
+  const artifacts = [
+    artifact,
+    ...(latestConfig.proofArtifacts ?? []).filter((existing) => existing.id !== artifact.id),
+  ].slice(0, 40);
+  await updateProjectConfig(projectId, { ...latestConfig, proofArtifacts: artifacts });
+  return artifact;
 }
 
 export async function renderPagePdf(projectId: string, pageKey: string): Promise<PageRenderResult> {
@@ -138,8 +184,18 @@ export async function renderPagePdf(projectId: string, pageKey: string): Promise
   logger.info({ projectId, pageKey }, 'Stage 6: rendering single page PDF');
   const { buffer, totalPages } = await renderHtmlToPdf(html, geometry);
 
-  await storage.writeProjectFile(projectId, ['pages', `${pageKey}.pdf`], buffer);
-  return { pageKey, chapterNumber: renderPage.chapterNumber, pdf: buffer, totalPages };
+  const stored = await storage.writeProjectFile(projectId, ['pages', `${pageKey}.pdf`], buffer);
+  const artifact = await recordProofArtifact(projectId, config, {
+    kind: 'PAGE_PROOF',
+    title: `${pageKey} Page Proof`,
+    chapterNumber: renderPage.chapterNumber,
+    pageKey,
+    storagePath: stored.relativePath,
+    sha256: stored.sha256,
+    fileSizeBytes: stored.sizeBytes,
+    totalPages,
+  });
+  return { pageKey, chapterNumber: renderPage.chapterNumber, pdf: buffer, totalPages, artifact };
 }
 
 export async function renderChapterPdf(projectId: string, chapterNumber: number): Promise<ChapterRenderResult> {
@@ -194,8 +250,17 @@ export async function renderChapterPdf(projectId: string, chapterNumber: number)
   logger.info({ projectId, chapterNumber, pages: pages.length }, 'Stage 6: rendering chapter PDF');
   const { buffer, totalPages } = await renderHtmlToPdf(html, geometry);
 
-  await storage.writeProjectFile(projectId, ['chapters', `CH${pad2(chapterNumber)}.pdf`], buffer);
-  return { chapterNumber, pdf: buffer, totalPages };
+  const stored = await storage.writeProjectFile(projectId, ['chapters', `CH${pad2(chapterNumber)}.pdf`], buffer);
+  const artifact = await recordProofArtifact(projectId, config, {
+    kind: 'CHAPTER_PROOF',
+    title: `Chapter ${chapterNumber} Proof`,
+    chapterNumber,
+    storagePath: stored.relativePath,
+    sha256: stored.sha256,
+    fileSizeBytes: stored.sizeBytes,
+    totalPages,
+  });
+  return { chapterNumber, pdf: buffer, totalPages, artifact };
 }
 
 export interface BookRenderResult {
@@ -204,6 +269,7 @@ export interface BookRenderResult {
   chaptersRendered: number;
   preflight: PreflightReport;
   storedPath: string;
+  artifact?: ProofArtifact;
 }
 
 /** Pull the introduction + glossary prose out of the manuscript's matter sections. */
@@ -307,14 +373,23 @@ export async function renderBookPdf(projectId: string): Promise<BookRenderResult
     sha256: createHash('sha256').update(pdf).digest('hex'),
     fileSizeBytes: pdf.byteLength,
   });
+  const artifact = await recordProofArtifact(projectId, config, {
+    kind: 'BOOK_PROOF',
+    title: 'Full Book PDF Proof',
+    storagePath: stored.relativePath,
+    sha256: stored.sha256,
+    fileSizeBytes: stored.sizeBytes,
+    totalPages: pageCount,
+  });
 
   logger.info({ projectId, pageCount, passed: preflight.passed }, 'Stage 7: book rendered + preflighted');
-  return { pdf, pageCount, chaptersRendered: chapters.length, preflight, storedPath: stored.relativePath };
+  return { pdf, pageCount, chaptersRendered: chapters.length, preflight, storedPath: stored.relativePath, artifact };
 }
 
 export interface CoverRenderResult {
   pdf: Buffer;
   storedPath: string;
+  artifact?: ProofArtifact;
 }
 
 /** Render the print-ready full-wrap cover PDF (spine width from interior page count). */
@@ -336,5 +411,13 @@ export async function renderCoverPdf(projectId: string): Promise<CoverRenderResu
 
   const storage = getProjectStorage();
   const stored = await storage.writeProjectFile(projectId, ['editions', 'COVER.pdf'], buffer);
-  return { pdf: buffer, storedPath: stored.relativePath };
+  const artifact = await recordProofArtifact(projectId, config, {
+    kind: 'COVER_PROOF',
+    title: 'Full Wrap Cover Proof',
+    storagePath: stored.relativePath,
+    sha256: stored.sha256,
+    fileSizeBytes: stored.sizeBytes,
+    totalPages: 1,
+  });
+  return { pdf: buffer, storedPath: stored.relativePath, artifact };
 }

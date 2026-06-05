@@ -356,6 +356,31 @@ export const PlanMetaSchema = z.object({
 });
 export type PlanMeta = z.infer<typeof PlanMetaSchema>;
 
+export const ProofArtifactSchema = z.object({
+  id: z.string().min(1),
+  kind: z.enum(['PAGE_PROOF', 'CHAPTER_PROOF', 'BOOK_PROOF', 'COVER_PROOF']),
+  title: z.string().min(1),
+  chapterNumber: z.number().int().positive().optional(),
+  pageKey: z.string().min(1).optional(),
+  storagePath: z.string().min(1),
+  sha256: z.string().min(1),
+  fileSizeBytes: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+  createdAt: z.string().datetime(),
+});
+export type ProofArtifact = z.infer<typeof ProofArtifactSchema>;
+
+export const PageQualityResolutionStatusSchema = z.enum(['ACCEPTED', 'FIXED', 'DEFERRED', 'OVERRIDDEN']);
+export const PageQualityResolutionSchema = z.object({
+  findingId: z.string().min(1),
+  status: PageQualityResolutionStatusSchema,
+  note: z.string().optional(),
+  resolvedAt: z.string().datetime(),
+  resolvedBy: z.string().min(1).default('operator'),
+});
+export type PageQualityResolution = z.infer<typeof PageQualityResolutionSchema>;
+export type PageQualityResolutionStatus = z.infer<typeof PageQualityResolutionStatusSchema>;
+
 export const ProjectConfigSchema = z.object({
   brand: BrandSchema.default('THE_WILDLANDS'),
   audience: AudienceSchema.default('ADULT'),
@@ -372,6 +397,14 @@ export const ProjectConfigSchema = z.object({
   layoutPolicy: LayoutPolicySchema.default({}),
   layoutPromptAssets: z.array(LayoutPromptAssetSchema).default([]),
   layoutApprovals: z.record(LayoutApprovalSchema).default({}),
+  pageQualityReview: z
+    .object({
+      reviewedAt: z.string().datetime(),
+      review: z.unknown(),
+    })
+    .optional(),
+  pageQualityResolutions: z.record(PageQualityResolutionSchema).default({}),
+  proofArtifacts: z.array(ProofArtifactSchema).default([]),
   outputProfile: OutputProfileSchema.default({}),
   /** Set by Page Plan; compared against current config to detect a stale plan. */
   planMeta: PlanMetaSchema.optional(),

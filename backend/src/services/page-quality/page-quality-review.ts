@@ -1,4 +1,12 @@
-import { PageManifestSchema, ProjectConfigSchema, type LayoutTemplateId, type PageManifest, type ProjectConfig } from '@wildlands/shared';
+import { createHash } from 'node:crypto';
+import {
+  PageManifestSchema,
+  ProjectConfigSchema,
+  type LayoutTemplateId,
+  type PageManifest,
+  type PageQualityResolution,
+  type ProjectConfig,
+} from '@wildlands/shared';
 import { listManifests } from '../../db/repositories/manifests.repo.js';
 import { getProject } from '../../db/repositories/projects.repo.js';
 import { buildTextFitPreview, type PageFitPreview } from '../../pipeline/stage-6-layout/text-fit-preview.js';
@@ -39,6 +47,7 @@ export interface PageQualityRecommendation {
 }
 
 export interface PageQualityFinding {
+  findingId: string;
   severity: PageQualitySeverity;
   scope: PageQualityScope;
   category: PageQualityCategory;
@@ -51,6 +60,7 @@ export interface PageQualityFinding {
   expectedResult: string;
   alternatives: string[];
   metrics: Record<string, number | string | boolean>;
+  resolution?: PageQualityResolution;
 }
 
 export interface ChapterQualitySummary {
@@ -148,6 +158,25 @@ function roundPercent(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+function stableFindingId(finding: Omit<PageQualityFinding, 'findingId'>): string {
+  const raw = [
+    finding.scope,
+    finding.category,
+    finding.pageKey ?? '',
+    finding.chapterNumber ?? '',
+    finding.layoutTemplate ?? '',
+    finding.problem,
+  ].join('|');
+  return createHash('sha256').update(raw).digest('hex').slice(0, 16);
+}
+
+function attachFindingIds(findings: Array<Omit<PageQualityFinding, 'findingId'> | PageQualityFinding>): PageQualityFinding[] {
+  return findings.map((finding) => {
+    if ('findingId' in finding && finding.findingId) return finding;
+    return { ...finding, findingId: stableFindingId(finding) };
+  });
+}
+
 function layoutBand(layoutTemplate: string): 'FEATURE' | 'MIXED' | 'TEXT_FIRST' {
   const template = layoutTemplate as LayoutTemplateId;
   if (FEATURE_LAYOUTS.has(template)) return 'FEATURE';
@@ -206,7 +235,7 @@ function underfilledFix(page: PageFitPreview): PageQualityRecommendation {
   };
 }
 
-function pushPageFindings(findings: PageQualityFinding[], page: PageFitPreview): void {
+function pushPageFindings(findings: Array<Omit<PageQualityFinding, 'findingId'>>, page: PageFitPreview): void {
   const tailRatio = continuationTailRatio(page);
   if (page.allocation.estimatedRenderedPages > 1 && tailRatio > 0 && tailRatio < 0.28) {
     findings.push({
@@ -277,7 +306,11 @@ function pushPageFindings(findings: PageQualityFinding[], page: PageFitPreview):
   }
 }
 
-function pushChapterFindings(findings: PageQualityFinding[], chapterPages: PageFitPreview[], chapterNumber: number): ChapterQualitySummary {
+function pushChapterFindings(
+  findings: Array<Omit<PageQualityFinding, 'findingId'>>,
+  chapterPages: PageFitPreview[],
+  chapterNumber: number,
+): ChapterQualitySummary {
   const dist = distributionFor(chapterPages);
   const layoutCounts = countLayouts(chapterPages);
   const dominant = layoutCounts[0];
@@ -341,7 +374,11 @@ function pushChapterFindings(findings: PageQualityFinding[], chapterPages: PageF
   };
 }
 
-function pushBookFindings(findings: PageQualityFinding[], pages: PageFitPreview[], distribution: PageQualityReview['distribution']): void {
+function pushBookFindings(
+  findings: Array<Omit<PageQualityFinding, 'findingId'>>,
+  pages: PageFitPreview[],
+  distribution: PageQualityReview['distribution'],
+): void {
   const style = WILDLANDS_PUBLISHING_STYLE;
   if (distribution.featurePercent < style.featurePageTargetPercent.min) {
     findings.push({
@@ -393,21 +430,22 @@ function nextActionFor(findings: PageQualityFinding[]): string {
 
 export function buildPageQualityReview(pageManifests: PageManifest[], config: ProjectConfig): PageQualityReview {
   const textFit = buildTextFitPreview(pageManifests, config);
-  const findings: PageQualityFinding[] = [];
+  const rawFindings: Array<Omit<PageQualityFinding, 'findingId'>> = [];
 
-  for (const page of textFit.pages) pushPageFindings(findings, page);
+  for (const page of textFit.pages) pushPageFindings(rawFindings, page);
 
   const chapters = Array.from(new Set(pageManifests.map((page) => page.chapterNumber))).sort((a, b) => a - b);
   const chapterSummaries = chapters.map((chapterNumber) =>
     pushChapterFindings(
-      findings,
+      rawFindings,
       textFit.pages.filter((page) => Number(page.pageKey.slice(2, 4)) === chapterNumber),
       chapterNumber,
     ),
   );
 
   const distribution = { ...distributionFor(textFit.pages), layoutCounts: countLayouts(textFit.pages) };
-  pushBookFindings(findings, textFit.pages, distribution);
+  pushBookFindings(rawFindings, textFit.pages, distribution);
+  const findings = attachFindingIds(rawFindings);
 
   const blockers = findings.filter((finding) => finding.severity === 'BLOCKER').length;
   const warnings = findings.filter((finding) => finding.severity === 'WARNING').length;

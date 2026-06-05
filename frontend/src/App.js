@@ -1085,6 +1085,8 @@ function defaultProjectConfig() {
     },
     layoutPromptAssets: defaultLayoutPromptAssets(),
     layoutApprovals: {},
+    pageQualityResolutions: {},
+    proofArtifacts: [],
     outputProfile: {
       printEdition: "PREMIUM",
       ebookEdition: "KINDLE_EPUB",
@@ -1109,6 +1111,9 @@ function normalizeProjectConfig(config) {
     outputProfile: { ...base.outputProfile, ...(incoming.outputProfile || {}) },
     layoutPromptAssets: Array.isArray(incoming.layoutPromptAssets) && incoming.layoutPromptAssets.length ? incoming.layoutPromptAssets : base.layoutPromptAssets,
     layoutApprovals: incoming.layoutApprovals || {},
+    pageQualityReview: incoming.pageQualityReview || null,
+    pageQualityResolutions: incoming.pageQualityResolutions || {},
+    proofArtifacts: Array.isArray(incoming.proofArtifacts) ? incoming.proofArtifacts : [],
   };
 }
 
@@ -1292,6 +1297,7 @@ function App() {
   const [pageQualityReview, setPageQualityReview] = useState(null);
   const [formatCalibration, setFormatCalibration] = useState(null);
   const [layoutApprovals, setLayoutApprovals] = useState({});
+  const [proofArtifacts, setProofArtifacts] = useState([]);
   const [pageImages, setPageImages] = useState({});
   const [imageLibrary, setImageLibrary] = useState({ total: 0, assets: [] });
   const [imageLibraryFilter, setImageLibraryFilter] = useState({ q: "", status: "", layout: "", chapter: "" });
@@ -1383,11 +1389,38 @@ function App() {
   const reviewChapterPages = reviewChapterNumber
     ? pageManifests.filter((page) => page.chapterNumber === reviewChapterNumber).sort((a, b) => Number(a.pageNumber || 0) - Number(b.pageNumber || 0))
     : [];
+  const savedReviewChapterProof = useMemo(
+    () =>
+      proofArtifacts.find(
+        (artifact) =>
+          artifact.kind === "CHAPTER_PROOF" && Number(artifact.chapterNumber) === Number(reviewChapterNumber),
+      ) || null,
+    [proofArtifacts, reviewChapterNumber],
+  );
   const hasReviewChapterProof = Boolean(
     pdfPreview.url &&
       (pdfPreview.kind === "book" || (pdfPreview.kind === "chapter" && pdfPreview.chapterNumber === reviewChapterNumber)),
-  );
+  ) || Boolean(savedReviewChapterProof);
   const selectedChapterApproval = selectedChapterNumber ? layoutApprovals[String(selectedChapterNumber)] : null;
+  const qualityResolutions = useMemo(() => projectConfig.pageQualityResolutions || {}, [projectConfig.pageQualityResolutions]);
+  const selectedChapterPageKeys = useMemo(
+    () => new Set(pageManifests.filter((page) => page.chapterNumber === selectedChapterNumber).map((page) => page.pageId)),
+    [pageManifests, selectedChapterNumber],
+  );
+  const selectedChapterQualityFindings = useMemo(
+    () =>
+      (pageQualityReview?.findings || []).filter((finding) => {
+        if (finding.scope === "BOOK") return true;
+        if (Number(finding.chapterNumber) === Number(selectedChapterNumber)) return true;
+        if (finding.pageKey && selectedChapterPageKeys.has(finding.pageKey)) return true;
+        return false;
+      }),
+    [pageQualityReview, selectedChapterNumber, selectedChapterPageKeys],
+  );
+  const unresolvedSelectedChapterQualityFindings = useMemo(
+    () => selectedChapterQualityFindings.filter((finding) => !(finding.resolution || qualityResolutions[finding.findingId])),
+    [qualityResolutions, selectedChapterQualityFindings],
+  );
   const selectedImages = selectedPage ? pageImages[selectedPage.id] || [] : [];
   const activeImage = latestActiveVersion(selectedImages);
   const libraryLayouts = useMemo(
@@ -1404,6 +1437,12 @@ function App() {
   const plannedPageCount = pages.filter((page) => page.layoutTemplate && page.imagePrompt && page.imagePromptSha256).length;
   const imagePageCount = pages.filter((page) => ["REVIEW", "APPROVED", "PRINT_READY"].includes(page.status)).length;
   const approvedImagePageCount = pages.filter((page) => ["APPROVED", "PRINT_READY"].includes(page.status)).length;
+  const bookProductionReady = Boolean(
+    pages.length > 0 &&
+      chapterManifests.length > 0 &&
+      approvedChapterCount === chapterManifests.length &&
+      approvedImagePageCount === pages.length,
+  );
   const operatorGuidance = useMemo(() => {
     if (busy) {
       return {
@@ -1514,11 +1553,14 @@ function App() {
       };
     }
     if (!selectedChapterApproval) {
+      const unresolvedCount = unresolvedSelectedChapterQualityFindings.length;
       return {
         stageKey: "layout",
         stageLabel: "Approve Layouts",
         status: "Waiting on you",
-        nextAction: "Approve the selected chapter layout once text-fit has no blocking readability issues.",
+        nextAction: unresolvedCount
+          ? `Resolve ${unresolvedCount} Page Quality finding(s) for ${selectedChapterLabel}, then approve the layout.`
+          : "Approve the selected chapter layout once text-fit and Page Quality decisions are complete.",
         afterAction: "After layout approval, render a chapter proof with placeholders.",
         buttonLabel: `Approve Layout for ${selectedChapterLabel}`,
         actionKey: "approve-layout",
@@ -1576,6 +1618,7 @@ function App() {
     selectedChapterLabel,
     selectedProject?.manuscriptPath,
     reviewChapterLabel,
+    unresolvedSelectedChapterQualityFindings.length,
   ]);
 
   function chapterApproval(chapterNumber) {
@@ -2051,6 +2094,7 @@ function App() {
     setPageQualityReview(null);
     setFormatCalibration(null);
     setPageImages({});
+    setProofArtifacts([]);
     setChapterIntelligence(null);
     setProductionDashboard(null);
     setPlannedPages([]);
@@ -2085,6 +2129,7 @@ function App() {
       setChapterIntelligence(null);
       setProductionDashboard(null);
       setLayoutApprovals({});
+      setProofArtifacts([]);
       resetProofDesk();
       setPdfPreview((current) => {
         if (current.url) URL.revokeObjectURL(current.url);
@@ -2169,7 +2214,12 @@ function App() {
       call(`/api/projects/${projectId}/pages`),
       call(`/api/projects/${projectId}/config`).catch((err) => ({ config: null, error: err instanceof Error ? err.message : String(err) })),
     ]);
-    if (configData?.config) setProjectConfig(normalizeProjectConfig(configData.config));
+    if (configData?.config) {
+      const normalized = normalizeProjectConfig(configData.config);
+      setProjectConfig(normalized);
+      setProofArtifacts(normalized.proofArtifacts || []);
+      setPageQualityReview(normalized.pageQualityReview?.review || null);
+    }
     else if (configData?.error) appendLog("issue", `Project standards not loaded yet: ${configData.error}`);
     setManifests(manifestData.manifests || []);
     const incomingPages = pageData.pages || [];
@@ -2205,6 +2255,27 @@ function App() {
     setProductionDashboard(data);
     appendLog("success", `Production dashboard refreshed: ${data.status}.`);
     return data;
+  }
+
+  async function loadProofArtifacts(projectId = activeProjectId) {
+    if (!projectId) throw new Error("Create or select a project first.");
+    const data = await call(`/api/projects/${projectId}/proof-artifacts`);
+    setProofArtifacts(data.artifacts || []);
+    return data.artifacts || [];
+  }
+
+  async function openProofArtifact(artifact) {
+    if (!activeProjectId || !artifact?.id) throw new Error("Select a saved proof first.");
+    const { blob, headers } = await callPdf(`/api/projects/${activeProjectId}/proof-artifacts/${artifact.id}/file`);
+    const pages = headers.get("x-total-pages") || artifact.totalPages || "?";
+    setRenderedChapterNumber(artifact.chapterNumber || renderedChapterNumber);
+    setPreviewBlob(artifact.title, blob, `${pages} saved rendered page(s) - ${new Date(artifact.createdAt).toLocaleString()}`, {
+      kind: artifact.kind === "BOOK_PROOF" ? "book" : artifact.kind === "PAGE_PROOF" ? "page" : "chapter",
+      chapterNumber: artifact.chapterNumber || null,
+      pageKey: artifact.pageKey || "",
+    });
+    setMessage(`Opened saved proof artifact: ${artifact.title}.`);
+    appendLog("success", `Opened saved proof artifact: ${artifact.title}.`);
   }
 
   async function refreshIntelligence() {
@@ -2541,11 +2612,44 @@ function App() {
       method: "POST",
     });
     setPageQualityReview(data);
+    setProjectConfig((current) => ({
+      ...current,
+      pageQualityReview: { reviewedAt: new Date().toISOString(), review: data },
+    }));
     setMessage(`Page Quality Review found ${data.totals?.findings || 0} publishing director recommendation(s).`);
     appendLog(
       data.status === "READY" ? "success" : "issue",
       `Page Quality Review: ${data.totals?.findings || 0} finding(s), ${data.totals?.awkwardContinuations || 0} continuation risk(s), ${data.totals?.underfilledPages || 0} underfilled page(s).`,
     );
+  }
+
+  async function resolvePageQualityFinding(finding, status, note = "") {
+    if (!activeProjectId) throw new Error("Create or select a project first.");
+    if (!finding?.findingId) throw new Error("Quality finding is missing a stable ID. Refresh Page Quality Review.");
+    const data = await call(`/api/projects/${activeProjectId}/page-quality-resolutions`, {
+      method: "POST",
+      body: JSON.stringify({ findingId: finding.findingId, status, note }),
+    });
+    setPageQualityReview(data);
+    const resolutions = Object.fromEntries(
+      (data.findings || [])
+        .filter((candidate) => candidate.resolution)
+        .map((candidate) => [candidate.findingId, candidate.resolution]),
+    );
+    setProjectConfig((current) => ({
+      ...current,
+      pageQualityReview: { reviewedAt: new Date().toISOString(), review: data },
+      pageQualityResolutions: { ...(current.pageQualityResolutions || {}), ...resolutions },
+    }));
+    appendLog("success", `${status.replace("_", " ")} Page Quality finding: ${finding.pageKey || (finding.chapterNumber ? `Chapter ${finding.chapterNumber}` : "Book")}.`);
+  }
+
+  async function resolveSelectedChapterQualityFindings(status) {
+    if (!unresolvedSelectedChapterQualityFindings.length) return false;
+    for (const finding of unresolvedSelectedChapterQualityFindings) {
+      await resolvePageQualityFinding(finding, status, `Bulk ${status.toLowerCase()} for ${selectedChapterLabel}.`);
+    }
+    setMessage(`${status} ${unresolvedSelectedChapterQualityFindings.length} Page Quality finding(s) for ${selectedChapterLabel}.`);
   }
 
   async function approveChapterLayout(chapterNumber = selectedChapterNumber, projectId = activeProjectId) {
@@ -2702,6 +2806,7 @@ function App() {
     });
     setMessage(`Rendered Chapter ${chapterNumber} proof: ${renderedPages} pages.`);
     appendLog("success", `Rendered Chapter ${chapterNumber} proof: ${renderedPages} pages.`);
+    await loadProofArtifacts(activeProjectId);
     await refreshChapterIntelligenceAfterRender(chapterNumber);
   }
 
@@ -2722,12 +2827,16 @@ function App() {
     });
     setMessage(`Rendered selected page proof for ${pageKey}: ${renderedPages} pages.`);
     appendLog("success", `Rendered selected page proof for ${pageKey}: ${renderedPages} pages.`);
+    await loadProofArtifacts(activeProjectId);
     if (page?.chapterNumber) await refreshChapterIntelligenceAfterRender(page.chapterNumber);
   }
 
   async function renderBookPreview() {
     if (!activeProjectId) throw new Error("Create or select a project first.");
-    if (!window.confirm(`Render Full Book PDF Proof for ${chapterManifests.length} chapters and ${pageManifests.length} mapped entries? This may take longer than a chapter render.`)) return false;
+    const readiness = bookProductionReady
+      ? "This book is marked production-ready."
+      : `Draft proof only: ${approvedChapterCount}/${chapterManifests.length || 0} chapters approved and ${approvedImagePageCount}/${pages.length || 0} pages have approved art.`;
+    if (!window.confirm(`Render Full Book PDF Proof for ${chapterManifests.length} chapters and ${pageManifests.length} mapped entries?\n\n${readiness}\n\nThis may take longer than a chapter render.`)) return false;
     const { blob, headers } = await callPdf(`/api/projects/${activeProjectId}/render-book`, {
       method: "POST",
     });
@@ -2737,6 +2846,7 @@ function App() {
     });
     setMessage(`Rendered full book PDF proof: ${pageCount} pages.`);
     appendLog("success", `Rendered full book PDF proof: ${pageCount} pages.`);
+    await loadProofArtifacts(activeProjectId);
   }
 
   async function renderCoverPreview() {
@@ -2746,10 +2856,14 @@ function App() {
       kind: "cover",
     });
     appendLog("success", "Rendered cover preview.");
+    await loadProofArtifacts(activeProjectId);
   }
 
   async function renderBookReport() {
     if (!activeProjectId) throw new Error("Create or select a project first.");
+    if (!bookProductionReady) {
+      throw new Error(`Book is not production-ready: ${approvedChapterCount}/${chapterManifests.length || 0} chapters approved and ${approvedImagePageCount}/${pages.length || 0} pages have approved art.`);
+    }
     const data = await call(`/api/projects/${activeProjectId}/render-book?format=json`, {
       method: "POST",
     });
@@ -3875,20 +3989,57 @@ function App() {
                       </div>
                     </div>
                     <p className="next-action">{pageQualityReview.nextAction}</p>
+                    <div className={`quality-gate-summary ${unresolvedSelectedChapterQualityFindings.length ? "blocked" : "ready"}`}>
+                      <div>
+                        <strong>{selectedChapterLabel} quality gate</strong>
+                        <span>
+                          {unresolvedSelectedChapterQualityFindings.length
+                            ? `${unresolvedSelectedChapterQualityFindings.length} finding(s) need an operator decision before layout approval.`
+                            : "All current-chapter findings have an operator decision."}
+                        </span>
+                      </div>
+                      <div className="button-row">
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={busy || unresolvedSelectedChapterQualityFindings.length === 0}
+                          onClick={() => run(`Accepting Page Quality findings for ${selectedChapterLabel}...`, () => resolveSelectedChapterQualityFindings("ACCEPTED"))}
+                        >
+                          Accept All for {selectedChapterLabel}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={busy || unresolvedSelectedChapterQualityFindings.length === 0}
+                          onClick={() => run(`Deferring Page Quality findings for ${selectedChapterLabel}...`, () => resolveSelectedChapterQualityFindings("DEFERRED"))}
+                        >
+                          Defer All for {selectedChapterLabel}
+                        </button>
+                      </div>
+                    </div>
                     <div className="quality-findings">
-                      {(pageQualityReview.findings || []).slice(0, 6).map((finding, index) => (
-                        <article className={`quality-finding ${finding.severity.toLowerCase()}`} key={`${finding.scope}-${finding.pageKey || finding.chapterNumber || "book"}-${index}`}>
+                      {selectedChapterQualityFindings.map((finding, index) => {
+                        const resolution = finding.resolution || qualityResolutions[finding.findingId];
+                        return (
+                        <article className={`quality-finding ${finding.severity.toLowerCase()} ${resolution ? "resolved" : "open"}`} key={finding.findingId || `${finding.scope}-${finding.pageKey || finding.chapterNumber || "book"}-${index}`}>
                           <div>
                             <strong>{finding.pageKey || (finding.chapterNumber ? `Chapter ${finding.chapterNumber}` : "Book")}</strong>
                             <span>{finding.problem}</span>
+                            <em>{resolution ? normalizeStatus(resolution.status) : "decision needed"}</em>
                           </div>
                           <p><b>Why it matters:</b> {finding.whyItMatters}</p>
                           <p><b>Recommended fix:</b> {finding.recommendedFix}</p>
                           <p><b>Expected result:</b> {finding.expectedResult}</p>
+                          <div className="quality-resolution-actions">
+                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Accepting quality finding...", () => resolvePageQualityFinding(finding, "ACCEPTED"))}>Accept</button>
+                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Marking quality finding fixed...", () => resolvePageQualityFinding(finding, "FIXED"))}>Fix</button>
+                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Deferring quality finding...", () => resolvePageQualityFinding(finding, "DEFERRED"))}>Defer</button>
+                            <button type="button" disabled={busy || Boolean(resolution)} onClick={() => run("Overriding quality finding...", () => resolvePageQualityFinding(finding, "OVERRIDDEN"))}>Override</button>
+                          </div>
                         </article>
-                      ))}
-                      {(pageQualityReview.findings || []).length === 0 && <p className="empty">No major page-quality issues detected. The plan is ready for layout approval review.</p>}
-                      {(pageQualityReview.findings || []).length > 6 && <p className="hint">{pageQualityReview.findings.length - 6} more recommendation(s) hidden to keep this review focused.</p>}
+                        );
+                      })}
+                      {selectedChapterQualityFindings.length === 0 && <p className="empty">No major page-quality issues detected for {selectedChapterLabel}. The plan is ready for layout approval review.</p>}
                     </div>
                   </>
                 ) : (
@@ -3903,8 +4054,10 @@ function App() {
                   <span>
                     {selectedChapterApproval
                       ? `Approved ${new Date(selectedChapterApproval.approvedAt).toLocaleString()}`
-                      : pageQualityReview
-                        ? "Approve this chapter layout after reviewing the Page Quality recommendations."
+                      : unresolvedSelectedChapterQualityFindings.length
+                        ? `Resolve ${unresolvedSelectedChapterQualityFindings.length} Page Quality finding(s) before approval.`
+                        : pageQualityReview
+                        ? "Page Quality decisions complete. This chapter can be approved for proof/image spend."
                         : "Run Page Quality Review before approving this chapter for image generation spend."}
                   </span>
                 </div>
@@ -3918,7 +4071,7 @@ function App() {
                     👁 Preview {selectedChapterLabel} (see the pages)
                   </button>
                   <button
-                    disabled={busy || !activeProjectId || !pageQualityReview || chapterPages(selectedChapterNumber).length === 0}
+                    disabled={busy || !activeProjectId || !pageQualityReview || unresolvedSelectedChapterQualityFindings.length > 0 || chapterPages(selectedChapterNumber).length === 0}
                     onClick={() => run(`Approving layout for ${selectedChapterLabel}...`, () => approveChapterLayout(selectedChapterNumber), () => scrollToWorkspaceSection(".layout-approval-panel", "center"))}
                   >
                     {selectedChapterApproval ? `Re-approve Layout for ${selectedChapterLabel}` : `Approve Layout for ${selectedChapterLabel}`}
@@ -4357,6 +4510,33 @@ function App() {
                 {reviewChapterPages.length === 0 && <span className="empty-inline">No pages available for this chapter.</span>}
               </div>
             </div>
+            <div className="saved-proof-artifacts">
+              <div className="section-head compact">
+                <div>
+                  <strong>Saved Proof Artifacts</strong>
+                  <p className="hint">Reload rendered proofs after refresh without rendering again. New proofs are saved automatically.</p>
+                </div>
+                <button type="button" className="secondary" disabled={busy || !activeProjectId} onClick={() => run("Loading saved proof artifacts...", () => loadProofArtifacts(activeProjectId))}>
+                  Refresh Saved Proofs
+                </button>
+              </div>
+              <div className="proof-artifact-list">
+                {proofArtifacts.slice(0, 8).map((artifact) => (
+                  <article className="proof-artifact" key={artifact.id}>
+                    <div>
+                      <strong>{artifact.title}</strong>
+                      <span>
+                        {normalizeStatus(artifact.kind)} · {artifact.totalPages} page(s) · {new Date(artifact.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                    <button type="button" disabled={busy} onClick={() => run(`Opening saved proof ${artifact.title}...`, () => openProofArtifact(artifact), () => scrollToWorkspaceSection(".pdf-preview-frame"))}>
+                      Open Saved Proof
+                    </button>
+                  </article>
+                ))}
+                {proofArtifacts.length === 0 && <p className="empty">No saved proof artifacts yet. Render a chapter proof to create the first one.</p>}
+              </div>
+            </div>
             {pdfPreview.url ? (
               <div className="pdf-preview-frame">
                 <div className="section-head">
@@ -4410,8 +4590,12 @@ function App() {
               <p className="empty">No PDF preview rendered yet.</p>
             )}
             <div className="button-row">
-              <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering book report...", renderBookReport, () => scrollToWorkspaceSection(".production-dashboard"))}>
-                Save Export Report
+              <button
+                disabled={busy || !bookProductionReady}
+                title={bookProductionReady ? "Render and save the final book proof report." : "Locked until every chapter is approved and every page has approved art."}
+                onClick={() => run("Rendering production-ready book report...", renderBookReport, () => scrollToWorkspaceSection(".production-dashboard"))}
+              >
+                Save Production-Ready Export Report
               </button>
               <button disabled title="Backend EPUB export endpoint is not exposed yet.">
                 EPUB Export Not Wired

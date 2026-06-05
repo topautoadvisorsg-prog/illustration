@@ -2381,6 +2381,36 @@ button.secondary {
   gap: 10px;
 }
 
+.quality-gate-summary {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #d4c8b8;
+  border-radius: 8px;
+  padding: 11px;
+  background: #fff;
+}
+
+.quality-gate-summary.blocked {
+  border-color: #b98222;
+  background: #fff8ea;
+}
+
+.quality-gate-summary.ready {
+  border-color: #2f7a57;
+  background: #edf6f0;
+}
+
+.quality-gate-summary > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.quality-gate-summary span {
+  color: #6d6258;
+}
+
 .quality-finding {
   display: grid;
   gap: 7px;
@@ -2402,6 +2432,10 @@ button.secondary {
   border-left-color: #a33a2f;
 }
 
+.quality-finding.resolved {
+  opacity: 0.76;
+}
+
 .quality-finding > div {
   display: flex;
   flex-wrap: wrap;
@@ -2414,9 +2448,32 @@ button.secondary {
   font-weight: 700;
 }
 
+.quality-finding > div em {
+  margin-left: auto;
+  border: 1px solid #d4c8b8;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #4d453d;
+  background: #f9f5eb;
+  font-size: 0.76rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
 .quality-finding p {
   margin: 0;
   color: #4d453d;
+}
+
+.quality-resolution-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.quality-resolution-actions button {
+  min-height: 34px;
+  padding: 6px 10px;
 }
 
 .selected-page-summary {
@@ -2537,6 +2594,41 @@ button.secondary {
 
 .preview-review-card {
   grid-column: 1 / -1;
+}
+
+.saved-proof-artifacts {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #d4c8b8;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffdf8;
+}
+
+.proof-artifact-list {
+  display: grid;
+  gap: 8px;
+}
+
+.proof-artifact {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #e0d7ca;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+}
+
+.proof-artifact > div {
+  display: grid;
+  gap: 3px;
+}
+
+.proof-artifact span {
+  color: #6d6258;
+  font-size: 0.88rem;
 }
 
 .pdf-preview-frame {
@@ -3004,7 +3096,9 @@ button.secondary {
 
   .operator-checkpoints,
   .operator-guidance,
-  .library-controls {
+  .library-controls,
+  .quality-gate-summary,
+  .proof-artifact {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
 
@@ -3044,6 +3138,11 @@ button.secondary {
   }
 
   .dashboard-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .quality-gate-summary,
+  .proof-artifact {
     grid-template-columns: 1fr;
   }
 

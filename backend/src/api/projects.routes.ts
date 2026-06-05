@@ -5,6 +5,8 @@ import {
   CreateProjectRequestSchema,
   LayoutApprovalSchema,
   PageManifestSchema,
+  PageQualityResolutionSchema,
+  ProofArtifactSchema,
   ProjectConfigSchema,
   type ProjectConfig,
   type LayoutTemplateId,
@@ -39,7 +41,9 @@ import {
   getProjectProductionDashboard,
 } from '../services/operator-intelligence/operator-intelligence.js';
 import { reviewProjectPageQuality } from '../services/page-quality/page-quality-review.js';
+import type { PageQualityFinding, PageQualityReview } from '../services/page-quality/page-quality-review.js';
 import { calibrateProjectChapterFormats } from '../services/calibration/format-calibration.js';
+import { getProjectStorage } from '../services/storage/project-storage.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 const ProjectPageParamsSchema = z.object({ id: z.string().uuid(), pageKey: z.string().min(1) });
@@ -55,6 +59,7 @@ const ChapterFormatCalibrationParamsSchema = z.object({
   id: z.string().uuid(),
   chapterNumber: z.coerce.number().int().positive(),
 });
+const ProofArtifactParamsSchema = z.object({ id: z.string().uuid(), artifactId: z.string().min(1) });
 
 const LayoutApprovalContractSchema = LayoutApprovalSchema;
 const LayoutApprovalsSchema = z.record(LayoutApprovalContractSchema);
@@ -65,6 +70,40 @@ function parseProjectConfig(row: ProjectRow): ProjectConfig {
 
 function getLayoutApprovals(row: ProjectRow): ProjectConfig['layoutApprovals'] {
   return parseProjectConfig(row).layoutApprovals ?? {};
+}
+
+function withQualityResolutions(review: PageQualityReview, config: ProjectConfig): PageQualityReview {
+  const resolutions = config.pageQualityResolutions ?? {};
+  return {
+    ...review,
+    findings: review.findings.map((finding) => ({
+      ...finding,
+      resolution: resolutions[finding.findingId],
+    })),
+  };
+}
+
+function chapterQualityFindings(
+  review: PageQualityReview,
+  chapterNumber: number,
+  pageKeys: Set<string>,
+): PageQualityFinding[] {
+  return review.findings.filter((finding) => {
+    if (finding.scope === 'BOOK') return true;
+    if (finding.chapterNumber === chapterNumber) return true;
+    if (finding.pageKey && pageKeys.has(finding.pageKey)) return true;
+    return false;
+  });
+}
+
+function unresolvedChapterQualityFindings(
+  review: PageQualityReview,
+  config: ProjectConfig,
+  chapterNumber: number,
+  pageKeys: Set<string>,
+): PageQualityFinding[] {
+  const resolutions = config.pageQualityResolutions ?? {};
+  return chapterQualityFindings(review, chapterNumber, pageKeys).filter((finding) => !resolutions[finding.findingId]);
 }
 
 /**
@@ -508,6 +547,7 @@ const PageQualityReviewResponseSchema = z.object({
   ),
   findings: z.array(
     z.object({
+      findingId: z.string(),
       severity: z.enum(['BLOCKER', 'WARNING', 'INFO']),
       scope: z.enum(['BOOK', 'CHAPTER', 'PAGE']),
       category: z.enum(['CONTINUATION', 'WHITESPACE', 'RHYTHM', 'ILLUSTRATION_BALANCE', 'LAYOUT_DIVERSITY', 'PUBLISHING_STYLE']),
@@ -520,6 +560,7 @@ const PageQualityReviewResponseSchema = z.object({
       expectedResult: z.string(),
       alternatives: z.array(z.string()),
       metrics: z.record(z.union([z.string(), z.number(), z.boolean()])),
+      resolution: PageQualityResolutionSchema.optional(),
     }),
   ),
 });
@@ -527,6 +568,16 @@ const PageQualityReviewResponseSchema = z.object({
 const ChapterLayoutApprovalResponseSchema = z.object({
   approval: LayoutApprovalContractSchema,
   layoutApprovals: LayoutApprovalsSchema,
+});
+
+const ProofArtifactsResponseSchema = z.object({
+  artifacts: z.array(ProofArtifactSchema),
+});
+
+const ResolvePageQualityFindingBodySchema = z.object({
+  findingId: z.string().min(1),
+  status: z.enum(['ACCEPTED', 'FIXED', 'DEFERRED', 'OVERRIDDEN']),
+  note: z.string().optional(),
 });
 
 export async function registerProjectRoutes(app: FastifyInstance): Promise<void> {
@@ -1087,7 +1138,52 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       }
       const review = await reviewProjectPageQuality(id);
       if (!review) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      const project = await getProject(id);
+      if (project) {
+        const config = parseProjectConfig(project);
+        await updateProjectConfig(id, {
+          ...config,
+          pageQualityReview: { reviewedAt: new Date().toISOString(), review },
+        });
+        return withQualityResolutions(review, config);
+      }
       return review;
+    },
+  );
+
+  app.post(
+    '/api/projects/:id/page-quality-resolutions',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        body: ResolvePageQualityFindingBodySchema,
+        response: { 200: PageQualityReviewResponseSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const body = ResolvePageQualityFindingBodySchema.parse(request.body);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      const config = parseProjectConfig(project);
+      const resolution = PageQualityResolutionSchema.parse({
+        findingId: body.findingId,
+        status: body.status,
+        note: body.note,
+        resolvedAt: new Date().toISOString(),
+        resolvedBy: 'operator',
+      });
+      const nextConfig = {
+        ...config,
+        pageQualityResolutions: {
+          ...(config.pageQualityResolutions ?? {}),
+          [body.findingId]: resolution,
+        },
+      };
+      await updateProjectConfig(id, nextConfig);
+      const review = await reviewProjectPageQuality(id);
+      if (!review) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      return withQualityResolutions(review, nextConfig);
     },
   );
 
@@ -1158,6 +1254,23 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       );
 
       const config = parseProjectConfig(project);
+      const qualityReview = await reviewProjectPageQuality(id);
+      if (!qualityReview) {
+        return reply.code(409).send({
+          error: 'Conflict',
+          message: 'Run Page Quality Review before approving layouts.',
+          statusCode: 409,
+        });
+      }
+      const unresolvedQuality = unresolvedChapterQualityFindings(qualityReview, config, chapterNumber, pageKeys);
+      if (unresolvedQuality.length > 0) {
+        return reply.code(409).send({
+          error: 'Conflict',
+          message: `Chapter ${chapterNumber} has ${unresolvedQuality.length} unresolved Page Quality finding(s). Accept, fix, defer, or override them before layout approval.`,
+          statusCode: 409,
+        });
+      }
+
       const approval = LayoutApprovalSchema.parse({
         status: 'APPROVED',
         chapterNumber,
@@ -1375,6 +1488,39 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     },
   );
 
+  app.get(
+    '/api/projects/:id/proof-artifacts',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        response: { 200: ProofArtifactsResponseSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Project Not Found', message: 'Project not found.', statusCode: 404 });
+      const config = parseProjectConfig(project);
+      return { artifacts: config.proofArtifacts ?? [] };
+    },
+  );
+
+  app.get('/api/projects/:id/proof-artifacts/:artifactId/file', async (request, reply) => {
+    const { id, artifactId } = ProofArtifactParamsSchema.parse(request.params);
+    const project = await getProject(id);
+    if (!project) return reply.code(404).send({ error: 'Project Not Found', message: 'Project not found.', statusCode: 404 });
+    const config = parseProjectConfig(project);
+    const artifact = (config.proofArtifacts ?? []).find((candidate) => candidate.id === artifactId);
+    if (!artifact) return reply.code(404).send({ error: 'Not Found', message: 'Proof artifact not found.', statusCode: 404 });
+    const pdf = await getProjectStorage().readProjectFile(artifact.storagePath);
+    reply.header('content-type', 'application/pdf');
+    reply.header('content-disposition', `inline; filename="${artifact.id}.pdf"`);
+    reply.header('x-total-pages', String(artifact.totalPages));
+    reply.header('x-proof-artifact-id', artifact.id);
+    reply.header('x-proof-created-at', artifact.createdAt);
+    return reply.send(pdf);
+  });
+
   function renderErrorStatus(code: string): 404 | 409 | 503 {
     if (code === 'not_found') return 404;
     if (code === 'no_chromium') return 503;
@@ -1386,13 +1532,17 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
   app.post('/api/projects/:id/pages/:pageKey/render', async (request, reply) => {
     const { id, pageKey } = ProjectPageParamsSchema.parse(request.params);
     try {
-      const { pdf, totalPages } = await renderPagePdf(id, pageKey);
+      const { pdf, totalPages, artifact } = await renderPagePdf(id, pageKey);
       if ((request.query as { format?: string } | undefined)?.format === 'json') {
-        return reply.send({ ok: true, pageKey, totalPages, bytes: pdf.byteLength });
+        return reply.send({ ok: true, pageKey, totalPages, bytes: pdf.byteLength, artifact });
       }
       reply.header('content-type', 'application/pdf');
       reply.header('content-disposition', `inline; filename="${pageKey}.pdf"`);
       reply.header('x-total-pages', String(totalPages));
+      if (artifact) {
+        reply.header('x-proof-artifact-id', artifact.id);
+        reply.header('x-proof-created-at', artifact.createdAt);
+      }
       return reply.send(pdf);
     } catch (error) {
       if (error instanceof RenderBlockedError) {
@@ -1407,13 +1557,17 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
   app.post('/api/projects/:id/chapters/:chapterNumber/render', async (request, reply) => {
     const { id, chapterNumber } = RenderChapterParamsSchema.parse(request.params);
     try {
-      const { pdf, totalPages } = await renderChapterPdf(id, chapterNumber);
+      const { pdf, totalPages, artifact } = await renderChapterPdf(id, chapterNumber);
       if ((request.query as { format?: string } | undefined)?.format === 'json') {
-        return reply.send({ ok: true, chapterNumber, totalPages, bytes: pdf.byteLength });
+        return reply.send({ ok: true, chapterNumber, totalPages, bytes: pdf.byteLength, artifact });
       }
       reply.header('content-type', 'application/pdf');
       reply.header('content-disposition', `inline; filename="chapter-${chapterNumber}.pdf"`);
       reply.header('x-total-pages', String(totalPages));
+      if (artifact) {
+        reply.header('x-proof-artifact-id', artifact.id);
+        reply.header('x-proof-created-at', artifact.createdAt);
+      }
       return reply.send(pdf);
     } catch (error) {
       if (error instanceof RenderBlockedError) {
@@ -1436,6 +1590,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           pageCount: result.pageCount,
           chaptersRendered: result.chaptersRendered,
           storedPath: result.storedPath,
+          artifact: result.artifact,
           preflight: result.preflight,
         });
       }
@@ -1443,6 +1598,10 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       reply.header('content-disposition', 'inline; filename="wildlands-book.pdf"');
       reply.header('x-page-count', String(result.pageCount));
       reply.header('x-preflight-passed', String(result.preflight.passed));
+      if (result.artifact) {
+        reply.header('x-proof-artifact-id', result.artifact.id);
+        reply.header('x-proof-created-at', result.artifact.createdAt);
+      }
       return reply.send(result.pdf);
     } catch (error) {
       if (error instanceof RenderBlockedError) {
@@ -1461,6 +1620,10 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       const result = await renderCoverPdf(id);
       reply.header('content-type', 'application/pdf');
       reply.header('content-disposition', 'inline; filename="wildlands-cover.pdf"');
+      if (result.artifact) {
+        reply.header('x-proof-artifact-id', result.artifact.id);
+        reply.header('x-proof-created-at', result.artifact.createdAt);
+      }
       return reply.send(result.pdf);
     } catch (error) {
       if (error instanceof RenderBlockedError) {
