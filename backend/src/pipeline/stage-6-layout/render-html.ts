@@ -290,12 +290,15 @@ function scrimGradient(slot: ArtSlot, coverage: number, paper: string, strong: b
     default: return `linear-gradient(${paperRgba(paper, strong ? 0.52 : 0.42)}, ${paperRgba(paper, strong ? 0.52 : 0.42)})`;
   }
 }
-/** The @page rule that makes this entry full-page artwork; `:first` keeps the opening page most vivid. */
-function entryArtworkPageCss(pageName: string, dataUri: string, slot: ArtSlot, coverage: number, paper: string): string {
-  const decl = (grad: string) =>
-    `background-image: ${grad}, url("${dataUri}"); background-size: cover, cover; background-position: center, center; background-repeat: no-repeat, no-repeat;`;
-  return `@page ${pageName} { ${decl(scrimGradient(slot, coverage, paper, true))} }
-  @page ${pageName}:first { ${decl(scrimGradient(slot, coverage, paper, false))} }`;
+/**
+ * Paint the entry's full-page artwork on the Paged.js SHEET (a real div that
+ * supports data-URI background images — unlike `@page`, where Chromium ignores
+ * url() backgrounds). `selector` scopes it: globally for a single-entry render,
+ * or to the entry's named-page class within a multi-entry chapter render.
+ */
+function artworkSheetCss(selector: string, dataUri: string, slot: ArtSlot, coverage: number, paper: string): string {
+  const grad = scrimGradient(slot, coverage, paper, false);
+  return `${selector} { background-image: ${grad}, url("${dataUri}") !important; background-size: cover, cover !important; background-position: center, center !important; background-repeat: no-repeat, no-repeat !important; }`;
 }
 /** First-page spacer that clears the image-priority zone so opening text lands in the text-safe region. */
 function prioritySpacerStyle(slot: ArtSlot, coverage: number, geometry: PageGeometry): string {
@@ -315,6 +318,9 @@ function textSafeStyle(slot: ArtSlot): string {
 function fullPageArtworkCss(t: Typography, c: Palette): string {
   return `.text-safe { position: relative; z-index: 1; }
   .art-spacer { width: 100%; }
+  /* Artwork lives on the sheet; keep the page box transparent so it shows behind the text. */
+  .pagedjs_sheet { background-color: ${c.paper}; }
+  .pagedjs_pagebox, .pagedjs_area { background: transparent !important; }
   .art-exclusion { width: 100%; min-height: 1.1in; box-sizing: border-box; display: flex; align-items: center; justify-content: center; text-align: center; border: 1px dashed ${c.accent}; color: ${c.accent}; font-family: var(--font-display); font-style: italic; font-size: ${t.captionPt}pt; background: rgba(232, 217, 176, 0.5); margin-bottom: 12pt; padding: 8pt; }`;
 }
 
@@ -336,8 +342,10 @@ function buildEntryArticle(
   geometry: PageGeometry,
   c: Palette,
   pageName: string,
+  /** true = multi-entry chapter (scope artwork to this entry's named-page class). */
+  perEntry: boolean,
   anchorId?: string,
-): { article: string; pageCss: string } {
+): { article: string; css: string } {
   const profile = getLayoutProfile(page.layoutTemplate);
   const danger = page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? ' is-danger' : '';
   const idAttr = anchorId ? ` id="${anchorId}"` : '';
@@ -350,11 +358,18 @@ function buildEntryArticle(
 
   if (page.imageDataUri) {
     const spacer = `<div class="art-spacer" style="${prioritySpacerStyle(profile.artSlot, profile.artAreaFraction, geometry)}"></div>`;
-    const article = `<article class="book-page art-page arch-${profile.artSlot}${danger}"${idAttr} style="page: ${pageName};">
+    // Single-entry render: every sheet is this entry → style the sheet globally.
+    // Chapter render: scope to this entry's named-page class so each entry keeps
+    // its own artwork (and continuation pages of the entry reuse it — rule i).
+    const sheetSelector = perEntry ? `.pagedjs_${pageName}_page .pagedjs_sheet` : '.pagedjs_sheet';
+    const register = perEntry ? `@page ${pageName} {}\n  ` : '';
+    const pageAttr = perEntry ? ` style="page: ${pageName};"` : '';
+    const article = `<article class="book-page art-page arch-${profile.artSlot}${danger}"${idAttr}${pageAttr}>
   ${spacer}
   ${textSafe}
 </article>`;
-    return { article, pageCss: entryArtworkPageCss(pageName, page.imageDataUri, profile.artSlot, profile.artAreaFraction, c.paper) };
+    const css = register + artworkSheetCss(sheetSelector, page.imageDataUri, profile.artSlot, profile.artAreaFraction, c.paper);
+    return { article, css };
   }
 
   // Planning placeholder: no artwork yet — mark the text-exclusion zone and flow
@@ -364,7 +379,7 @@ function buildEntryArticle(
   ${exclusion}
   ${textSafe}
 </article>`;
-  return { article, pageCss: '' };
+  return { article, css: '' };
 }
 
 /** Build the standalone HTML document for one page. */
@@ -374,7 +389,7 @@ export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: R
   const c = config.colorPalette;
   const m = geometry.margins;
 
-  const { article, pageCss } = buildEntryArticle(
+  const { article, css } = buildEntryArticle(
     {
       entryTitle: page.entryTitle,
       scientificName: page.scientificName,
@@ -385,6 +400,7 @@ export function buildPageHtml(page: PageManifest, config: ProjectConfig, opts: R
     geometry,
     c,
     'entrypage',
+    false,
   );
 
   const polyfill = opts.polyfillJs ? `<script>${opts.polyfillJs}</script>` : '';
@@ -403,7 +419,7 @@ ${fontLinkTags(t)}
     background: ${c.paper};
     ${pageBoxesCss(t, c, chapterLabel)}
   }
-  ${pageCss}
+  ${css}
   ${typographyStyleBlock(t, c)}
   ${fullPageArtworkCss(t, c)}
   ${page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? `.entry-title{color:${c.warning};} .is-danger .text-safe{border-left:4pt solid ${c.warning};padding-left:10pt;}` : ''}
@@ -477,9 +493,9 @@ export function buildChapterHtml(
   const m = geometry.margins;
   const chapterLabel = escapeHtml(`Chapter ${chapter.chapterNumber} — ${chapter.chapterTitle}`);
 
-  const built = pages.map((page, i) => buildEntryArticle(page, geometry, c, `entry-${chapter.chapterNumber}-${i}`));
+  const built = pages.map((page, i) => buildEntryArticle(page, geometry, c, `entryC${chapter.chapterNumber}E${i}`, true));
   const pagesHtml = built.map((b) => b.article).join('\n');
-  const entryPageCss = built.map((b) => b.pageCss).filter(Boolean).join('\n  ');
+  const entryPageCss = built.map((b) => b.css).filter(Boolean).join('\n  ');
 
   const polyfill = opts.polyfillJs ? `<script>${opts.polyfillJs}</script>` : '';
 

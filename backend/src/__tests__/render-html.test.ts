@@ -52,20 +52,15 @@ describe('buildPageHtml', () => {
     expect(html).not.toContain('background-image:'); // no artwork yet
   });
 
-  it('makes the image the full-page artwork (background), not an in-flow image box', () => {
+  it('makes the image the full-page artwork (sheet background), not an in-flow image box', () => {
     const html = buildPageHtml(page(), config, { geometry, imageDataUri: 'data:image/png;base64,AAAA' });
-    // Artwork is painted as the page background via a named @page rule + text-safe layer.
-    expect(html).toContain('@page entrypage');
+    // Artwork is painted on the Paged.js sheet (a real div, supports data-URI bg) + a text-safe layer.
+    expect(html).toContain('.pagedjs_sheet {');
     expect(html).toContain('url("data:image/png;base64,AAAA")');
     expect(html).toContain('background-size: cover');
     expect(html).toContain('class="text-safe"');
     expect(html).not.toContain('<img'); // the image is the page, not a boxed <img>
     expect(html).not.toContain('text-exclusion zone'); // exclusion marker is planning-only
-  });
-
-  it('keeps the opening page artwork most vivid via @page :first', () => {
-    const html = buildPageHtml(page(), config, { geometry, imageDataUri: 'data:image/png;base64,AAAA' });
-    expect(html).toContain('@page entrypage:first');
   });
 
   it('omits the Paged.js script unless a polyfill is provided (browser-free HTML)', () => {
