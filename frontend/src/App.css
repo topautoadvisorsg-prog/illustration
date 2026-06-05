@@ -1458,6 +1458,10 @@ h3 {
   cursor: not-allowed;
 }
 
+.page-plan-actions {
+  margin-top: 8px;
+}
+
 .danger-text {
   background: transparent;
   color: #b4541f;

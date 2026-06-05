@@ -3811,12 +3811,23 @@ function App() {
                         : "Run Page Quality Review before approving this chapter for image generation spend."}
                   </span>
                 </div>
-                <button
-                  disabled={busy || !activeProjectId || !pageQualityReview || chapterPages(selectedChapterNumber).length === 0}
-                  onClick={() => run(`Approving layout for ${selectedChapterLabel}...`, () => approveChapterLayout(selectedChapterNumber), () => scrollToWorkspaceSection(".layout-approval-panel", "center"))}
-                >
-                  {selectedChapterApproval ? `Re-approve Layout for ${selectedChapterLabel}` : `Approve Layout for ${selectedChapterLabel}`}
-                </button>
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busy || !activeProjectId || chapterPages(selectedChapterNumber).length === 0}
+                    onClick={() => run(`Rendering ${selectedChapterLabel} proof...`, () => renderChapterPreview(selectedChapterNumber), () => scrollToWorkspaceSection(".pdf-preview-frame"))}
+                  >
+                    👁 Preview {selectedChapterLabel} (see the pages)
+                  </button>
+                  <button
+                    disabled={busy || !activeProjectId || !pageQualityReview || chapterPages(selectedChapterNumber).length === 0}
+                    onClick={() => run(`Approving layout for ${selectedChapterLabel}...`, () => approveChapterLayout(selectedChapterNumber), () => scrollToWorkspaceSection(".layout-approval-panel", "center"))}
+                  >
+                    {selectedChapterApproval ? `Re-approve Layout for ${selectedChapterLabel}` : `Approve Layout for ${selectedChapterLabel}`}
+                  </button>
+                </div>
+                <p className="hint">Preview renders the real pages (placeholders now, your images once generated) so you approve what you can actually see.</p>
               </div>
             )}
             <div className="page-plan-list">
@@ -3851,6 +3862,18 @@ function App() {
                           <strong>{allocation.openingPageImagePercent}% image</strong>
                           <span>{allocation.imagePlacement}</span>
                         </div>
+                      </div>
+                    )}
+                    {selectedPage?.pageKey === page.pageId && (
+                      <div className="page-plan-actions">
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={busy}
+                          onClick={() => run(`Rendering ${page.pageId} proof...`, () => renderPagePreview(page.pageId), () => scrollToWorkspaceSection(".pdf-preview-frame"))}
+                        >
+                          👁 Preview this page (render proof)
+                        </button>
                       </div>
                     )}
                     {advancedMode && (
