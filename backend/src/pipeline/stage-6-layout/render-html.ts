@@ -297,8 +297,17 @@ function scrimGradient(slot: ArtSlot, coverage: number, paper: string, strong: b
  * or to the entry's named-page class within a multi-entry chapter render.
  */
 function artworkSheetCss(selector: string, dataUri: string, slot: ArtSlot, coverage: number, paper: string): string {
-  const grad = scrimGradient(slot, coverage, paper, false);
-  return `${selector} { background-image: ${grad}, url("${dataUri}") !important; background-size: cover, cover !important; background-position: center, center !important; background-repeat: no-repeat, no-repeat !important; }`;
+  const url = `url("${dataUri}")`;
+  const decl = (grad: string) =>
+    `background-image: ${grad}, ${url} !important; background-size: cover, cover !important; background-position: center, center !important; background-repeat: no-repeat, no-repeat !important;`;
+  // Opening page: edge gradient keeps the image-priority zone vivid, scrims the text zone.
+  const firstGrad = scrimGradient(slot, coverage, paper, false);
+  // Continuation pages: text can land anywhere, so a uniform readable veil — readability first.
+  const contGrad = `linear-gradient(${paperRgba(paper, 0.6)}, ${paperRgba(paper, 0.6)})`;
+  // `.pagedjs_first_page` = the opening sheet; everything else is continuation.
+  const firstSel = selector.replace('.pagedjs_sheet', '.pagedjs_first_page .pagedjs_sheet');
+  return `${selector} { ${decl(contGrad)} }
+  ${firstSel} { ${decl(firstGrad)} }`;
 }
 /** First-page spacer that clears the image-priority zone so opening text lands in the text-safe region. */
 function prioritySpacerStyle(slot: ArtSlot, coverage: number, geometry: PageGeometry): string {
