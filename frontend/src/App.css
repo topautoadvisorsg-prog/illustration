@@ -1224,39 +1224,6 @@ h3 {
   color: #f3d58c;
 }
 
-.flow-steps {
-  display: grid;
-  gap: 9px;
-}
-
-.flow-step {
-  display: grid;
-  gap: 3px;
-  border: 1px solid #e0d7ca;
-  border-left: 5px solid #c8c0b4;
-  border-radius: 6px;
-  padding: 10px 12px;
-  background: #fffdf8;
-}
-
-.flow-step strong {
-  color: #1b332d;
-}
-
-.flow-step span {
-  color: #6d6258;
-  font-size: 0.88rem;
-}
-
-.flow-step.done {
-  border-left-color: #2f7a57;
-}
-
-.flow-step.current {
-  border-left-color: #a77a22;
-  background: #fff8e8;
-}
-
 .agent-roster {
   margin-top: 14px;
 }
@@ -1385,82 +1352,6 @@ h3 {
   border-radius: 999px;
   background: #f3ead2;
   color: #6d4f12;
-}
-
-.stage-strip {
-  display: grid;
-  grid-template-columns: repeat(9, minmax(118px, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.stage-card {
-  display: grid;
-  gap: 4px;
-  min-height: 108px;
-  border: 1px solid #e0d7ca;
-  border-top: 5px solid #c8c0b4;
-  border-radius: 8px;
-  padding: 12px;
-  background: #fffdf8;
-}
-
-.stage-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.stage-card span {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border-radius: 50%;
-  color: #fff;
-  background: #8a7f71;
-  font-size: 0.78rem;
-  font-weight: 900;
-}
-
-.stage-card em {
-  color: #6d6258;
-  font-size: 0.68rem;
-  font-style: normal;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.stage-card small {
-  color: #6d6258;
-  line-height: 1.3;
-}
-
-.stage-card.done {
-  border-top-color: #2f7a57;
-}
-
-.stage-card.done span {
-  background: #2f7a57;
-}
-
-.stage-card.current {
-  border-top-color: #a77a22;
-  background: #fff8e8;
-}
-
-.stage-card.current span {
-  background: #a77a22;
-}
-
-.stage-card.open {
-  border-top-color: #5d7f8f;
-  background: #f4f8fa;
-}
-
-.stage-card.open span {
-  background: #5d7f8f;
 }
 
 .operator-guidance {
@@ -1711,23 +1602,6 @@ button.secondary {
   background: #fff5f2;
 }
 
-.operator-checkpoints {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.operator-checkpoints div {
-  display: grid;
-  gap: 4px;
-  border: 1px solid #e0d7ca;
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: #f9f5eb;
-}
-
-.operator-checkpoints span,
 .review-note {
   color: #6d6258;
   font-size: 0.86rem;
@@ -3065,9 +2939,6 @@ button.secondary {
     grid-template-columns: 1fr;
   }
 
-  .stage-strip {
-    grid-template-columns: repeat(3, minmax(150px, 1fr));
-  }
 }
 
 @media (max-width: 1180px) {
@@ -3083,9 +2954,6 @@ button.secondary {
     grid-template-columns: 1fr;
   }
 
-  .stage-strip {
-    grid-template-columns: repeat(3, minmax(150px, 1fr));
-  }
 }
 
 @media (max-width: 1120px) {
@@ -3120,11 +2988,6 @@ button.secondary {
     grid-template-columns: 1fr;
   }
 
-  .stage-strip {
-    grid-template-columns: repeat(3, minmax(150px, 1fr));
-  }
-
-  .operator-checkpoints,
   .operator-guidance,
   .library-controls,
   .quality-gate-summary,
@@ -3212,8 +3075,6 @@ button.secondary {
   .production-metrics,
   .production-queues,
   .intelligence-filter,
-  .stage-strip,
-  .operator-checkpoints,
   .operator-guidance,
   .guidance-status-grid,
   .library-controls,

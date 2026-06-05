@@ -3659,17 +3659,8 @@ function App() {
           </div>
         </section>
 
+        {advancedMode && (
         <section className="panel flow-panel">
-          <h2>Agent Workflow</h2>
-          <div className="flow-steps">
-            {WORKFLOW_STAGES.map((stage, index) => (
-              <div className={`flow-step ${workflowStageState(stage.key)}`} key={stage.key}>
-                <strong>{index + 1}. {stage.label}</strong>
-                <span>{stage.action}</span>
-              </div>
-            ))}
-          </div>
-          {advancedMode && (
           <div className="agent-roster">
             <h3>Pipeline Agents</h3>
             {agents.map((agent) => (
@@ -3687,8 +3678,8 @@ function App() {
             ))}
             {agents.length === 0 && <p className="empty">Agent roster not loaded yet.</p>}
           </div>
-          )}
         </section>
+        )}
       </section>
 
       <section className="panel chat-panel" ref={chatPanelRef}>
@@ -3728,9 +3719,9 @@ function App() {
       <section className="panel review-board">
         <div className="section-head">
           <div>
-            <p className="eyebrow">Operator Review Mode</p>
-            <h2>Publishing Workflow Board</h2>
-            <p className="hint">Work left to right: confirm the book map, approve text-safe layouts, manage art assets, then render proofs.</p>
+            <p className="eyebrow">Current Workflow Step</p>
+            <h2>{operatorGuidance.stageLabel}</h2>
+            <p className="hint">Progress is tracked by the single production workflow in the left navigation.</p>
           </div>
           <div className="button-row">
             <button disabled={busy || !activeProjectId} onClick={() => run("Running manuscript intake...", runManuscriptIntake, () => scrollToWorkspaceSection(".page-plan-list"))}>
@@ -3741,28 +3732,6 @@ function App() {
             </button>
           </div>
         </div>
-
-        <div className="stage-strip">
-          {WORKFLOW_STAGES.map((stage, index) => (
-            <div className={`stage-card ${workflowStageState(stage.key)}`} key={stage.key}>
-              <div className="stage-card-top">
-                <span>{index + 1}</span>
-                <em>
-                  {workflowStageState(stage.key) === "done"
-                    ? "Done"
-                    : workflowStageState(stage.key) === "current"
-                      ? "Next"
-                      : workflowStageState(stage.key) === "open"
-                        ? "Open"
-                        : "Locked"}
-                </em>
-              </div>
-              <strong>{stage.label}</strong>
-              <small>{stage.action}</small>
-            </div>
-          ))}
-        </div>
-
         <section className={`operator-guidance ${operatorGuidance.stageKey}`}>
           <div className="guidance-main">
             <span className="mode-pill">{operatorGuidance.status}</span>
@@ -3906,25 +3875,6 @@ function App() {
             <p className="empty">No production dashboard loaded yet.</p>
           )}
         </section>
-
-        <div className="operator-checkpoints">
-          <div>
-            <strong>1. Book map</strong>
-            <span>Chapters and pages exist in the right order.</span>
-          </div>
-          <div>
-            <strong>2. Layout gate</strong>
-            <span>Text-fit has no overflow before paid image work.</span>
-          </div>
-          <div>
-            <strong>3. Proof</strong>
-            <span>Render page-shaped PDFs and inspect readability before image spend.</span>
-          </div>
-          <div>
-            <strong>4. Asset desk</strong>
-            <span>Generate, reuse, approve, and upscale images as publishing assets.</span>
-          </div>
-        </div>
 
         <div className="review-grid">
           <section className="review-card">
