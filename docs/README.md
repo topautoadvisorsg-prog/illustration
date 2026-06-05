@@ -9,6 +9,7 @@ Living documentation for the platform.
 | `api-contracts.md` | Auto-generated from Zod (Phase 1+); see `/api/docs` at runtime |
 | `runbook.md` | What to do when X breaks |
 | `decision-log.md` | Architecture Decision Records (ADRs) |
+| `AGENT_LAYER.md` | What actually runs in the agent/LLM layer + the metadata-not-pixels rule |
 | `publishing-intelligence-center.md` | Standards ledger / knowledge system architecture |
 | `operator-workflow-review.md` | UI workflow audit and implementation order for operator review mode |
 | `ACTION_SCOPE_AUDIT.md` | Operator action scope table, button copy rules, and confirmation policy |

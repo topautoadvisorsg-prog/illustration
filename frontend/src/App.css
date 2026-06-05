@@ -1371,6 +1371,32 @@ h3 {
   font-size: 0.84rem;
 }
 
+.agent-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-runtime-badge {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.agent-runtime-badge.advisory-llm { background: #e8f3ed; color: #2f7a57; }
+.agent-runtime-badge.deterministic { background: #eef0f3; color: #4a5568; }
+.agent-runtime-badge.planned { background: #f3ead2; color: #6d4f12; }
+
+.agent-flags {
+  font-size: 0.72rem !important;
+  color: #8a8174 !important;
+}
+
 .stage-strip {
   display: grid;
   grid-template-columns: repeat(9, minmax(118px, 1fr));

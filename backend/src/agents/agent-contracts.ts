@@ -1,9 +1,18 @@
 /**
  * Agent contracts for The Wildlands pipeline.
  *
- * These are not chat UI prompts. They are backend-owned behavior contracts that
- * describe each pipeline agent's role, expertise, hard rules, and required
- * outputs so automated stages stay consistent and auditable.
+ * These are NOT chat UI prompts. They are backend-owned behavior contracts that
+ * describe each role's mission, expertise, hard rules, and required outputs.
+ *
+ * HONESTY NOTE (read before trusting the roster):
+ * Most of these roles are enforced by DETERMINISTIC code, not by a running LLM
+ * "agent". Only two contracts (`OPERATOR_ADVISER`, `STAGE_REVIEWER`) are live
+ * LLM calls, and both are text-only, read-only advisers. The `runtime`,
+ * `usesTools`, and `usesVision` flags on each contract state exactly what runs.
+ *
+ * PIXEL RULE (non-negotiable): no agent reads image pixels. Review and reuse
+ * reason over METADATA only — layout type, coverage %, placement, subject,
+ * prompt + hash, dimensions/DPI, status. Vision calls are banned to control cost.
  */
 
 export type WildlandsAgentId =
@@ -14,7 +23,17 @@ export type WildlandsAgentId =
   | 'PROMPT_ASSEMBLER'
   | 'COVER_ART_DIRECTOR'
   | 'TEXT_FIT_QA'
-  | 'IMAGE_QA';
+  | 'IMAGE_QA'
+  | 'OPERATOR_ADVISER'
+  | 'STAGE_REVIEWER';
+
+/**
+ * How the role actually runs today:
+ * - `advisory-llm`  — a real Claude call; text-only; advises, cannot act.
+ * - `deterministic` — enforced by code (parsing/planning/rendering); no LLM.
+ * - `planned`       — described here but NOT implemented as a runtime step yet.
+ */
+export type AgentRuntime = 'advisory-llm' | 'deterministic' | 'planned';
 
 export interface WildlandsAgentContract {
   id: WildlandsAgentId;
@@ -25,6 +44,14 @@ export interface WildlandsAgentContract {
   requiredInputs: string[];
   requiredOutputs: string[];
   researchDirectives: string[];
+  /** Truthful runtime classification — what actually executes. */
+  runtime: AgentRuntime;
+  /** Whether the role can call tools / take actions. All current roles: false. */
+  usesTools: boolean;
+  /** Whether the role reads image pixels. Must stay false (pixel rule). */
+  usesVision: boolean;
+  /** Plain-English statement of what really happens, so the roster never oversells. */
+  realityNote: string;
 }
 
 export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentContract> = {
@@ -46,6 +73,10 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
       'Use deterministic parsing first; use LLM enrichment only after local structure is known.',
       'Prefer source offsets and hashes over fuzzy text matching for auditability.',
     ],
+    runtime: 'deterministic',
+    usesTools: false,
+    usesVision: false,
+    realityNote: 'Implemented as deterministic Markdown parsing (stage-1 parse-manuscript-outline.ts). No LLM call runs under this name today.',
   },
   PAGE_PLANNER: {
     id: 'PAGE_PLANNER',
@@ -65,6 +96,10 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
       'KDP print readiness depends on trim, bleed, margins, and keeping content inside safe zones.',
       'Use measured layout capacity ranges; do not assume a universal body font size for every field-guide page.',
     ],
+    runtime: 'deterministic',
+    usesTools: false,
+    usesVision: false,
+    realityNote: 'Implemented as deterministic planning (stage-2 plan-pages.ts). It references this contract only to label reason codes.',
   },
   LAYOUT_SELECTOR: {
     id: 'LAYOUT_SELECTOR',
@@ -83,6 +118,10 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
       'Check layout choices against the approved 16-layout reference set.',
       'Keep all important text within safe margins; image slots may bleed only when the output profile allows it.',
     ],
+    runtime: 'deterministic',
+    usesTools: false,
+    usesVision: false,
+    realityNote: 'Folded into deterministic page planning + layout profiles. No separate LLM agent runs.',
   },
   ART_BRIEF_DIRECTOR: {
     id: 'ART_BRIEF_DIRECTOR',
@@ -102,6 +141,10 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
       'Treat KDP trim, bleed, and safe areas as physical production constraints.',
       'Size source art larger than the final slot so final placement can crop gracefully.',
     ],
+    runtime: 'deterministic',
+    usesTools: false,
+    usesVision: false,
+    realityNote: 'Enforced by deterministic layout geometry + image-shape hints + prompt assembly. No separate runtime agent.',
   },
   PROMPT_ASSEMBLER: {
     id: 'PROMPT_ASSEMBLER',
@@ -121,6 +164,10 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
       'Favor literal subject details over generic style language.',
       'Keep layout and typography instructions out of the image prompt; Stage 6 owns page composition.',
     ],
+    runtime: 'deterministic',
+    usesTools: false,
+    usesVision: false,
+    realityNote: 'Implemented as deterministic prompt templating + SHA-256 hashing in stages 2/3. No LLM call.',
   },
   COVER_ART_DIRECTOR: {
     id: 'COVER_ART_DIRECTOR',
@@ -140,6 +187,10 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
       'Full cover production requires front, spine, and back geometry once page count and paper stock are known.',
       'For the current front-cover phase, lock visual direction and title-safe composition before full-wrap spine math.',
     ],
+    runtime: 'deterministic',
+    usesTools: false,
+    usesVision: false,
+    realityNote: 'Cover is rendered deterministically (typographic overlay + full-bleed art slot, spine sized from page count). No separate LLM.',
   },
   TEXT_FIT_QA: {
     id: 'TEXT_FIT_QA',
@@ -158,24 +209,73 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
       'Validate against trim size, bleed, and safe margin requirements before export.',
       'Prefer layout retry over unreadable type.',
     ],
+    runtime: 'deterministic',
+    usesTools: false,
+    usesVision: false,
+    realityNote: 'Implemented as deterministic text-fit measurement (text-fit.ts / text-fit-preview.ts). No LLM call.',
   },
   IMAGE_QA: {
     id: 'IMAGE_QA',
     name: 'Image QA',
-    mission: 'Evaluate generated subject art against approved prompt, naturalist accuracy, style consistency, and print readiness.',
+    mission: 'Judge generated art for print readiness from METADATA ONLY — approved prompt + hash, layout type, coverage, dimensions, and DPI. Never by inspecting pixels.',
     expertFrame:
-      'Act like a senior naturalist illustrator, scientific accuracy reviewer, and prepress image technician.',
+      'Act like a prepress image technician who validates production parameters (prompt match by hash, size, DPI, layout fit) rather than aesthetics, to keep token cost at zero for review.',
     hardRules: [
-      'Do not approve images that drift from the approved subject prompt.',
-      'Do not approve images with rendered text unless the page explicitly requires a diagram label stage handled outside image generation.',
-      'Block final placement until DPI, dimensions, crop, and approved image version are locked.',
+      'PIXEL RULE: never read or send image pixels to any model. No vision calls. Evaluate from metadata only.',
+      'Check the generated image was produced from the approved prompt hash for that page.',
+      'Block final placement until dimensions, DPI, layout shape match, and an approved version are locked.',
+      'Approve/reject of the actual artwork is a human operator decision; this role only reports metadata readiness.',
     ],
-    requiredInputs: ['Prompt hash', 'Generated image', 'Page manifest', 'Layout art slot', 'DPI requirements'],
-    requiredOutputs: ['Approval status', 'Rejection reason', 'Regeneration notes', 'Locked image version metadata'],
+    requiredInputs: ['Approved prompt + prompt hash', 'Layout type + coverage %', 'Generated dimensions + DPI', 'Image shape vs layout shape', 'Page status'],
+    requiredOutputs: ['Metadata-readiness status', 'Mismatch reasons (prompt hash / size / DPI / shape)', 'Regeneration notes', 'Locked image version metadata'],
     researchDirectives: [
-      'Compare final art to the approved draft/prompt rather than only checking aesthetics.',
-      'Use 300 DPI print readiness as the target for full-color KDP interior assets unless the output profile changes.',
+      'Compare prompt hash, size, DPI, and layout-shape fit — not aesthetics by pixel inspection.',
+      'Target 300 DPI for full-color KDP interior assets unless the output profile changes.',
     ],
+    runtime: 'planned',
+    usesTools: false,
+    usesVision: false,
+    realityNote: 'No automated agent runs today; image approve/reject is a manual operator action. If built, it MUST stay metadata-only per the hard rules above.',
+  },
+  OPERATOR_ADVISER: {
+    id: 'OPERATOR_ADVISER',
+    name: 'Operator Adviser (live chat)',
+    mission: 'Answer the operator\'s "what is wrong / what is next" questions about the current project, in plain language.',
+    expertFrame:
+      'Act like a calm production manager who reads the project state and explains the next concrete button to click. No jargon, no filler.',
+    hardRules: [
+      'Advise and explain only — cannot click buttons or run actions; always name the button the operator should click.',
+      'Never claim the book is done/ready to export unless every page is APPROVED/PRINT_READY and the project is EXPORTED.',
+      'Reason over project METADATA only (page keys, layouts, statuses, log). Never request or read image pixels.',
+      'Be concise and honest about how much work remains.',
+    ],
+    requiredInputs: ['Project state summary (title, status, chapters, per-page layout + status)', 'Recent activity log', 'Operator message'],
+    requiredOutputs: ['Plain-language guidance', 'The specific next button to click'],
+    researchDirectives: ['Use the deterministic pipeline order as the source of truth for "what is next".'],
+    runtime: 'advisory-llm',
+    usesTools: false,
+    usesVision: false,
+    realityNote: 'LIVE: Claude text call (callChat), temperature 0.3, capped ~700 tokens. Read-only. This is one of the only two LLM agents that actually run.',
+  },
+  STAGE_REVIEWER: {
+    id: 'STAGE_REVIEWER',
+    name: 'Stage Reviewer (live review)',
+    mission: 'Give a strict PASS / NEEDS WORK verdict on a single pipeline step (breakdown, plan, text-fit, images, render) so the operator does not inspect every page by hand.',
+    expertFrame:
+      'Act like a meticulous book-production QA reviewer: do not invent problems, do not rubber-stamp.',
+    hardRules: [
+      'Follow the per-stage rubric exactly and answer in the fixed VERDICT / WHAT\'S GOOD / ISSUES / FIX NEXT format.',
+      'Reason over project METADATA only (statuses, layouts, counts). Never read image pixels.',
+      'Long entries spanning multiple pages are fine — not overflow.',
+      'Report-only — cannot mutate the project.',
+    ],
+    requiredInputs: ['Stage name', 'Project state summary', 'Chapter/entry counts', 'Per-page layout + status'],
+    requiredOutputs: ['VERDICT (PASS/NEEDS WORK)', "WHAT'S GOOD", 'ISSUES', 'FIX NEXT'],
+    researchDirectives: ['Grade against the stage rubric, not aesthetics.'],
+    runtime: 'advisory-llm',
+    usesTools: false,
+    usesVision: false,
+    realityNote: 'LIVE: Claude text call (callChat), temperature 0, capped ~600 tokens. Read-only. The second of the two LLM agents that actually run.',
   },
 };
 

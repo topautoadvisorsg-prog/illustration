@@ -13,6 +13,10 @@ const AgentContractResponseSchema = z.object({
       requiredInputs: z.array(z.string()),
       requiredOutputs: z.array(z.string()),
       researchDirectives: z.array(z.string()),
+      runtime: z.enum(['advisory-llm', 'deterministic', 'planned']),
+      usesTools: z.boolean(),
+      usesVision: z.boolean(),
+      realityNote: z.string(),
     }),
   ),
 });

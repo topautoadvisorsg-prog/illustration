@@ -12,7 +12,30 @@ describe('Wildlands agent contracts', () => {
       'COVER_ART_DIRECTOR',
       'TEXT_FIT_QA',
       'IMAGE_QA',
+      'OPERATOR_ADVISER',
+      'STAGE_REVIEWER',
     ]);
+  });
+
+  it('never lets any agent read image pixels (pixel rule)', () => {
+    for (const contract of Object.values(WILDLANDS_AGENT_CONTRACTS)) {
+      expect(contract.usesVision).toBe(false);
+      expect(contract.usesTools).toBe(false);
+    }
+  });
+
+  it('marks exactly the two live chat agents as advisory-llm', () => {
+    const live = Object.values(WILDLANDS_AGENT_CONTRACTS)
+      .filter((c) => c.runtime === 'advisory-llm')
+      .map((c) => c.id);
+    expect(live).toEqual(['OPERATOR_ADVISER', 'STAGE_REVIEWER']);
+  });
+
+  it('keeps Image QA metadata-only by design', () => {
+    const imageQa = getAgentContract('IMAGE_QA');
+    expect(imageQa.usesVision).toBe(false);
+    expect(imageQa.hardRules.join('\n')).toContain('PIXEL RULE');
+    expect(imageQa.requiredInputs.join('\n')).not.toContain('Generated image');
   });
 
   it('gives the page planner hard rules and operator-useful outputs', () => {

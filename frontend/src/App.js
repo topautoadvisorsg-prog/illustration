@@ -3302,10 +3302,16 @@ function App() {
           <div className="agent-roster">
             <h3>Pipeline Agents</h3>
             {agents.map((agent) => (
-              <article className="agent-card" key={agent.id}>
-                <strong>{agent.name}</strong>
+              <article className={`agent-card runtime-${agent.runtime || "deterministic"}`} key={agent.id}>
+                <div className="agent-card-head">
+                  <strong>{agent.name}</strong>
+                  <span className={`agent-runtime-badge ${agent.runtime || "deterministic"}`}>
+                    {agent.runtime === "advisory-llm" ? "live chat" : agent.runtime === "planned" ? "planned" : "code"}
+                  </span>
+                </div>
                 <span>{agent.mission}</span>
-                <small>{agent.expertFrame}</small>
+                {agent.realityNote && <small className="agent-reality">{agent.realityNote}</small>}
+                <small className="agent-flags">{agent.usesVision ? "👁 reads images" : "metadata only · no vision"}{agent.usesTools ? " · can act" : " · read-only"}</small>
               </article>
             ))}
             {agents.length === 0 && <p className="empty">Agent roster not loaded yet.</p>}
