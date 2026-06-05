@@ -1005,17 +1005,55 @@ h3 {
   background: #fffaf0;
 }
 
+.setup-primary-form {
+  max-width: 560px;
+}
+
 .compact-head {
   align-items: flex-start;
   gap: 12px;
 }
 
-.operator-format-section .field {
+.format-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  gap: 10px;
   margin: 12px 0;
 }
 
-.operator-format-section select {
-  max-width: 420px;
+.format-choice {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-height: 128px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e0d7ca;
+  border-radius: 8px;
+  background: #fffdf8;
+  color: #173730;
+  text-align: left;
+  box-shadow: none;
+}
+
+.format-choice:hover,
+.format-choice.active {
+  border-color: #2f6f56;
+  background: #eef8ef;
+}
+
+.format-choice.active {
+  box-shadow: inset 0 0 0 2px rgba(47, 111, 86, 0.18);
+}
+
+.format-choice strong {
+  font-size: 0.94rem;
+}
+
+.format-choice span,
+.format-choice small {
+  color: #6d6258;
+  line-height: 1.35;
 }
 
 .format-summary-grid {
@@ -3064,6 +3102,7 @@ button.secondary {
 
   .form-grid,
   .form-grid.compact,
+  .format-choice-grid,
   .format-summary-grid,
   .number-row,
   .swatch-grid,

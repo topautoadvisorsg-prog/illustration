@@ -213,7 +213,7 @@ function publishingStandardFor(config) {
 
 const WORKFLOW_STAGES = [
   { key: "project", label: "Project Setup", action: "Create or select the book project." },
-  { key: "standards", label: "Publishing Standards", action: "Choose format before planning." },
+  { key: "standards", label: "Publishing Format", action: "Choose format before planning." },
   { key: "manuscript", label: "Upload Manuscript", action: "Store the master manuscript." },
   { key: "breakdown", label: "Review Breakdown", action: "Confirm chapters and pages." },
   { key: "plan", label: "Review Page Plan", action: "Confirm layout and page flow." },
@@ -1474,9 +1474,9 @@ function App() {
         stageKey: "project",
         stageLabel: "Project Setup",
         status: "Waiting on you",
-        nextAction: "Create a new project or select an existing book project.",
+        nextAction: "Name the book, choose the publishing format, then create the project.",
         afterAction: "After that, upload the master manuscript for this book.",
-        buttonLabel: "+ New Project",
+        buttonLabel: "Start Book Project",
         actionKey: "create-project",
         helpPrompt: "Help me start a new Wildlands book project.",
       };
@@ -1484,13 +1484,13 @@ function App() {
     if (!projectConfig.publishingStandard?.format) {
       return {
         stageKey: "standards",
-        stageLabel: "Publishing Standards",
+        stageLabel: "Publishing Format",
         status: "Waiting on you",
         nextAction: "Choose the target book format before manuscript breakdown or page planning.",
-        afterAction: "After standards are configured, upload the master manuscript.",
-        buttonLabel: "Review Publishing Standards",
+        afterAction: "After the format is configured, upload the master manuscript.",
+        buttonLabel: "Review Publishing Format",
         actionKey: "standards",
-        helpPrompt: "Help me choose the right publishing standard for this book.",
+        helpPrompt: "Help me choose the right publishing format for this book.",
       };
     }
     if (!selectedProject?.manuscriptPath && !manuscript.trim()) {
@@ -1662,8 +1662,8 @@ function App() {
     const preset = PUBLISHING_STANDARD_PRESETS[format] || PUBLISHING_STANDARD_PRESETS.HARDCOVER_7X10;
     setProjectConfig((current) => applyPublishingStandardPreset(current, preset.format));
     setFormatCalibration(null);
-    setMessage(`Publishing standard selected: ${preset.label}. Save before planning.`);
-    appendLog("success", `Publishing standard selected: ${preset.label}; text capacity now uses ${preset.trimSize.widthIn} x ${preset.trimSize.heightIn}.`);
+    setMessage(`Publishing format selected: ${preset.label}. Save before planning.`);
+    appendLog("success", `Publishing format selected: ${preset.label}; text capacity now uses ${preset.trimSize.widthIn} x ${preset.trimSize.heightIn}.`);
   }
 
   function updateDraft(setter, key, value) {
@@ -1779,7 +1779,7 @@ function App() {
   function executeOperatorNextStep() {
     switch (operatorGuidance.actionKey) {
       case "create-project":
-        createNamedProject();
+        scrollToWorkspaceSection(".setup-panel", "center");
         break;
       case "standards":
         scrollToWorkspaceSection(".operator-format-section", "center");
@@ -2175,11 +2175,12 @@ function App() {
     return data.project.id;
   }
 
-  // Ask for a name first, then create. Used by the "+ New Project" buttons.
-  function createNamedProject() {
-    const name = window.prompt("Name this project / book:", projectConfig.title || "Untitled Book");
-    if (name === null) return; // cancelled — do nothing
-    run("Creating new project...", () => createProject(name.trim() || "Untitled Book"));
+  async function submitProjectSetup() {
+    if (activeProjectId) {
+      await saveProjectConfig(activeProjectId);
+      return activeProjectId;
+    }
+    return createProject();
   }
 
   async function saveProjectConfig(projectId = activeProjectId) {
@@ -2190,7 +2191,7 @@ function App() {
     });
     setProjects((current) => current.map((project) => (project.id === data.project.id ? data.project : project)));
     setMessage(`Project setup saved: ${activePublishingStandard.label}.`);
-    appendLog("success", `Project setup saved: ${activePublishingStandard.label} publishing standard.`);
+    appendLog("success", `Project setup saved: ${activePublishingStandard.label} publishing format.`);
   }
 
   async function uploadManuscript(projectId = activeProjectId) {
@@ -3165,14 +3166,14 @@ function App() {
         ],
       },
       standards: {
-        title: "Publishing Standards Result",
+        title: "Publishing Format Result",
         status: projectConfig.publishingStandard?.status === "CUSTOM" ? "Custom" : "Configured",
         happened: `The project is set up as ${activePublishingStandard.label}.`,
         created: "Book format, page geometry, typography package, and planning capacity rules.",
         review: "Confirm this is the target format before upload, breakdown, page planning, text-fit, rendering, or export.",
-        artifactLabel: "Publishing standards",
+        artifactLabel: "Publishing format",
         artifactSelector: ".operator-format-section",
-        primaryLabel: "Review Publishing Standards",
+        primaryLabel: "Review Publishing Format",
         secondaryLabel: "Ask Agent",
         metrics: [
           { label: "format", value: activePublishingStandard.label },
@@ -3607,9 +3608,6 @@ function App() {
               ))}
               {projects.length === 0 && <span className="empty-inline">No projects yet</span>}
             </div>
-            <button type="button" disabled={busy} onClick={createNamedProject}>
-              + New Project
-            </button>
             <span className="hint">{projects.length} project{projects.length === 1 ? "" : "s"}</span>
           </div>
           <div className="quick-actions">
@@ -5120,65 +5118,54 @@ function App() {
       <section className="workspace-grid">
         <section className="panel setup-panel">
           <div className="section-head">
-            <h2>1. Project Setup</h2>
+            <div>
+              <h2>1. Project Setup</h2>
+              <p className="hint">Start the book with only the name and target format. Advanced publishing details can wait.</p>
+            </div>
             <div className="button-row">
-              <button disabled={busy} onClick={createNamedProject}>
-                Create Project
+              <button
+                disabled={busy}
+                onClick={() => run(activeProjectId ? "Saving project..." : "Creating project...", submitProjectSetup)}
+              >
+                {activeProjectId ? "Save Project" : "Create Project"}
               </button>
-              <button disabled={busy || !activeProjectId} onClick={() => run("Saving project configuration...", saveProjectConfig)}>
-                Save Project Setup
+              <button type="button" className="secondary" onClick={() => setAdvancedMode((value) => !value)}>
+                {advancedMode ? "Hide Advanced Settings" : "Advanced Settings"}
               </button>
             </div>
           </div>
 
-          <div className="form-grid">
-            <Field label="Title">
+          <div className="setup-primary-form">
+            <Field label="Project Name">
               <input value={projectConfig.title} onChange={(event) => setConfig(["title"], event.target.value)} />
-            </Field>
-            <Field label="Subtitle">
-              <input value={projectConfig.subtitle} onChange={(event) => setConfig(["subtitle"], event.target.value)} />
-            </Field>
-            <Field label="Author / Imprint">
-              <input value={projectConfig.authorName} onChange={(event) => setConfig(["authorName"], event.target.value)} />
-            </Field>
-            <Field label="Volume">
-              <input
-                type="number"
-                min="1"
-                value={projectConfig.volume}
-                onChange={(event) => setConfig(["volume"], trimNumber(event.target.value))}
-              />
-            </Field>
-            <Field label="Brand">
-              <select value={projectConfig.brand} onChange={(event) => setConfig(["brand"], event.target.value)}>
-                <option value="THE_WILDLANDS">THE_WILDLANDS</option>
-              </select>
-            </Field>
-            <Field label="Audience">
-              <select value={projectConfig.audience} onChange={(event) => setConfig(["audience"], event.target.value)}>
-                <option value="ADULT">Adult</option>
-              </select>
             </Field>
           </div>
 
           <div className="config-section operator-format-section">
             <div className="section-head compact-head">
               <div>
-                <h3>Publishing Standards</h3>
-                <p className="hint">Choose this before breakdown and page planning. It controls page geometry, text capacity, and proof rendering.</p>
+                <h3>Publishing Format</h3>
+                <p className="hint">Choose this before breakdown and page planning. It controls page size, text capacity, layout decisions, and proof rendering.</p>
               </div>
               <span className="mode-pill">{projectConfig.publishingStandard?.status === "CUSTOM" ? "Custom" : "Configured"}</span>
             </div>
-            <Field label="Selected Format">
-              <select
-                value={projectConfig.publishingStandard?.format || "HARDCOVER_7X10"}
-                onChange={(event) => selectPublishingStandard(event.target.value)}
-              >
-                {Object.values(PUBLISHING_STANDARD_PRESETS).map((preset) => (
-                  <option key={preset.format} value={preset.format}>{preset.label}</option>
-                ))}
-              </select>
-            </Field>
+            <div className="format-choice-grid">
+              {Object.values(PUBLISHING_STANDARD_PRESETS).map((preset) => {
+                const isSelected = (projectConfig.publishingStandard?.format || "HARDCOVER_7X10") === preset.format;
+                return (
+                  <button
+                    key={preset.format}
+                    type="button"
+                    className={`format-choice ${isSelected ? "active" : ""}`}
+                    onClick={() => selectPublishingStandard(preset.format)}
+                  >
+                    <strong>{preset.label}</strong>
+                    <span>{preset.description}</span>
+                    <small>{preset.trimSize.widthIn} x {preset.trimSize.heightIn} in</small>
+                  </button>
+                );
+              })}
+            </div>
             <div className="format-summary-grid">
               <div>
                 <strong>{activePublishingStandard.label}</strong>
@@ -5195,13 +5182,14 @@ function App() {
             </div>
             <p className="hint">{activePublishingStandard.planningNote}</p>
             {(pageManifests.length > 0 || pages.length > 0 || plannedPages.length > 0) && (
-              <p className="warning-note">This project already has generated breakdown/page planning. Changing standards may require regenerating downstream outputs.</p>
+              <p className="warning-note">This project already has generated breakdown/page planning. Changing the format may require regenerating downstream outputs.</p>
             )}
+            {advancedMode && (
             <div className="format-calibration-panel">
               <div className="section-head compact-head">
                 <div>
                   <strong>First Chapter Calibration</strong>
-                  <p className="hint">Compare publishing standards against the selected chapter before committing to full-book planning decisions.</p>
+                  <p className="hint">Compare publishing formats against the selected chapter before committing to full-book planning decisions.</p>
                 </div>
                 <button
                   type="button"
@@ -5243,10 +5231,41 @@ function App() {
                 <p className="empty">{pageManifests.length > 0 ? "Run calibration to compare formats on the selected chapter." : "Generate the chapter breakdown first, then compare formats before page planning."}</p>
               )}
             </div>
+            )}
           </div>
 
           {advancedMode && (
           <>
+          <div className="config-section">
+            <h3>Advanced Book Details</h3>
+            <div className="form-grid compact">
+              <Field label="Subtitle">
+                <input value={projectConfig.subtitle} onChange={(event) => setConfig(["subtitle"], event.target.value)} />
+              </Field>
+              <Field label="Author / Imprint">
+                <input value={projectConfig.authorName} onChange={(event) => setConfig(["authorName"], event.target.value)} />
+              </Field>
+              <Field label="Volume">
+                <input
+                  type="number"
+                  min="1"
+                  value={projectConfig.volume}
+                  onChange={(event) => setConfig(["volume"], trimNumber(event.target.value))}
+                />
+              </Field>
+              <Field label="Brand">
+                <select value={projectConfig.brand} onChange={(event) => setConfig(["brand"], event.target.value)}>
+                  <option value="THE_WILDLANDS">THE_WILDLANDS</option>
+                </select>
+              </Field>
+              <Field label="Audience">
+                <select value={projectConfig.audience} onChange={(event) => setConfig(["audience"], event.target.value)}>
+                  <option value="ADULT">Adult</option>
+                </select>
+              </Field>
+            </div>
+          </div>
+
           <div className="config-section">
             <h3>Output Profile</h3>
             <div className="form-grid compact">
@@ -5657,6 +5676,7 @@ function App() {
         </section>
 
         <aside className="side-stack">
+          {advancedMode && (
           <section className="panel preview-panel">
             <h2>Operator Preview</h2>
             <div className="book-preview" style={{ backgroundColor: projectConfig.colorPalette.paper }}>
@@ -5694,6 +5714,7 @@ function App() {
               )}
             </div>
           </section>
+          )}
 
           <section className="panel">
             <h2>Active Project</h2>
@@ -5714,6 +5735,7 @@ function App() {
             {selectedProject && <p className="meta">Selected: {selectedProject.id}</p>}
           </section>
 
+          {advancedMode && (
           <section className="panel template-panel">
             <h2>16 Layout Templates</h2>
             {LAYOUT_TEMPLATES.map(([id, name, description]) => (
@@ -5723,6 +5745,7 @@ function App() {
               </div>
             ))}
           </section>
+          )}
         </aside>
       </section>
 
