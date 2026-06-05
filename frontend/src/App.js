@@ -140,7 +140,7 @@ const WORKFLOW_STAGES = [
   { key: "manuscript", label: "Upload Manuscript", action: "Store the master manuscript." },
   { key: "breakdown", label: "Review Breakdown", action: "Confirm chapters and pages." },
   { key: "plan", label: "Review Page Plan", action: "Confirm layout and page flow." },
-  { key: "textfit", label: "Run Text-Fit", action: "Check readability before images." },
+  { key: "textfit", label: "Text-Fit Check", action: "Check readability before images." },
   { key: "layout", label: "Approve Layouts", action: "Lock text-safe chapter layouts." },
   { key: "images", label: "Manage Images", action: "Generate, reuse, approve art." },
   { key: "proof", label: "Render Proofs", action: "Review chapter and page PDFs." },
@@ -1248,6 +1248,8 @@ function App() {
   const selectedChapterNumber =
     selectedPageManifest?.chapterNumber || selectedPage?.chapterNumber || chapterManifests[0]?.chapterNumber || null;
   const reviewChapterNumber = renderedChapterNumber || selectedChapterNumber || chapterManifests[0]?.chapterNumber || null;
+  const selectedChapterLabel = selectedChapterNumber ? `Chapter ${selectedChapterNumber}` : "Selected Chapter";
+  const reviewChapterLabel = reviewChapterNumber ? `Chapter ${reviewChapterNumber}` : "Selected Chapter";
   const reviewChapterPages = reviewChapterNumber
     ? pageManifests.filter((page) => page.chapterNumber === reviewChapterNumber).sort((a, b) => Number(a.pageNumber || 0) - Number(b.pageNumber || 0))
     : [];
@@ -1344,11 +1346,11 @@ function App() {
     if (!hasTextFitProof) {
       return {
         stageKey: "textfit",
-        stageLabel: "Run Text-Fit",
+        stageLabel: "Text-Fit Check",
         status: "Waiting on you",
         nextAction: "Run Text-Fit to check readability before approving layouts or spending on images.",
         afterAction: "After Text-Fit passes, approve the selected chapter layout.",
-        buttonLabel: "Run Text-Fit",
+        buttonLabel: "Run Text-Fit for Book",
         actionKey: "textfit",
         helpPrompt: "Review text-fit and tell me whether the chapter is readable.",
       };
@@ -1360,7 +1362,7 @@ function App() {
         status: "Waiting on you",
         nextAction: "Approve the selected chapter layout once text-fit has no blocking readability issues.",
         afterAction: "After layout approval, render a chapter proof with placeholders.",
-        buttonLabel: "Approve Layout",
+        buttonLabel: `Approve Layout for ${selectedChapterLabel}`,
         actionKey: "approve-layout",
         helpPrompt: "Should I approve this chapter layout, or is anything still risky?",
       };
@@ -1372,7 +1374,7 @@ function App() {
         status: "Ready for review",
         nextAction: "Render the selected chapter with placeholders, then click pages to inspect text and layout flow.",
         afterAction: "After the proof reads cleanly, move into image generation and approval.",
-        buttonLabel: "Render Chapter",
+        buttonLabel: `Render ${reviewChapterLabel} Proof`,
         actionKey: "render-chapter",
         helpPrompt: "What should I look for when reviewing this chapter proof?",
       };
@@ -1384,7 +1386,7 @@ function App() {
         status: "Waiting on review",
         nextAction: "If the text/layout proof is acceptable, generate, reuse, approve, or reject image assets page by page.",
         afterAction: "After all images are approved and print-ready, run final proof/export checks.",
-        buttonLabel: "Check Assets",
+        buttonLabel: "Load Project Image Library",
         actionKey: "images",
         helpPrompt: "Which images are missing or need approval, and what should I do next?",
       };
@@ -1411,7 +1413,9 @@ function App() {
     pdfPreview.url,
     plannedPageCount,
     selectedChapterApproval,
+    selectedChapterLabel,
     selectedProject?.manuscriptPath,
+    reviewChapterLabel,
   ]);
 
   function chapterApproval(chapterNumber) {
@@ -1534,7 +1538,7 @@ function App() {
 
   function currentStagePrimaryAction() {
     const label = String(currentStageResult.primaryLabel || "").toLowerCase();
-    const shouldRunStage = ["create", "choose", "upload", "start", "generate", "run", "approve", "render"].some((word) => label.startsWith(word));
+    const shouldRunStage = ["create", "choose", "upload", "start", "generate", "run", "approve", "render", "load"].some((word) => label.startsWith(word));
     if (shouldRunStage && operatorGuidance.actionKey) {
       executeOperatorNextStep();
       return;
@@ -1560,16 +1564,16 @@ function App() {
         run("Generating page plan...", planPages, () => scrollToWorkspaceSection(".page-plan-list"));
         break;
       case "textfit":
-        run("Running text-fit preview...", runTextFitPreview, () => scrollToWorkspaceSection(".fit-summary", "center"));
+        run("Running Text-Fit for Book...", runTextFitPreview, () => scrollToWorkspaceSection(".fit-summary", "center"));
         break;
       case "approve-layout":
-        run(`Approving Chapter ${selectedChapterNumber || "?"} layout...`, () => approveChapterLayout(selectedChapterNumber), () => scrollToWorkspaceSection(".layout-approval-panel", "center"));
+        run(`Approving layout for ${selectedChapterLabel}...`, () => approveChapterLayout(selectedChapterNumber), () => scrollToWorkspaceSection(".layout-approval-panel", "center"));
         break;
       case "render-chapter":
-        run("Rendering chapter preview...", () => renderChapterPreview(reviewChapterNumber), () => scrollToWorkspaceSection(".pdf-preview-frame"));
+        run(`Rendering ${reviewChapterLabel} proof...`, () => renderChapterPreview(reviewChapterNumber), () => scrollToWorkspaceSection(".pdf-preview-frame"));
         break;
       case "images":
-        run("Loading image library...", () => loadImageLibrary(), () => scrollToWorkspaceSection(".asset-library-panel"));
+        run("Loading project image library...", () => loadImageLibrary(), () => scrollToWorkspaceSection(".asset-library-panel"));
         break;
       default:
         focusAgentChat();
@@ -1656,7 +1660,12 @@ function App() {
     setMessage(label);
     appendLog("running", label);
     try {
-      await fn();
+      const result = await fn();
+      if (result === false) {
+        setMessage("Action cancelled.");
+        appendLog("system", `${label.replace(/\.\.\.$/, "")} cancelled.`);
+        return;
+      }
       appendLog("success", label.replace(/\.\.\.$/, " complete."));
       afterSuccess?.();
     } catch (err) {
@@ -1788,7 +1797,7 @@ function App() {
 
   async function deleteProjectById(id, label) {
     if (!id) return;
-    if (!window.confirm(`Permanently delete "${label}" and all its pages/images? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete project "${label}"? This removes the whole project workspace, pages, generated images, and review records. This cannot be undone.`)) return false;
     await call(`/api/projects/${id}`, { method: "DELETE" });
     appendLog("issue", `Deleted project ${id.slice(0, 8)}.`);
     if (id === activeProjectId) {
@@ -1853,6 +1862,7 @@ function App() {
       }
       throw new Error("The manuscript box is empty. Drop your .md/.txt file on it or paste your text first.");
     }
+    if ((pageManifests.length > 0 || pages.length > 0) && !window.confirm("Upload manuscript to this project? A breakdown or page plan already exists, so review those results after upload before continuing.")) return false;
     const data = await call(`/api/projects/${projectId}/manuscript`, {
       method: "POST",
       body: JSON.stringify({ filename: manuscriptName || "manuscript.md", markdown: manuscript }),
@@ -2156,8 +2166,9 @@ function App() {
     setPlannedPages(data.plannedPages || []);
     setLayoutLibraryReport(data.layoutLibrary || null);
     const blockers = data.plannedPages?.reduce((total, page) => total + (page.blockers?.length || 0), 0) || 0;
-    setMessage(`Planned ${data.plannedPages?.length || 0} page(s). Layout blockers: ${blockers}.`);
-    appendLog(blockers > 0 ? "error" : "success", `Stage 2 planned ${data.plannedPages?.length || 0} page(s); ${blockers} blocker(s).`);
+    const plannedCount = data.plannedPages?.length || 0;
+    setMessage(`Page plan generated for ${plannedCount} entries. Layout blockers: ${blockers}.`);
+    appendLog(blockers > 0 ? "error" : "success", `Page plan generated for ${plannedCount} entries. Layout blockers: ${blockers}.`);
     await loadArtifacts(projectId);
   }
 
@@ -2169,8 +2180,10 @@ function App() {
     setTextFitPreview(data);
     saveTextFitCache(projectId, data);
     const overflow = data.totals?.overflow || 0;
-    appendLog(overflow > 0 ? "error" : "success", `Text-fit preview complete: ${data.totals?.fits || 0} fit, ${overflow} overflow.`);
-    setMessage(`Text-fit preview: ${data.readyForImageSpend ? "ready for image spend" : "needs review"}.`);
+    const tight = data.totals?.tight || 0;
+    const checked = data.pages?.length || pages.length || pageManifests.length || 0;
+    appendLog(overflow > 0 ? "error" : "success", `Text-Fit checked ${checked} pages: ${overflow} overflow, ${tight} tight.`);
+    setMessage(`Text-Fit checked ${checked} pages: ${overflow} overflow, ${tight} tight.`);
   }
 
   async function approveChapterLayout(chapterNumber = selectedChapterNumber, projectId = activeProjectId) {
@@ -2180,16 +2193,20 @@ function App() {
       method: "POST",
     });
     setLayoutApprovals(data.layoutApprovals || {});
-    appendLog("success", `Approved Chapter ${chapterNumber} layout for image spend.`);
+    const unlockedPages = chapterPages(chapterNumber).length || pageManifests.filter((page) => page.chapterNumber === chapterNumber).length;
+    appendLog("success", `Layout approved for Chapter ${chapterNumber}. Image generation unlocked for ${unlockedPages} pages.`);
     await loadArtifacts(projectId);
-    setMessage(`Chapter ${chapterNumber} layout approved. Image generation is now unlocked for that chapter.`);
+    setMessage(`Layout approved for Chapter ${chapterNumber}. Image generation unlocked for ${unlockedPages} pages.`);
   }
 
   async function loadPageImages(pageId = selectedPageId) {
     if (!pageId) throw new Error("Select a page first.");
     const data = await call(`/api/pages/${pageId}/images`);
     setPageImages((current) => ({ ...current, [pageId]: data.images || [] }));
-    appendLog("success", `Loaded ${data.images?.length || 0} image version(s) for selected page.`);
+    const page = pages.find((candidate) => candidate.id === pageId);
+    const count = data.images?.length || 0;
+    setMessage(`Loaded ${count} image version(s) for ${page?.pageKey || "selected page"}.`);
+    appendLog("success", `Loaded ${count} image version(s) for ${page?.pageKey || "selected page"}.`);
   }
 
   async function loadImageLibrary(projectId = activeProjectId) {
@@ -2202,7 +2219,8 @@ function App() {
     const suffix = params.toString() ? `?${params.toString()}` : "";
     const data = await call(`/api/projects/${projectId}/image-library${suffix}`);
     setImageLibrary(data);
-    appendLog("success", `Loaded ${data.total || 0} image asset(s) from the project library.`);
+    setMessage(`Loaded project image library: ${data.total || 0} assets.`);
+    appendLog("success", `Loaded project image library: ${data.total || 0} assets.`);
   }
 
   async function loadChapterIntelligence(chapterNumber = reviewChapterNumber, projectId = activeProjectId) {
@@ -2229,16 +2247,18 @@ function App() {
       method: "POST",
       body: JSON.stringify({ sourceImageId }),
     });
-    appendLog("success", `Reused library asset as ${page.pageKey} version ${data.version}.`);
+    setMessage(`Reused image asset on ${page.pageKey}, version ${data.version}.`);
+    appendLog("success", `Reused image asset on ${page.pageKey}, version ${data.version}.`);
     await loadPageImages(page.id);
     await loadArtifacts(activeProjectId);
   }
 
   async function generateSelectedPageImage() {
     const page = requireSelectedPage();
-    if (!confirmPaidAction("Generate an image for this page using OpenAI? This may spend API credits.")) return;
+    if (!confirmPaidAction(`Generate Image for Selected Page (${page.pageKey})? This creates one paid OpenAI image version for this page.`)) return false;
     const data = await call(`/api/pages/${page.id}/generate-image`, { method: "POST" });
-    appendLog("success", `Generated image version ${data.image.version} for ${page.pageKey}.`);
+    setMessage(`Generated image for ${page.pageKey}, version ${data.image.version}.`);
+    appendLog("success", `Generated image for ${page.pageKey}, version ${data.image.version}.`);
     await loadPageImages(page.id);
     await loadImageLibrary(activeProjectId);
     await loadArtifacts(activeProjectId);
@@ -2247,7 +2267,8 @@ function App() {
   async function approveImageVersion(version) {
     const page = requireSelectedPage();
     await call(`/api/pages/${page.id}/images/${version}/approve`, { method: "POST" });
-    appendLog("success", `Approved ${page.pageKey} image version ${version}.`);
+    setMessage(`Approved image for ${page.pageKey}, version ${version}.`);
+    appendLog("success", `Approved image for ${page.pageKey}, version ${version}.`);
     await loadPageImages(page.id);
     await loadArtifacts(activeProjectId);
   }
@@ -2259,6 +2280,7 @@ function App() {
       method: "POST",
       body: JSON.stringify({ note }),
     });
+    setMessage(`Rejected image for ${page.pageKey}, version ${version}.`);
     appendLog("issue", `Rejected ${page.pageKey} image version ${version}: ${note}`);
     await loadPageImages(page.id);
   }
@@ -2267,12 +2289,13 @@ function App() {
     const page = requireSelectedPage();
     const addendum = imageInstruction.trim();
     if (!addendum) throw new Error("Write the change request before regenerating.");
-    if (!confirmPaidAction("Regenerate this page image with your instruction? This may spend API credits.")) return;
+    if (!confirmPaidAction(`Regenerate Selected Page Image (${page.pageKey})? This creates one new paid image version using your correction request.`)) return false;
     const data = await call(`/api/pages/${page.id}/regenerate`, {
       method: "POST",
       body: JSON.stringify({ promptAddendum: addendum }),
     });
-    appendLog("success", `Regenerated ${page.pageKey} image version ${data.image.version}.`);
+    setMessage(`Regenerated image for ${page.pageKey}, version ${data.image.version}.`);
+    appendLog("success", `Regenerated image for ${page.pageKey}, version ${data.image.version}.`);
     setImageInstruction("");
     await loadPageImages(page.id);
     await loadImageLibrary(activeProjectId);
@@ -2281,8 +2304,9 @@ function App() {
 
   async function upscaleSelectedPageImage() {
     const page = requireSelectedPage();
-    if (!confirmPaidAction("Upscale the approved image through Replicate? This may spend API credits.")) return;
+    if (!confirmPaidAction(`Upscale Approved Image for ${page.pageKey}? This uses Replicate and may spend API credits.`)) return false;
     const data = await call(`/api/pages/${page.id}/upscale`, { method: "POST" });
+    setMessage(`Upscaled approved image for ${page.pageKey}: ${data.passed ? "passed" : "failed"} (${data.dpiW}x${data.dpiH} DPI).`);
     appendLog(data.passed ? "success" : "error", `Upscale ${data.passed ? "passed" : "failed"}: ${data.dpiW}x${data.dpiH} DPI.`);
     await loadPageImages(page.id);
     await loadArtifacts(activeProjectId);
@@ -2294,8 +2318,10 @@ function App() {
       method: "POST",
     });
     setRenderedChapterNumber(chapterNumber);
-    setPreviewBlob(`Chapter ${chapterNumber} PDF Preview`, blob, `${headers.get("x-total-pages") || "?"} rendered page(s)`);
-    appendLog("success", `Rendered chapter ${chapterNumber} preview.`);
+    const renderedPages = headers.get("x-total-pages") || "?";
+    setPreviewBlob(`Chapter ${chapterNumber} PDF Preview`, blob, `${renderedPages} rendered page(s)`);
+    setMessage(`Rendered Chapter ${chapterNumber} proof: ${renderedPages} pages.`);
+    appendLog("success", `Rendered Chapter ${chapterNumber} proof: ${renderedPages} pages.`);
     await refreshChapterIntelligenceAfterRender(chapterNumber);
   }
 
@@ -2308,18 +2334,23 @@ function App() {
     const row = pageByKey.get(pageKey);
     if (row?.id) setSelectedPageId(row.id);
     setRenderedChapterNumber(page?.chapterNumber || renderedChapterNumber);
-    setPreviewBlob(`${pageKey} Page Proof`, blob, `${headers.get("x-total-pages") || "?"} rendered page(s) for ${page?.entryTitle || "selected page"}`);
-    appendLog("success", `Rendered page proof for ${pageKey}.`);
+    const renderedPages = headers.get("x-total-pages") || "?";
+    setPreviewBlob(`${pageKey} Page Proof`, blob, `${renderedPages} rendered page(s) for ${page?.entryTitle || "selected page"}`);
+    setMessage(`Rendered selected page proof for ${pageKey}: ${renderedPages} pages.`);
+    appendLog("success", `Rendered selected page proof for ${pageKey}: ${renderedPages} pages.`);
     if (page?.chapterNumber) await refreshChapterIntelligenceAfterRender(page.chapterNumber);
   }
 
   async function renderBookPreview() {
     if (!activeProjectId) throw new Error("Create or select a project first.");
+    if (!window.confirm(`Render Full Book PDF Proof for ${chapterManifests.length} chapters and ${pageManifests.length} mapped entries? This may take longer than a chapter render.`)) return false;
     const { blob, headers } = await callPdf(`/api/projects/${activeProjectId}/render-book`, {
       method: "POST",
     });
-    setPreviewBlob("Full Book PDF Preview", blob, `${headers.get("x-page-count") || "?"} page(s), preflight ${headers.get("x-preflight-passed") || "unknown"}`);
-    appendLog("success", "Rendered full book PDF preview.");
+    const pageCount = headers.get("x-page-count") || "?";
+    setPreviewBlob("Full Book PDF Preview", blob, `${pageCount} page(s), preflight ${headers.get("x-preflight-passed") || "unknown"}`);
+    setMessage(`Rendered full book PDF proof: ${pageCount} pages.`);
+    appendLog("success", `Rendered full book PDF proof: ${pageCount} pages.`);
   }
 
   async function renderCoverPreview() {
@@ -2399,7 +2430,7 @@ function App() {
     } else if (normalized.includes("plan") || normalized.includes("layout")) {
       await run("Planning pages...", planPages);
     } else if (normalized.includes("text") && normalized.includes("fit")) {
-      await run("Running text-fit preview...", runTextFitPreview);
+      await run("Running Text-Fit for Book...", runTextFitPreview);
     } else if (normalized.includes("show") && normalized.includes("prompt")) {
       setAdvancedMode(true);
       appendLog("system", "Advanced mode enabled. Prompt details are available in the selected page panel.");
@@ -2413,9 +2444,9 @@ function App() {
       await run("Loading selected page images...", () => loadPageImages());
     } else if (normalized.includes("render") || normalized.includes("preview")) {
       const chapter = chapterManifests[0]?.chapterNumber || 1;
-      await run("Rendering chapter preview...", () => renderChapterPreview(chapter));
+      await run(`Rendering Chapter ${chapter} proof...`, () => renderChapterPreview(chapter));
     } else if (normalized.includes("export")) {
-      await run("Rendering full book preview...", renderBookPreview);
+      await run("Rendering full book PDF proof...", renderBookPreview);
     } else if (normalized.includes("refresh") || normalized.includes("output")) {
       await run("Loading output...", () => loadArtifacts());
     } else if (normalized.includes("intelligence") || normalized.includes("knowledge") || normalized.includes("standards")) {
@@ -2624,7 +2655,7 @@ function App() {
         review: "Review overflow, tight pages, density warnings, and any typography risk before approving layouts.",
         artifactLabel: "Text-fit summary",
         artifactSelector: ".fit-summary",
-        primaryLabel: textFitPreview ? "Review Text-Fit" : "Run Text-Fit",
+        primaryLabel: textFitPreview ? "Review Text-Fit" : "Run Text-Fit for Book",
         secondaryLabel: "Audit Text-Fit",
         metrics: [
           { label: "fit", value: textFitPreview?.totals?.fits ?? "pending" },
@@ -2640,7 +2671,7 @@ function App() {
         review: "Confirm the selected chapter is text-safe before unlocking image generation.",
         artifactLabel: "Layout approval checkpoint",
         artifactSelector: ".layout-approval-panel",
-        primaryLabel: selectedChapterApproval ? "Review Approval" : "Approve Layout",
+        primaryLabel: selectedChapterApproval ? "Review Approval" : `Approve Layout for ${selectedChapterLabel}`,
         secondaryLabel: "Ask Agent",
         metrics: [
           { label: "approved chapters", value: `${approvedChapterCount}/${chapterManifests.length || 0}` },
@@ -2657,7 +2688,7 @@ function App() {
         artifactLabel: "Image library",
         artifactSelector: ".asset-library-panel",
         primaryLabel: "Open Image Review",
-        secondaryLabel: "Load Library",
+        secondaryLabel: "Load Project Image Library",
         metrics: [
           { label: "pages with art", value: `${imagePageCount}/${pages.length}` },
           { label: "approved art", value: approvedImagePageCount },
@@ -2672,8 +2703,8 @@ function App() {
         review: "Review rendered pages, text flow, image placement, and readability at proof size.",
         artifactLabel: "Proof preview",
         artifactSelector: ".preview-review-card",
-        primaryLabel: pdfPreview.url ? "Review Proof" : "Render Chapter",
-        secondaryLabel: "Check Chapter",
+        primaryLabel: pdfPreview.url ? "Review Proof" : `Render ${reviewChapterLabel} Proof`,
+        secondaryLabel: `Check ${reviewChapterLabel} Readiness`,
         metrics: [
           { label: "chapter", value: reviewChapterNumber || "none" },
           { label: "proof", value: pdfPreview.url ? pdfPreview.title : "not rendered" },
@@ -2891,8 +2922,8 @@ function App() {
                 reviewStage(operatorReviewStage());
                 return;
               }
-              if (currentStageResult.secondaryLabel.toLowerCase().includes("load library")) {
-                run("Loading image library...", () => loadImageLibrary(), () => scrollToWorkspaceSection(".asset-library-panel"));
+              if (currentStageResult.secondaryLabel.toLowerCase().includes("library")) {
+                run("Loading project image library...", () => loadImageLibrary(), () => scrollToWorkspaceSection(".asset-library-panel"));
                 return;
               }
               if (currentStageResult.secondaryLabel.toLowerCase().includes("check chapter")) {
@@ -2903,7 +2934,7 @@ function App() {
             }}
             disabled={
               (currentStageResult.secondaryLabel.toLowerCase().includes("audit") && (!activeProjectId || chatBusy)) ||
-              (currentStageResult.secondaryLabel.toLowerCase().includes("load library") && !activeProjectId) ||
+              (currentStageResult.secondaryLabel.toLowerCase().includes("library") && !activeProjectId) ||
               (currentStageResult.secondaryLabel.toLowerCase().includes("check chapter") && !reviewChapterNumber)
             }
           >
@@ -3075,8 +3106,8 @@ function App() {
             <button disabled={busy || !activeProjectId} onClick={() => run("Running manuscript intake...", runManuscriptIntake, () => scrollToWorkspaceSection(".page-plan-list"))}>
               Run Agent Intake
             </button>
-            <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview, () => scrollToWorkspaceSection(".fit-summary", "center"))}>
-              Run Text-Fit
+            <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running Text-Fit for Book...", runTextFitPreview, () => scrollToWorkspaceSection(".fit-summary", "center"))}>
+              Run Text-Fit for Book
             </button>
           </div>
         </div>
@@ -3323,8 +3354,8 @@ function App() {
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("plan")}>
                   Audit with Agent
                 </button>
-                <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running text-fit preview...", runTextFitPreview, () => scrollToWorkspaceSection(".fit-summary", "center"))}>
-                  Text-Fit
+                <button disabled={busy || !activeProjectId || pages.length === 0} onClick={() => run("Running Text-Fit for Book...", runTextFitPreview, () => scrollToWorkspaceSection(".fit-summary", "center"))}>
+                  Run Text-Fit for Book
                 </button>
               </div>
             </div>
@@ -3352,9 +3383,9 @@ function App() {
                 </div>
                 <button
                   disabled={busy || !activeProjectId || chapterPages(selectedChapterNumber).length === 0}
-                  onClick={() => run(`Approving Chapter ${selectedChapterNumber} layout...`, () => approveChapterLayout(selectedChapterNumber), () => scrollToWorkspaceSection(".layout-approval-panel", "center"))}
+                  onClick={() => run(`Approving layout for ${selectedChapterLabel}...`, () => approveChapterLayout(selectedChapterNumber), () => scrollToWorkspaceSection(".layout-approval-panel", "center"))}
                 >
-                  {selectedChapterApproval ? "Re-approve Layout" : "Approve Chapter Layout"}
+                  {selectedChapterApproval ? `Re-approve Layout for ${selectedChapterLabel}` : `Approve Layout for ${selectedChapterLabel}`}
                 </button>
               </div>
             )}
@@ -3423,7 +3454,7 @@ function App() {
               </div>
               <div className="button-row">
                 <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages(), () => scrollToWorkspaceSection(".image-version-list"))}>
-                  Load Images
+                  Load Images for Selected Page
                 </button>
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("images")}>
                   Audit with Agent
@@ -3468,10 +3499,10 @@ function App() {
             )}
             <div className="button-row">
               <button disabled={busy || !selectedPage || !selectedChapterApproval || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady)} onClick={() => run("Generating selected page image...", generateSelectedPageImage, () => scrollToWorkspaceSection(".image-version-list"))}>
-                Generate Image
+                Generate Image for Selected Page
               </button>
               <button disabled={busy || !selectedPage || selectedPage?.status !== "APPROVED"} onClick={() => run("Upscaling selected page image...", upscaleSelectedPageImage, () => scrollToWorkspaceSection(".image-version-list"))}>
-                Enhance / Upscale
+                Upscale Approved Image
               </button>
             </div>
             <details className="asset-library-panel" open>
@@ -3494,17 +3525,17 @@ function App() {
                 <select value={imageLibraryFilter.layout} onChange={(event) => setImageLibraryFilter((current) => ({ ...current, layout: event.target.value }))}>
                   <option value="">Any layout</option>
                   {libraryLayouts.map((layout) => (
-                    <option key={layout} value={layout}>{layoutName(layout)}</option>
+                    <option key={layout} value={layout} label={layoutName(layout)} />
                   ))}
                 </select>
                 <select value={imageLibraryFilter.chapter} onChange={(event) => setImageLibraryFilter((current) => ({ ...current, chapter: event.target.value }))}>
                   <option value="">Any chapter</option>
                   {chapterManifests.map((chapter) => (
-                    <option key={chapter.chapterNumber} value={chapter.chapterNumber}>Chapter {chapter.chapterNumber}</option>
+                    <option key={chapter.chapterNumber} value={String(chapter.chapterNumber)} label={`Chapter ${chapter.chapterNumber}`} />
                   ))}
                 </select>
-                <button disabled={busy || !activeProjectId} onClick={() => run("Loading image library...", () => loadImageLibrary(), () => scrollToWorkspaceSection(".asset-library-panel"))}>
-                  Load Library
+                <button disabled={busy || !activeProjectId} onClick={() => run("Loading project image library...", () => loadImageLibrary(), () => scrollToWorkspaceSection(".asset-library-panel"))}>
+                  Load Project Image Library
                 </button>
               </div>
               <div className="asset-library-summary">
@@ -3530,7 +3561,7 @@ function App() {
                     </div>
                     <div className="button-row">
                       <button disabled={busy || !selectedPage || asset.source.pageId === selectedPage.id} onClick={() => run("Reusing image asset...", () => reuseImageAsset(asset.imageId), () => scrollToWorkspaceSection(".image-version-list"))}>
-                        Reuse on Selected Page
+                        Reuse Image on Selected Page
                       </button>
                     </div>
                     {advancedMode && (
@@ -3573,10 +3604,10 @@ function App() {
                   </div>
                   <div className="button-row">
                     <button disabled={busy || image.status === "REJECTED"} onClick={() => run("Approving image...", () => approveImageVersion(image.version), () => scrollToWorkspaceSection(".image-version-list"))}>
-                      Approve
+                      Approve Image v{image.version}
                     </button>
                     <button disabled={busy} onClick={() => run("Rejecting image...", () => rejectImageVersion(image.version))}>
-                      Reject
+                      Reject Image v{image.version}
                     </button>
                   </div>
                   {advancedMode && (
@@ -3591,7 +3622,7 @@ function App() {
               {selectedImages.length === 0 && <p className="empty">No image versions loaded for this page yet.</p>}
             </div>
             <button disabled={busy || !selectedPage || !imageInstruction.trim()} onClick={() => run("Regenerating selected page image...", regenerateSelectedPageImage, () => scrollToWorkspaceSection(".image-version-list"))}>
-              Regenerate With Correction
+              Regenerate Selected Page Image
             </button>
           </section>
 
@@ -3613,8 +3644,8 @@ function App() {
               <div className="part-row"><strong>Back Matter / Colophon</strong><span>about the author / imprint</span><span className="part-tag auto">auto</span></div>
             </div>
             <div className="button-row">
-              <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book...", renderBookPreview)}>
-                Render Full Book (all parts)
+              <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book proof...", renderBookPreview)}>
+                Render Full Book PDF Proof
               </button>
               <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering cover...", renderCoverPreview)}>
                 Render Cover
@@ -3629,14 +3660,14 @@ function App() {
                 <p className="hint">Open a large PDF proof before final output. Rendering uses placeholders until approved art exists.</p>
               </div>
               <div className="button-row">
-                <button disabled={busy || !reviewChapterNumber} onClick={() => run("Rendering chapter preview...", () => renderChapterPreview(reviewChapterNumber), () => scrollToWorkspaceSection(".pdf-preview-frame"))}>
-                  Render Selected Chapter
+                <button disabled={busy || !reviewChapterNumber} onClick={() => run(`Rendering ${reviewChapterLabel} proof...`, () => renderChapterPreview(reviewChapterNumber), () => scrollToWorkspaceSection(".pdf-preview-frame"))}>
+                  Render {reviewChapterLabel} Proof
                 </button>
                 <button disabled={busy || !reviewChapterNumber} onClick={() => run("Checking chapter intelligence...", () => loadChapterIntelligence(reviewChapterNumber), () => scrollToWorkspaceSection(".chapter-intelligence"))}>
-                  Check Chapter
+                  Check {reviewChapterLabel} Readiness
                 </button>
                 <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering full book preview...", renderBookPreview, () => scrollToWorkspaceSection(".pdf-preview-frame"))}>
-                  Render Book PDF
+                  Render Full Book PDF Proof
                 </button>
                 <button disabled={busy || chapterManifests.length === 0} onClick={() => run("Rendering cover...", renderCoverPreview, () => scrollToWorkspaceSection(".pdf-preview-frame"))}>
                   Render Cover
@@ -3708,7 +3739,7 @@ function App() {
                   </div>
                 </>
               ) : (
-                <p className="empty">Run Check Chapter to see layout, image, and proof-readiness blockers for this chapter.</p>
+                <p className="empty">Run Check Chapter Readiness to see layout, image, and proof-readiness blockers for this chapter.</p>
               )}
             </div>
             <div className="render-page-review-list">
@@ -3742,7 +3773,7 @@ function App() {
                   </div>
                   <div className="preview-actions">
                     <a className="download-link secondary" href={pdfPreview.url} target="_blank" rel="noreferrer">Open PDF</a>
-                    <a className="download-link" href={pdfPreview.url} download="wildlands-preview.pdf">Download PDF</a>
+                    <a className="download-link" href={pdfPreview.url} download="wildlands-preview.pdf">Download Current Preview PDF</a>
                   </div>
                 </div>
                 <p className="pdf-preview-note">If the embedded preview appears blank, open or download the same rendered proof. The iframe uses a temporary browser PDF blob.</p>
