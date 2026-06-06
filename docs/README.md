@@ -15,6 +15,8 @@ actually works today.**
 | `TYPOGRAPHY_SPEC.md` | Role-based typography (Cormorant + EB Garamond), default 7×10 |
 | `LAYERED_LAYOUT.md` / `LAYOUT_ALLOCATION_MAP.md` | Content type → coverage → architecture; per-layout coverage map |
 | `PUBLISHING_DIRECTION.md` | Illustration density & page-design guidance (three layers, visual presence, controlled variety) |
+| `PUBLISHING_DIRECTOR.md` | **Design proposal** for the Publishing Director layer (rebalancing, rhythm, feature distribution). Not built yet. |
+| `STYLE_DNA_REVIEW.md` | **Design proposal** for v2 Master Style Block — expanded reference roster + composition modes + bounded color. Not built yet. |
 | `publishing-intelligence-center.md` | Standards ledger / knowledge system architecture |
 | `operator-workflow-review.md` | UI workflow audit and implementation order for operator review mode |
 | `ACTION_SCOPE_AUDIT.md` | Operator action scope table, button copy rules, and confirmation policy |
