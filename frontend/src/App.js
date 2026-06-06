@@ -386,7 +386,7 @@ Page structure:
 
 Visual balance:
 - Top 60% contains the comparison area.
-- Bottom 40% remains largely clear for educational text placement.
+- Bottom 40% serves as the text-safe zone (calm artwork supporting overlaid body text).
 - Leave generous negative space in the lower section.
 - Maintain a clean and organized layout.
 
@@ -448,7 +448,7 @@ Page structure:
 
 Visual balance:
 - Top 60% serves as the reference illustration area.
-- Bottom 40% remains largely clear for educational text placement.
+- Bottom 40% serves as the text-safe zone (calm artwork supporting overlaid body text).
 - Avoid dense grids or crowded collections.
 - Avoid excessive labels and callouts.
 - Preserve strong negative space throughout the page.
@@ -598,7 +598,7 @@ Page structure:
 
 Visual balance:
 - Upper 60% contains the primary diagram and callouts.
-- Lower 40% remains largely clear for educational text placement.
+- Lower 40% serves as the text-safe zone (calm artwork supporting overlaid body text).
 - Maintain generous negative space.
 - Preserve a clean and organized presentation.
 
@@ -620,12 +620,12 @@ Page structure:
 - A wide horizontal illustration spans the upper portion of the page.
 - The illustration acts as a visual header for the topic.
 - Minimal callouts may appear within the illustration.
-- The lower portion of the page remains primarily reserved for educational content.
+- The lower portion of the artwork serves as the text-safe zone — calm, low-detail composition that supports overlaid body text.
 
 Visual balance:
 - Upper 35-40% contains the feature illustration.
-- Lower 60-65% remains largely clear for text placement.
-- Maintain strong separation between image and content areas.
+- Lower 60-65% serves as the text-safe zone (calm artwork supporting overlaid body text).
+- The image IS the full page. The "upper" and "lower" portions are zones of one full-bleed artwork — not separate compartments. Compose the image-priority zone with focal content and keep the text-safe zone calm and low-detail.
 - Preserve generous reading space.
 
 Composition notes:
@@ -645,15 +645,15 @@ Subject and scientific context:
 Page structure:
 - A large vertical illustration occupies the left side of the page.
 - The illustration should remain contained to approximately one-third of the page width.
-- The remaining two-thirds of the page should remain largely clear and open.
+- The remaining two-thirds of the page should is the text-safe zone — kept calm and low-detail so body text overlays readably.
 - Do not fill the open area with additional illustrations, diagrams, labels, annotations, maps, or decorative elements.
 - Do not generate readable text anywhere on the page.
 - The open area should function as reserved space for future educational content.
 
 Visual balance:
 - Left 35% contains the primary illustration.
-- Right 65% remains mostly empty.
-- Maintain a strong visual separation between the illustration area and the content area.
+- Right 65% is the text-safe zone (calm artwork supporting overlaid body text).
+- The image IS the full page. The illustration area and the text-safe area are zones of one full-bleed artwork — not separate compartments.
 - Preserve generous negative space throughout the open area.
 - Avoid background elements spilling into the content area.
 
@@ -679,7 +679,7 @@ Page structure:
 
 Visual balance:
 - Upper 50-60% contains the progression studies.
-- Lower 40-50% remains available for educational text.
+- Lower 40-50% serves as the text-safe zone (calm artwork supporting overlaid body text).
 - Avoid excessive callouts or technical breakdowns.
 - Maintain generous spacing between stages.
 
@@ -705,7 +705,7 @@ Page structure:
 
 Visual balance:
 - Upper 60% contains the cutaway illustration.
-- Lower 40% remains largely clear for educational text placement.
+- Lower 40% serves as the text-safe zone (calm artwork supporting overlaid body text).
 - Maintain clean organization and strong negative space.
 
 Composition notes:
@@ -779,7 +779,7 @@ function defaultLayoutPromptAssets() {
                             : id === "LAYOUT_12_DIAGNOSTIC_DIAGRAM"
                               ? "Diagnostic diagram page. Upper 60% contains a large central subject with restrained major-feature callouts; lower 40% remains clear for educational text."
                               : id === "LAYOUT_13_FEATURE_BANNER"
-                                ? "Feature banner page. Upper 35-40% contains a wide horizontal topic illustration; lower 60-65% remains open for educational text with strong separation between image and content."
+                                ? "Feature banner page. The image IS the full page; the upper 35-40% is the image-priority zone (focal terrain/subject) and the lower 60-65% is the text-safe zone (calm artwork supporting overlaid body text)."
                                 : id === "LAYOUT_14_SIDEBAR_FEATURE"
                                   ? "Sidebar feature page. Left 35% contains one large vertical illustration; right 65% remains empty and uninterrupted for educational text."
                                   : id === "LAYOUT_15_PROGRESSION_STUDY"
@@ -830,11 +830,11 @@ function defaultLayoutPromptAssets() {
           : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
             ? "Approximately 40% of the page remains clear for educational text, mainly in the left side and lower portion."
             : id === "LAYOUT_4_DANGER_WARNING"
-              ? "Bottom 40% remains largely clear for educational text placement, with generous negative space."
+              ? "Bottom 40% serves as the text-safe zone (calm artwork supporting overlaid body text), with generous negative space."
               : id === "LAYOUT_5_CHAPTER_OPENER"
                 ? "Lower 40% remains intentionally blank and reserved for future chapter content."
                 : id === "LAYOUT_6_BACK_MATTER"
-                  ? "Bottom 40% remains largely clear for educational text placement."
+                  ? "Bottom 40% serves as the text-safe zone (calm artwork supporting overlaid body text)."
                   : id === "LAYOUT_7_SCATTERED_VIGNETTES"
                     ? "Preserve a large continuous educational text area that can flow naturally around the staggered studies."
                     : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
@@ -846,15 +846,15 @@ function defaultLayoutPromptAssets() {
                           : id === "LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD"
                             ? "No large body text area; only small lower-edge callouts are expected."
                             : id === "LAYOUT_12_DIAGNOSTIC_DIAGRAM"
-                              ? "Lower 40% remains largely clear for educational text placement."
+                              ? "Lower 40% serves as the text-safe zone (calm artwork supporting overlaid body text)."
                               : id === "LAYOUT_13_FEATURE_BANNER"
-                                ? "Lower 60-65% remains largely clear for educational text placement."
+                                ? "Lower 60-65% serves as the text-safe zone (calm artwork supporting overlaid body text)."
                                 : id === "LAYOUT_14_SIDEBAR_FEATURE"
-                                  ? "Right 65% remains mostly empty and reserved for future educational content."
+                                  ? "Right 65% is the text-safe zone (calm artwork supporting overlaid body text) and reserved for future educational content."
                                   : id === "LAYOUT_15_PROGRESSION_STUDY"
-                                    ? "Lower 40-50% remains available for educational text."
+                                    ? "Lower 40-50% serves as the text-safe zone (calm artwork supporting overlaid body text)."
                                     : id === "LAYOUT_16_CUTAWAY_FEATURE"
-                                      ? "Lower 40% remains largely clear for educational text placement."
+                                      ? "Lower 40% serves as the text-safe zone (calm artwork supporting overlaid body text)."
             : "Balanced text zone based on the uploaded mockup.",
     imageZoneDescription:
       id === "LAYOUT_1_STANDARD"
