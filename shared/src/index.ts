@@ -302,8 +302,13 @@ export const LayoutPromptAssetSchema = z.object({
   layoutDescription: z.string().min(1).default('Written description of the layout structure.'),
   useCases: z.array(z.string().min(1)).default([]),
   avoidWhen: z.array(z.string().min(1)).default([]),
-  textZoneDescription: z.string().min(1).default('Describe where manuscript text fits on this layout.'),
-  imageZoneDescription: z.string().min(1).default('Describe where generated subject art fits on this layout.'),
+  // Full-page artwork model: the image IS the page; these fields describe the
+  // ZONES on that page (where text is safe to live; where the strongest visual
+  // content should live). Field names kept for back-compat with stored configs.
+  /** Where manuscript body text lives on the artwork (the text-safe zone). */
+  textZoneDescription: z.string().min(1).default('Text-safe zone: the calm region of the artwork reserved for body text and captions.'),
+  /** Where the strongest visual content should live in the artwork (image-priority zone). */
+  imageZoneDescription: z.string().min(1).default('Image-priority zone: the area where focal subjects and primary visual detail should live in the artwork.'),
   capacityNotes: z.string().default(''),
   minWords: z.number().int().nonnegative().default(0),
   targetWords: z.number().int().nonnegative().default(250),
@@ -312,8 +317,9 @@ export const LayoutPromptAssetSchema = z.object({
   recommendedLineHeight: z.number().positive().default(1.28),
   promptTemplate: z.string().min(1),
   placeholders: z.array(z.string().min(1)).default(['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}']),
-  textFitRule: z.string().min(1).default('Fit manuscript text into this mockup before image generation.'),
-  imageSlotDescription: z.string().min(1).default('Replace mockup art with generated subject illustration after text fit approval.'),
+  textFitRule: z.string().min(1).default('Fit manuscript text into the text-safe zone before any image is generated.'),
+  /** @deprecated Use `imageZoneDescription`. Kept for back-compat with stored configs. */
+  imageSlotDescription: z.string().min(1).default('Image-priority zone description (legacy field name; describes where focal visual content lives on the full-page artwork).'),
   capacityTestStatus: z.enum(['UNTESTED', 'TESTING', 'APPROVED']).default('UNTESTED'),
   operatorNotes: z.string().default(''),
 });

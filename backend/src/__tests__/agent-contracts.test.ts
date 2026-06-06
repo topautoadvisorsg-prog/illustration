@@ -48,7 +48,9 @@ describe('Wildlands agent contracts', () => {
   it('defines art brief and cover direction contracts for downstream image generation', () => {
     const artBrief = getAgentContract('ART_BRIEF_DIRECTOR');
     expect(artBrief.requiredOutputs.join('\n')).toContain('300-DPI pixel target');
-    expect(artBrief.hardRules.join('\n')).toContain('corner art');
+    // Hard rules teach the new full-page-artwork zone model (text-safe zone + image-priority zone).
+    expect(artBrief.hardRules.join('\n')).toContain('image-priority zone');
+    expect(artBrief.hardRules.join('\n')).toContain('text-safe zone');
 
     const cover = getAgentContract('COVER_ART_DIRECTOR');
     expect(cover.hardRules.join('\n')).toContain('title');

@@ -108,7 +108,7 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
     expertFrame:
       'Act like a professional art director and book-layout specialist for premium full-color naturalist guides.',
     hardRules: [
-      'A layout template is only production-ready when its mockup, text area, art slot, prompt template, and capacity metadata stay together.',
+      'A layout template is only production-ready when its mockup, text-safe zone, image-priority zone, prompt template, and capacity metadata stay together.',
       'If capacity status is not approved, report the risk instead of pretending the layout is proven.',
       'Use danger, comparison, diagnostic, tall-subject, short-text, and long-text signals before the default layout.',
     ],
@@ -116,7 +116,7 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
     requiredOutputs: ['Selected layout template', 'Layout reference label', 'Capacity range', 'Reason codes', 'Text-fit risk notes'],
     researchDirectives: [
       'Check layout choices against the approved 16-layout reference set.',
-      'Keep all important text within safe margins; image slots may bleed only when the output profile allows it.',
+      'The image IS the page (full-bleed artwork). Keep important text within the text-safe zone; the image-priority zone holds the strongest visual content.',
     ],
     runtime: 'deterministic',
     usesTools: false,
@@ -126,20 +126,20 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
   ART_BRIEF_DIRECTOR: {
     id: 'ART_BRIEF_DIRECTOR',
     name: 'Art Brief Director',
-    mission: 'Translate an approved layout into exact image-slot production requirements before image generation.',
+    mission: 'Translate an approved layout into a zone-aware composition brief (text-safe zone, image-priority zone, typography zone) for full-page artwork generation.',
     expertFrame:
-      'Act like a senior art director and print production designer who turns layout decisions into precise illustration briefs with slot geometry, crop safety, bleed safety, and overlay-safe negative space.',
+      'Act like a senior art director and print production designer who turns layout decisions into precise composition briefs: image-priority zone, text-safe zone, typography zone, crop safety, bleed safety, and overlay-safe negative space across the full page artwork.',
     hardRules: [
       'Do not generate images or rewrite manuscript text.',
-      'Always specify image percentage, text percentage, placement, slot dimensions in inches, minimum 300-DPI pixel size, and crop/bleed padding.',
-      'For text-heavy pages, preserve a small illustration zone such as corner art, edge art, specimen detail, track mark, pine bough, or marginal naturalist decoration.',
-      'For chapter openers and covers, reserve calm negative space for layout-typeset titles; the image model must still render no readable text.',
+      'The image IS the page (full-bleed). Specify the image-priority zone (where focal visual content lives), the text-safe zone (where body text overlays readably), the typography zone (where the title sits on the artwork), and the 300-DPI pixel target for the full page.',
+      'For text-heavy pages, keep the image-priority zone narrow (corner, edge, margin) so most of the artwork supports a generous text-safe zone.',
+      'For chapter openers and covers, reserve a calm typography zone so the layout-typeset title reads on the artwork; the image model still renders no readable text.',
     ],
     requiredInputs: ['Approved layout template', 'Page geometry', 'Typography settings', 'Page subject', 'Body text context'],
-    requiredOutputs: ['Art slot dimensions', '300-DPI pixel target', 'Bleed/crop guidance', 'Overlay-safe area instruction', 'Image-generation composition brief'],
+    requiredOutputs: ['Image-priority zone position + share', 'Text-safe zone position + share', 'Typography zone position', '300-DPI pixel target for the full page', 'Bleed/crop guidance', 'Composition brief for the image generator'],
     researchDirectives: [
       'Treat KDP trim, bleed, and safe areas as physical production constraints.',
-      'Size source art larger than the final slot so final placement can crop gracefully.',
+      'Compose the full page so each zone reads as one integrated illustrated page — never a photo with a paper card glued on top.',
     ],
     runtime: 'deterministic',
     usesTools: false,
@@ -190,7 +190,7 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
     runtime: 'deterministic',
     usesTools: false,
     usesVision: false,
-    realityNote: 'Cover is rendered deterministically (typographic overlay + full-bleed art slot, spine sized from page count). No separate LLM.',
+    realityNote: 'Cover is rendered deterministically (typographic overlay on the full-page artwork, spine sized from page count). No separate LLM.',
   },
   TEXT_FIT_QA: {
     id: 'TEXT_FIT_QA',

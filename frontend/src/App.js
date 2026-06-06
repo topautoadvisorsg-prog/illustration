@@ -931,7 +931,7 @@ function defaultLayoutPromptAssets() {
                                       ? LAYOUT_16_MASTER_PROMPT
             : `{MASTER_STYLE_DNA}\n\nCreate the final illustration for ${name}. Subject: {SUBJECT}. ` +
               `Scientific/diagnostic details: {SCIENTIFIC_DETAILS}. ` +
-              `Composition must match the approved mockup image slot for ${id}: ${description}. ` +
+              `The image IS the full page (full-bleed artwork). Compose the page so its zones match the approved mockup for ${id}: ${description}. ` +
               `{COMPOSITION_NOTES} ` +
               `Do not render page text, labels, titles, captions, or typography.`),
     placeholders: ["{MASTER_STYLE_DNA}", "{SUBJECT}", "{SCIENTIFIC_DETAILS}", "{COMPOSITION_NOTES}"],
@@ -967,7 +967,7 @@ function defaultLayoutPromptAssets() {
         : id === "LAYOUT_16_CUTAWAY_FEATURE"
           ? "Use when the page needs to explain layers, internal structure, zones, or hidden relationships."
           : "Fit the real manuscript text into this mockup before generating final art.",
-    imageSlotDescription: "Mockup image defines the art slot. Generated art replaces only that slot after text-fit approval.",
+    imageSlotDescription: "Mockup defines the image-priority zone within the full-page artwork. Generated artwork composes to match those zones after text-fit approval.",
     capacityTestStatus: ["LAYOUT_1_STANDARD", "LAYOUT_2_TEXT_HEAVY", "LAYOUT_3_ILLUSTRATION_DOMINANT", "LAYOUT_4_DANGER_WARNING", "LAYOUT_5_CHAPTER_OPENER", "LAYOUT_6_BACK_MATTER", "LAYOUT_7_SCATTERED_VIGNETTES", "LAYOUT_8_MARGIN_ILLUSTRATION", "LAYOUT_9_DIAGNOSTIC_DIAGRAM", "LAYOUT_10_FULL_PAGE_PLATE", "LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD", "LAYOUT_12_DIAGNOSTIC_DIAGRAM", "LAYOUT_13_FEATURE_BANNER", "LAYOUT_14_SIDEBAR_FEATURE", "LAYOUT_15_PROGRESSION_STUDY", "LAYOUT_16_CUTAWAY_FEATURE"].includes(id) ? "TESTING" : "UNTESTED",
     operatorNotes:
       id === "LAYOUT_1_STANDARD"
@@ -4268,7 +4268,7 @@ function App() {
                         {allocation && <p><strong>Continuation:</strong> {allocation.continuationPageTextPercent}% text / {allocation.continuationPageImagePercent}% image after the opening page.</p>}
                         {artBrief?.artBox && (
                           <p>
-                            <strong>Art brief:</strong> {artBrief.imagePercent}% image / {artBrief.textPercent}% text, {artBrief.artBox.widthIn}in x {artBrief.artBox.heightIn}in slot, minimum {artBrief.artBox.recommendedWidthPx} x {artBrief.artBox.recommendedHeightPx}px.
+                            <strong>Zone plan:</strong> image-priority {artBrief.imagePercent}% / text-safe {artBrief.textPercent}%; image-priority zone ≈ {artBrief.artBox.widthIn}in × {artBrief.artBox.heightIn}in; min source {artBrief.artBox.recommendedWidthPx} × {artBrief.artBox.recommendedHeightPx}px at 300 DPI.
                           </p>
                         )}
                         <p><strong>Prompt hash:</strong> {row?.imagePromptSha256 || plan?.promptSha256 || "No prompt hash"}</p>
@@ -5646,7 +5646,7 @@ function App() {
                       onChange={(event) => updateLayoutAsset(index, "textFitRule", event.target.value)}
                     />
                   </Field>
-                  <Field label="Image Slot Rule">
+                  <Field label="Image-Priority Zone Rule">
                     <input
                       value={asset.imageSlotDescription}
                       onChange={(event) => updateLayoutAsset(index, "imageSlotDescription", event.target.value)}
@@ -5699,7 +5699,7 @@ function App() {
                 Chanterelle identification notes sit beside a cinematic naturalist illustration. Section labels use
                 {projectConfig.typography.smallCaps ? " small caps" : " normal caps"}.
               </p>
-              <div className="mock-art">subject art slot</div>
+              <div className="mock-art">image-priority zone</div>
             </div>
             <div className="facts">
               <span>{printFormatLabel}</span>
