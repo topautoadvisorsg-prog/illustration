@@ -30,10 +30,10 @@ import { recordExport } from '../../db/repositories/exports.repo.js';
 import { getProjectStorage, type ProjectStorage } from '../../services/storage/project-storage.js';
 import { logger } from '../../lib/logger.js';
 import { computePageGeometry } from './page-geometry.js';
-import { buildChapterHtml, buildBookHtml, buildCoverHtml, buildPageHtml, computeCoverDimensions, type ChapterPageRender, type BookChapter } from './render-html.js';
+import { buildBookHtml, buildCoverHtml, buildPageHtml, computeCoverDimensions, type ChapterPageRender, type BookChapter } from './render-html.js';
 import { directLayout } from './layout-director.js';
 import { isChromiumAvailable, loadPagedPolyfill, renderHtmlToPdf } from './render-pdf.js';
-import { preflightBook, type PreflightReport } from '../stage-7-pdf-compile/stitch-book.js';
+import { preflightBook, stitchPdfs, type PreflightReport } from '../stage-7-pdf-compile/stitch-book.js';
 import sharp from 'sharp';
 
 export class RenderBlockedError extends Error {
@@ -222,7 +222,10 @@ export async function renderChapterPdf(projectId: string, chapterNumber: number)
   const rowByKey = new Map(pageRows.map((row) => [row.pageKey, row]));
   const geometry = computePageGeometry(config.trimSize);
 
-  const pages: ChapterPageRender[] = [];
+  const entryPdfs: Buffer[] = [];
+  const chapterLabel = `Chapter ${chapterNumber} — ${chapterRow.chapterTitle}`;
+  const polyfillJs = await loadPagedPolyfill();
+
   for (const pm of pageManifests) {
     const pageRow = rowByKey.get(pm.pageId);
     const renderPage = {
@@ -230,25 +233,18 @@ export async function renderChapterPdf(projectId: string, chapterNumber: number)
       layoutTemplate: (pageRow?.layoutTemplate ?? pm.layoutTemplate) as PageManifest['layoutTemplate'],
     };
     const imageDataUri = await imageDataUriForPage(storage, pageRow?.id, renderImageTargetPx(renderPage, config, geometry));
-    pages.push({
-      entryTitle: renderPage.entryTitle,
-      scientificName: renderPage.scientificName,
-      bodyMarkdown: renderPage.bodyMarkdown,
-      layoutTemplate: renderPage.layoutTemplate,
+    const html = buildPageHtml(renderPage, config, {
+      geometry,
       imageDataUri,
+      polyfillJs,
+      chapterLabel,
     });
+    const { buffer } = await renderHtmlToPdf(html, geometry);
+    entryPdfs.push(buffer);
   }
 
-  const polyfillJs = await loadPagedPolyfill();
-  const html = buildChapterHtml(
-    pages,
-    config,
-    { chapterNumber, chapterTitle: chapterRow.chapterTitle },
-    { geometry, polyfillJs, proofGuides: true }, // chapter preview is the operator proof view
-  );
-
-  logger.info({ projectId, chapterNumber, pages: pages.length }, 'Stage 6: rendering chapter PDF');
-  const { buffer, totalPages } = await renderHtmlToPdf(html, geometry);
+  logger.info({ projectId, chapterNumber, pages: pageManifests.length }, 'Stage 6: stitching chapter proof from entry renders');
+  const { pdf: buffer, pageCount: totalPages } = await stitchPdfs(entryPdfs);
 
   const stored = await storage.writeProjectFile(projectId, ['chapters', `CH${pad2(chapterNumber)}.pdf`], buffer);
   const artifact = await recordProofArtifact(projectId, config, {
