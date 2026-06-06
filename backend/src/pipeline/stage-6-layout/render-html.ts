@@ -478,7 +478,7 @@ export function buildChapterHtml(
   const m = geometry.margins;
   const chapterLabel = escapeHtml(`Chapter ${chapter.chapterNumber} — ${chapter.chapterTitle}`);
 
-  const built = pages.map((page, i) => buildEntryArticle(page, geometry, c, `entryC${chapter.chapterNumber}E${i}`, true));
+  const built = pages.map((page, i) => buildEntryArticle(page, geometry, c, `entryc${chapter.chapterNumber}e${i}`, true));
   const pagesHtml = built.map((b) => b.article).join('\n');
   const entryCss = built.map((b) => b.css).filter(Boolean).join('\n  ');
 
@@ -576,7 +576,7 @@ export function buildBookHtml(input: BookAssemblyInput, config: ProjectConfig, o
           const entryId = `entry-${entryCounter}`;
           const anchorId = pageIdx === 0 ? `chap-${chapter.chapterNumber}` : entryId;
           indexItems.push({ title: page.entryTitle, id: anchorId });
-          const pageName = `bookC${chapter.chapterNumber}E${pageIdx}`;
+          const pageName = `bookc${chapter.chapterNumber}e${pageIdx}`;
           const built = bookEntryArticle(page, geometry, c, pageName, anchorId);
           if (built.css) entryCssChunks.push(built.css);
           return built.article;
