@@ -69,11 +69,11 @@ describe('layered model — policy + composition tables', () => {
     }
   });
 
-  it('decomposes every existing template, and the architecture matches its render art slot', () => {
+  it('decomposes every existing template, and the architecture matches its render image-priority edge', () => {
     for (const t of ALL_TEMPLATES) {
       const comp = LAYOUT_TEMPLATE_COMPOSITION[t];
       expect(comp, `composition for ${t}`).toBeDefined();
-      // The decomposed architecture must equal what actually renders (the profile art slot),
+      // The decomposed architecture must equal what actually renders (the profile image-priority edge),
       // proving the layered model is consistent with the unchanged render path.
       expect(comp.architecture).toBe(LAYOUT_PROFILES[t].artSlot);
       expect(ContentTypeSchema.options).toContain(comp.contentType);
@@ -121,7 +121,7 @@ describe('classifyContentType', () => {
 });
 
 describe('composeProfile — forward engine (coverage + architecture only)', () => {
-  it('maps coverage to art area and architecture to art slot', () => {
+  it('maps coverage to art area and architecture to image-priority edge', () => {
     const p = composeProfile(50, 'TOP_BAND');
     expect(p.artSlot).toBe('TOP_BAND');
     expect(p.artAreaFraction).toBe(0.5);

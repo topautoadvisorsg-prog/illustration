@@ -1,4 +1,4 @@
-# Agent Layer — what actually runs
+﻿# Agent Layer â€” what actually runs
 
 This documents the real agent/LLM layer, because the roster historically implied
 more than runs. Source of truth: `backend/src/agents/agent-contracts.ts` (each
@@ -8,10 +8,10 @@ contract carries `runtime`, `usesTools`, `usesVision`, `realityNote`).
 
 **No agent reads image pixels. No vision calls.** Review and reuse reason over
 **metadata only**: layout type, coverage %, placement, subject, prompt + hash,
-dimensions/DPI, status. This keeps token cost predictable — the only image spend
-is one-way generation to `gpt-image-2` (text prompt → image). The Claude wrapper
+dimensions/DPI, status. This keeps token cost predictable â€” the only image spend
+is one-way generation to `gpt-image-2` (text prompt â†’ image). The Claude wrapper
 (`services/claude/claude.ts`) is text-only; every base64/image reference in the
-codebase is the renderer embedding PNGs into HTML for Chromium → PDF.
+codebase is the renderer embedding PNGs into HTML for Chromium â†’ PDF.
 
 `usesVision` must stay `false` for every contract; a test enforces this.
 
@@ -26,7 +26,7 @@ codebase is the renderer embedding PNGs into HTML for Chromium → PDF.
 | Layout Selector | deterministic | Folded into planning + layout profiles. No LLM. |
 | Art Brief Director | deterministic | Layout geometry + image-shape hints + prompt assembly. No LLM. |
 | Prompt Assembler | deterministic | Prompt templating + SHA-256 hashing. No LLM. |
-| Cover Art Director | deterministic | Typographic overlay + full-bleed art slot. No LLM. |
+| Cover Art Director | deterministic | Typographic overlay + full-bleed image-priority zone. No LLM. |
 | Text-Fit QA | deterministic | `text-fit.ts`. No LLM. |
 | Image QA | **planned** | Not implemented. Approve/reject is a manual operator action. If built, it MUST stay metadata-only. |
 
@@ -41,7 +41,7 @@ real structured agents but is currently unused.
 - **Safety:** no agent can take actions (`usesTools: false`) or read pixels
   (`usesVision: false`).
 - **Honesty:** the operator's "Pipeline Agents" panel now shows a runtime badge
-  (live chat / code / planned) and a "metadata only · no vision · read-only" line.
+  (live chat / code / planned) and a "metadata only Â· no vision Â· read-only" line.
 
 ## If you implement Image QA later
 

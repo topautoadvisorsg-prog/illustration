@@ -1,4 +1,4 @@
-# Publishing Standards Setup
+﻿# Publishing Standards Setup
 
 Publishing Standards are project identity, not only export settings.
 
@@ -45,7 +45,7 @@ Publishing standards affect:
 
 - Page planning: layout selection and capacity assumptions use project config.
 - Text-fit: geometry and typography determine available text capacity.
-- Rendering: PDF dimensions, bleed, typography, and art slots come from project config.
+- Rendering: PDF dimensions, bleed, typography, and image-priority zones come from project config.
 - Upscale/preflight: DPI and trim checks use project trim dimensions.
 - Export: output labels and targets come from project output profile.
 

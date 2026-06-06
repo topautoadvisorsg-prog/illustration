@@ -35,13 +35,21 @@ is**, not how big the image is.
   legible by a soft, edgeless scrim + light glyph halo — **no opaque paper card**.
 - Text on the image is allowed **when it's readable** — not a ban, a readability rule.
 - Continuation pages reuse the same entry artwork (visually unified).
-- The **placeholder** is planning-only: it marks the IMAGE zone (text-exclusion) so
-  the operator reviews text flow before any image is generated. It is never the
-  image's frame.
+- The **planning preview** (no image yet) shows a three-zone overlay —
+  Image-Priority Zone, Typography Zone, Text-Safe Zone — outlines only on a
+  clean paper page. It teaches the model; it is never the image's frame.
 
 Code: `backend/src/pipeline/stage-6-layout/render-html.ts` (`buildEntryArticle`,
 `artworkSheetCss`, `fullPageArtworkCss`). Render via Paged.js + Chromium
 (`Dockerfile.backend`).
+
+The image model is taught the same model via the **PAGE COMPOSITION BRIEF** in
+every prompt (`artBriefText` in `stage-2-planner/plan-pages.ts`) — three explicit
+zones, no boxes. `LayoutAllocation` exposes `priorityEdge` + `imagePriorityZone`
+(new names) alongside `architecture` + `artBox` (deprecated aliases). The legacy
+`art slot` / `image slot` vocabulary has been swept out of code, docs, and UI;
+any remaining occurrence is an explicit reference to the retired term so Cody
+recognizes legacy material.
 
 ## Workflow state safety (don't regress these)
 

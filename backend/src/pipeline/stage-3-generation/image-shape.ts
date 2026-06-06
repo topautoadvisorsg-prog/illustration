@@ -1,9 +1,9 @@
 /**
  * Layout-aware image generation shape hints.
  *
- * The renderer can crop safely only when the generated image roughly matches
- * the intended art slot. This map keeps Stage 3 from forcing a portrait source
- * into a wide banner or landscape spread.
+ * The renderer can crop safely only when the generated image's aspect roughly
+ * matches the layout's intended image-priority zone shape. This map keeps Stage 3
+ * from forcing a portrait source into a wide-banner or landscape composition.
  */
 
 import type { LayoutTemplateId } from '@wildlands/shared';
@@ -70,7 +70,7 @@ export function imageShapeForLayout(template: LayoutTemplateId): LayoutImageShap
   return {
     shape,
     size: SHAPE_SIZE[shape],
-    description: `${shape} image for ${profile.artSlot} art slot`,
+    description: `${shape} image for ${profile.artSlot} image-priority zone`,
     clearZoneInstruction: CLEAR_ZONE_BY_SHAPE[shape],
   };
 }

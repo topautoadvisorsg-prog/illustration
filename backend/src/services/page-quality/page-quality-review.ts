@@ -218,7 +218,7 @@ function continuationTailRatio(page: PageFitPreview): number {
 function alternativeForMoreTextCapacity(layoutTemplate: string): string {
   const profile = getLayoutProfile(layoutTemplate as LayoutTemplateId);
   if (profile.artAreaFraction >= 0.4) return 'Switch to Text Heavy or Margin Art to give the text more first-page capacity.';
-  return 'Reduce the art slot slightly or tighten typography within approved readability limits.';
+  return 'Reduce the image-priority zone slightly or tighten typography within approved readability limits.';
 }
 
 function underfilledFix(page: PageFitPreview): PageQualityRecommendation {

@@ -1,18 +1,26 @@
 /**
- * Stage 6 — per-layout composition profiles.
+ * Stage 6 — per-layout composition profiles (full-page-artwork model).
  *
  * What it does: for each of the 16 canonical layouts, declares how much of the
- * text frame is actually available to body copy (the rest is the art slot) and
- * where the art sits. The text-fit analyzer uses `textAreaFactor` to estimate
- * capacity; the HTML renderer uses `artSlot` to place the (clean, text-free)
- * illustration. These are estimates calibrated against the layout mockups and
- * confirmed by the real Paged.js render.
+ * page is the text-safe zone (where body text overlays the artwork) and where
+ * the image-priority zone (the strong-content edge of the artwork) sits. The
+ * text-fit analyzer uses `textAreaFactor`; the HTML renderer uses `artSlot` as
+ * the image-priority edge identifier. These are estimates calibrated against
+ * the layout mockups and confirmed by the real Paged.js render.
+ *
+ * `ArtSlot` keeps its name internally for back-compat (every file imports it);
+ * semantically it now identifies the **image-priority edge** of the page, not
+ * a slot/box. The image IS the full page; this edge tells us where the strongest
+ * visual content lives so the text-safe zone can sit on the calm side.
  */
 
 import type { LayoutTemplateId } from '@wildlands/shared';
 
-// Mirrors the shared Architecture enum so a composed layout's architecture maps
-// 1:1 to a render art slot.
+/**
+ * The image-priority edge of the page — where the strongest visual content
+ * lives in the full-page artwork. (Named `ArtSlot` for back-compat across many
+ * files; new code should treat it as `ImagePriorityEdge`.)
+ */
 export type ArtSlot =
   | 'FLOAT_LEFT'
   | 'FLOAT_RIGHT'
@@ -24,8 +32,9 @@ export type ArtSlot =
   | 'CENTER_WRAP';
 
 export interface LayoutProfile {
-  /** Fraction of the text frame available to body copy after the art slot (0-1). */
+  /** Fraction of the page available to body copy in the text-safe zone (0-1). */
   textAreaFactor: number;
+  /** The image-priority edge (where focal visual content lives in the artwork). */
   artSlot: ArtSlot;
   /** Approximate fraction of page area the illustration occupies. */
   artAreaFraction: number;
@@ -73,7 +82,7 @@ export function isRepeatableLayout(template: LayoutTemplateId): boolean {
   return REPEATABLE_LAYOUTS.has(template);
 }
 
-/** Human-readable placement label for each art slot. */
+/** Human-readable placement label for each image-priority edge. */
 const ART_SLOT_LABELS: Record<ArtSlot, string> = {
   FLOAT_LEFT: 'inset left',
   FLOAT_RIGHT: 'inset right',
@@ -87,8 +96,9 @@ const ART_SLOT_LABELS: Record<ArtSlot, string> = {
 
 /**
  * Coverage metadata an agent or operator can read WITHOUT looking at pixels:
- * how much of the page is image vs text, and where the art sits. Derived from
- * the layout profile so reuse/QA reason over numbers, not the artwork itself.
+ * how much of the page is the image-priority zone vs the text-safe zone, and
+ * where the image-priority edge sits. Derived from the layout profile so
+ * reuse/QA reason over numbers, not the artwork itself.
  */
 export interface LayoutCoverageMeta {
   imagePercent: number;

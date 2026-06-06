@@ -46,7 +46,7 @@ const baseConfig = ProjectConfigSchema.parse({
       promptTemplate: '{MASTER_STYLE_DNA}. Subject {SUBJECT}. Details {SCIENTIFIC_DETAILS}. Notes {COMPOSITION_NOTES}.',
       placeholders: ['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'],
       textFitRule: 'Use for comparison pages.',
-      imageSlotDescription: 'Comparison image slot.',
+      imageSlotDescription: 'Comparison image-priority zone.',
       capacityTestStatus: 'APPROVED',
       operatorNotes: '',
     },
@@ -92,7 +92,7 @@ describe('planPage', () => {
     expect(decision.reasonCodes).toContain('comparison_or_lookalike_signal');
     // Layered model surfaced without changing template selection.
     expect(decision.contentType).toBe('COMPARISON');
-    expect(decision.architecture).toBe('FLOAT_LEFT'); // LAYOUT_4's render art slot
+    expect(decision.architecture).toBe('FLOAT_LEFT'); // LAYOUT_4's image-priority edge
     expect(typeof decision.coverage).toBe('number');
     expect(decision.prompt).toContain('golden chanterelle mushroom');
     expect(decision.prompt).toContain('Vintage Naturalist master style DNA.');

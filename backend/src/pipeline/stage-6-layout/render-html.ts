@@ -1,12 +1,13 @@
 /**
- * Stage 6 — page HTML generator.
+ * Stage 6 — page HTML generator (full-page-artwork model).
  *
  * What it does: builds the HTML/CSS document Paged.js paginates into a print page.
- * Typography, colors, and trim all come from project config (never hardcoded).
- * The art slot is a clean placeholder for the text-fit preview pass; the real,
- * text-free illustration is dropped in for the final pass. ALL text on the page
- * (title, scientific name, body, any future labels) is typeset here by the layout
- * engine — never baked into the generated image.
+ * The image IS the page — painted full-bleed on `.pagedjs_sheet` via
+ * `artworkSheetCss`. Title + body overlay the artwork in the reserved text-safe
+ * zone (no boxes, no cards). Planning preview (no image yet) renders a
+ * three-zone overlay (image-priority / typography / text-safe). All text-on-page
+ * is typeset here by the layout engine — never baked into the image.
+ * Typography, colors, and trim come from project config.
  */
 
 import type { LayoutTemplateId, PageManifest, ProjectConfig } from '@wildlands/shared';
@@ -96,9 +97,9 @@ function typographyStyleBlock(t: Typography, c: Palette): string {
   .id-list li { margin: 0 0 2pt 0; text-align: left; }
   .caption { font-family: var(--font-body); font-style: italic; font-size: ${t.captionPt}pt; color: ${c.accent}; }
   .mono { font-family: 'Courier New', monospace; font-size: 0.92em; }
-  .art-placeholder { width: 100%; height: 100%; min-height: 2.4in; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #E8D9B0; outline: 1px dashed ${c.accent}; outline-offset: -4px; font-family: var(--font-display); font-style: italic; font-size: ${t.captionPt}pt; color: ${c.accent}; }
-  .art-slot { box-sizing: border-box; overflow: hidden; background: rgba(245, 237, 214, 0.5); border-radius: 2pt; }
-  .art-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }`;
+  /* Legacy .art-placeholder / .art-slot CSS removed: nothing references them
+     anymore in the full-page-artwork model. The artwork lives on .pagedjs_sheet
+     via artworkSheetCss; planning uses the three-zone .planning-zones overlay. */`;
 }
 
 /**
@@ -159,79 +160,9 @@ function bodyToHtml(markdown: string): string {
   return out.join('\n');
 }
 
-/** Positioning only (float direction / block / margins) — size comes from coverage. */
-function artSlotPositionCss(slot: ArtSlot): string {
-  switch (slot) {
-    case 'FLOAT_LEFT':
-      return 'float:left;margin:0 18pt 10pt 0;';
-    case 'FLOAT_RIGHT':
-      return 'float:right;margin:0 0 10pt 18pt;';
-    case 'TOP_BAND':
-      return 'display:block;margin:0 0 14pt 0;';
-    case 'BOTTOM_BAND':
-      return 'display:block;margin:14pt 0 0 0;';
-    case 'FULL_PAGE':
-      return 'display:block;margin:0;';
-    case 'SIDEBAR_RIGHT':
-      return 'float:right;margin:0 0 10pt 18pt;';
-    case 'SCATTERED':
-      return 'float:left;margin:0 14pt 8pt 0;';
-    case 'CENTER_WRAP':
-      return 'display:block;margin:0 auto 10pt auto;';
-    default:
-      return 'float:left;margin:0 18pt 10pt 0;';
-  }
-}
-
-/**
- * PRESENTATION size for the rendered illustration. This is deliberately separate
- * from the planning coverage: the layout's coverage reserves space for text flow,
- * but the IMAGE itself is rendered at book scale so it has real visual impact
- * (a dominant plate, a wide band, a half-page float) — never shrunk into a tiny
- * placeholder. Text still flows beside/below the art, so readability is preserved.
- */
-function artSlotSizeStyle(
-  slot: ArtSlot,
-  coverage: number,
-  geometry: PageGeometry,
-  hasImage: boolean,
-): string {
-  const round2 = (n: number) => Math.round(n * 100) / 100;
-  const fh = geometry.textHeightIn;
-  const m = geometry.margins;
-  // Bleed (negative margins out to the physical page edge) is PRESENTATION — it
-  // applies only once a real image exists. The PLANNING placeholder stays a clean
-  // in-page reserved zone (text flows around it) so the operator can review the
-  // layout / text-fit before any artwork is generated.
-  const top = hasImage ? `-${m.topIn}in` : '0';
-  const fore = hasImage ? `-${m.rightIn}in` : '0';
-  const bottom = hasImage ? `-${m.bottomIn}in` : '0';
-  const spine = hasImage ? `-${m.gutterIn}in` : '0';
-  switch (slot) {
-    case 'FULL_PAGE':
-      // Dominant plate that bleeds top + both sides; title/caption sits below.
-      return `display:block;width:auto;height:${round2(fh * 0.72)}in;margin:${top} ${fore} 12pt ${spine};`;
-    case 'TOP_BAND':
-      // Full-bleed banner: runs off the top and both side edges; text flows below.
-      return `display:block;width:auto;height:${round2(Math.max(0.45, coverage) * fh)}in;margin:${top} ${fore} 14pt ${spine};`;
-    case 'BOTTOM_BAND':
-      return `display:block;width:auto;height:${round2(Math.max(0.45, coverage) * fh)}in;margin:14pt ${fore} ${bottom} ${spine};`;
-    case 'SIDEBAR_RIGHT':
-      // Tall image column bleeding off the top + fore-edge; body runs on the left.
-      return `float:right;width:48%;height:${round2(fh * 0.98)}in;margin:${top} ${fore} 10pt 18pt;`;
-    case 'CENTER_WRAP':
-      return `display:block;width:72%;height:${round2(Math.max(0.45, coverage) * fh)}in;margin:0 auto 10pt auto;`;
-    case 'SCATTERED':
-      return `float:left;width:42%;height:${round2(0.34 * fh)}in;margin:0 14pt 8pt 0;`;
-    case 'FLOAT_RIGHT':
-      // Half-page float bleeding off the fore-edge; text wraps to the left.
-      return `float:right;width:48%;height:${round2(Math.max(0.5, coverage) * fh)}in;margin:0 ${fore} 10pt 18pt;`;
-    case 'FLOAT_LEFT':
-    default:
-      // Half-page float bleeding off the spine-edge; text wraps to the right.
-      return `float:left;width:48%;height:${round2(Math.max(0.5, coverage) * fh)}in;margin:0 18pt 10pt ${spine};`;
-  }
-}
+// (Legacy `artSlotPositionCss` and `artSlotSizeStyle` removed in the full-page-
+// artwork migration. The full-page model paints artwork on `.pagedjs_sheet` via
+// `artworkSheetCss`; no per-slot figure/box CSS is needed anymore.)
 
 /** Short human label for the layout's image-priority position (planning preview only). */
 function layoutPriorityLabel(template: LayoutTemplateId): string {
@@ -251,7 +182,7 @@ function layoutPriorityLabel(template: LayoutTemplateId): string {
 
 // ─── Full-page artwork model ───────────────────────────────────────────────
 // The generated image is the PAGE artwork (full bleed), not a box. Layout
-// percentage / art slot define WHERE the text-safe zone sits, not the image
+// percentage + image-priority edge define WHERE the text-safe zone sits, not the image
 // size. The placeholder is a planning-only text-exclusion marker.
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -490,10 +421,8 @@ function proofGuidesCss(geometry: PageGeometry): string {
   .pagedjs_sheet .crop-mark { display: none; }`;
 }
 
-/** Per-architecture art-slot CSS, scoped to a `.arch-<NAME>` page wrapper. */
-function scopedArtSlotCss(slot: ArtSlot): string {
-  return `.arch-${slot} .art-slot{ ${artSlotPositionCss(slot)} }`;
-}
+// (Legacy `scopedArtSlotCss` removed: per-architecture .art-slot CSS no longer
+// needed in the full-page-artwork model.)
 
 /**
  * Build ONE HTML document containing every page of a chapter, so Paged.js

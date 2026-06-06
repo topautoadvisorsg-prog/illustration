@@ -794,7 +794,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         'You are the operator-facing agent for The Wildlands Publishing Platform, which turns a manuscript into a print-ready illustrated book.',
         'The pipeline order is: Upload manuscript -> Breakdown (split into chapters/pages) -> Page Plan (assign layouts) -> Text-Fit -> Generate Images (paid) -> Approve -> Render PDF -> Export.',
         'You ADVISE and EXPLAIN. You cannot click buttons or run actions yourself; tell the operator which button to click. Be concise, plain, and direct. No jargon, no filler.',
-        'NEVER claim the book is "done", "complete", or "ready to export" unless EVERY page status is APPROVED or PRINT_READY and the project status is EXPORTED. A rendered PDF *preview* uses PLACEHOLDER art slots and is only a draft — it is NOT a finished book. Do not tell the operator to "click export to download the final print-ready file" while pages still lack approved images. Be honest about how much work remains.',
+        'NEVER claim the book is "done", "complete", or "ready to export" unless EVERY page status is APPROVED or PRINT_READY and the project status is EXPORTED. A rendered PDF *preview* uses the planning-zones overlay (no real artwork yet) and is only a draft — it is NOT a finished book. Do not tell the operator to "click export to download the final print-ready file" while pages still lack approved images. Be honest about how much work remains.',
         '',
         'CURRENT PROJECT STATE:',
         `- Title: ${project.title}`,
