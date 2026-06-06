@@ -492,6 +492,9 @@ const BOX_MODEL_LINE_PATTERNS: RegExp[] = [
   // remains uninterrupted", "spans the upper portion of the page"). Zone language
   // uses "band" / "-center" / "image-priority zone", never "portion", so this is safe.
   /\b(upper|lower|left|right|top|bottom)\s+portion\b/i,
+  // "<verb> the <side> side of the page" compartment directive (LAYOUT_14 etc.).
+  // Anchored on "of the page" so it strips layout directives, never body prose.
+  /\b(occupies|spans|fills|dominates|sits on)\s+the\s+(left|right|upper|lower|top|bottom)\s+side\s+of\s+the\s+page\b/i,
   // Percentage-band "<region> N% contains/remains the illustration/text" lines.
   /\b(upper|lower|left|right|top|bottom|rightmost|leftmost|topmost|bottommost)\s+[\w-]*\s*\d{1,3}(\s*-\s*\d{1,3})?%\s+(contains|remains|is reserved|holds|reserved)/i,
   // The retired "text area(s)" / "content area(s)" compartment noun (NOT

@@ -197,6 +197,7 @@ describe('planPage', () => {
       'Page structure:',
       '- A wide horizontal illustration spans the upper portion of the page.',
       '- Upper portion remains visually uninterrupted.',
+      '- A large vertical illustration occupies the left side of the page.',
       'Visual balance:',
       '- Upper 35-40% contains the feature illustration.',
       '- Lower 60-65% remains largely clear for text placement.',
@@ -225,6 +226,9 @@ describe('planPage', () => {
     expect(cleaned).not.toMatch(/spans the upper portion/i);
     expect(cleaned).not.toMatch(/upper portion remains/i);
     expect(cleaned).not.toMatch(/\bupper portion\b/i);
+    expect(cleaned).not.toMatch(/occupies the left side of the page/i);
+    // Body prose with similar words but no "of the page" anchor must SURVIVE.
+    expect(stripLegacyBoxModelLanguage('The bear occupies the left side of its range in winter.')).toContain('occupies the left side of its range');
     expect(cleaned).not.toMatch(/\btext areas?\b/i);
     expect(cleaned).not.toMatch(/\bcontent areas?\b/i);
     expect(cleaned).not.toMatch(/\breading areas?\b/i);
