@@ -552,6 +552,23 @@ function artBriefText(
   const imagePriorityDescription = asset?.imageZoneDescription?.trim()
     || asset?.imageSlotDescription?.trim()
     || `Concentrate primary detail, focal subject, depth, and color saturation here.`;
+  // Edge-aware calm-zone directive. The text-safe zone is NOT always a lower band:
+  // for side-column layouts it is a full-height column, and for scattered layouts it
+  // is the open parchment between studies. Telling the image model exactly where the
+  // calm field lives (and that it spans the FULL height for side columns) is what
+  // keeps body text off busy artwork — a generic "fade downward" calms only the
+  // bottom and leaves side-column text over detailed art.
+  const calmZoneByEdge: Record<string, string> = {
+    FLOAT_LEFT: `This text-safe zone is the FULL-HEIGHT RIGHT COLUMN — roughly the right half of the page, from the very top edge to the very bottom. Keep that entire right column calm, light, and near-empty top-to-bottom; do NOT let the left-side scene (branches, foliage, ridgelines, texture) cross into the right column at ANY height. Focal artwork lives only on the left.`,
+    FLOAT_RIGHT: `This text-safe zone is the FULL-HEIGHT LEFT COLUMN — roughly the left half of the page, from the very top edge to the very bottom. Keep that entire left column calm, light, and near-empty top-to-bottom; do NOT let the right-side scene (branches, foliage, ridgelines, texture) cross into the left column at ANY height. Focal artwork lives only on the right.`,
+    SIDEBAR_RIGHT: `This text-safe zone is the FULL-HEIGHT LEFT COLUMN — running body text fills the left side top-to-bottom. Keep that entire left column calm, light, and near-empty; confine all focal detail to the tall right-side subject. Nothing from the right may cross into the left column at any height.`,
+    TOP_BAND: `This text-safe zone is the LOWER band across the full width. Dissolve the artwork downward into calm, light parchment so the entire lower portion is quiet and even, with a gradual painted fade — never a hard edge.`,
+    BOTTOM_BAND: `This text-safe zone is the UPPER band across the full width. Keep the entire upper portion calm, light, and even (open sky/haze/parchment); concentrate focal detail low.`,
+    SCATTERED: `Compose this as SEPARATE small studies floating on OPEN, calm parchment — this is NOT one continuous landscape or full-bleed scene. Surround every study with wide, quiet, near-empty parchment margins, and keep the reading path BETWEEN the studies bare and light so body text drops cleanly between them.`,
+    FULL_PAGE: `Reserve only small, calm, low-detail pockets near the corners/edges for a short overlaid title or caption; the rest is hero artwork.`,
+    CENTER_WRAP: `Keep the surrounding margins and the lower portion calm, light, and even around a single central focal subject; text wraps in those calm margins, so detail must not bleed into them.`,
+  };
+  const calmZoneDirective = calmZoneByEdge[allocation.priorityEdge] ?? calmZoneByEdge.TOP_BAND;
   return [
     'PAGE COMPOSITION BRIEF',
     `The image IS the entire page (full-bleed artwork — no boxes, no frames, no cards). Compose the artwork so it honors the three zones below.`,
@@ -564,7 +581,8 @@ function artBriefText(
     `• TEXT-SAFE ZONE — ${allocation.textPlacement} (~${textPct}% of the page)`,
     `    CRITICAL — this zone is reserved for overlaid body text and MUST be painted as a calm, near-empty field. Let the artwork dissolve here into a soft, even, LIGHT surface — near-solid warm parchment, open pale sky, still water, or distant haze that settles toward the page color — so dark body text reads cleanly directly on the artwork with NO scrim, card, panel, or overlay added afterward.`,
     `    Forbidden in this zone: focal subjects, foreground elements, branches, foliage, rocks, animals, specimens, landmarks, structures, fine texture, sharp edges, strong shadows, high contrast, or any busy pattern that competes with text.`,
-    `    The shift from the image-priority zone into this calm field must be a gradual, painted fade — part of one continuous illustration, never a hard edge, rectangle, or pasted-on block. ${textSafeDescription}`,
+    `    ${calmZoneDirective}`,
+    `    It must stay part of one continuous illustration — never a hard edge, rectangle, or pasted-on block. ${textSafeDescription}`,
     `    Hold the values here light and uniform so long-form educational copy is legible on the bare artwork without any readability treatment.`,
     '',
     `• TYPOGRAPHY ZONE — just above the text-safe zone (upper-center)`,
