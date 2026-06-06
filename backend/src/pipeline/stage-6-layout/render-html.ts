@@ -268,12 +268,14 @@ function fullPageArtworkCss(t: Typography, c: Palette): string {
      treatment — the artwork itself is the visual identity. */
   .pagedjs_sheet.has-artwork::before,
   .pagedjs_sheet.has-artwork::after { content: none; }
-  /* Text sits DIRECTLY on the artwork in the reserved text-safe zone — no opaque
-     card. A soft, edgeless scrim (transparent at the top, gently feathering in)
-     plus a light paper halo on the glyphs keeps it readable while staying part of
-     the image. No border, no radius, no box — it must feel integrated, not glued on. */
-  .text-panel { position: relative; z-index: 2; padding: 0 2pt; background: linear-gradient(to bottom, ${paperRgba(c.paper, 0)} 0%, ${paperRgba(c.paper, 0.4)} 16%, ${paperRgba(c.paper, 0.46)} 100%); }
-  .text-panel p, .text-panel li, .text-panel h3, .text-panel strong, .text-panel .section-header, .text-panel .section-body { text-shadow: 0 0 3px ${c.paper}, 0 0 5px ${c.paper}; }
+  /* Text sits DIRECTLY on the artwork in the reserved text-safe zone. The image
+     model now paints that zone as a calm, light parchment field (see the TEXT-SAFE
+     ZONE brief), so NO scrim, card, or panel background is drawn here — only a tight
+     per-glyph paper halo gives the letters crisp edges. The halo hugs each glyph; it
+     is not a rectangle. If a page ever reads poorly, fix the artwork's calm zone in
+     the prompt — do NOT reintroduce a panel, gradient, or translucent block. */
+  .text-panel { position: relative; z-index: 2; padding: 0 2pt; background: transparent; }
+  .text-panel p, .text-panel li, .text-panel h3, .text-panel strong, .text-panel .section-header, .text-panel .section-body { text-shadow: 0 0 2px ${c.paper}, 0 0 4px ${c.paper}, 0 0 6px ${c.paper}; }
   /* Planning preview (no image yet): three-zone overlay teaches "the page IS artwork".
      Outlines only — never a filled box. Labels float at the edges; the page stays paper-clean. */
   .planning-zones { position: relative; box-sizing: border-box; width: 100%; page-break-inside: avoid; margin-bottom: 14pt; }

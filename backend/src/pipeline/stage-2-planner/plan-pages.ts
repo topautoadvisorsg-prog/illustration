@@ -548,7 +548,7 @@ function artBriefText(
   // historically NOT reaching the image model. Quoting them here makes the
   // operator-controlled language actually influence generation.
   const textSafeDescription = asset?.textZoneDescription?.trim()
-    || `Keep this region of the artwork visually calm and low-detail: sky, mist, soft terrain, plain ground, even background.`;
+    || `Keep this region of the artwork visually calm, light, and low-detail: soft sky, mist, quiet water, or plain even ground that fades toward bare parchment.`;
   const imagePriorityDescription = asset?.imageZoneDescription?.trim()
     || asset?.imageSlotDescription?.trim()
     || `Concentrate primary detail, focal subject, depth, and color saturation here.`;
@@ -562,9 +562,10 @@ function artBriefText(
     `    Recommended density: ${z.recommendedWidthPx}×${z.recommendedHeightPx}px of usable detail at 300 DPI within this zone.`,
     '',
     `• TEXT-SAFE ZONE — ${allocation.textPlacement} (~${textPct}% of the page)`,
-    `    ${textSafeDescription}`,
-    `    No important subjects, no fine pattern, no busy texture here — body text will overlay this zone.`,
-    `    Reserve enough negative space that long-form educational copy reads cleanly directly on the artwork (no paper card will be added).`,
+    `    CRITICAL — this zone is reserved for overlaid body text and MUST be painted as a calm, near-empty field. Let the artwork dissolve here into a soft, even, LIGHT surface — near-solid warm parchment, open pale sky, still water, or distant haze that settles toward the page color — so dark body text reads cleanly directly on the artwork with NO scrim, card, panel, or overlay added afterward.`,
+    `    Forbidden in this zone: focal subjects, foreground elements, branches, foliage, rocks, animals, specimens, landmarks, structures, fine texture, sharp edges, strong shadows, high contrast, or any busy pattern that competes with text.`,
+    `    The shift from the image-priority zone into this calm field must be a gradual, painted fade — part of one continuous illustration, never a hard edge, rectangle, or pasted-on block. ${textSafeDescription}`,
+    `    Hold the values here light and uniform so long-form educational copy is legible on the bare artwork without any readability treatment.`,
     '',
     `• TYPOGRAPHY ZONE — just above the text-safe zone (upper-center)`,
     `    The title sits directly on the artwork. Keep this band calm enough that bold display type reads without a backing panel.`,
