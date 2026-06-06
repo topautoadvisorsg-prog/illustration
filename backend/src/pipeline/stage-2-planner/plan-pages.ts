@@ -411,21 +411,33 @@ function labelTextRules(_page: PageManifest): string {
   ].join(' ');
 }
 
-function artBriefText(page: PageManifest, allocation: LayoutAllocation): string {
+function artBriefText(
+  page: PageManifest,
+  allocation: LayoutAllocation,
+  asset: LayoutPromptAsset | undefined,
+): string {
   const z = allocation.imagePriorityZone;
   const imagePct = allocation.openingPageImagePercent;
   const textPct = allocation.openingPageTextPercent;
+  // Per-layout zone descriptions are operator-editable in project config but were
+  // historically NOT reaching the image model. Quoting them here makes the
+  // operator-controlled language actually influence generation.
+  const textSafeDescription = asset?.textZoneDescription?.trim()
+    || `Keep this region of the artwork visually calm and low-detail: sky, mist, soft terrain, plain ground, even background.`;
+  const imagePriorityDescription = asset?.imageZoneDescription?.trim()
+    || asset?.imageSlotDescription?.trim()
+    || `Concentrate primary detail, focal subject, depth, and color saturation here.`;
   return [
     'PAGE COMPOSITION BRIEF',
     `The image IS the entire page (full-bleed artwork — no boxes, no frames, no cards). Compose the artwork so it honors the three zones below.`,
     '',
     `• IMAGE-PRIORITY ZONE — ${allocation.imagePlacement} (~${imagePct}% of the page)`,
     `    Subject anchor: ${page.imageSubject}.`,
-    `    Concentrate primary detail, focal subject, depth, and color saturation here.`,
+    `    ${imagePriorityDescription}`,
     `    Recommended density: ${z.recommendedWidthPx}×${z.recommendedHeightPx}px of usable detail at 300 DPI within this zone.`,
     '',
     `• TEXT-SAFE ZONE — ${allocation.textPlacement} (~${textPct}% of the page)`,
-    `    Keep this region of the artwork visually calm and low-detail: sky, mist, soft terrain, plain ground, even background.`,
+    `    ${textSafeDescription}`,
     `    No important subjects, no fine pattern, no busy texture here — body text will overlay this zone.`,
     `    Reserve enough negative space that long-form educational copy reads cleanly directly on the artwork (no paper card will be added).`,
     '',
@@ -499,7 +511,13 @@ export function planPage(page: PageManifest, config: ProjectConfig, options: Pla
     '{SCIENTIFIC_DETAILS}': scientificDetails(page),
     '{COMPOSITION_NOTES}': [
       asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? `Image-priority zone follows ${selected.template}.`,
-      artBriefText(page, allocation),
+      // Pull the operator-editable layout description into the prompt context so
+      // edits in project config actually influence the image. Previously surfaced
+      // to the UI but never reached the model.
+      asset?.layoutDescription && !asset.layoutDescription.startsWith('Written description')
+        ? `LAYOUT CONTEXT: ${asset.layoutDescription}`
+        : '',
+      artBriefText(page, allocation, asset),
       labelTextRules(page),
     ].join('\n'),
   });
