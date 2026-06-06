@@ -464,6 +464,43 @@ function appendPromptSafetyRules(promptTemplate: string): string {
   return `${promptTemplate}\n\n${IMAGE_PROMPT_SAFETY_RULES}`;
 }
 
+/**
+ * Box-model assertions that contradict the full-page-artwork model. These phrases
+ * historically lived in per-layout `promptTemplate` prose that is persisted in a
+ * project's stored config — so a project created before the zone migration still
+ * carries them, and re-planning re-emits them straight to the image model
+ * alongside the (correct) zone-based PAGE COMPOSITION BRIEF. The image model then
+ * receives two contradictory mental models in one prompt.
+ *
+ * This denylist is intentionally tight: each phrase asserts the image and the
+ * text live in SEPARATE COMPARTMENTS ("a box + a text area"), which is exactly the
+ * model we retired. Zone language ("text-safe zone", "image-priority zone", "the
+ * image IS the page", "~40% of the page") is NOT matched and survives untouched.
+ */
+const BOX_MODEL_LINE_PATTERNS: RegExp[] = [
+  /strong separation between image and content/i,
+  /strong visual separation between the illustration/i,
+  /maintain (a )?strong (visual )?separation/i,
+  /remains (largely|mostly|primarily) (clear|empty|reserved)/i,
+  /(lower|upper) portion of the page remains/i,
+  /(upper|lower)\s+\d{1,3}-\d{1,3}%\s+(contains|remains|is)/i,
+  /reserved space for future educational content/i,
+  /avoid background elements spilling into the content area/i,
+];
+
+/**
+ * Strip box-model directive lines from an assembled prompt so the image model only
+ * ever sees the full-page-artwork + zones model. Deterministic and idempotent.
+ * Backend-owned: makes the zone model immune to stale per-project stored templates.
+ */
+export function stripLegacyBoxModelLanguage(prompt: string): string {
+  const kept = prompt
+    .split('\n')
+    .filter((line) => !BOX_MODEL_LINE_PATTERNS.some((re) => re.test(line)));
+  // Collapse any 3+ blank-line runs left behind into a single blank line.
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
 function scientificDetails(page: PageManifest): string {
   const pieces = [
     page.scientificName ? `Scientific name: ${page.scientificName}.` : '',
@@ -579,7 +616,7 @@ export function planPage(page: PageManifest, config: ProjectConfig, options: Pla
     }
   }
 
-  const prompt = replaceTemplatePlaceholders(appendPromptSafetyRules(promptTemplate), {
+  const assembledPrompt = replaceTemplatePlaceholders(appendPromptSafetyRules(promptTemplate), {
     '{MASTER_STYLE_DNA}': config.imageGeneration.masterStyleBlockText,
     '{SUBJECT}': page.imageSubject,
     '{SCIENTIFIC_DETAILS}': scientificDetails(page),
@@ -595,6 +632,10 @@ export function planPage(page: PageManifest, config: ProjectConfig, options: Pla
       labelTextRules(page),
     ].join('\n'),
   });
+  // Defensive: strip any box-model assertions that survive in a stored per-project
+  // promptTemplate so the image model only ever receives the zone model. The
+  // backend owns the publishing model; stale stored templates cannot override it.
+  const prompt = stripLegacyBoxModelLanguage(assembledPrompt);
   const unresolved = prompt.match(/\{[A-Z0-9_]+\}/g) ?? [];
   for (const placeholder of unresolved) {
     blockers.push(`unresolved_prompt_placeholder:${placeholder}`);

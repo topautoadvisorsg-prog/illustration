@@ -1,6 +1,6 @@
 ﻿import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema, type PageManifest } from '@wildlands/shared';
-import { countPageWords, planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
+import { countPageWords, planPage, stripLegacyBoxModelLanguage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 
 const baseConfig = ProjectConfigSchema.parse({
   brand: 'THE_WILDLANDS',
@@ -188,6 +188,79 @@ describe('planPage', () => {
 
     expect(decision.layoutTemplate).toBe('LAYOUT_13_FEATURE_BANNER');
     expect(decision.reasonCodes).toContain('feature_banner_signal');
+  });
+
+  it('strips box-model language while preserving zone language (stored-config rot defense)', () => {
+    // The exact box-model lines observed live in project af27e69d's stored prompt.
+    const legacy = [
+      '{MASTER_STYLE_DNA}',
+      'Page structure:',
+      '- A wide horizontal illustration spans the upper portion of the page.',
+      'Visual balance:',
+      '- Upper 35-40% contains the feature illustration.',
+      '- Lower 60-65% remains largely clear for text placement.',
+      '- Maintain strong separation between image and content areas.',
+      '',
+      'PAGE COMPOSITION BRIEF',
+      'The image IS the entire page (full-bleed artwork — no boxes, no frames, no cards).',
+      '• IMAGE-PRIORITY ZONE — upper band (~40% of the page)',
+      '• TEXT-SAFE ZONE — lower band (~60% of the page)',
+      '• TYPOGRAPHY ZONE — just above the text-safe zone',
+    ].join('\n');
+
+    const cleaned = stripLegacyBoxModelLanguage(legacy);
+
+    // Box-model assertions are gone.
+    expect(cleaned).not.toMatch(/strong separation between image and content/i);
+    expect(cleaned).not.toMatch(/remains largely clear/i);
+    expect(cleaned).not.toMatch(/Upper 35-40% contains/i);
+    expect(cleaned).not.toMatch(/Lower 60-65% remains/i);
+    // Zone language survives untouched.
+    expect(cleaned).toContain('The image IS the entire page');
+    expect(cleaned).toContain('IMAGE-PRIORITY ZONE — upper band (~40% of the page)');
+    expect(cleaned).toContain('TEXT-SAFE ZONE — lower band (~60% of the page)');
+    expect(cleaned).toContain('TYPOGRAPHY ZONE');
+    expect(cleaned).toContain('{MASTER_STYLE_DNA}');
+    // Idempotent.
+    expect(stripLegacyBoxModelLanguage(cleaned)).toBe(cleaned);
+  });
+
+  it('produces a planned prompt with zero box-model language even from a legacy stored template', () => {
+    const legacyAssetConfig = ProjectConfigSchema.parse({
+      ...baseConfig,
+      layoutPromptAssets: [
+        {
+          ...baseConfig.layoutPromptAssets[0],
+          templateId: 'LAYOUT_3_ILLUSTRATION_DOMINANT',
+          label: 'Illustration Dominant (legacy template)',
+          minWords: 1,
+          targetWords: 60,
+          maxWords: 200,
+          promptTemplate:
+            '{MASTER_STYLE_DNA}. Subject {SUBJECT}. Details {SCIENTIFIC_DETAILS}. '
+            + 'Visual balance: Upper 35-40% contains the feature illustration. '
+            + 'Lower 60-65% remains largely clear for text placement. '
+            + 'Maintain strong separation between image and content areas. Notes {COMPOSITION_NOTES}.',
+          placeholders: ['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'],
+        },
+      ],
+    });
+    const decision = planPage(
+      page({
+        entryTitle: 'Granite Outcrop',
+        imageSubject: 'granite mountain formation',
+        bodyMarkdown: 'Short entry about granite.',
+      }),
+      legacyAssetConfig,
+    );
+
+    expect(decision.layoutTemplate).toBe('LAYOUT_3_ILLUSTRATION_DOMINANT');
+    expect(decision.prompt).not.toMatch(/strong separation between image and content/i);
+    expect(decision.prompt).not.toMatch(/remains largely clear/i);
+    expect(decision.prompt).not.toMatch(/Upper 35-40% contains/i);
+    // The zone model still reaches the model.
+    expect(decision.prompt).toContain('PAGE COMPOSITION BRIEF');
+    expect(decision.prompt).toContain('The image IS the entire page');
   });
 
   it('keeps borderline terrain analysis pages on a text-safe banner layout', () => {
