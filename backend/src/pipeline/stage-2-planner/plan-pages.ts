@@ -210,6 +210,8 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
   // into a low-capacity special layout that the text then overflows.
   const signal = signalText(page);
   const reasons: string[] = [];
+  // Operator-tunable thresholds (with current defaults) — see LayoutPolicy.
+  const t = config.layoutPolicy.thresholds;
 
   if (isDangerPage(page)) {
     reasons.push('danger_or_warning_signal');
@@ -242,9 +244,10 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
         return { template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Diagnostic / ID content uses LAYOUT_12_DIAGNOSTIC_DIAGRAM.`, alternatives: [] };
       case 'HABITAT_OVERVIEW':
       case 'TERRAIN_ANALYSIS': {
-        const tpl = wordCount > 140 ? 'LAYOUT_13_FEATURE_BANNER' : 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD';
-        const otherTpl = wordCount > 140 ? 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD' : 'LAYOUT_13_FEATURE_BANNER';
-        return { template: tpl, reasons, rule: `content_type_${ct.toLowerCase()}_wordcount_split_140`, explanation: `Habitat/terrain content with ${wordCount} words — over 140 routes to a feature banner; ≤ 140 routes to a landscape spread.`, alternatives: [{ template: otherTpl as LayoutTemplateId, skippedBecause: wordCount > 140 ? 'over 140 words — banner suits this length better' : '≤ 140 words — landscape spread suits a short overview' }] };
+        const split = t.terrainBannerThreshold;
+        const tpl = wordCount > split ? 'LAYOUT_13_FEATURE_BANNER' : 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD';
+        const otherTpl = wordCount > split ? 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD' : 'LAYOUT_13_FEATURE_BANNER';
+        return { template: tpl, reasons, rule: `content_type_${ct.toLowerCase()}_wordcount_split_${split}`, explanation: `Habitat/terrain content with ${wordCount} words — over ${split} routes to a feature banner; ≤ ${split} routes to a landscape spread.`, alternatives: [{ template: otherTpl as LayoutTemplateId, skippedBecause: wordCount > split ? `over ${split} words — banner suits this length better` : `≤ ${split} words — landscape spread suits a short overview` }] };
       }
       case 'PROGRESSION_STUDY':
         return { template: 'LAYOUT_15_PROGRESSION_STUDY', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Progression / lifecycle content uses LAYOUT_15_PROGRESSION_STUDY.`, alternatives: [] };
@@ -258,19 +261,22 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
         return { template: 'LAYOUT_14_SIDEBAR_FEATURE', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Sidebar feature content uses LAYOUT_14_SIDEBAR_FEATURE.`, alternatives: [] };
       case 'ANIMAL_PROFILE':
       case 'SPECIES_PROFILE': {
-        // Profile pages route to different layouts based on word-count thresholds.
+        const sb = t.speciesProfileSidebarThreshold;
+        const mg = t.speciesProfileMarginThreshold;
+        const th = t.speciesProfileTextHeavyThreshold;
+        const il = t.speciesProfileIllustrationDominantThreshold;
         const alts: Array<{ template: LayoutTemplateId; skippedBecause: string }> = [
-          { template: 'LAYOUT_14_SIDEBAR_FEATURE', skippedBecause: 'needs > 900 words' },
-          { template: 'LAYOUT_8_MARGIN_ILLUSTRATION', skippedBecause: 'needs > 650 words' },
-          { template: 'LAYOUT_2_TEXT_HEAVY', skippedBecause: 'needs > 420 words' },
-          { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', skippedBecause: 'needs < 180 words' },
-          { template: config.layoutPolicy.defaultTemplate, skippedBecause: 'default standard range 180–420 words' },
+          { template: 'LAYOUT_14_SIDEBAR_FEATURE', skippedBecause: `needs > ${sb} words` },
+          { template: 'LAYOUT_8_MARGIN_ILLUSTRATION', skippedBecause: `needs > ${mg} words` },
+          { template: 'LAYOUT_2_TEXT_HEAVY', skippedBecause: `needs > ${th} words` },
+          { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', skippedBecause: `needs < ${il} words` },
+          { template: config.layoutPolicy.defaultTemplate, skippedBecause: `default standard range ${il}–${th} words` },
         ];
-        if (wordCount > 900) return { template: 'LAYOUT_14_SIDEBAR_FEATURE', reasons: [...reasons, 'long_profile_sidebar_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_over_900`, explanation: `${ct} with ${wordCount} words (> 900) — sidebar feature gives room for long copy with vertical art.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_14_SIDEBAR_FEATURE') };
-        if (wordCount > 650) return { template: 'LAYOUT_8_MARGIN_ILLUSTRATION', reasons: [...reasons, 'long_profile_margin_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_over_650`, explanation: `${ct} with ${wordCount} words (> 650) — margin illustration keeps text room dominant.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_8_MARGIN_ILLUSTRATION') };
-        if (wordCount > 420) return { template: 'LAYOUT_2_TEXT_HEAVY', reasons: [...reasons, 'dense_profile_corner_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_over_420`, explanation: `${ct} with ${wordCount} words (> 420) — text-heavy layout with small corner art.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_2_TEXT_HEAVY') };
-        if (wordCount < 180) return { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', reasons: [...reasons, 'short_profile_hero_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_under_180`, explanation: `${ct} with ${wordCount} words (< 180) — illustration-dominant gives the short copy a hero image.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_3_ILLUSTRATION_DOMINANT') };
-        return { template: config.layoutPolicy.defaultTemplate, reasons, rule: `content_type_${ct.toLowerCase()}_standard_range`, explanation: `${ct} with ${wordCount} words (180–420) — uses the project default (${config.layoutPolicy.defaultTemplate}).`, alternatives: alts.filter((a) => a.template !== config.layoutPolicy.defaultTemplate) };
+        if (wordCount > sb) return { template: 'LAYOUT_14_SIDEBAR_FEATURE', reasons: [...reasons, 'long_profile_sidebar_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_over_${sb}`, explanation: `${ct} with ${wordCount} words (> ${sb}) — sidebar feature gives room for long copy with vertical art.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_14_SIDEBAR_FEATURE') };
+        if (wordCount > mg) return { template: 'LAYOUT_8_MARGIN_ILLUSTRATION', reasons: [...reasons, 'long_profile_margin_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_over_${mg}`, explanation: `${ct} with ${wordCount} words (> ${mg}) — margin illustration keeps text room dominant.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_8_MARGIN_ILLUSTRATION') };
+        if (wordCount > th) return { template: 'LAYOUT_2_TEXT_HEAVY', reasons: [...reasons, 'dense_profile_corner_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_over_${th}`, explanation: `${ct} with ${wordCount} words (> ${th}) — text-heavy layout with small corner art.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_2_TEXT_HEAVY') };
+        if (wordCount < il) return { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', reasons: [...reasons, 'short_profile_hero_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_under_${il}`, explanation: `${ct} with ${wordCount} words (< ${il}) — illustration-dominant gives the short copy a hero image.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_3_ILLUSTRATION_DOMINANT') };
+        return { template: config.layoutPolicy.defaultTemplate, reasons, rule: `content_type_${ct.toLowerCase()}_standard_range`, explanation: `${ct} with ${wordCount} words (${il}–${th}) — uses the project default (${config.layoutPolicy.defaultTemplate}).`, alternatives: alts.filter((a) => a.template !== config.layoutPolicy.defaultTemplate) };
       }
       default:
         break;
@@ -297,7 +303,7 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
     { needles: ['overview', 'region overview', 'feature banner', 'visual header', 'mountain range', 'river system', 'watershed', 'landscape context'], template: 'LAYOUT_13_FEATURE_BANNER', rule: 'signal_feature_banner', reasonCode: 'feature_banner_signal', explain: (m) => `Identity contains "${m}" → feature banner layout.` },
     { needles: ['geography', 'geology', 'climate', 'season', 'seasons', 'wilderness zone', 'wilderness zones', 'terrain', 'ecoregion'], template: 'LAYOUT_13_FEATURE_BANNER', rule: 'signal_terrain', reasonCode: 'terrain_or_region_structure_signal', explain: (m) => `Identity contains "${m}" → terrain feature banner layout.` },
     { needles: ['track', 'tracks', 'habitat scene', 'signs', 'scat', 'trail'], template: 'LAYOUT_7_SCATTERED_VIGNETTES', rule: 'signal_field_signs', reasonCode: 'track_or_habitat_signal', explain: (m) => `Identity contains "${m}" → scattered vignettes layout.` },
-    { needles: ['tree', 'sapling', 'tall plant', 'vine', 'trunk', 'bark'], template: (wc) => (wc >= 300 ? 'LAYOUT_14_SIDEBAR_FEATURE' : 'LAYOUT_8_MARGIN_ILLUSTRATION'), rule: 'signal_tall_subject', reasonCode: 'tall_subject_signal', explain: (m) => `Identity contains tall-subject signal "${m}" → sidebar (≥300 words) or margin art (< 300).` },
+    { needles: ['tree', 'sapling', 'tall plant', 'vine', 'trunk', 'bark'], template: (wc) => (wc >= t.tallSubjectSidebarThreshold ? 'LAYOUT_14_SIDEBAR_FEATURE' : 'LAYOUT_8_MARGIN_ILLUSTRATION'), rule: 'signal_tall_subject', reasonCode: 'tall_subject_signal', explain: (m) => `Identity contains tall-subject signal "${m}" → sidebar (≥${t.tallSubjectSidebarThreshold} words) or margin art (< ${t.tallSubjectSidebarThreshold}).` },
   ];
 
   for (const r of signalRules) {
@@ -308,30 +314,32 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
     return { template, reasons, rule: r.rule, explanation: r.explain(matched), alternatives: [] };
   }
 
-  if (wordCount < 200) {
-    reasons.push('short_text_under_200_words');
+  const shortT = t.shortTextThreshold;
+  const longT = t.longTextThreshold;
+  if (wordCount < shortT) {
+    reasons.push(`short_text_under_${shortT}_words`);
     return {
       template: 'LAYOUT_3_ILLUSTRATION_DOMINANT',
       reasons,
-      rule: 'wordcount_under_200',
-      explanation: `No content-type or signal match; ${wordCount} words (< 200) — illustration-dominant default for short entries.`,
+      rule: `wordcount_under_${shortT}`,
+      explanation: `No content-type or signal match; ${wordCount} words (< ${shortT}) — illustration-dominant default for short entries.`,
       alternatives: [
-        { template: config.layoutPolicy.defaultTemplate, skippedBecause: 'needs ≥ 200 words for standard layout' },
-        { template: config.layoutPolicy.longTextTemplate, skippedBecause: 'needs > 400 words for long-text layout' },
+        { template: config.layoutPolicy.defaultTemplate, skippedBecause: `needs ≥ ${shortT} words for standard layout` },
+        { template: config.layoutPolicy.longTextTemplate, skippedBecause: `needs > ${longT} words for long-text layout` },
       ],
     };
   }
 
-  if (wordCount > 400) {
-    reasons.push('long_text_over_400_words');
+  if (wordCount > longT) {
+    reasons.push(`long_text_over_${longT}_words`);
     return {
       template: config.layoutPolicy.longTextTemplate,
       reasons,
-      rule: 'wordcount_over_400',
-      explanation: `No content-type or signal match; ${wordCount} words (> 400) — project's longTextTemplate (${config.layoutPolicy.longTextTemplate}).`,
+      rule: `wordcount_over_${longT}`,
+      explanation: `No content-type or signal match; ${wordCount} words (> ${longT}) — project's longTextTemplate (${config.layoutPolicy.longTextTemplate}).`,
       alternatives: [
-        { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', skippedBecause: 'needs < 200 words' },
-        { template: config.layoutPolicy.defaultTemplate, skippedBecause: 'standard range 200–400 words' },
+        { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', skippedBecause: `needs < ${shortT} words` },
+        { template: config.layoutPolicy.defaultTemplate, skippedBecause: `standard range ${shortT}–${longT} words` },
       ],
     };
   }
@@ -341,10 +349,10 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
     template: config.layoutPolicy.defaultTemplate,
     reasons,
     rule: 'wordcount_standard_range',
-    explanation: `No content-type or signal match; ${wordCount} words (200–400) — project default (${config.layoutPolicy.defaultTemplate}).`,
+    explanation: `No content-type or signal match; ${wordCount} words (${shortT}–${longT}) — project default (${config.layoutPolicy.defaultTemplate}).`,
     alternatives: [
-      { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', skippedBecause: 'needs < 200 words' },
-      { template: config.layoutPolicy.longTextTemplate, skippedBecause: 'needs > 400 words' },
+      { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', skippedBecause: `needs < ${shortT} words` },
+      { template: config.layoutPolicy.longTextTemplate, skippedBecause: `needs > ${longT} words` },
     ],
   };
 }

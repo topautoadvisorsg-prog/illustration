@@ -285,6 +285,27 @@ export const ImageGenerationConfigSchema = z.object({
   upscaleModel: z.string().min(1).default('Replicate Real-ESRGAN'),
 });
 
+/**
+ * Layout-selection thresholds. Previously hardcoded in `chooseLayout`. Lifted
+ * into project config so an operator can tune publishing decisions without code
+ * changes. Defaults preserve current behavior exactly.
+ */
+export const LayoutSelectionThresholdsSchema = z.object({
+  /** Word count at/under which a fallback entry uses the short-text default layout. */
+  shortTextThreshold: z.number().int().positive().default(200),
+  /** Word count above which a fallback entry uses the long-text template. */
+  longTextThreshold: z.number().int().positive().default(400),
+  // ANIMAL / SPECIES profile word-count routing.
+  speciesProfileSidebarThreshold: z.number().int().positive().default(900),
+  speciesProfileMarginThreshold: z.number().int().positive().default(650),
+  speciesProfileTextHeavyThreshold: z.number().int().positive().default(420),
+  speciesProfileIllustrationDominantThreshold: z.number().int().positive().default(180),
+  // Habitat/terrain word-count split between feature banner and landscape spread.
+  terrainBannerThreshold: z.number().int().positive().default(140),
+  // Tall-subject signal split between sidebar and margin layouts.
+  tallSubjectSidebarThreshold: z.number().int().positive().default(300),
+});
+
 export const LayoutPolicySchema = z.object({
   layoutReferenceSet: z.string().min(1).default('wildlands-layout-references-v1'),
   textFitFirst: z.boolean().default(true),
@@ -292,6 +313,7 @@ export const LayoutPolicySchema = z.object({
   defaultTemplate: LayoutTemplateIdSchema.default('LAYOUT_1_STANDARD'),
   longTextTemplate: LayoutTemplateIdSchema.default('LAYOUT_2_TEXT_HEAVY'),
   comparisonTemplate: LayoutTemplateIdSchema.default('LAYOUT_4_DANGER_WARNING'),
+  thresholds: LayoutSelectionThresholdsSchema.default({}),
 });
 
 export const LayoutPromptAssetSchema = z.object({
