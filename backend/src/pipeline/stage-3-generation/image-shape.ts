@@ -27,11 +27,11 @@ const SHAPE_SIZE: Record<ImageShape, ImageSize> = {
 
 const CLEAR_ZONE_BY_SHAPE: Record<ImageShape, string> = {
   landscape:
-    'Compose as a wide horizontal image. Keep the lower text area calm and low-detail so educational typography can sit below or beside the art without fighting the image.',
+    'Compose as full-page artwork with a wide horizontal image-priority zone. Keep the text-safe zone calm and low-detail so educational typography can overlay the artwork without fighting it.',
   portrait:
-    'Compose as a vertical page-oriented image. Keep one side or lower portion visually calm so educational text can be placed cleanly by the layout engine.',
+    'Compose as vertical full-page artwork. Keep the configured side or lower text-safe zone visually calm so educational text can overlay the artwork cleanly.',
   square:
-    'Compose as a flexible square reference study. Keep clean negative space around the studies so captions and educational text can be placed outside the artwork.',
+    'Compose as flexible full-page reference artwork. Keep clean negative space around studies so captions and educational text can overlay the artwork in the text-safe zone.',
 };
 
 const SHAPE_BY_SLOT: Record<ArtSlot, ImageShape> = {
@@ -78,7 +78,7 @@ export function imageShapeForLayout(template: LayoutTemplateId): LayoutImageShap
 export function appendImageShapeInstruction(prompt: string, shape: LayoutImageShape): string {
   return [
     prompt.trim(),
-    `LAYOUT IMAGE SHAPE: ${shape.description}. Generate at ${shape.size} so the subject matches the page composition and avoids obvious cropping.`,
-    `LAYOUT CLEAR ZONE: ${shape.clearZoneInstruction}`,
+    `LAYOUT FULL-PAGE ARTWORK SHAPE: ${shape.description}. Generate at ${shape.size} so the artwork matches the page composition and avoids obvious cropping.`,
+    `LAYOUT TEXT-SAFE / IMAGE-PRIORITY GUIDANCE: ${shape.clearZoneInstruction}`,
   ].join('\n\n');
 }

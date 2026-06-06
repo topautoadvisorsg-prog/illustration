@@ -31,16 +31,17 @@ analyzed, the written metadata becomes canonical:
 - use cases
 - avoid rules
 - text zone description
-- image zone description
+- image-priority zone description
 - min/target/max word capacity
 - recommended body size and line height
 - capacity approval status
 - prompt template and required placeholders
 - inherited Master Style DNA through `{MASTER_STYLE_DNA}`
 
-Layouts are strong reference templates, not rigid cages. They provide image
-placement, negative space, reading flow, content zones, and hierarchy. They do
-not provide article text or detailed educational analysis.
+Layouts are strong reference templates, not rigid cages. They provide
+text-safe zones, image-priority zones, negative space, reading flow, composition
+zones, and hierarchy. They do not provide article text or detailed educational
+analysis.
 
 The core invariant is text-area preservation: future educational content zones
 must remain clear. The planner appends layout-system safety rules to every

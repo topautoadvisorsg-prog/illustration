@@ -69,11 +69,12 @@ describe('analyzeTextFit', () => {
     expect(dominant.capacityChars).toBeLessThan(heavy.capacityChars);
   });
 
-  it('reports layout allocation for previewing text and image zones', () => {
+  it('reports layout allocation for previewing text-safe and image-priority zones', () => {
     const r = fit('x'.repeat(1500), 'LAYOUT_2_TEXT_HEAVY');
     expect(r.allocation.openingPageImagePercent).toBe(14);
     expect(r.allocation.openingPageTextPercent).toBe(86);
-    expect(r.allocation.artBox.recommendedWidthPx).toBeGreaterThan(0);
-    expect(r.allocation.textPlacement).toMatch(/wrap/);
+    expect(r.allocation.imagePriorityZone.recommendedWidthPx).toBeGreaterThan(0);
+    expect(r.allocation.textSafeZones[0]?.instruction).toMatch(/body text|readable/i);
+    expect(r.allocation.imagePriorityZones[0]?.instruction).toMatch(/focal|detail/i);
   });
 });

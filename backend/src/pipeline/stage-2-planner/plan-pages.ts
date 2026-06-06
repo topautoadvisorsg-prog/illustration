@@ -42,7 +42,7 @@ Use minimal annotation only when structurally necessary. Limit callouts to 0-2 m
 
 Do not build scientific-poster layouts, dense labeling systems, or technical breakdowns. The image is pure subject artwork; the educational markup is overlaid afterward.
 
-Layouts define image placement, negative space, reading flow, content zones, and visual hierarchy. They do not define subject matter, article content, or detailed scientific analysis.
+Layouts define text-safe zones, overlay typography zones, image-priority zones, negative space, reading flow, and visual hierarchy. They do not define subject matter, article content, or detailed scientific analysis.
 
 Prioritize readability over visual density. A simpler image with protected text placement is preferred over a beautiful image that consumes the content area.
 
@@ -124,6 +124,11 @@ export interface PagePlanningDecision {
     placement: string;
     textPlacement: string;
     architecture: string;
+    textSafeZones: LayoutAllocation['textSafeZones'];
+    typographyZones: LayoutAllocation['typographyZones'];
+    imagePriorityZones: LayoutAllocation['imagePriorityZones'];
+    imagePriorityZone: LayoutAllocation['imagePriorityZone'];
+    /** @deprecated Use `imagePriorityZone`. */
     artBox: LayoutAllocation['artBox'];
   };
   agent: {
@@ -616,7 +621,7 @@ export function planPage(page: PageManifest, config: ProjectConfig, options: Pla
       description: asset?.layoutDescription ?? `Fallback instructions for ${selected.template}; written mockup analysis is missing.`,
       useCases: asset?.useCases ?? [],
       avoidWhen: asset?.avoidWhen ?? [],
-      textZone: asset?.textZoneDescription ?? 'Text zone has not been analyzed yet.',
+      textZone: asset?.textZoneDescription ?? 'Text-safe zone has not been analyzed yet.',
       imageZone: asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? 'Image-priority zone has not been analyzed yet.',
       textFitRule: asset?.textFitRule ?? 'Run text-fit preview before image generation.',
     },
@@ -645,6 +650,10 @@ export function planPage(page: PageManifest, config: ProjectConfig, options: Pla
       placement: allocation.imagePlacement,
       textPlacement: allocation.textPlacement,
       architecture: allocation.architecture,
+      textSafeZones: allocation.textSafeZones,
+      typographyZones: allocation.typographyZones,
+      imagePriorityZones: allocation.imagePriorityZones,
+      imagePriorityZone: allocation.imagePriorityZone,
       artBox: allocation.artBox,
     },
     agent: {

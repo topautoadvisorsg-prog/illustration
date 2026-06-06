@@ -46,6 +46,48 @@ export interface PageFitPreview {
     estimatedRenderedPages: number;
     wordsPerOpeningPage: number;
     wordsPerContinuationPage: number;
+    textSafeZones: {
+      id: string;
+      role: string;
+      shape: string;
+      xPct: number;
+      yPct: number;
+      widthPct: number;
+      heightPct: number;
+      instruction: string;
+    }[];
+    typographyZones: {
+      id: string;
+      role: string;
+      shape: string;
+      xPct: number;
+      yPct: number;
+      widthPct: number;
+      heightPct: number;
+      instruction: string;
+    }[];
+    imagePriorityZones: {
+      id: string;
+      role: string;
+      shape: string;
+      xPct: number;
+      yPct: number;
+      widthPct: number;
+      heightPct: number;
+      instruction: string;
+    }[];
+    imagePriorityZone: {
+      xIn: number;
+      yIn: number;
+      widthIn: number;
+      heightIn: number;
+      recommendedWidthPx: number;
+      recommendedHeightPx: number;
+      bleedPaddingPx: number;
+      aspectRatio: string;
+      overlaySafeArea: string;
+    };
+    /** @deprecated Use `imagePriorityZone`. */
     artBox: {
       xIn: number;
       yIn: number;

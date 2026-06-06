@@ -137,6 +137,25 @@ const LAYOUT_TEMPLATES = [
 
 const LAYOUT_LABELS = Object.fromEntries(LAYOUT_TEMPLATES.map(([id, name]) => [id, name]));
 
+const LAYOUT_ZONE_PRESETS = {
+  LAYOUT_1_STANDARD: { architecture: "FLOAT_LEFT", openingPageImagePercent: 32, openingPageTextPercent: 68 },
+  LAYOUT_2_TEXT_HEAVY: { architecture: "FLOAT_LEFT", openingPageImagePercent: 14, openingPageTextPercent: 86 },
+  LAYOUT_3_ILLUSTRATION_DOMINANT: { architecture: "FLOAT_RIGHT", openingPageImagePercent: 50, openingPageTextPercent: 50 },
+  LAYOUT_4_DANGER_WARNING: { architecture: "FLOAT_LEFT", openingPageImagePercent: 34, openingPageTextPercent: 66 },
+  LAYOUT_5_CHAPTER_OPENER: { architecture: "TOP_BAND", openingPageImagePercent: 55, openingPageTextPercent: 45 },
+  LAYOUT_6_BACK_MATTER: { architecture: "FLOAT_RIGHT", openingPageImagePercent: 10, openingPageTextPercent: 90 },
+  LAYOUT_7_SCATTERED_VIGNETTES: { architecture: "SCATTERED", openingPageImagePercent: 36, openingPageTextPercent: 64 },
+  LAYOUT_8_MARGIN_ILLUSTRATION: { architecture: "FLOAT_RIGHT", openingPageImagePercent: 26, openingPageTextPercent: 74 },
+  LAYOUT_9_DIAGNOSTIC_DIAGRAM: { architecture: "SCATTERED", openingPageImagePercent: 38, openingPageTextPercent: 62 },
+  LAYOUT_10_FULL_PAGE_PLATE: { architecture: "FULL_PAGE", openingPageImagePercent: 95, openingPageTextPercent: 5 },
+  LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD: { architecture: "TOP_BAND", openingPageImagePercent: 60, openingPageTextPercent: 40 },
+  LAYOUT_12_DIAGNOSTIC_DIAGRAM: { architecture: "TOP_BAND", openingPageImagePercent: 42, openingPageTextPercent: 58 },
+  LAYOUT_13_FEATURE_BANNER: { architecture: "TOP_BAND", openingPageImagePercent: 40, openingPageTextPercent: 60 },
+  LAYOUT_14_SIDEBAR_FEATURE: { architecture: "SIDEBAR_RIGHT", openingPageImagePercent: 30, openingPageTextPercent: 70 },
+  LAYOUT_15_PROGRESSION_STUDY: { architecture: "TOP_BAND", openingPageImagePercent: 42, openingPageTextPercent: 58 },
+  LAYOUT_16_CUTAWAY_FEATURE: { architecture: "TOP_BAND", openingPageImagePercent: 44, openingPageTextPercent: 56 },
+};
+
 const PUBLISHING_STANDARD_PRESETS = {
   HARDCOVER_7X10: {
     format: "HARDCOVER_7X10",
@@ -275,7 +294,7 @@ Use minimal annotation only when structurally necessary. Limit callouts to 0-2 m
 
 Do not build scientific-poster layouts, dense labeling systems, or technical breakdowns. The image is pure subject artwork; the educational markup is overlaid afterward.
 
-Layouts define image placement, negative space, reading flow, content zones, and visual hierarchy. They do not define subject matter, article content, or detailed scientific analysis.
+Layouts define text-safe zones, overlay typography zones, image-priority zones, negative space, reading flow, and visual hierarchy. They do not define subject matter, article content, or detailed scientific analysis.
 
 Prioritize readability over visual density. A simpler image with protected text placement is preferred over a beautiful image that consumes the content area.
 
@@ -858,13 +877,13 @@ function defaultLayoutPromptAssets() {
             : "Balanced text zone based on the uploaded mockup.",
     imageZoneDescription:
       id === "LAYOUT_1_STANDARD"
-        ? "Top 35% illustration zone: primary illustration in upper-left quadrant, secondary study illustration in upper-right quadrant, with light supporting sketches and annotation callouts."
+        ? "Top 35% image-priority zone: primary focal detail in upper-left quadrant, secondary study detail in upper-right quadrant, with light supporting sketches and annotation callouts."
         : id === "LAYOUT_2_TEXT_HEAVY"
           ? "Small supporting illustrations in the outer margins, tiny scientific diagrams between sections, and bottom reference callouts."
           : id === "LAYOUT_3_ILLUSTRATION_DOMINANT"
             ? "Approximately 60% of the page contains illustration elements, led by an upper-right hero illustration plus optional nearby supporting studies."
             : id === "LAYOUT_4_DANGER_WARNING"
-              ? "Top 60% comparison zone with Subject A on the left and Subject B on the right; use only essential distinguishing callouts."
+              ? "Top 60% comparison image-priority zone with Subject A on the left and Subject B on the right; use only essential distinguishing callouts."
               : id === "LAYOUT_5_CHAPTER_OPENER"
                 ? "Upper 60% contains cinematic environmental artwork with atmospheric depth and strong sense of scale."
                 : id === "LAYOUT_6_BACK_MATTER"
@@ -872,7 +891,7 @@ function defaultLayoutPromptAssets() {
                   : id === "LAYOUT_7_SCATTERED_VIGNETTES"
                     ? "Three specimen studies alternate vertically: upper-left, center-right, lower-left, each with minimal label/annotation and generous negative space."
                     : id === "LAYOUT_8_MARGIN_ILLUSTRATION"
-                      ? "Rightmost 25% contains one tall vertical illustration with small annotations extending into the left text area."
+                      ? "Rightmost 25% is the vertical image-priority zone, with small annotations extending toward the left text-safe area."
                       : id === "LAYOUT_9_DIAGNOSTIC_DIAGRAM"
                         ? "Primary illustration near center with three smaller supporting studies distributed around it in varied sizes and positions."
                         : id === "LAYOUT_10_FULL_PAGE_PLATE"
@@ -889,7 +908,7 @@ function defaultLayoutPromptAssets() {
                                     ? "Upper 50-60% contains three to five sequential educational studies with generous spacing."
                                     : id === "LAYOUT_16_CUTAWAY_FEATURE"
                                       ? "Upper 60% contains one large cutaway or layered illustration with simple major-zone callouts and optional corner studies."
-              : "Generated subject art replaces only the mockup image area.",
+              : "Generated full-page artwork follows the approved text-safe and image-priority zones.",
     capacityNotes: "Update after text-fit testing with the real mockup.",
     minWords,
     targetWords,
@@ -1029,6 +1048,63 @@ function safeManifestContent(manifest) {
 
 function latestActiveVersion(images = []) {
   return images.find((image) => image.active) || images[0] || null;
+}
+
+function zonePreviewLayers(source) {
+  if (!source) return [];
+  const layers = [];
+  for (const zone of source.imagePriorityZones || []) layers.push({ ...zone, kind: "image-priority", label: "Image-priority" });
+  for (const zone of source.typographyZones || []) layers.push({ ...zone, kind: "typography", label: "Title / typography" });
+  for (const zone of source.textSafeZones || []) layers.push({ ...zone, kind: "text-safe", label: "Text-safe" });
+  if (layers.length > 0) return layers;
+
+  const imagePercent = source.openingPageImagePercent ?? source.imagePercent ?? 40;
+  const textPercent = source.openingPageTextPercent ?? source.textPercent ?? Math.max(0, 100 - imagePercent);
+  const architecture = source.architecture || "TOP_BAND";
+  const baseTitle = {
+    id: "title-main",
+    kind: "typography",
+    label: "Title / typography",
+    xPct: 9,
+    yPct: 6,
+    widthPct: 82,
+    heightPct: 14,
+    instruction: "Title overlays the artwork with composition support.",
+  };
+  if (architecture === "FLOAT_RIGHT" || architecture === "SIDEBAR_RIGHT") {
+    return [
+      { id: "image-priority-right", kind: "image-priority", label: "Image-priority", xPct: Math.max(52, textPercent), yPct: 12, widthPct: Math.max(18, imagePercent), heightPct: 72 },
+      baseTitle,
+      { id: "text-safe-left", kind: "text-safe", label: "Text-safe", xPct: 8, yPct: 24, widthPct: Math.min(62, textPercent), heightPct: 60 },
+    ];
+  }
+  if (architecture === "FLOAT_LEFT") {
+    return [
+      { id: "image-priority-left", kind: "image-priority", label: "Image-priority", xPct: 0, yPct: 12, widthPct: Math.max(18, imagePercent), heightPct: 58 },
+      baseTitle,
+      { id: "text-safe-right", kind: "text-safe", label: "Text-safe", xPct: Math.min(46, imagePercent + 8), yPct: 24, widthPct: Math.max(44, textPercent - 8), heightPct: 58 },
+    ];
+  }
+  if (architecture === "SCATTERED") {
+    return [
+      { id: "image-priority-study-a", kind: "image-priority", label: "Image-priority", xPct: 6, yPct: 18, widthPct: 30, heightPct: 24 },
+      { id: "image-priority-study-b", kind: "image-priority", label: "Image-priority", xPct: 58, yPct: 28, widthPct: 30, heightPct: 24 },
+      baseTitle,
+      { id: "text-safe-path", kind: "text-safe", label: "Text-safe", xPct: 34, yPct: 48, widthPct: 52, heightPct: 36 },
+    ];
+  }
+  if (architecture === "FULL_PAGE") {
+    return [
+      { id: "image-priority-full", kind: "image-priority", label: "Image-priority", xPct: 0, yPct: 0, widthPct: 100, heightPct: 100 },
+      baseTitle,
+      { id: "text-safe-caption", kind: "text-safe", label: "Text-safe", xPct: 12, yPct: 78, widthPct: 76, heightPct: 12 },
+    ];
+  }
+  return [
+    { id: "image-priority-top", kind: "image-priority", label: "Image-priority", xPct: 0, yPct: 0, widthPct: 100, heightPct: imagePercent },
+    baseTitle,
+    { id: "text-safe-lower", kind: "text-safe", label: "Text-safe", xPct: 10, yPct: Math.max(28, imagePercent), widthPct: 80, heightPct: Math.max(28, textPercent) },
+  ];
 }
 
 function defaultProjectConfig() {
@@ -1222,7 +1298,7 @@ const defaultSopDraft = {
   title: "SOP: Image Review",
   workflowName: "Image Review SOP",
   bodyMarkdown: "1. Review text-safe negative space.\n2. Confirm no generated article text.\n3. Approve only if subject matches the page context.",
-  checklist: "No fake text\nText zones preserved\nSubject matches page\nReady for upscale",
+  checklist: "No fake text\nText-safe zones preserved\nSubject matches page\nReady for upscale",
   changeNotes: "Initial operator workflow.",
   ownerName: "Operator",
   tags: "sop, image-review",
@@ -3307,7 +3383,7 @@ function App() {
           : pdfPreview.url
             ? "A focused PDF preview exists. Render the selected chapter to complete this stage."
             : "Render the selected chapter to create the proof review object.",
-        review: "Review rendered pages, text flow, image placement, and readability at proof size.",
+        review: "Review rendered pages, text flow, zone placement, and readability at proof size.",
         artifactLabel: "Proof preview",
         artifactSelector: ".preview-review-card",
         primaryLabel: hasReviewChapterProof ? "Review Chapter Proof" : `Render ${reviewChapterLabel} Proof`,
@@ -4220,6 +4296,11 @@ function App() {
                 const fit = textFitPreview?.pages?.find((candidate) => candidate.pageKey === page.pageId);
                 const allocation = fit?.allocation;
                 const artBrief = plan?.artBrief;
+                const layoutForPreview = row?.layoutTemplate || plan?.layoutTemplate || page.layoutTemplate;
+                const zoneSource = allocation?.textSafeZones?.length
+                  ? allocation
+                  : artBrief || LAYOUT_ZONE_PRESETS[layoutForPreview] || LAYOUT_ZONE_PRESETS.LAYOUT_1_STANDARD;
+                const zoneLayers = zonePreviewLayers(zoneSource);
                 const approval = chapterApproval(page.chapterNumber);
                 return (
                   <article className={selectedPage?.pageKey === page.pageId ? "page-plan-card active" : "page-plan-card"} key={page.pageId}>
@@ -4238,13 +4319,36 @@ function App() {
                     {allocation && (
                       <div className="layout-allocation">
                         <div>
-                          <strong>{allocation.openingPageTextPercent}% text</strong>
+                          <strong>{allocation.openingPageTextPercent}% text-safe</strong>
                           <span>{allocation.textPlacement}</span>
                         </div>
                         <div>
-                          <strong>{allocation.openingPageImagePercent}% image</strong>
+                          <strong>{allocation.openingPageImagePercent}% image-priority</strong>
                           <span>{allocation.imagePlacement}</span>
                         </div>
+                      </div>
+                    )}
+                    {zoneLayers.length > 0 && (
+                      <div className="zone-preview-card" aria-label={`${page.pageId} zone planning preview`}>
+                        <div className="zone-preview-canvas">
+                          <span className="zone-preview-artwork-label">Full-page artwork canvas</span>
+                          {zoneLayers.map((zone) => (
+                            <span
+                              key={`${zone.kind}-${zone.id}`}
+                              className={`zone-preview-layer ${zone.kind}`}
+                              style={{
+                                left: `${zone.xPct}%`,
+                                top: `${zone.yPct}%`,
+                                width: `${zone.widthPct}%`,
+                                height: `${zone.heightPct}%`,
+                              }}
+                              title={zone.instruction}
+                            >
+                              <span className="zone-preview-layer-label">{zone.label}</span>
+                            </span>
+                          ))}
+                        </div>
+                        <p>The image is the page. Outlines only show where text, title, and focal detail belong.</p>
                       </div>
                     )}
                     {selectedPage?.pageKey === page.pageId && (
@@ -4288,7 +4392,7 @@ function App() {
                         <summary>Prompt + layout internals</summary>
                         <p><strong>Purpose:</strong> {plan?.contentTypePurpose || page.contentType || "No purpose loaded"}</p>
                         <p><strong>Coverage:</strong> {formatPercent(plan?.coverage)} / {plan?.architecture || "architecture pending"}</p>
-                        <p><strong>Text zone:</strong> {plan?.layoutInstructions?.textZone || "No text-zone note"}</p>
+                        <p><strong>Text-safe zone:</strong> {plan?.layoutInstructions?.textZone || "No text-safe-zone note"}</p>
                         {allocation && <p><strong>Continuation:</strong> {allocation.continuationPageTextPercent}% text / {allocation.continuationPageImagePercent}% image after the opening page.</p>}
                         {artBrief?.artBox && (
                           <p>
@@ -5115,7 +5219,7 @@ function App() {
                     <span>{page.wordCount} words / {page.textFitStatus}</span>
                     <span>{page.capacity?.status || "capacity?"}</span>
                     <span>{page.blockers?.length || 0} blockers</span>
-                    <span>{page.layoutInstructions?.textZone || "No text-zone note"}</span>
+                    <span>{page.layoutInstructions?.textZone || "No text-safe-zone note"}</span>
                   </div>
                 ))}
                 {plannedPages.length === 0 && <p className="empty">No page plan yet.</p>}
@@ -5579,14 +5683,14 @@ function App() {
                       }
                     />
                   </Field>
-                  <Field label="Text Zone Description">
+                  <Field label="Text-Safe Zone Description">
                     <textarea
                       className="notes-field"
                       value={asset.textZoneDescription || ""}
                       onChange={(event) => updateLayoutAsset(index, "textZoneDescription", event.target.value)}
                     />
                   </Field>
-                  <Field label="Image Zone Description">
+                  <Field label="Image-Priority Zone Description">
                     <textarea
                       className="notes-field"
                       value={asset.imageZoneDescription || ""}

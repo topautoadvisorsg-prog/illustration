@@ -2099,6 +2099,107 @@ button.secondary {
   line-height: 1.25;
 }
 
+.zone-preview-card {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #e0d7ca;
+  border-radius: 8px;
+  padding: 9px;
+  background: #fffdf8;
+}
+
+.zone-preview-card p {
+  margin: 0;
+  color: #6d6258;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.zone-preview-canvas {
+  position: relative;
+  min-height: 170px;
+  overflow: hidden;
+  border: 1px solid #d2c5b4;
+  border-radius: 6px;
+  background:
+    linear-gradient(140deg, rgba(42, 78, 67, 0.12), rgba(244, 232, 197, 0.26)),
+    radial-gradient(circle at 30% 22%, rgba(88, 118, 93, 0.2), transparent 34%),
+    radial-gradient(circle at 72% 62%, rgba(72, 99, 111, 0.15), transparent 35%),
+    #f7efe0;
+}
+
+.zone-preview-artwork-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  color: rgba(48, 62, 55, 0.72);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.zone-preview-layer {
+  position: absolute;
+  z-index: 2;
+  display: block;
+  min-width: 34px;
+  min-height: 22px;
+  box-sizing: border-box;
+  border: 2px dashed currentColor;
+  border-radius: 7px;
+  background: transparent;
+  color: #245f39;
+}
+
+.zone-preview-layer-label {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  max-width: calc(100% - 12px);
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: rgba(247, 239, 224, 0.82);
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1.05;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  overflow-wrap: anywhere;
+}
+
+.zone-preview-layer.image-priority {
+  color: #176d9f;
+}
+
+.zone-preview-layer.image-priority .zone-preview-layer-label {
+  right: 6px;
+  bottom: 6px;
+}
+
+.zone-preview-layer.typography {
+  color: #9d6a00;
+}
+
+.zone-preview-layer.typography .zone-preview-layer-label {
+  top: 50%;
+  left: 50%;
+  background: rgba(255, 248, 222, 0.86);
+  transform: translate(-50%, -50%);
+}
+
+.zone-preview-layer.text-safe {
+  color: #2f7a45;
+}
+
+.zone-preview-layer.text-safe .zone-preview-layer-label {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
 .page-chip,
 .select-page-button {
   width: 100%;

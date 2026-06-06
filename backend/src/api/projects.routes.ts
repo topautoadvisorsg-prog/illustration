@@ -395,6 +395,29 @@ const ProductionDashboardResponseSchema = z.object({
   ),
 });
 
+const PlanningZoneSchema = z.object({
+  id: z.string(),
+  role: z.string(),
+  shape: z.string(),
+  xPct: z.number(),
+  yPct: z.number(),
+  widthPct: z.number(),
+  heightPct: z.number(),
+  instruction: z.string(),
+});
+
+const ImagePriorityZoneSchema = z.object({
+  xIn: z.number(),
+  yIn: z.number(),
+  widthIn: z.number(),
+  heightIn: z.number(),
+  recommendedWidthPx: z.number(),
+  recommendedHeightPx: z.number(),
+  bleedPaddingPx: z.number(),
+  aspectRatio: z.string(),
+  overlaySafeArea: z.string(),
+});
+
 const PlanPagesResponseSchema = z.object({
   project: ProjectSchema,
   layoutLibrary: z.object({
@@ -456,17 +479,11 @@ const PlanPagesResponseSchema = z.object({
         placement: z.string(),
         textPlacement: z.string(),
         architecture: z.string(),
-        artBox: z.object({
-          xIn: z.number(),
-          yIn: z.number(),
-          widthIn: z.number(),
-          heightIn: z.number(),
-          recommendedWidthPx: z.number(),
-          recommendedHeightPx: z.number(),
-          bleedPaddingPx: z.number(),
-          aspectRatio: z.string(),
-          overlaySafeArea: z.string(),
-        }),
+        textSafeZones: z.array(PlanningZoneSchema),
+        typographyZones: z.array(PlanningZoneSchema),
+        imagePriorityZones: z.array(PlanningZoneSchema),
+        imagePriorityZone: ImagePriorityZoneSchema,
+        artBox: ImagePriorityZoneSchema,
       }),
       agent: z.object({
         id: z.string(),
@@ -533,17 +550,11 @@ const TextFitPreviewResponseSchema = z.object({
         estimatedRenderedPages: z.number(),
         wordsPerOpeningPage: z.number(),
         wordsPerContinuationPage: z.number(),
-        artBox: z.object({
-          xIn: z.number(),
-          yIn: z.number(),
-          widthIn: z.number(),
-          heightIn: z.number(),
-          recommendedWidthPx: z.number(),
-          recommendedHeightPx: z.number(),
-          bleedPaddingPx: z.number(),
-          aspectRatio: z.string(),
-          overlaySafeArea: z.string(),
-        }),
+        textSafeZones: z.array(PlanningZoneSchema),
+        typographyZones: z.array(PlanningZoneSchema),
+        imagePriorityZones: z.array(PlanningZoneSchema),
+        imagePriorityZone: ImagePriorityZoneSchema,
+        artBox: ImagePriorityZoneSchema,
         notes: z.array(z.string()),
       }),
     }),

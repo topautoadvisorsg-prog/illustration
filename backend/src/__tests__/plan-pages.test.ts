@@ -36,7 +36,7 @@ const baseConfig = ProjectConfigSchema.parse({
       useCases: ['look-alike species', 'comparison pages', 'quick recognition'],
       avoidWhen: ['simple short entry without comparison need'],
       textZoneDescription: 'Lower text zone remains clear for educational content.',
-      imageZoneDescription: 'Upper comparison image zone only; never render page text.',
+      imageZoneDescription: 'Upper comparison image-priority zone only; never render page text.',
       capacityNotes: 'Measured against 10.5 pt body type.',
       minWords: 240,
       targetWords: 340,

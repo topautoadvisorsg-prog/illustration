@@ -130,7 +130,7 @@ describe('layout-aware image shape mapping', () => {
 
     expect(shape.shape).toBe('landscape');
     expect(shape.size).toBe('1536x1024');
-    expect(shape.clearZoneInstruction).toContain('wide horizontal image');
+    expect(shape.clearZoneInstruction).toContain('wide horizontal image-priority zone');
   });
 
   it('maps full art plates and sidebar layouts to portrait generation', () => {
@@ -147,9 +147,9 @@ describe('layout-aware image shape mapping', () => {
     const shaped = appendImageShapeInstruction('Render NO text.', imageShapeForLayout('LAYOUT_13_FEATURE_BANNER'));
     const { prompt } = finalizePrompt(shaped, 'Make the mountain line lower.');
 
-    expect(prompt).toContain('LAYOUT IMAGE SHAPE: landscape image');
+    expect(prompt).toContain('LAYOUT FULL-PAGE ARTWORK SHAPE: landscape image');
     expect(prompt).toContain('Generate at 1536x1024');
-    expect(prompt).toContain('LAYOUT CLEAR ZONE');
+    expect(prompt).toContain('LAYOUT TEXT-SAFE / IMAGE-PRIORITY GUIDANCE');
     expect(prompt).toContain('Make the mountain line lower.');
   });
 });

@@ -37,11 +37,31 @@ export interface ImagePriorityZone {
   overlaySafeArea: string;
 }
 
+export type PlanningZoneRole = 'body' | 'caption' | 'title' | 'section-title' | 'primary-art' | 'supporting-art';
+export type PlanningZoneShape = 'rect' | 'organic' | 'path';
+
+export interface PlanningZone {
+  id: string;
+  role: PlanningZoneRole;
+  shape: PlanningZoneShape;
+  xPct: number;
+  yPct: number;
+  widthPct: number;
+  heightPct: number;
+  instruction: string;
+}
+
 export interface LayoutAllocation {
   /** Position of the image-priority zone (the strong-content edge of the artwork). */
   priorityEdge: ImagePriorityEdge;
   /** Geometry of the image-priority zone within the full-page artwork. */
   imagePriorityZone: ImagePriorityZone;
+  /** Where body/caption text may sit directly on the artwork. */
+  textSafeZones: PlanningZone[];
+  /** Where titles/headings may overlay the artwork. */
+  typographyZones: PlanningZone[];
+  /** Where focal visual detail should live inside the full-page artwork. */
+  imagePriorityZones: PlanningZone[];
   imagePlacement: string;
   textPlacement: string;
   openingPageImagePercent: number;
@@ -83,23 +103,23 @@ function countWordsForLayout(plainText: string): number {
 function placementFor(slot: ArtSlot): { imagePlacement: string; textPlacement: string } {
   switch (slot) {
     case 'FLOAT_LEFT':
-      return { imagePlacement: 'left floating art block', textPlacement: 'title and body wrap to the right, then continue below' };
+      return { imagePlacement: 'left-side image-priority zone within the full-page artwork', textPlacement: 'body text uses the calm right-side text-safe zone, then continues below' };
     case 'FLOAT_RIGHT':
-      return { imagePlacement: 'right floating art block', textPlacement: 'title and body wrap to the left, then continue below' };
+      return { imagePlacement: 'right-side image-priority zone within the full-page artwork', textPlacement: 'body text uses the calm left-side text-safe zone, then continues below' };
     case 'TOP_BAND':
-      return { imagePlacement: 'wide image band above the text', textPlacement: 'body text flows below the band' };
+      return { imagePlacement: 'upper image-priority zone within one full-page artwork', textPlacement: 'body text sits in the calmer lower text-safe zone' };
     case 'BOTTOM_BAND':
-      return { imagePlacement: 'wide image band below the text', textPlacement: 'body text flows above the band' };
+      return { imagePlacement: 'lower image-priority zone within one full-page artwork', textPlacement: 'body text sits in the calmer upper text-safe zone' };
     case 'FULL_PAGE':
-      return { imagePlacement: 'full-page plate area', textPlacement: 'minimal caption or title text only' };
+      return { imagePlacement: 'full-page image-priority artwork', textPlacement: 'minimal caption or title text only in small calm overlay zones' };
     case 'SIDEBAR_RIGHT':
-      return { imagePlacement: 'tall right-side image column', textPlacement: 'running body column on the left' };
+      return { imagePlacement: 'tall right-side image-priority zone within the full-page artwork', textPlacement: 'running body text uses the calm left-side text-safe zone' };
     case 'SCATTERED':
-      return { imagePlacement: 'small scattered study/vignette zones', textPlacement: 'text wraps through the open reading path' };
+      return { imagePlacement: 'scattered image-priority study zones inside the full-page artwork', textPlacement: 'text uses the calm reading path between studies' };
     case 'CENTER_WRAP':
-      return { imagePlacement: 'centered image with surrounding negative space', textPlacement: 'text wraps around and below the centered image' };
+      return { imagePlacement: 'central image-priority zone inside the full-page artwork', textPlacement: 'text uses calm surrounding and lower text-safe zones' };
     default:
-      return { imagePlacement: 'left floating art block', textPlacement: 'title and body wrap to the right, then continue below' };
+      return { imagePlacement: 'left-side image-priority zone within the full-page artwork', textPlacement: 'body text uses the calm right-side text-safe zone, then continues below' };
   }
 }
 
@@ -107,8 +127,8 @@ function refinedPlacement(slot: ArtSlot, imagePercent: number): { imagePlacement
   if (imagePercent <= 15 && (slot === 'FLOAT_LEFT' || slot === 'FLOAT_RIGHT')) {
     const side = slot === 'FLOAT_LEFT' ? 'upper-left' : 'upper-right';
     return {
-      imagePlacement: `small ${side} corner or edge illustration, suitable for pine boughs, tracks, specimen details, or other quiet marginal art`,
-      textPlacement: 'body text owns the page and wraps around the small supporting illustration',
+      imagePlacement: `small ${side} image-priority zone for pine boughs, tracks, specimen details, or other quiet marginal art`,
+      textPlacement: 'body text owns the calm text-safe zone across most of the artwork',
     };
   }
   return placementFor(slot);
@@ -178,6 +198,75 @@ function imagePriorityZoneFor(slot: ArtSlot, coverage: number, geometry: PageGeo
   };
 }
 
+function zone(id: string, role: PlanningZoneRole, xPct: number, yPct: number, widthPct: number, heightPct: number, instruction: string, shape: PlanningZoneShape = 'rect'): PlanningZone {
+  const round = (n: number) => Math.round(n * 10) / 10;
+  return { id, role, shape, xPct: round(xPct), yPct: round(yPct), widthPct: round(widthPct), heightPct: round(heightPct), instruction };
+}
+
+function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation, 'textSafeZones' | 'typographyZones' | 'imagePriorityZones'> {
+  const textPct = Math.max(0, 100 - imagePercent);
+  const title = zone(
+    'title-main',
+    'title',
+    9,
+    6,
+    82,
+    14,
+    'Overlay title/heading sits directly on the artwork; composition should provide calm value contrast and negative space.',
+  );
+
+  switch (slot) {
+    case 'TOP_BAND':
+      return {
+        typographyZones: [title],
+        imagePriorityZones: [zone('image-priority-top', 'primary-art', 0, 0, 100, imagePercent, 'Concentrate focal visual detail in the upper artwork zone; frame the text-safe zone naturally.')],
+        textSafeZones: [zone('text-safe-lower', 'body', 10, Math.max(28, imagePercent), 80, Math.max(28, textPct), 'Reserve calm, low-detail artwork for readable body text. Do not draw a panel, box, card, or empty cutout.', 'organic')],
+      };
+    case 'BOTTOM_BAND':
+      return {
+        typographyZones: [title],
+        imagePriorityZones: [zone('image-priority-bottom', 'primary-art', 0, Math.max(35, textPct), 100, imagePercent, 'Concentrate focal visual detail in the lower artwork zone; keep upper body area calm.')],
+        textSafeZones: [zone('text-safe-upper', 'body', 10, 22, 80, Math.max(30, textPct - 8), 'Reserve calm upper artwork for readable body text. No boxes or paper panels.', 'organic')],
+      };
+    case 'FLOAT_LEFT':
+      return {
+        typographyZones: [title],
+        imagePriorityZones: [zone('image-priority-left', 'primary-art', 0, 12, Math.max(18, imagePercent), 58, 'Focal visual detail lives along the left side while the full page remains one illustration.')],
+        textSafeZones: [zone('text-safe-right', 'body', Math.min(46, imagePercent + 8), 24, Math.max(44, textPct - 8), 58, 'Keep the right/lower artwork calm for body text; artwork remains visible under text.', 'organic')],
+      };
+    case 'FLOAT_RIGHT':
+    case 'SIDEBAR_RIGHT':
+      return {
+        typographyZones: [title],
+        imagePriorityZones: [zone('image-priority-right', 'primary-art', Math.max(52, textPct), 12, Math.max(18, imagePercent), 72, 'Focal visual detail lives along the right side while the full page remains one illustration.')],
+        textSafeZones: [zone('text-safe-left', 'body', 8, 24, Math.min(62, textPct), 60, 'Keep the left artwork calm for body text; no box, card, or hard separation.', 'organic')],
+      };
+    case 'SCATTERED':
+      return {
+        typographyZones: [title],
+        imagePriorityZones: [
+          zone('image-priority-study-a', 'primary-art', 6, 18, 30, 24, 'First study/focal visual detail zone.'),
+          zone('image-priority-study-b', 'supporting-art', 58, 28, 30, 24, 'Second study/focal visual detail zone.'),
+          zone('image-priority-study-c', 'supporting-art', 12, 62, 26, 22, 'Third study/focal visual detail zone.'),
+        ],
+        textSafeZones: [zone('text-safe-path', 'body', 34, 48, 52, 36, 'Maintain a calm flowing reading path between studies; no filled panel.', 'path')],
+      };
+    case 'CENTER_WRAP':
+      return {
+        typographyZones: [title],
+        imagePriorityZones: [zone('image-priority-center', 'primary-art', 24, 24, 52, 38, 'Central focal visual detail with calm surrounding artwork.')],
+        textSafeZones: [zone('text-safe-lower', 'body', 12, 64, 76, 26, 'Reserve calm lower artwork for readable body text.', 'organic')],
+      };
+    case 'FULL_PAGE':
+    default:
+      return {
+        typographyZones: [title],
+        imagePriorityZones: [zone('image-priority-full', 'primary-art', 0, 0, 100, 100, 'The whole page is artwork; focal detail can occupy the full composition while respecting small overlay zones.')],
+        textSafeZones: [zone('text-safe-caption', 'caption', 12, 78, 76, 12, 'Small calm caption/notes zone only; no large body text panel.', 'organic')],
+      };
+  }
+}
+
 export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
   const profile = getLayoutProfile(input.layoutTemplate);
   const plainText = stripMarkdownForLayout(input.bodyMarkdown);
@@ -200,6 +289,7 @@ export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
   const textPercent = Math.max(0, 100 - imagePercent);
   const placement = refinedPlacement(profile.artSlot, imagePercent);
   const imagePriorityZone = imagePriorityZoneFor(profile.artSlot, profile.artAreaFraction, input.geometry);
+  const zonePlan = zonePlanFor(profile.artSlot, imagePercent);
   const notes: string[] = [];
 
   if (estimatedRenderedPages > 1) {
@@ -216,6 +306,9 @@ export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
     // New zone vocabulary (primary).
     priorityEdge: profile.artSlot,
     imagePriorityZone,
+    textSafeZones: zonePlan.textSafeZones,
+    typographyZones: zonePlan.typographyZones,
+    imagePriorityZones: zonePlan.imagePriorityZones,
     imagePlacement: placement.imagePlacement,
     textPlacement: placement.textPlacement,
     // Back-compat aliases (deprecated; consumers should migrate to the names above).
