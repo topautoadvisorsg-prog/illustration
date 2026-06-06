@@ -488,8 +488,10 @@ const BOX_MODEL_LINE_PATTERNS: RegExp[] = [
   /reserved space for future educational content/i,
   /avoid background elements spilling into the content area/i,
   // Positional "the illustration lives only in part of the page" language.
-  /(spans|occupies|fills|sits in|lives in) the (upper|lower|left|right|top|bottom) portion/i,
-  /(upper|lower|left|right|top|bottom) portion of the page/i,
+  // "portion" is the compartment tell — match it in any phrasing ("Upper portion
+  // remains uninterrupted", "spans the upper portion of the page"). Zone language
+  // uses "band" / "-center" / "image-priority zone", never "portion", so this is safe.
+  /\b(upper|lower|left|right|top|bottom)\s+portion\b/i,
   // Percentage-band "<region> N% contains/remains the illustration/text" lines.
   /\b(upper|lower|left|right|top|bottom|rightmost|leftmost|topmost|bottommost)\s+[\w-]*\s*\d{1,3}(\s*-\s*\d{1,3})?%\s+(contains|remains|is reserved|holds|reserved)/i,
   // The retired "text area(s)" / "content area(s)" compartment noun (NOT

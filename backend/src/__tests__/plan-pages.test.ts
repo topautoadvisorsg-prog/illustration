@@ -196,6 +196,7 @@ describe('planPage', () => {
       '{MASTER_STYLE_DNA}',
       'Page structure:',
       '- A wide horizontal illustration spans the upper portion of the page.',
+      '- Upper portion remains visually uninterrupted.',
       'Visual balance:',
       '- Upper 35-40% contains the feature illustration.',
       '- Lower 60-65% remains largely clear for text placement.',
@@ -222,6 +223,8 @@ describe('planPage', () => {
     expect(cleaned).not.toMatch(/Lower 60-65% remains/i);
     expect(cleaned).not.toMatch(/Rightmost 25% contains/i);
     expect(cleaned).not.toMatch(/spans the upper portion/i);
+    expect(cleaned).not.toMatch(/upper portion remains/i);
+    expect(cleaned).not.toMatch(/\bupper portion\b/i);
     expect(cleaned).not.toMatch(/\btext areas?\b/i);
     expect(cleaned).not.toMatch(/\bcontent areas?\b/i);
     expect(cleaned).not.toMatch(/\breading areas?\b/i);

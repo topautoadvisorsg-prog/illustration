@@ -296,13 +296,23 @@ function deriveVisualSubject(
   if (bodySubjects.length > 0) {
     return bodySubjects.join(' and ');
   }
-  // 2. CHAPTER FALLBACK — something general about the chapter.
-  const chapterTitle = cleanDisplayTitle(chapter.title);
-  const chapterSubjects = extractConcreteSubjects(`${chapter.title}`);
+  // 2. CHAPTER FALLBACK — something general about the chapter. Strip the
+  // "CHAPTER N -" heading prefix; a bare chapter heading ("KNOW YOUR REGION") is
+  // not depictable, so prefer concrete chapter terms, then a depictable chapter
+  // title, then a generic regional landscape — never a raw heading.
+  const chapterSubjects = extractConcreteSubjects(chapter.title);
   if (chapterSubjects.length > 0) {
     return chapterSubjects.join(' and ');
   }
-  return chapterTitle || title;
+  const chapterTitle = cleanDisplayTitle(chapter.title)
+    .replace(/^chapter\s+\d+\s*[—:\-]\s*/i, '')
+    .trim();
+  // Use the cleaned chapter title only if it names something depictable; otherwise
+  // fall back to a general wilderness landscape for the region.
+  if (chapterTitle && extractConcreteSubjects(chapterTitle, 1).length > 0) {
+    return chapterTitle;
+  }
+  return 'the surrounding wilderness landscape';
 }
 
 function imageSubjectFor(

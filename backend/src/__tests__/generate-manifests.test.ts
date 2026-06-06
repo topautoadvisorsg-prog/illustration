@@ -117,4 +117,30 @@ The region is built on ancient granite bedrock. Glacial ice carved the deep vall
     // Still wrapped with the terrain content-type framing.
     expect(bones?.imageSubject).toContain('New England terrain feature:');
   });
+
+  it('falls back to a general landscape (never a raw chapter heading) when page + chapter lack a depictable subject', () => {
+    const outline = parseManuscriptOutline(`# THE WILD LANDS
+
+# FULL CHAPTER OUTLINE
+
+## CHAPTER 1 - KNOW YOUR REGION
+
+Outline-only text.
+
+# CHAPTER 1 - KNOW YOUR REGION
+
+## At a Glance
+
+A short orientation note about using this guide responsibly and safely.`);
+
+    const config = ProjectConfigSchema.parse({ volume: 1, title: 'The Wild Lands', authorName: 'Wildlands' });
+    const result = buildDeterministicManifestResult(outline, config);
+    const entry = result.chapters[0]?.entries[0];
+
+    // The raw chapter heading must never become the subject.
+    expect(entry?.imageSubject.toLowerCase()).not.toContain('chapter 1');
+    expect(entry?.imageSubject.toLowerCase()).not.toContain('know your region');
+    // Falls back to a general, depictable wilderness landscape.
+    expect(entry?.imageSubject.toLowerCase()).toContain('wilderness landscape');
+  });
 });
