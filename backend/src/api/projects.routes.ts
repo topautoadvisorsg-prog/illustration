@@ -475,6 +475,15 @@ const PlanPagesResponseSchema = z.object({
         expertFrame: z.string(),
       }),
       textFitStatus: z.enum(['PENDING_PREVIEW', 'BLOCKED_LAYOUT_LIBRARY']),
+      decisionTrace: z.object({
+        contentTypeSource: z.enum(['from_manifest', 'classified']),
+        contentTypeReason: z.string(),
+        layoutRule: z.string(),
+        layoutExplanation: z.string(),
+        wordCountBand: z.enum(['under_200', 'standard_range', 'over_400']),
+        operatorForced: z.boolean(),
+        alternativesConsidered: z.array(z.object({ template: z.string(), skippedBecause: z.string() })),
+      }),
     }),
   ),
 });
@@ -1142,6 +1151,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           artBrief: decision.artBrief,
           agent: decision.agent,
           textFitStatus: decision.textFitStatus,
+          decisionTrace: decision.decisionTrace,
         });
       }
 

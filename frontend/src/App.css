@@ -2540,6 +2540,46 @@ button.secondary {
   color: #6d6258;
 }
 
+.decision-trace {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #f4ead2;
+  border: 1px solid #ddc89b;
+  border-radius: 5px;
+  font-size: 0.88rem;
+  color: #4d3f1f;
+}
+.decision-trace summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #2f5d50;
+}
+.decision-rule-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #2f5d50;
+  color: #fdf6e6;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.decision-trace .decision-explanation { margin: 8px 0 4px; font-weight: 600; }
+.decision-trace .decision-content-type,
+.decision-trace .decision-band { margin: 4px 0; }
+.decision-trace .decision-alt-title { margin: 6px 0 2px; }
+.decision-trace .decision-alternatives { margin: 2px 0 0 18px; padding: 0; }
+.decision-trace .decision-alternatives li { margin-bottom: 2px; }
+.decision-trace .decision-alternatives code {
+  background: #efe2b8;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 0.78rem;
+}
+
 .advanced-details {
   grid-column: 1 / -1;
   border-top: 1px solid #e8dfd2;

@@ -4259,6 +4259,30 @@ function App() {
                         </button>
                       </div>
                     )}
+                    {plan?.decisionTrace && (
+                      <details className="decision-trace">
+                        <summary>Why this layout? <span className="decision-rule-tag">{plan.decisionTrace.layoutRule}</span></summary>
+                        <p className="decision-explanation">{plan.decisionTrace.layoutExplanation}</p>
+                        <p className="decision-content-type">
+                          <strong>Content type:</strong> {plan.contentType} — <em>{plan.decisionTrace.contentTypeReason}</em>
+                        </p>
+                        <p className="decision-band">
+                          <strong>Word band:</strong> {plan.wordCount} words ({plan.decisionTrace.wordCountBand.replace(/_/g, ' ')}){plan.decisionTrace.operatorForced && " · operator-forced"}
+                        </p>
+                        {plan.decisionTrace.alternativesConsidered?.length > 0 && (
+                          <>
+                            <p className="decision-alt-title"><strong>Alternatives considered:</strong></p>
+                            <ul className="decision-alternatives">
+                              {plan.decisionTrace.alternativesConsidered.slice(0, 5).map((alt) => (
+                                <li key={alt.template}>
+                                  <code>{alt.template}</code> — <span>{alt.skippedBecause}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                      </details>
+                    )}
                     {advancedMode && (
                       <details className="advanced-details">
                         <summary>Prompt + layout internals</summary>

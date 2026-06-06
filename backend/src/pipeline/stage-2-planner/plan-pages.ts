@@ -52,6 +52,31 @@ Negative space is intentional. Do not fill empty areas simply because space is a
 
 Final rule: the educational knowledge belongs primarily in the written article. The illustration supports the lesson; it does not replace it.`;
 
+/**
+ * Decision trace — every page records WHY the system landed on this layout,
+ * which thresholds fired, and what alternatives were considered. Surfaces the
+ * deterministic decision logic so the operator can audit and tune it.
+ */
+export interface PagePlanningDecision_DecisionTrace {
+  /** "from_manifest" = content type came from Stage 1.5; "classified" = inferred here. */
+  contentTypeSource: 'from_manifest' | 'classified';
+  /** Plain-English reason for the content type choice. */
+  contentTypeReason: string;
+  /** Which rule branch in chooseLayout fired (e.g. "danger_override", "content_type_animal_profile_long"). */
+  layoutRule: string;
+  /** Human-readable one-sentence explanation suitable for operator display. */
+  layoutExplanation: string;
+  /** Word-count band the page fell into: under_200 | standard_range | over_400. */
+  wordCountBand: 'under_200' | 'standard_range' | 'over_400';
+  /** True when an operator forced the layout, bypassing chooseLayout. */
+  operatorForced: boolean;
+  /**
+   * Other plausible layouts considered + why each was skipped. Empty when the
+   * decision was unambiguous (e.g. operator-forced or danger-override).
+   */
+  alternativesConsidered: Array<{ template: LayoutTemplateId; skippedBecause: string }>;
+}
+
 export interface PagePlanningDecision {
   pageKey: string;
   entryTitle: string;
@@ -108,6 +133,8 @@ export interface PagePlanningDecision {
     expertFrame: string;
   };
   textFitStatus: 'PENDING_PREVIEW' | 'BLOCKED_LAYOUT_LIBRARY';
+  /** Operator-visible explanation of WHY this layout was chosen. */
+  decisionTrace: PagePlanningDecision_DecisionTrace;
 }
 
 export interface PlanPageOptions {
@@ -168,7 +195,15 @@ export function countPageWords(markdown: string): number {
   return text.split(/\s+/).filter(Boolean).length;
 }
 
-function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConfig): { template: LayoutTemplateId; reasons: string[] } {
+interface ChooseLayoutResult {
+  template: LayoutTemplateId;
+  reasons: string[];
+  rule: string;
+  explanation: string;
+  alternatives: Array<{ template: LayoutTemplateId; skippedBecause: string }>;
+}
+
+function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConfig): ChooseLayoutResult {
   // Layout intent comes from what the page IS (title + image subject), not from
   // incidental vocabulary in the body prose. This prevents a single word like
   // "diagnostic" or a "look-alike warning" subsection from forcing a long entry
@@ -178,118 +213,140 @@ function chooseLayout(page: PageManifest, wordCount: number, config: ProjectConf
 
   if (isDangerPage(page)) {
     reasons.push('danger_or_warning_signal');
-    return { template: 'LAYOUT_4_DANGER_WARNING', reasons };
+    return {
+      template: 'LAYOUT_4_DANGER_WARNING',
+      reasons,
+      rule: 'danger_override',
+      explanation: 'Page identity is danger/toxic — locked to the warning layout, bypassing other signals.',
+      alternatives: [],
+    };
   }
 
   if (page.contentType) {
     reasons.push(`manifest_content_type_${page.contentType.toLowerCase()}`);
-    switch (page.contentType) {
+    const ct = page.contentType;
+    switch (ct) {
       case 'CHAPTER_OPENER':
-        return { template: 'LAYOUT_5_CHAPTER_OPENER', reasons };
+        return { template: 'LAYOUT_5_CHAPTER_OPENER', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Content type CHAPTER_OPENER maps to LAYOUT_5_CHAPTER_OPENER.`, alternatives: [] };
       case 'REFERENCE_PAGE':
-        return { template: 'LAYOUT_6_BACK_MATTER', reasons };
+        return { template: 'LAYOUT_6_BACK_MATTER', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Reference / back-matter content uses LAYOUT_6_BACK_MATTER.`, alternatives: [] };
       case 'ENCYCLOPEDIA_ENTRY':
-        return { template: 'LAYOUT_2_TEXT_HEAVY', reasons };
+        return { template: 'LAYOUT_2_TEXT_HEAVY', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Long encyclopedic entry — text-heavy layout with margin accent.`, alternatives: [] };
       case 'WARNING_PAGE':
-        return { template: 'LAYOUT_4_DANGER_WARNING', reasons };
+        return { template: 'LAYOUT_4_DANGER_WARNING', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Warning content uses the danger layout.`, alternatives: [] };
       case 'COMPARISON':
       case 'MULTI_SPECIES_COMPARISON':
-        return { template: config.layoutPolicy.comparisonTemplate, reasons };
+        return { template: config.layoutPolicy.comparisonTemplate, reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Comparison content uses the project's comparisonTemplate (${config.layoutPolicy.comparisonTemplate}).`, alternatives: [] };
       case 'DIAGNOSTIC_DIAGRAM':
       case 'IDENTIFICATION_GUIDE':
-        return { template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM', reasons };
+        return { template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Diagnostic / ID content uses LAYOUT_12_DIAGNOSTIC_DIAGRAM.`, alternatives: [] };
       case 'HABITAT_OVERVIEW':
-      case 'TERRAIN_ANALYSIS':
-        return { template: wordCount > 140 ? 'LAYOUT_13_FEATURE_BANNER' : 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD', reasons };
+      case 'TERRAIN_ANALYSIS': {
+        const tpl = wordCount > 140 ? 'LAYOUT_13_FEATURE_BANNER' : 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD';
+        const otherTpl = wordCount > 140 ? 'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD' : 'LAYOUT_13_FEATURE_BANNER';
+        return { template: tpl, reasons, rule: `content_type_${ct.toLowerCase()}_wordcount_split_140`, explanation: `Habitat/terrain content with ${wordCount} words — over 140 routes to a feature banner; ≤ 140 routes to a landscape spread.`, alternatives: [{ template: otherTpl as LayoutTemplateId, skippedBecause: wordCount > 140 ? 'over 140 words — banner suits this length better' : '≤ 140 words — landscape spread suits a short overview' }] };
+      }
       case 'PROGRESSION_STUDY':
-        return { template: 'LAYOUT_15_PROGRESSION_STUDY', reasons };
+        return { template: 'LAYOUT_15_PROGRESSION_STUDY', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Progression / lifecycle content uses LAYOUT_15_PROGRESSION_STUDY.`, alternatives: [] };
       case 'CUTAWAY_ILLUSTRATION':
-        return { template: 'LAYOUT_16_CUTAWAY_FEATURE', reasons };
+        return { template: 'LAYOUT_16_CUTAWAY_FEATURE', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Cutaway / cross-section content uses LAYOUT_16_CUTAWAY_FEATURE.`, alternatives: [] };
       case 'FIELD_NOTES_PAGE':
-        return { template: 'LAYOUT_7_SCATTERED_VIGNETTES', reasons };
+        return { template: 'LAYOUT_7_SCATTERED_VIGNETTES', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Field-notes content (tracks/signs/vignettes) uses scattered vignettes.`, alternatives: [] };
       case 'BOTANICAL_PLATE':
-        return { template: 'LAYOUT_10_FULL_PAGE_PLATE', reasons };
+        return { template: 'LAYOUT_10_FULL_PAGE_PLATE', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Botanical plate content uses the full-page plate.`, alternatives: [] };
       case 'SIDEBAR_FEATURE':
-        return { template: 'LAYOUT_14_SIDEBAR_FEATURE', reasons };
+        return { template: 'LAYOUT_14_SIDEBAR_FEATURE', reasons, rule: `content_type_${ct.toLowerCase()}`, explanation: `Sidebar feature content uses LAYOUT_14_SIDEBAR_FEATURE.`, alternatives: [] };
       case 'ANIMAL_PROFILE':
-      case 'SPECIES_PROFILE':
-        if (wordCount > 900) return { template: 'LAYOUT_14_SIDEBAR_FEATURE', reasons: [...reasons, 'long_profile_sidebar_art'] };
-        if (wordCount > 650) return { template: 'LAYOUT_8_MARGIN_ILLUSTRATION', reasons: [...reasons, 'long_profile_margin_art'] };
-        if (wordCount > 420) return { template: 'LAYOUT_2_TEXT_HEAVY', reasons: [...reasons, 'dense_profile_corner_art'] };
-        if (wordCount < 180) return { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', reasons: [...reasons, 'short_profile_hero_art'] };
-        return { template: config.layoutPolicy.defaultTemplate, reasons };
+      case 'SPECIES_PROFILE': {
+        // Profile pages route to different layouts based on word-count thresholds.
+        const alts: Array<{ template: LayoutTemplateId; skippedBecause: string }> = [
+          { template: 'LAYOUT_14_SIDEBAR_FEATURE', skippedBecause: 'needs > 900 words' },
+          { template: 'LAYOUT_8_MARGIN_ILLUSTRATION', skippedBecause: 'needs > 650 words' },
+          { template: 'LAYOUT_2_TEXT_HEAVY', skippedBecause: 'needs > 420 words' },
+          { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', skippedBecause: 'needs < 180 words' },
+          { template: config.layoutPolicy.defaultTemplate, skippedBecause: 'default standard range 180–420 words' },
+        ];
+        if (wordCount > 900) return { template: 'LAYOUT_14_SIDEBAR_FEATURE', reasons: [...reasons, 'long_profile_sidebar_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_over_900`, explanation: `${ct} with ${wordCount} words (> 900) — sidebar feature gives room for long copy with vertical art.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_14_SIDEBAR_FEATURE') };
+        if (wordCount > 650) return { template: 'LAYOUT_8_MARGIN_ILLUSTRATION', reasons: [...reasons, 'long_profile_margin_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_over_650`, explanation: `${ct} with ${wordCount} words (> 650) — margin illustration keeps text room dominant.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_8_MARGIN_ILLUSTRATION') };
+        if (wordCount > 420) return { template: 'LAYOUT_2_TEXT_HEAVY', reasons: [...reasons, 'dense_profile_corner_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_over_420`, explanation: `${ct} with ${wordCount} words (> 420) — text-heavy layout with small corner art.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_2_TEXT_HEAVY') };
+        if (wordCount < 180) return { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', reasons: [...reasons, 'short_profile_hero_art'], rule: `content_type_${ct.toLowerCase()}_wordcount_under_180`, explanation: `${ct} with ${wordCount} words (< 180) — illustration-dominant gives the short copy a hero image.`, alternatives: alts.filter((a) => a.template !== 'LAYOUT_3_ILLUSTRATION_DOMINANT') };
+        return { template: config.layoutPolicy.defaultTemplate, reasons, rule: `content_type_${ct.toLowerCase()}_standard_range`, explanation: `${ct} with ${wordCount} words (180–420) — uses the project default (${config.layoutPolicy.defaultTemplate}).`, alternatives: alts.filter((a) => a.template !== config.layoutPolicy.defaultTemplate) };
+      }
       default:
         break;
     }
   }
 
-  if (includesAny(signal, ['chapter opener', 'chapter introduction', 'section introduction', 'opening page', 'opener'])) {
-    reasons.push('chapter_opener_signal');
-    return { template: 'LAYOUT_5_CHAPTER_OPENER', reasons };
-  }
+  // Signal cascade — matches identity keywords (title + image subject only).
+  // Each branch documents which signal fired so the operator can see WHY this
+  // page took a special-purpose layout instead of the standard one.
+  const signalRules: Array<{
+    needles: string[];
+    template: LayoutTemplateId | ((wc: number) => LayoutTemplateId);
+    rule: string;
+    reasonCode: string;
+    explain: (matched: string) => string;
+  }> = [
+    { needles: ['chapter opener', 'chapter introduction', 'section introduction', 'opening page', 'opener'], template: 'LAYOUT_5_CHAPTER_OPENER', rule: 'signal_chapter_opener', reasonCode: 'chapter_opener_signal', explain: (m) => `Identity contains "${m}" → chapter-opener layout.` },
+    { needles: ['glossary', 'index', 'back matter', 'quick reference', 'reference table', 'reference grid'], template: 'LAYOUT_6_BACK_MATTER', rule: 'signal_reference', reasonCode: 'reference_or_back_matter_signal', explain: (m) => `Identity contains "${m}" → back-matter layout.` },
+    { needles: ['hazard', 'extreme weather', 'lyme', 'tick-borne', 'tick borne', 'hypothermia', 'river crossing', 'spruce trap', 'disorientation'], template: 'LAYOUT_4_DANGER_WARNING', rule: 'signal_hazard', reasonCode: 'hazard_section_signal', explain: (m) => `Identity contains hazard signal "${m}" → warning layout.` },
+    { needles: ['life cycle', 'lifecycle', 'growth stage', 'growth stages', 'stage sequence', 'progression', 'development over time', 'seedling', 'sapling', 'mature stage', 'seasonal sequence'], template: 'LAYOUT_15_PROGRESSION_STUDY', rule: 'signal_progression', reasonCode: 'progression_or_lifecycle_signal', explain: (m) => `Identity contains "${m}" → progression study layout.` },
+    { needles: ['cutaway', 'cut away', 'cross-section', 'cross section', 'layered', 'layers', 'internal structure', 'hidden relationship', 'root layer', 'soil layer', 'strata', 'stratum', 'groundwater zone'], template: 'LAYOUT_16_CUTAWAY_FEATURE', rule: 'signal_cutaway', reasonCode: 'cutaway_or_layer_signal', explain: (m) => `Identity contains "${m}" → cutaway feature layout.` },
+    { needles: ['compare', 'comparison', 'look-alike', 'look alike', 'versus', ' vs ', 'similar species'], template: config.layoutPolicy.comparisonTemplate, rule: 'signal_comparison', reasonCode: 'comparison_or_lookalike_signal', explain: (m) => `Identity contains "${m}" → project comparisonTemplate (${config.layoutPolicy.comparisonTemplate}).` },
+    { needles: ['diagram', 'anatomy', 'diagnostic', 'parts', 'major features', 'identifying features'], template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM', rule: 'signal_diagnostic', reasonCode: 'diagnostic_diagram_signal', explain: (m) => `Identity contains "${m}" → diagnostic-diagram layout.` },
+    { needles: ['overview', 'region overview', 'feature banner', 'visual header', 'mountain range', 'river system', 'watershed', 'landscape context'], template: 'LAYOUT_13_FEATURE_BANNER', rule: 'signal_feature_banner', reasonCode: 'feature_banner_signal', explain: (m) => `Identity contains "${m}" → feature banner layout.` },
+    { needles: ['geography', 'geology', 'climate', 'season', 'seasons', 'wilderness zone', 'wilderness zones', 'terrain', 'ecoregion'], template: 'LAYOUT_13_FEATURE_BANNER', rule: 'signal_terrain', reasonCode: 'terrain_or_region_structure_signal', explain: (m) => `Identity contains "${m}" → terrain feature banner layout.` },
+    { needles: ['track', 'tracks', 'habitat scene', 'signs', 'scat', 'trail'], template: 'LAYOUT_7_SCATTERED_VIGNETTES', rule: 'signal_field_signs', reasonCode: 'track_or_habitat_signal', explain: (m) => `Identity contains "${m}" → scattered vignettes layout.` },
+    { needles: ['tree', 'sapling', 'tall plant', 'vine', 'trunk', 'bark'], template: (wc) => (wc >= 300 ? 'LAYOUT_14_SIDEBAR_FEATURE' : 'LAYOUT_8_MARGIN_ILLUSTRATION'), rule: 'signal_tall_subject', reasonCode: 'tall_subject_signal', explain: (m) => `Identity contains tall-subject signal "${m}" → sidebar (≥300 words) or margin art (< 300).` },
+  ];
 
-  if (includesAny(signal, ['glossary', 'index', 'back matter', 'quick reference', 'reference table', 'reference grid'])) {
-    reasons.push('reference_or_back_matter_signal');
-    return { template: 'LAYOUT_6_BACK_MATTER', reasons };
-  }
-
-  if (includesAny(signal, ['hazard', 'extreme weather', 'lyme', 'tick-borne', 'tick borne', 'hypothermia', 'river crossing', 'spruce trap', 'disorientation'])) {
-    reasons.push('hazard_section_signal');
-    return { template: 'LAYOUT_4_DANGER_WARNING', reasons };
-  }
-
-  if (includesAny(signal, ['life cycle', 'lifecycle', 'growth stage', 'growth stages', 'stage sequence', 'progression', 'development over time', 'seedling', 'sapling', 'mature stage', 'seasonal sequence'])) {
-    reasons.push('progression_or_lifecycle_signal');
-    return { template: 'LAYOUT_15_PROGRESSION_STUDY', reasons };
-  }
-
-  if (includesAny(signal, ['cutaway', 'cut away', 'cross-section', 'cross section', 'layered', 'layers', 'internal structure', 'hidden relationship', 'root layer', 'soil layer', 'strata', 'stratum', 'groundwater zone'])) {
-    reasons.push('cutaway_or_layer_signal');
-    return { template: 'LAYOUT_16_CUTAWAY_FEATURE', reasons };
-  }
-
-  if (includesAny(signal, ['compare', 'comparison', 'look-alike', 'look alike', 'versus', ' vs ', 'similar species'])) {
-    reasons.push('comparison_or_lookalike_signal');
-    return { template: config.layoutPolicy.comparisonTemplate, reasons };
-  }
-
-  if (includesAny(signal, ['diagram', 'anatomy', 'diagnostic', 'parts', 'major features', 'identifying features'])) {
-    reasons.push('diagnostic_diagram_signal');
-    return { template: 'LAYOUT_12_DIAGNOSTIC_DIAGRAM', reasons };
-  }
-
-  if (includesAny(signal, ['overview', 'region overview', 'feature banner', 'visual header', 'mountain range', 'river system', 'watershed', 'landscape context'])) {
-    reasons.push('feature_banner_signal');
-    return { template: 'LAYOUT_13_FEATURE_BANNER', reasons };
-  }
-
-  if (includesAny(signal, ['geography', 'geology', 'climate', 'season', 'seasons', 'wilderness zone', 'wilderness zones', 'terrain', 'ecoregion'])) {
-    reasons.push('terrain_or_region_structure_signal');
-    return { template: 'LAYOUT_13_FEATURE_BANNER', reasons };
-  }
-
-  if (includesAny(signal, ['track', 'tracks', 'habitat scene', 'signs', 'scat', 'trail'])) {
-    reasons.push('track_or_habitat_signal');
-    return { template: 'LAYOUT_7_SCATTERED_VIGNETTES', reasons };
-  }
-
-  if (includesAny(signal, ['tree', 'sapling', 'tall plant', 'vine', 'trunk', 'bark'])) {
-    reasons.push('tall_subject_signal');
-    return { template: wordCount >= 300 ? 'LAYOUT_14_SIDEBAR_FEATURE' : 'LAYOUT_8_MARGIN_ILLUSTRATION', reasons };
+  for (const r of signalRules) {
+    const matched = r.needles.find((needle) => signal.includes(needle));
+    if (!matched) continue;
+    reasons.push(r.reasonCode);
+    const template = typeof r.template === 'function' ? r.template(wordCount) : r.template;
+    return { template, reasons, rule: r.rule, explanation: r.explain(matched), alternatives: [] };
   }
 
   if (wordCount < 200) {
     reasons.push('short_text_under_200_words');
-    return { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', reasons };
+    return {
+      template: 'LAYOUT_3_ILLUSTRATION_DOMINANT',
+      reasons,
+      rule: 'wordcount_under_200',
+      explanation: `No content-type or signal match; ${wordCount} words (< 200) — illustration-dominant default for short entries.`,
+      alternatives: [
+        { template: config.layoutPolicy.defaultTemplate, skippedBecause: 'needs ≥ 200 words for standard layout' },
+        { template: config.layoutPolicy.longTextTemplate, skippedBecause: 'needs > 400 words for long-text layout' },
+      ],
+    };
   }
 
   if (wordCount > 400) {
     reasons.push('long_text_over_400_words');
-    return { template: config.layoutPolicy.longTextTemplate, reasons };
+    return {
+      template: config.layoutPolicy.longTextTemplate,
+      reasons,
+      rule: 'wordcount_over_400',
+      explanation: `No content-type or signal match; ${wordCount} words (> 400) — project's longTextTemplate (${config.layoutPolicy.longTextTemplate}).`,
+      alternatives: [
+        { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', skippedBecause: 'needs < 200 words' },
+        { template: config.layoutPolicy.defaultTemplate, skippedBecause: 'standard range 200–400 words' },
+      ],
+    };
   }
 
   reasons.push('standard_entry_word_range');
-  return { template: config.layoutPolicy.defaultTemplate, reasons };
+  return {
+    template: config.layoutPolicy.defaultTemplate,
+    reasons,
+    rule: 'wordcount_standard_range',
+    explanation: `No content-type or signal match; ${wordCount} words (200–400) — project default (${config.layoutPolicy.defaultTemplate}).`,
+    alternatives: [
+      { template: 'LAYOUT_3_ILLUSTRATION_DOMINANT', skippedBecause: 'needs < 200 words' },
+      { template: config.layoutPolicy.longTextTemplate, skippedBecause: 'needs > 400 words' },
+    ],
+  };
 }
 
 function assetForTemplate(config: ProjectConfig, template: LayoutTemplateId): LayoutPromptAsset | undefined {
@@ -454,16 +511,20 @@ function artBriefText(
 export function planPage(page: PageManifest, config: ProjectConfig, options: PlanPageOptions = {}): PagePlanningDecision {
   const agent = getAgentContract('PAGE_PLANNER');
   const wordCount = countPageWords(page.bodyMarkdown);
-  const selected = options.forcedLayoutTemplate
+  const selected: ChooseLayoutResult = options.forcedLayoutTemplate
     ? {
         template: options.forcedLayoutTemplate,
         reasons: [options.reasonCode ?? 'operator_forced_layout'],
+        rule: 'operator_forced',
+        explanation: `Layout was operator-forced to ${options.forcedLayoutTemplate}${options.reasonCode ? ` (${options.reasonCode})` : ''}.`,
+        alternatives: [],
       }
     : chooseLayout(page, wordCount, config);
   // Layered model: classify the page's purpose (first-class), and decompose the
   // chosen render template into its coverage + architecture axes so the operator
   // sees what actually renders. Rendering still flows through `selected.template`.
-  const contentType = classifyContentType(page).contentType;
+  const classification = classifyContentType(page);
+  const contentType = classification.contentType;
   const contentPolicy = CONTENT_TYPE_POLICY[contentType];
   const composition = decomposeTemplate(selected.template);
   const rawAsset = assetForTemplate(config, selected.template);
@@ -585,5 +646,16 @@ export function planPage(page: PageManifest, config: ProjectConfig, options: Pla
       expertFrame: agent.expertFrame,
     },
     textFitStatus: blockers.length > 0 ? 'BLOCKED_LAYOUT_LIBRARY' : 'PENDING_PREVIEW',
+    decisionTrace: {
+      contentTypeSource: page.contentType ? 'from_manifest' : 'classified',
+      contentTypeReason: page.contentType
+        ? `Content type carried over from Stage 1.5 manifest (${page.contentType}).`
+        : `Inferred from page identity — ${classification.reason}.`,
+      layoutRule: selected.rule,
+      layoutExplanation: selected.explanation,
+      wordCountBand: wordCount < 200 ? 'under_200' : wordCount > 400 ? 'over_400' : 'standard_range',
+      operatorForced: Boolean(options.forcedLayoutTemplate),
+      alternativesConsidered: selected.alternatives,
+    },
   };
 }
