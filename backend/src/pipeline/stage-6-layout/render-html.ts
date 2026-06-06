@@ -206,10 +206,59 @@ function priorityEdgeFor(slot: ArtSlot): PriorityEdge {
     default: return 'center';
   }
 }
-/** Sheet background = full-page artwork under a light unifying veil. The image IS the page. */
-function artworkSheetCss(selector: string, dataUri: string, paper: string): string {
-  const veil = `linear-gradient(${paperRgba(paper, 0.12)}, ${paperRgba(paper, 0.12)})`;
-  return `${selector} { background-image: ${veil}, url("${dataUri}") !important; background-size: cover, cover !important; background-position: center, center !important; background-repeat: no-repeat, no-repeat !important; }`;
+/**
+ * Phase 1 — HARD-LOCK zone enforcement (compositor level, deterministic).
+ *
+ * The image is still painted on the sheet, but we stack edge-aware PARCHMENT mask
+ * gradients ABOVE it so the TEXT-SAFE zone and a feathered TITLE halo resolve to
+ * clean parchment regardless of what the image model painted. Artwork stays visible
+ * only in the IMAGE-PRIORITY zone; the boundary is a soft feather, not a hard box —
+ * so the page still reads as one continuous illustration. The mask is derived purely
+ * from the layout edge + coverage (which match the zone rectangles in
+ * layout-director), so it is identical every render and never relies on the model
+ * obeying a "keep this area calm" instruction.
+ */
+const LOCK_ALPHA = 0.97; // near-opaque parchment over the text-safe zone (text reads clean)
+const FEATHER_PCT = 7; // soft transition width at the artwork↔parchment boundary
+/** Build the text-safe parchment mask gradient for one edge (image on `edge`, text opposite). */
+function textSafeMaskGradient(edge: PriorityEdge, imagePct: number, paper: string): string {
+  const clear = paperRgba(paper, 0);
+  const lock = paperRgba(paper, LOCK_ALPHA);
+  const b = Math.max(0, Math.min(100, imagePct));
+  const lo = (n: number) => Math.max(0, Math.min(100, n));
+  switch (edge) {
+    case 'top': // image top, text lower band
+      return `linear-gradient(to bottom, ${clear} 0%, ${clear} ${lo(b - FEATHER_PCT)}%, ${lock} ${lo(b + FEATHER_PCT)}%, ${lock} 100%)`;
+    case 'bottom': { // image bottom, text upper band
+      const t = 100 - b;
+      return `linear-gradient(to bottom, ${lock} 0%, ${lock} ${lo(t - FEATHER_PCT)}%, ${clear} ${lo(t + FEATHER_PCT)}%, ${clear} 100%)`;
+    }
+    case 'left': // image left, text right column
+      return `linear-gradient(to right, ${clear} 0%, ${clear} ${lo(b - FEATHER_PCT)}%, ${lock} ${lo(b + FEATHER_PCT)}%, ${lock} 100%)`;
+    case 'right': { // image right, text left column
+      const t = 100 - b;
+      return `linear-gradient(to right, ${lock} 0%, ${lock} ${lo(t - FEATHER_PCT)}%, ${clear} ${lo(t + FEATHER_PCT)}%, ${clear} 100%)`;
+    }
+    case 'center': // central subject, calm lower text band
+      return `linear-gradient(to bottom, ${clear} 0%, ${clear} 54%, ${paperRgba(paper, 0.95)} 66%, ${paperRgba(paper, 0.95)} 100%)`;
+    case 'full': // hero plate, only a small calm caption band at the very bottom
+    default:
+      return `linear-gradient(to bottom, ${clear} 0%, ${clear} 76%, ${paperRgba(paper, 0.82)} 88%, ${paperRgba(paper, 0.82)} 100%)`;
+  }
+}
+/**
+ * Sheet background = full-page artwork with the TEXT-SAFE zone and TITLE halo
+ * hard-locked to clean parchment via stacked, feathered parchment masks. Layer order
+ * (first paints on top): title halo → text-safe mask → artwork.
+ */
+function artworkSheetCss(selector: string, dataUri: string, paper: string, slot: ArtSlot, imagePct: number): string {
+  const edge = priorityEdgeFor(slot);
+  const textMask = textSafeMaskGradient(edge, imagePct, paper);
+  // TITLE hard lock: a soft elliptical parchment halo behind the title band (top
+  // ~12%), feathering to transparent — guarantees the heading reads on calm
+  // parchment without a hard card/panel edge.
+  const titleHalo = `radial-gradient(ellipse 72% 15% at 50% 12%, ${paperRgba(paper, 0.92)} 0%, ${paperRgba(paper, 0.92)} 52%, ${paperRgba(paper, 0)} 100%)`;
+  return `${selector} { background-image: ${titleHalo}, ${textMask}, url("${dataUri}") !important; background-size: 100% 100%, 100% 100%, cover !important; background-position: center, center, center !important; background-repeat: no-repeat, no-repeat, no-repeat !important; }`;
 }
 /** Spacer that drops the body panel into the text-safe zone, clearing the image-priority area. */
 function bodyZoneSpacer(slot: ArtSlot, coverage: number, geometry: PageGeometry): string {
@@ -354,7 +403,7 @@ function buildEntryArticle(
 </article>`;
     // Mark the sheet as having artwork so the continuation ornament suppresses.
     const artworkCss = register
-      + artworkSheetCss(sheetSel, page.imageDataUri, c.paper)
+      + artworkSheetCss(sheetSel, page.imageDataUri, c.paper, profile.artSlot, Math.round(profile.artAreaFraction * 100))
       + `\n  ${sheetSel} { /* artwork present */ }\n  ${sheetSel}::before, ${sheetSel}::after { content: none !important; }\n  ${panelCss}`;
     return { article, css: artworkCss };
   }

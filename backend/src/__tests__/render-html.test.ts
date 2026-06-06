@@ -70,6 +70,33 @@ describe('buildPageHtml', () => {
     expect(html).not.toContain('IMAGE ZONE'); // exclusion marker is planning-only
   });
 
+  it('hard-locks the text-safe and title zones with a feathered parchment mask over the artwork (Phase 1)', () => {
+    const html = buildPageHtml(page({ layoutTemplate: 'LAYOUT_13_FEATURE_BANNER' }), config, {
+      geometry,
+      imageDataUri: 'data:image/png;base64,AAAA',
+    });
+    // Title hard lock: soft radial parchment halo behind the heading band.
+    expect(html).toContain('radial-gradient(ellipse');
+    // Text-safe hard lock: near-opaque parchment over the lower band (TOP_BAND → vertical feather).
+    expect(html).toContain('linear-gradient(to bottom');
+    expect(html).toContain('rgba(245, 237, 214, 0.97)');
+    // Masks must composite ABOVE the artwork — gradients listed before the image url.
+    const bg = /background-image:\s*([^;]*url\("data:image\/png;base64,AAAA"\))/.exec(html)?.[1] ?? '';
+    expect(bg).toContain('radial-gradient');
+    expect(bg.indexOf('radial-gradient')).toBeLessThan(bg.indexOf('url('));
+    expect(bg.indexOf('linear-gradient')).toBeLessThan(bg.indexOf('url('));
+  });
+
+  it('locks the text-safe column with a horizontal feather on side-column layouts', () => {
+    // FLOAT_RIGHT (illustration-dominant) → artwork right, text-safe left column → horizontal mask.
+    const html = buildPageHtml(page({ layoutTemplate: 'LAYOUT_3_ILLUSTRATION_DOMINANT' }), config, {
+      geometry,
+      imageDataUri: 'data:image/png;base64,AAAA',
+    });
+    expect(html).toContain('linear-gradient(to right');
+    expect(html).toContain('rgba(245, 237, 214, 0.97)');
+  });
+
   it('omits the Paged.js script unless a polyfill is provided (browser-free HTML)', () => {
     expect(buildPageHtml(page(), config, { geometry })).not.toContain('<script>');
     expect(buildPageHtml(page(), config, { geometry, polyfillJs: 'console.log(1)' })).toContain('<script>console.log(1)</script>');
