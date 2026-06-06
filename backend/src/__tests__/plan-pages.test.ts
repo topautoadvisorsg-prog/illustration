@@ -202,6 +202,7 @@ describe('planPage', () => {
       '- Maintain strong separation between image and content areas.',
       '- Rightmost 25% contains one tall vertical illustration with small annotations extending into the left text area.',
       '- Preserve the left text area as the dominant readable zone.',
+      'Preserve future text areas above all else; do not let art consume the reading areas.',
       '- Lower 40-50% remains available for educational text.',
       '',
       'PAGE COMPOSITION BRIEF',
@@ -221,8 +222,9 @@ describe('planPage', () => {
     expect(cleaned).not.toMatch(/Lower 60-65% remains/i);
     expect(cleaned).not.toMatch(/Rightmost 25% contains/i);
     expect(cleaned).not.toMatch(/spans the upper portion/i);
-    expect(cleaned).not.toMatch(/\btext area\b/i);
-    expect(cleaned).not.toMatch(/\bcontent area\b/i);
+    expect(cleaned).not.toMatch(/\btext areas?\b/i);
+    expect(cleaned).not.toMatch(/\bcontent areas?\b/i);
+    expect(cleaned).not.toMatch(/\breading areas?\b/i);
     expect(cleaned).not.toMatch(/portion of the page/i);
     // Zone language survives untouched (hyphenated zones, bands, % of the page).
     expect(cleaned).toContain('The image IS the entire page');

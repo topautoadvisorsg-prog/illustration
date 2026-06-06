@@ -492,9 +492,12 @@ const BOX_MODEL_LINE_PATTERNS: RegExp[] = [
   /(upper|lower|left|right|top|bottom) portion of the page/i,
   // Percentage-band "<region> N% contains/remains the illustration/text" lines.
   /\b(upper|lower|left|right|top|bottom|rightmost|leftmost|topmost|bottommost)\s+[\w-]*\s*\d{1,3}(\s*-\s*\d{1,3})?%\s+(contains|remains|is reserved|holds|reserved)/i,
-  // The retired "text area" / "content area" compartment noun (NOT "text-safe zone").
-  /\btext area\b/i,
-  /\bcontent area\b/i,
+  // The retired "text area(s)" / "content area(s)" compartment noun (NOT
+  // "text-safe zone"). Must match the PLURAL too — \b after "area" fails on
+  // "areas", so an explicit optional s is required.
+  /\btext areas?\b/i,
+  /\bcontent areas?\b/i,
+  /\breading areas?\b/i,
   /annotations? (extend|extending) (from|into)/i,
 ];
 
