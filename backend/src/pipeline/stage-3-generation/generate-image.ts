@@ -161,7 +161,7 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
     generatedPath: stored.relativePath,
     widthPx: image.widthPx,
     heightPx: image.heightPx,
-    status: 'GENERATED',
+    status: 'REVIEW',
     // The newest generation becomes the active version, so the preview and render
     // always show the latest image (insertImage clears the previous active one).
     active: true,
