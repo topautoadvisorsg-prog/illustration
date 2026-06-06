@@ -81,5 +81,40 @@ Water hemlock is a deadly plant that resembles edible wetland species.`);
     expect(ramps?.scientificName).toBe('Allium tricoccum');
     expect(hemlock?.contentType).toBe('WARNING_PAGE');
     expect(hemlock?.layoutTemplate).toBe('LAYOUT_4_DANGER_WARNING');
+
+    // Subject derivation: a literary section title ("THE THREE WILDERNESS ZONES")
+    // must NOT become the image subject — page context drives it instead.
+    expect(zones?.imageSubject.toLowerCase()).not.toContain('three wilderness zones');
+    expect(zones?.imageSubject.toLowerCase()).toMatch(/forest|alpine|hardwood|boreal/);
+    // A species page keeps its concrete title + scientific name as the subject.
+    expect(moose?.imageSubject).toContain('Alces alces');
+  });
+
+  it('derives a concrete VISUAL subject from page context for a literary/thematic title', () => {
+    const outline = parseManuscriptOutline(`# THE WILD LANDS
+
+# FULL CHAPTER OUTLINE
+
+## CHAPTER 1 - KNOW YOUR REGION
+
+Outline-only text.
+
+# CHAPTER 1 - KNOW YOUR REGION
+
+## THE BONES OF THE LAND - Geography & Geology
+
+The region is built on ancient granite bedrock. Glacial ice carved the deep valleys and left scattered boulders across the mountain ranges. Exposed ridgelines and rocky outcrops reveal the layered strata beneath the forest.`);
+
+    const config = ProjectConfigSchema.parse({ volume: 1, title: 'The Wild Lands', authorName: 'Wildlands' });
+    const result = buildDeterministicManifestResult(outline, config);
+    const bones = result.chapters[0]?.entries[0];
+
+    expect(bones?.contentType).toBe('TERRAIN_ANALYSIS');
+    // The literary title must NOT survive into the image subject.
+    expect(bones?.imageSubject.toLowerCase()).not.toContain('bones of the land');
+    // Page context yields depictable terrain subjects (granite/glacial/mountain).
+    expect(bones?.imageSubject.toLowerCase()).toMatch(/granite|glacial|mountain|ridge|bedrock|outcrop/);
+    // Still wrapped with the terrain content-type framing.
+    expect(bones?.imageSubject).toContain('New England terrain feature:');
   });
 });

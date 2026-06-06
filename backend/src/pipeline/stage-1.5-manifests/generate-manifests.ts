@@ -180,13 +180,138 @@ function chooseManifestTemplate(contentType: ContentType, wordCount: number): La
   }
 }
 
-function imageSubjectFor(
+/**
+ * Depictable wilderness subjects for deterministic extraction. Each entry maps a
+ * body/title keyword to a concrete VISUAL noun phrase the image model can draw.
+ * Ordered by salience so ties resolve to the more iconic subject. Domain-tuned to
+ * the New England field guide. No LLM — the manuscript analyst stays deterministic.
+ */
+const VISUAL_SUBJECT_TERMS: Array<{ term: RegExp; label: string }> = [
+  // Geology / terrain
+  { term: /\bgranite\b/i, label: 'granite bedrock' },
+  { term: /\bglaci(?:al|er|ers|ated|ation)\b/i, label: 'glacial valley' },
+  { term: /\b(?:mountain|peak|summit|range|massif)\b/i, label: 'mountain range' },
+  { term: /\b(?:ridge|ridgeline|arête|aret e)\b/i, label: 'rocky ridgeline' },
+  { term: /\b(?:cliff|ledge|escarpment|outcrop|crag)\b/i, label: 'rock outcrop' },
+  { term: /\b(?:notch|ravine|gorge|gulf)\b/i, label: 'mountain notch' },
+  { term: /\b(?:bedrock|strata|sediment|metamorphic|schist|gneiss)\b/i, label: 'layered bedrock strata' },
+  { term: /\b(?:talus|scree|boulder|erratic)\b/i, label: 'boulder field' },
+  // Water
+  { term: /\b(?:river|stream|brook|creek)\b/i, label: 'flowing river' },
+  { term: /\b(?:lake|pond|tarn|reservoir)\b/i, label: 'mountain lake' },
+  { term: /\b(?:wetland|bog|marsh|swamp|fen|mire)\b/i, label: 'wetland marsh' },
+  { term: /\b(?:waterfall|cascade|falls)\b/i, label: 'waterfall' },
+  // Habitat / flora
+  { term: /\b(?:boreal|spruce|balsam fir|conifer|coniferous)\b/i, label: 'boreal spruce-fir forest' },
+  { term: /\bwhite pine\b/i, label: 'white pine forest' },
+  { term: /\b(?:hardwood|sugar maple|beech|yellow birch|\boak\b)\b/i, label: 'northern hardwood forest' },
+  { term: /\b(?:alpine|tundra|krummholz)\b/i, label: 'alpine tundra' },
+  { term: /\b(?:meadow|clearing|grassland|field)\b/i, label: 'open meadow' },
+  { term: /\b(?:fern|moss|lichen|understory)\b/i, label: 'forest understory' },
+  // Sky / weather / season
+  { term: /\b(?:blizzard|snowpack|snowfall|snow-covered|winter storm)\b/i, label: 'winter snowscape' },
+  { term: /\b(?:fog|mist|cloud cover|low cloud)\b/i, label: 'mist over the landscape' },
+];
+
+/** Season / behavior cues that enrich a species subject ("Black Bear" -> "...denning in winter"). */
+const SUBJECT_CONTEXT_CUES: Array<{ term: RegExp; cue: string }> = [
+  { term: /\b(?:hibernat|den\b|denning|winter den)\b/i, cue: 'denning in winter' },
+  { term: /\b(?:forag|feeding|browsing|grazing)\b/i, cue: 'foraging' },
+  { term: /\b(?:swim|wading|aquatic)\b/i, cue: 'near water' },
+  { term: /\b(?:nest|nesting|rookery)\b/i, cue: 'at the nest' },
+  { term: /\b(?:migrat|migration)\b/i, cue: 'on the move' },
+  { term: /\b(?:track|scat|sign)\b/i, cue: 'with tracks and field sign' },
+];
+
+/** Content types whose title is already a concrete, depictable subject (a species/plant). */
+const TITLE_IS_SUBJECT_TYPES = new Set<ContentType>([
+  'ANIMAL_PROFILE',
+  'SPECIES_PROFILE',
+  'BOTANICAL_PLATE',
+  'IDENTIFICATION_GUIDE',
+  'DIAGNOSTIC_DIAGRAM',
+]);
+
+/**
+ * Extract the most salient concrete visual subjects from text. Returns up to two
+ * distinct depictable noun phrases, ranked by match frequency then salience order.
+ */
+function extractConcreteSubjects(text: string, max = 2): string[] {
+  const haystack = stripMarkdown(text).toLowerCase();
+  const scored = VISUAL_SUBJECT_TERMS
+    .map((entry, order) => {
+      const matches = haystack.match(new RegExp(entry.term, 'gi'));
+      return { label: entry.label, count: matches ? matches.length : 0, order };
+    })
+    .filter((row) => row.count > 0)
+    .sort((a, b) => (b.count - a.count) || (a.order - b.order));
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  for (const row of scored) {
+    if (seen.has(row.label)) continue;
+    seen.add(row.label);
+    labels.push(row.label);
+    if (labels.length >= max) break;
+  }
+  return labels;
+}
+
+function firstContextCue(text: string): string | undefined {
+  const haystack = stripMarkdown(text).toLowerCase();
+  return SUBJECT_CONTEXT_CUES.find((c) => c.term.test(haystack))?.cue;
+}
+
+/**
+ * Derive the visual subject for image generation. Rule (operator-specified):
+ *   1. PAGE CONTEXT first — the concrete subject the page's own body describes.
+ *   2. CHAPTER fallback — if the page body yields nothing depictable, use the
+ *      chapter's subject (its title's concrete terms, else the chapter title).
+ * A concrete title (a named species/plant, or one carrying a scientific name) is
+ * trusted as the subject directly; only literary/thematic titles fall through to
+ * body/chapter derivation — which is exactly the "THE BONES OF THE LAND" case.
+ */
+function deriveVisualSubject(
+  chapter: ManuscriptChapterOutline,
   entry: ManuscriptEntryOutline,
   contentType: ContentType,
   scientificName?: string,
 ): string {
   const title = cleanDisplayTitle(entry.title);
-  const subject = scientificName ? `${title} (${scientificName})` : title;
+
+  // A scientific name or a species/plant content type means the title IS the subject.
+  if (scientificName) {
+    return `${title} (${scientificName})`;
+  }
+  if (TITLE_IS_SUBJECT_TYPES.has(contentType)) {
+    const cue = firstContextCue(entry.bodyMarkdown);
+    return cue ? `${title}, ${cue}` : title;
+  }
+  // The title also already carries a concrete term (e.g. "White Pine Stands").
+  const titleSubjects = extractConcreteSubjects(title, 1);
+  if (titleSubjects.length > 0) {
+    return title;
+  }
+  // 1. PAGE CONTEXT — derive from what the page body actually describes.
+  const bodySubjects = extractConcreteSubjects(entry.bodyMarkdown);
+  if (bodySubjects.length > 0) {
+    return bodySubjects.join(' and ');
+  }
+  // 2. CHAPTER FALLBACK — something general about the chapter.
+  const chapterTitle = cleanDisplayTitle(chapter.title);
+  const chapterSubjects = extractConcreteSubjects(`${chapter.title}`);
+  if (chapterSubjects.length > 0) {
+    return chapterSubjects.join(' and ');
+  }
+  return chapterTitle || title;
+}
+
+function imageSubjectFor(
+  chapter: ManuscriptChapterOutline,
+  entry: ManuscriptEntryOutline,
+  contentType: ContentType,
+  scientificName?: string,
+): string {
+  const subject = deriveVisualSubject(chapter, entry, contentType, scientificName);
 
   switch (contentType) {
     case 'WARNING_PAGE':
@@ -217,7 +342,7 @@ function buildEntryManifest(chapter: ManuscriptChapterOutline, entry: Manuscript
     scientificName,
     category,
     contentType,
-    imageSubject: imageSubjectFor(entry, contentType, scientificName),
+    imageSubject: imageSubjectFor(chapter, entry, contentType, scientificName),
     layoutTemplate: chooseManifestTemplate(contentType, entry.wordCount),
     bodyMarkdown: entry.bodyMarkdown,
   };
