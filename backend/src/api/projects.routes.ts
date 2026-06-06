@@ -667,6 +667,7 @@ const PublishingDirectorDecisionLedgerResponseSchema = z.object({
     underfilledRisks: z.number(),
     tightTextRisks: z.number(),
     repeatedLayoutRisks: z.number(),
+    actionableProposals: z.number(),
   }),
   pages: z.array(
     z.object({
@@ -705,6 +706,19 @@ const PublishingDirectorDecisionLedgerResponseSchema = z.object({
       recommendedFix: z.string(),
       fixMode: z.enum(['AUTOMATIC', 'MANUAL', 'DECISION_ONLY', 'NONE']),
       automaticFixAvailable: z.boolean(),
+      alternativesConsidered: z.array(
+        z.object({ template: z.string(), skippedBecause: z.string() }),
+      ),
+      proposedActions: z.array(
+        z.object({
+          kind: z.enum(['switch_layout', 'apply_repeating_accent', 'mark_intentional']),
+          pageKey: z.string().optional(),
+          from: z.string().optional(),
+          to: z.string().optional(),
+          layoutTemplate: z.string().optional(),
+          rationale: z.string(),
+        }),
+      ),
       operatorDecision: z.enum(['READY', 'NEEDS_DECISION', 'RESOLVED']),
     }),
   ),
