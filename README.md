@@ -18,6 +18,7 @@ Live frontend: `https://frontend-production-f65d.up.railway.app`
 | Doc | What it covers |
 |---|---|
 | `docs/RENDER_MODEL.md` | How pages render — **full-page artwork + text-safe zones** (the model that matters most) |
+| `docs/HANDOFF_CODY.md` | Current checkpoint: Phase 1/2 complete, prompt/renderer migration paused for operator visual approval |
 | `docs/AGENT_LAYER.md` | What actually runs in the agent/LLM layer + the **metadata-not-pixels** rule |
 | `docs/PUBLISHING_DIRECTION.md` | Illustration density / page-design guidance (three layers, controlled variety) |
 | `docs/runbook.md` | Operations — including the **production durable-storage requirement** + `/health` check |

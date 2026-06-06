@@ -7,6 +7,7 @@ actually works today.**
 | File | Purpose |
 |---|---|
 | `RENDER_MODEL.md` | **How pages render** — full-page artwork + text-safe zones (current, authoritative) |
+| `HANDOFF_CODY.md` | Current handoff/checkpoint for Claudio/Cody before continuing layout-zone migration |
 | `architecture.md` | System diagram, data flow, component map |
 | `pipeline-spec.md` | Distilled pipeline contract — single source of truth for behavior |
 | `runbook.md` | What to do when X breaks + the production durable-storage requirement |
