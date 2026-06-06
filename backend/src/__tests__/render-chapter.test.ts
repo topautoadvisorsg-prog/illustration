@@ -47,7 +47,10 @@ describe('buildChapterHtml', () => {
     expect(withArt).toContain('class="text-panel"');
     expect(withArt).not.toContain('<img');
     const placeholder = buildChapterHtml([pages[0]!], config, { chapterNumber: 1, chapterTitle: 'Fungi' }, { geometry });
-    expect(placeholder).toContain('IMAGE ZONE');
+    // Planning preview now uses the three-zone overlay (image-priority / typography / text-safe).
+    expect(placeholder).toContain('class="planning-zones"');
+    expect(placeholder).toContain('Image-Priority Zone');
+    expect(placeholder).toContain('Text-Safe Zone');
   });
 });
 

@@ -44,11 +44,17 @@ describe('buildPageHtml', () => {
     expect(html).toContain('background: #F5EDD6;');
   });
 
-  it('marks the IMAGE ZONE as text-exclusion when no image is supplied (planning)', () => {
+  it('shows the three-zone planning overlay (image-priority / typography / text-safe) when no image is supplied', () => {
     const html = buildPageHtml(page(), config, { geometry });
-    expect(html).toContain('art-exclusion');
-    expect(html).toContain('IMAGE ZONE');
+    expect(html).toContain('class="planning-zones"');
+    expect(html).toContain('Image-Priority Zone');
+    expect(html).toContain('Typography Zone');
+    expect(html).toContain('Text-Safe Zone');
+    expect(html).toContain('The page IS artwork');
     expect(html).not.toContain('<img');
+    // Outlines only — the legacy filled rectangle is gone.
+    expect(html).not.toContain('art-exclusion');
+    expect(html).not.toContain('PREVIEW - ');
   });
 
   it('makes the image the full page (sheet artwork) with a readable title + body panel', () => {

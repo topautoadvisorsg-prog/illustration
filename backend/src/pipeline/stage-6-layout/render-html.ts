@@ -233,14 +233,20 @@ function artSlotSizeStyle(
   }
 }
 
-function artPlaceholderLabel(template: LayoutTemplateId): string {
+/** Short human label for the layout's image-priority position (planning preview only). */
+function layoutPriorityLabel(template: LayoutTemplateId): string {
   const profile = getLayoutProfile(template);
-  if (profile.artAreaFraction <= 0.15) return 'PREVIEW - CORNER / EDGE ART SLOT';
-  if (profile.artSlot === 'TOP_BAND') return 'PREVIEW - TOP ILLUSTRATION BAND';
-  if (profile.artSlot === 'SIDEBAR_RIGHT') return 'PREVIEW - SIDE ILLUSTRATION SLOT';
-  if (profile.artSlot === 'SCATTERED') return 'PREVIEW - STUDY / VIGNETTE SLOTS';
-  if (profile.artSlot === 'FULL_PAGE') return 'PREVIEW - FULL PLATE ART SLOT';
-  return 'PREVIEW - ART SLOT';
+  switch (profile.artSlot) {
+    case 'TOP_BAND': return 'top of page';
+    case 'BOTTOM_BAND': return 'bottom of page';
+    case 'FLOAT_LEFT': return 'left side';
+    case 'FLOAT_RIGHT':
+    case 'SIDEBAR_RIGHT': return 'right side';
+    case 'SCATTERED': return 'scattered studies across the page';
+    case 'CENTER_WRAP': return 'center of page';
+    case 'FULL_PAGE':
+    default: return 'across the whole page';
+  }
 }
 
 // ─── Full-page artwork model ───────────────────────────────────────────────
@@ -306,7 +312,41 @@ function fullPageArtworkCss(t: Typography, c: Palette): string {
      the image. No border, no radius, no box — it must feel integrated, not glued on. */
   .text-panel { position: relative; z-index: 2; padding: 0 2pt; background: linear-gradient(to bottom, ${paperRgba(c.paper, 0)} 0%, ${paperRgba(c.paper, 0.4)} 16%, ${paperRgba(c.paper, 0.46)} 100%); }
   .text-panel p, .text-panel li, .text-panel h3, .text-panel strong, .text-panel .section-header, .text-panel .section-body { text-shadow: 0 0 3px ${c.paper}, 0 0 5px ${c.paper}; }
-  .art-exclusion { box-sizing: border-box; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8pt; page-break-inside: avoid; border: 1px dashed ${c.accent}; color: ${c.accent}; font-family: var(--font-display); font-style: italic; font-size: ${t.captionPt}pt; background: rgba(232, 217, 176, 0.5); margin-bottom: 12pt; }`;
+  /* Planning preview (no image yet): three-zone overlay teaches "the page IS artwork".
+     Outlines only — never a filled box. Labels float at the edges; the page stays paper-clean. */
+  .planning-zones { position: relative; box-sizing: border-box; width: 100%; page-break-inside: avoid; margin-bottom: 14pt; }
+  .planning-zones .pz-zone { box-sizing: border-box; width: 100%; border: 1.5px dashed ${c.accent}; padding: 10pt 12pt; margin-bottom: 8pt; color: ${c.accent}; font-family: var(--font-display); font-size: ${t.captionPt}pt; line-height: 1.35; background: transparent; }
+  .planning-zones .pz-zone strong { font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-style: normal; display: block; margin-bottom: 2pt; }
+  .planning-zones .pz-zone em { font-style: italic; opacity: 0.85; }
+  .planning-zones .pz-caption { margin-top: 6pt; text-align: center; font-family: var(--font-display); font-style: italic; font-size: ${t.captionPt}pt; color: ${c.accent}; opacity: 0.8; }`;
+}
+
+/**
+ * Three-zone planning overlay — replaces the legacy single beige rectangle.
+ * Communicates the full-page-artwork model to the operator: the page IS artwork;
+ * these zones only mark where each kind of content is allowed. Outlined only,
+ * never filled — the page must read as paper, not as a box.
+ */
+function planningZonesHtml(template: LayoutTemplateId): string {
+  const profile = getLayoutProfile(template);
+  const priority = layoutPriorityLabel(template);
+  const imagePct = Math.round(profile.artAreaFraction * 100);
+  const textPct = Math.max(0, 100 - imagePct);
+  return `<div class="planning-zones">
+    <div class="pz-zone">
+      <strong>Image-Priority Zone — ${escapeHtml(priority)} (~${imagePct}%)</strong>
+      <em>Where the strongest visual content lives in the artwork (mountains, wildlife, terrain, focal subject).</em>
+    </div>
+    <div class="pz-zone">
+      <strong>Typography Zone</strong>
+      <em>The title sits directly on the artwork. Composition keeps it readable.</em>
+    </div>
+    <div class="pz-zone">
+      <strong>Text-Safe Zone (~${textPct}%)</strong>
+      <em>The calm region the image generator reserves for body text. Text sits on the artwork — not in a paper card.</em>
+    </div>
+    <p class="pz-caption">Planning preview · The page IS artwork. These zones only mark where content is allowed.</p>
+  </div>`;
 }
 
 interface EntryArtInput {
@@ -351,12 +391,13 @@ function buildEntryArticle(
     return { article, css: register + artworkSheetCss(sheetSel, page.imageDataUri, c.paper) };
   }
 
-  // Planning placeholder: mark the IMAGE zone (text-exclusion) so the operator
-  // reviews text flow before any image is generated. Body sits on its panel.
-  const exclusion = `<div class="art-exclusion" style="${bodyZoneSpacer(profile.artSlot, profile.artAreaFraction, geometry)}">${escapeHtml(artPlaceholderLabel(page.layoutTemplate))} · IMAGE ZONE (planning)<br>${escapeHtml(page.layoutTemplate)}</div>`;
+  // Planning preview: three-zone overlay teaches the full-page-artwork model
+  // (image-priority / typography / text-safe). The page background stays paper —
+  // no filled rectangle implies "the image goes in a box".
+  const zones = planningZonesHtml(page.layoutTemplate);
   const article = `<article class="book-page arch-${profile.artSlot}${danger}"${idAttr}>
   ${title}
-  ${exclusion}
+  ${zones}
   <div class="text-panel" style="${panelStyle}">${scientific}${bodyToHtml(page.bodyMarkdown)}</div>
 </article>`;
   return { article, css: '' };
@@ -529,21 +570,15 @@ function slugifyId(s: string, fallback: string): string {
   return base || fallback;
 }
 
-/** One entry article (chapter body page). Mirrors buildChapterHtml's per-entry markup. */
-function entryArticleHtml(page: ChapterPageRender, geometry: PageGeometry, anchorId?: string): string {
-  const profile = getLayoutProfile(page.layoutTemplate);
-  const danger = page.layoutTemplate === 'LAYOUT_4_DANGER_WARNING' ? ' is-danger' : '';
-  const art = page.imageDataUri
-    ? `<img src="${page.imageDataUri}" alt="${escapeHtml(page.entryTitle)}">`
-    : `<div class="art-placeholder">${escapeHtml(artPlaceholderLabel(page.layoutTemplate))}<br>${escapeHtml(page.layoutTemplate)}</div>`;
-  const scientific = page.scientificName ? `<p class="scientific-name">${escapeHtml(page.scientificName)}</p>` : '';
-  const idAttr = anchorId ? ` id="${anchorId}"` : '';
-  return `<article class="book-page arch-${profile.artSlot}${danger}"${idAttr}>
-  <h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>
-  ${scientific}
-  <figure class="art-slot" style="${artSlotSizeStyle(profile.artSlot, profile.artAreaFraction, geometry, Boolean(page.imageDataUri))}">${art}</figure>
-  ${bodyToHtml(page.bodyMarkdown)}
-</article>`;
+/** Book-stitch wrapper: one entry as full-page artwork via the shared builder. */
+function bookEntryArticle(
+  page: ChapterPageRender,
+  geometry: PageGeometry,
+  c: Palette,
+  pageName: string,
+  anchorId?: string,
+): { article: string; css: string } {
+  return buildEntryArticle(page, geometry, c, pageName, true, anchorId);
 }
 
 /**
@@ -563,15 +598,12 @@ export function buildBookHtml(input: BookAssemblyInput, config: ProjectConfig, o
   const subtitle = config.subtitle ? escapeHtml(config.subtitle) : '';
   const author = escapeHtml(config.authorName);
 
-  const archCss = (Object.values(LAYOUT_PROFILES).map((p) => p.artSlot) as ArtSlot[])
-    .filter((slot, i, arr) => arr.indexOf(slot) === i)
-    .map(scopedArtSlotCss)
-    .join('\n  ');
-
   // Tag each chapter's first entry (#chap-N) and every entry (#entry-K) so the
-  // TOC and index can reference real page numbers via target-counter.
+  // TOC and index can reference real page numbers via target-counter. Each entry
+  // also yields its own @page artwork CSS (collected for the book <style> block).
   let entryCounter = 0;
   const indexItems: { title: string; id: string }[] = [];
+  const entryCssChunks: string[] = [];
   const chaptersHtml = input.chapters
     .map((chapter) =>
       chapter.pages
@@ -580,11 +612,15 @@ export function buildBookHtml(input: BookAssemblyInput, config: ProjectConfig, o
           const entryId = `entry-${entryCounter}`;
           const anchorId = pageIdx === 0 ? `chap-${chapter.chapterNumber}` : entryId;
           indexItems.push({ title: page.entryTitle, id: anchorId });
-          return entryArticleHtml(page, geometry, anchorId);
+          const pageName = `bookC${chapter.chapterNumber}E${pageIdx}`;
+          const built = bookEntryArticle(page, geometry, c, pageName, anchorId);
+          if (built.css) entryCssChunks.push(built.css);
+          return built.article;
         })
         .join('\n'),
     )
     .join('\n');
+  const bookEntryCss = entryCssChunks.join('\n  ');
 
   const tocRows = input.chapters
     .map(
@@ -626,12 +662,11 @@ ${fontLinkTags(t)}
     ${pageBoxesCss(t, c, bookTitle)}
   }
   @page :first { @top-left { content: ""; } @bottom-center { content: ""; } }
+  ${bookEntryCss}
   ${typographyStyleBlock(t, c)}
-  ${archCss}
+  ${fullPageArtworkCss(t, c)}
   .book-page, .fm-page, .bm-page { page-break-after: always; }
-  .art-slot { page-break-inside: avoid; }
   .is-danger .entry-title { color: ${c.warning}; }
-  .is-danger { border-left: 4pt solid ${c.warning}; padding-left: 10pt; }
   .title-page { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 8in; page-break-after: always; }
   .title-page .book-title { font-family: var(--font-display); font-weight: 600; font-size: ${t.bookTitlePt}pt; line-height: 1.05; margin: 0; color: ${c.ink}; }
   .title-page .subtitle { font-family: var(--font-display); font-style: italic; font-size: ${t.chapterTitlePt}pt; color: ${c.accent}; margin: 14pt 0 0; }
