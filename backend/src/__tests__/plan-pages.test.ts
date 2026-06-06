@@ -200,25 +200,34 @@ describe('planPage', () => {
       '- Upper 35-40% contains the feature illustration.',
       '- Lower 60-65% remains largely clear for text placement.',
       '- Maintain strong separation between image and content areas.',
+      '- Rightmost 25% contains one tall vertical illustration with small annotations extending into the left text area.',
+      '- Preserve the left text area as the dominant readable zone.',
+      '- Lower 40-50% remains available for educational text.',
       '',
       'PAGE COMPOSITION BRIEF',
       'The image IS the entire page (full-bleed artwork — no boxes, no frames, no cards).',
-      '• IMAGE-PRIORITY ZONE — upper band (~40% of the page)',
-      '• TEXT-SAFE ZONE — lower band (~60% of the page)',
-      '• TYPOGRAPHY ZONE — just above the text-safe zone',
+      '• IMAGE-PRIORITY ZONE — left-side image-priority zone within the full-page artwork (~40% of the page)',
+      '• TEXT-SAFE ZONE — body text uses the calm right-side text-safe zone (~60% of the page)',
+      '• TYPOGRAPHY ZONE — just above the text-safe zone (upper-center)',
     ].join('\n');
 
     const cleaned = stripLegacyBoxModelLanguage(legacy);
 
-    // Box-model assertions are gone.
+    // Every box-model / compartment phrase observed live is gone.
     expect(cleaned).not.toMatch(/strong separation between image and content/i);
     expect(cleaned).not.toMatch(/remains largely clear/i);
+    expect(cleaned).not.toMatch(/remains available/i);
     expect(cleaned).not.toMatch(/Upper 35-40% contains/i);
     expect(cleaned).not.toMatch(/Lower 60-65% remains/i);
-    // Zone language survives untouched.
+    expect(cleaned).not.toMatch(/Rightmost 25% contains/i);
+    expect(cleaned).not.toMatch(/spans the upper portion/i);
+    expect(cleaned).not.toMatch(/\btext area\b/i);
+    expect(cleaned).not.toMatch(/\bcontent area\b/i);
+    expect(cleaned).not.toMatch(/portion of the page/i);
+    // Zone language survives untouched (hyphenated zones, bands, % of the page).
     expect(cleaned).toContain('The image IS the entire page');
-    expect(cleaned).toContain('IMAGE-PRIORITY ZONE — upper band (~40% of the page)');
-    expect(cleaned).toContain('TEXT-SAFE ZONE — lower band (~60% of the page)');
+    expect(cleaned).toContain('IMAGE-PRIORITY ZONE — left-side image-priority zone within the full-page artwork (~40% of the page)');
+    expect(cleaned).toContain('right-side text-safe zone (~60% of the page)');
     expect(cleaned).toContain('TYPOGRAPHY ZONE');
     expect(cleaned).toContain('{MASTER_STYLE_DNA}');
     // Idempotent.

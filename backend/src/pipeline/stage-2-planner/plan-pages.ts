@@ -32,7 +32,7 @@ const IMAGE_PROMPT_SAFETY_RULES = `LAYOUT SYSTEM RULES
 
 Treat the selected layout as a strong reference template, not a rigid rule. Minor composition adjustments are allowed when they improve readability, subject presentation, or overall page quality.
 
-Preserve future text areas above all else. Do not allow illustrations, background elements, diagrams, labels, decorative details, or environmental elements to consume areas intended for written educational content. When in doubt, leave more negative space.
+Preserve the text-safe zones above all else. Do not allow illustrations, background elements, diagrams, labels, decorative details, or environmental elements to consume the zones reserved for written educational content. When in doubt, leave more negative space.
 
 Generate clean artwork only. The illustration must contain ZERO readable text of any kind: no subject names, labels, captions, titles, headings, paragraphs, article text, fake encyclopedia text, page numbers, headers, reference notes, measurements, callouts, or annotations. Do not draw arrows, leader lines, or pointer marks with text. All labels, names, annotations, arrows, and typography are added later by the layout/composition system — never by the image model.
 
@@ -472,20 +472,30 @@ function appendPromptSafetyRules(promptTemplate: string): string {
  * alongside the (correct) zone-based PAGE COMPOSITION BRIEF. The image model then
  * receives two contradictory mental models in one prompt.
  *
- * This denylist is intentionally tight: each phrase asserts the image and the
- * text live in SEPARATE COMPARTMENTS ("a box + a text area"), which is exactly the
- * model we retired. Zone language ("text-safe zone", "image-priority zone", "the
- * image IS the page", "~40% of the page") is NOT matched and survives untouched.
+ * Each pattern matches a line that asserts the image and the text live in
+ * SEPARATE COMPARTMENTS ("a box + a text area") — the model we retired. The zone
+ * vocabulary is deliberately protected: "text-safe zone" (hyphenated), "image-
+ * priority zone", "the image IS the page", "~40% of the page", "upper band",
+ * "upper-center" do NOT match any pattern and survive untouched. Note the
+ * difference: "text area" (compartment) is stripped; "text-safe zone" (zone) is not.
  */
 const BOX_MODEL_LINE_PATTERNS: RegExp[] = [
+  // Explicit separation / compartment assertions.
   /strong separation between image and content/i,
   /strong visual separation between the illustration/i,
   /maintain (a )?strong (visual )?separation/i,
-  /remains (largely|mostly|primarily) (clear|empty|reserved)/i,
-  /(lower|upper) portion of the page remains/i,
-  /(upper|lower)\s+\d{1,3}-\d{1,3}%\s+(contains|remains|is)/i,
+  /remains (largely|mostly|primarily) (clear|empty|reserved|available)/i,
   /reserved space for future educational content/i,
   /avoid background elements spilling into the content area/i,
+  // Positional "the illustration lives only in part of the page" language.
+  /(spans|occupies|fills|sits in|lives in) the (upper|lower|left|right|top|bottom) portion/i,
+  /(upper|lower|left|right|top|bottom) portion of the page/i,
+  // Percentage-band "<region> N% contains/remains the illustration/text" lines.
+  /\b(upper|lower|left|right|top|bottom|rightmost|leftmost|topmost|bottommost)\s+[\w-]*\s*\d{1,3}(\s*-\s*\d{1,3})?%\s+(contains|remains|is reserved|holds|reserved)/i,
+  // The retired "text area" / "content area" compartment noun (NOT "text-safe zone").
+  /\btext area\b/i,
+  /\bcontent area\b/i,
+  /annotations? (extend|extending) (from|into)/i,
 ];
 
 /**
