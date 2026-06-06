@@ -22,21 +22,28 @@ export interface LayoutDirectorInput {
   lineHeight: number;
 }
 
+/** Position of the image-priority zone on the page (where focal visual content lives). */
+export type ImagePriorityEdge = ArtSlot;
+
+export interface ImagePriorityZone {
+  xIn: number;
+  yIn: number;
+  widthIn: number;
+  heightIn: number;
+  recommendedWidthPx: number;
+  recommendedHeightPx: number;
+  bleedPaddingPx: number;
+  aspectRatio: string;
+  overlaySafeArea: string;
+}
+
 export interface LayoutAllocation {
-  architecture: ArtSlot;
+  /** Position of the image-priority zone (the strong-content edge of the artwork). */
+  priorityEdge: ImagePriorityEdge;
+  /** Geometry of the image-priority zone within the full-page artwork. */
+  imagePriorityZone: ImagePriorityZone;
   imagePlacement: string;
   textPlacement: string;
-  artBox: {
-    xIn: number;
-    yIn: number;
-    widthIn: number;
-    heightIn: number;
-    recommendedWidthPx: number;
-    recommendedHeightPx: number;
-    bleedPaddingPx: number;
-    aspectRatio: string;
-    overlaySafeArea: string;
-  };
   openingPageImagePercent: number;
   openingPageTextPercent: number;
   continuationPageImagePercent: number;
@@ -45,6 +52,10 @@ export interface LayoutAllocation {
   wordsPerOpeningPage: number;
   wordsPerContinuationPage: number;
   notes: string[];
+  /** @deprecated Use `priorityEdge`. Kept for back-compat with older consumers. */
+  architecture: ArtSlot;
+  /** @deprecated Use `imagePriorityZone`. Kept for back-compat with older consumers. */
+  artBox: ImagePriorityZone;
 }
 
 function countSectionHeaders(markdown: string): number {
@@ -121,7 +132,7 @@ function aspectRatio(widthPx: number, heightPx: number): string {
   return `${Math.round(widthPx / divisor)}:${Math.round(heightPx / divisor)}`;
 }
 
-function artBoxForSlot(slot: ArtSlot, coverage: number, geometry: PageGeometry): LayoutAllocation['artBox'] {
+function imagePriorityZoneFor(slot: ArtSlot, coverage: number, geometry: PageGeometry): ImagePriorityZone {
   const frameW = geometry.textWidthIn;
   const frameH = geometry.textHeightIn;
   let xIn = 0;
@@ -163,7 +174,7 @@ function artBoxForSlot(slot: ArtSlot, coverage: number, geometry: PageGeometry):
     overlaySafeArea:
       slot === 'FULL_PAGE' || slot === 'TOP_BAND'
         ? 'Leave calm negative space for layout-typeset title/caption overlays; render no text in the image.'
-        : 'Keep the art contained inside this slot and preserve adjacent negative space for body text.',
+        : 'Concentrate focal visual content in this zone while keeping the text-safe zone calm; render no text in the image.',
   };
 }
 
@@ -188,7 +199,7 @@ export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
   const imagePercent = Math.round(profile.artAreaFraction * 100);
   const textPercent = Math.max(0, 100 - imagePercent);
   const placement = refinedPlacement(profile.artSlot, imagePercent);
-  const artBox = artBoxForSlot(profile.artSlot, profile.artAreaFraction, input.geometry);
+  const imagePriorityZone = imagePriorityZoneFor(profile.artSlot, profile.artAreaFraction, input.geometry);
   const notes: string[] = [];
 
   if (estimatedRenderedPages > 1) {
@@ -202,10 +213,14 @@ export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
   }
 
   return {
-    architecture: profile.artSlot,
+    // New zone vocabulary (primary).
+    priorityEdge: profile.artSlot,
+    imagePriorityZone,
     imagePlacement: placement.imagePlacement,
     textPlacement: placement.textPlacement,
-    artBox,
+    // Back-compat aliases (deprecated; consumers should migrate to the names above).
+    architecture: profile.artSlot,
+    artBox: imagePriorityZone,
     openingPageImagePercent: imagePercent,
     openingPageTextPercent: textPercent,
     continuationPageImagePercent: 0,
