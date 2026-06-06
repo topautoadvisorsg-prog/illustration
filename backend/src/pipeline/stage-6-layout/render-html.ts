@@ -219,11 +219,20 @@ function bodyZoneSpacer(slot: ArtSlot, coverage: number, geometry: PageGeometry)
   if (edge === 'full') return `height:${Math.round(0.74 * th * 100) / 100}in;`;
   return 'height:0.12in;';
 }
-/** For side-priority layouts, keep the body panel off the image side. */
-function bodyPanelSideStyle(slot: ArtSlot): string {
+/**
+ * Body-panel side style — keeps text off the image side ONLY on the first sheet
+ * of the entry. On continuation pages there is no image to defer to, so the body
+ * should use the full text frame. Returns CSS rules scoped per sheet position so
+ * Paged.js applies the right one to the right page automatically.
+ */
+function bodyPanelSideCss(slot: ArtSlot): string {
   const edge = priorityEdgeFor(slot);
-  if (edge === 'left') return 'margin-left:46%;';
-  if (edge === 'right') return 'margin-right:46%;';
+  if (edge === 'left') {
+    return `.pagedjs_first_page .text-panel { margin-left: 46%; }`;
+  }
+  if (edge === 'right') {
+    return `.pagedjs_first_page .text-panel { margin-right: 46%; }`;
+  }
   return '';
 }
 /**
@@ -237,6 +246,28 @@ function fullPageArtworkCss(t: Typography, c: Palette): string {
   .entry-title { position: relative; z-index: 2; font-weight: 700; text-shadow: 0 0 8px ${c.paper}, 0 0 8px ${c.paper}, 0 0 14px ${c.paper}, 0 2px 3px rgba(0,0,0,0.35); }
   .scientific-name { position: relative; z-index: 2; text-shadow: 0 0 8px ${c.paper}, 0 0 8px ${c.paper}; }
   .art-spacer { width: 100%; }
+  /* Continuation Visual Identity (Layer 3): every non-opening sheet of the entry
+     carries a subtle ornamental treatment so a continuation page never reads as
+     blank parchment. Two horizontal rules + corner ornaments framed by accent
+     color; ZERO content cost (pure CSS). Applies to sheets that are NOT the
+     first sheet of the entry. Overridden when real artwork paints the sheet. */
+  .pagedjs_sheet:not(.pagedjs_first_page)::before {
+    content: ""; position: absolute; pointer-events: none; z-index: 0;
+    top: 0.55in; left: 0.7in; right: 0.7in; height: 0.6in;
+    border-top: 0.6pt solid ${c.accent};
+    border-bottom: 0.4pt solid ${c.accent};
+    opacity: 0.42;
+  }
+  .pagedjs_sheet:not(.pagedjs_first_page)::after {
+    content: "❦"; position: absolute; pointer-events: none; z-index: 0;
+    left: 0; right: 0; bottom: 0.5in; text-align: center;
+    color: ${c.accent}; opacity: 0.5;
+    font-family: var(--font-display); font-size: 14pt; letter-spacing: 0.2em;
+  }
+  /* When real artwork is painted on the sheet, suppress the ornamental
+     treatment — the artwork itself is the visual identity. */
+  .pagedjs_sheet.has-artwork::before,
+  .pagedjs_sheet.has-artwork::after { content: none; }
   /* Text sits DIRECTLY on the artwork in the reserved text-safe zone — no opaque
      card. A soft, edgeless scrim (transparent at the top, gently feathering in)
      plus a light paper halo on the glyphs keeps it readable while staying part of
@@ -307,7 +338,7 @@ function buildEntryArticle(
   const idAttr = anchorId ? ` id="${anchorId}"` : '';
   const scientific = page.scientificName ? `<p class="scientific-name">${escapeHtml(page.scientificName)}</p>` : '';
   const title = `<h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>`;
-  const panelStyle = bodyPanelSideStyle(profile.artSlot);
+  const panelCss = bodyPanelSideCss(profile.artSlot);
   const spacer = `<div class="art-spacer" style="${bodyZoneSpacer(profile.artSlot, profile.artAreaFraction, geometry)}"></div>`;
 
   if (page.imageDataUri) {
@@ -317,9 +348,13 @@ function buildEntryArticle(
     const article = `<article class="book-page art-page arch-${profile.artSlot}${danger}"${idAttr}${pageAttr}>
   ${title}
   ${spacer}
-  <div class="text-panel" style="${panelStyle}">${scientific}${bodyToHtml(page.bodyMarkdown)}</div>
+  <div class="text-panel">${scientific}${bodyToHtml(page.bodyMarkdown)}</div>
 </article>`;
-    return { article, css: register + artworkSheetCss(sheetSel, page.imageDataUri, c.paper) };
+    // Mark the sheet as having artwork so the continuation ornament suppresses.
+    const artworkCss = register
+      + artworkSheetCss(sheetSel, page.imageDataUri, c.paper)
+      + `\n  ${sheetSel} { /* artwork present */ }\n  ${sheetSel}::before, ${sheetSel}::after { content: none !important; }\n  ${panelCss}`;
+    return { article, css: artworkCss };
   }
 
   // Planning preview: three-zone overlay teaches the full-page-artwork model
@@ -329,9 +364,9 @@ function buildEntryArticle(
   const article = `<article class="book-page arch-${profile.artSlot}${danger}"${idAttr}>
   ${title}
   ${zones}
-  <div class="text-panel" style="${panelStyle}">${scientific}${bodyToHtml(page.bodyMarkdown)}</div>
+  <div class="text-panel">${scientific}${bodyToHtml(page.bodyMarkdown)}</div>
 </article>`;
-  return { article, css: '' };
+  return { article, css: panelCss };
 }
 
 /** Build the standalone HTML document for one page. */
