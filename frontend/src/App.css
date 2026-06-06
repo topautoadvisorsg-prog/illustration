@@ -2117,7 +2117,12 @@ button.secondary {
 
 .zone-preview-canvas {
   position: relative;
-  min-height: 170px;
+  /* Portrait page proxy: width is capped and height comes from the inline
+     aspect-ratio (project trim), so the preview matches real printed proportions
+     instead of stretching to the card width. Centered under the card. */
+  width: 100%;
+  max-width: 230px;
+  margin: 0 auto;
   overflow: hidden;
   border: 1px solid #d2c5b4;
   border-radius: 6px;

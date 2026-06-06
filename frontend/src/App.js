@@ -4330,8 +4330,21 @@ function App() {
                     )}
                     {zoneLayers.length > 0 && (
                       <div className="zone-preview-card" aria-label={`${page.pageId} zone planning preview`}>
-                        <div className="zone-preview-canvas">
-                          <span className="zone-preview-artwork-label">Full-page artwork canvas</span>
+                        <div
+                          className="zone-preview-canvas"
+                          style={{
+                            // Render at the project's TRUE trim aspect ratio so the
+                            // operator reviews zones in the proportions that will be
+                            // printed (every trim is portrait). Without this the canvas
+                            // fills the card width and looks landscape — zone proportions
+                            // would read wrong and an approval here could mislead.
+                            aspectRatio: `${projectConfig?.trimSize?.widthIn || 7} / ${projectConfig?.trimSize?.heightIn || 10}`,
+                            minHeight: 0,
+                          }}
+                        >
+                          <span className="zone-preview-artwork-label">
+                            Full-page artwork canvas · {projectConfig?.trimSize?.widthIn || 7}×{projectConfig?.trimSize?.heightIn || 10}in
+                          </span>
                           {zoneLayers.map((zone) => (
                             <span
                               key={`${zone.kind}-${zone.id}`}
