@@ -97,9 +97,13 @@ describe('planPage', () => {
     expect(decision.prompt).toContain('golden chanterelle mushroom');
     expect(decision.prompt).toContain('Vintage Naturalist master style DNA.');
     expect(decision.prompt).toContain('LAYOUT SYSTEM RULES');
-    expect(decision.prompt).toContain('ART BRIEF FOR IMAGE GENERATION');
-    expect(decision.prompt).toContain('Recommended minimum source art:');
-    expect(decision.prompt).toContain('Cover/chapter titles are overlaid later by the layout engine.');
+    // New zone-aware composition brief: teaches the full-page-artwork model to the image model.
+    expect(decision.prompt).toContain('PAGE COMPOSITION BRIEF');
+    expect(decision.prompt).toContain('IMAGE-PRIORITY ZONE');
+    expect(decision.prompt).toContain('TEXT-SAFE ZONE');
+    expect(decision.prompt).toContain('TYPOGRAPHY ZONE');
+    expect(decision.prompt).toContain('The image IS the entire page');
+    expect(decision.prompt).toContain('All typography is overlaid later by the layout engine.');
     expect(decision.artBrief.artBox.recommendedWidthPx).toBeGreaterThan(0);
     expect(decision.artBrief.artBox.recommendedHeightPx).toBeGreaterThan(0);
     expect(decision.prompt).toContain('Generate clean artwork only.');

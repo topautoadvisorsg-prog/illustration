@@ -412,19 +412,30 @@ function labelTextRules(_page: PageManifest): string {
 }
 
 function artBriefText(page: PageManifest, allocation: LayoutAllocation): string {
-  const box = allocation.artBox;
+  const z = allocation.imagePriorityZone;
+  const imagePct = allocation.openingPageImagePercent;
+  const textPct = allocation.openingPageTextPercent;
   return [
-    'ART BRIEF FOR IMAGE GENERATION',
-    `Page subject: ${page.imageSubject}.`,
-    `Layout architecture: ${allocation.architecture}.`,
-    `Image share on opening page: ${allocation.openingPageImagePercent}%. Text share: ${allocation.openingPageTextPercent}%.`,
-    `Image placement: ${allocation.imagePlacement}.`,
-    `Text placement: ${allocation.textPlacement}.`,
-    `Art slot box relative to text frame: x=${box.xIn}in, y=${box.yIn}in, width=${box.widthIn}in, height=${box.heightIn}in.`,
-    `Recommended minimum source art: ${box.recommendedWidthPx}x${box.recommendedHeightPx}px at 300 DPI, aspect ${box.aspectRatio}.`,
-    `Include at least ${box.bleedPaddingPx}px extra usable texture/detail around important subject edges for crop and bleed safety.`,
-    box.overlaySafeArea,
-    'Do not render readable text, titles, labels, captions, page numbers, or typography inside the image. Cover/chapter titles are overlaid later by the layout engine.',
+    'PAGE COMPOSITION BRIEF',
+    `The image IS the entire page (full-bleed artwork — no boxes, no frames, no cards). Compose the artwork so it honors the three zones below.`,
+    '',
+    `• IMAGE-PRIORITY ZONE — ${allocation.imagePlacement} (~${imagePct}% of the page)`,
+    `    Subject anchor: ${page.imageSubject}.`,
+    `    Concentrate primary detail, focal subject, depth, and color saturation here.`,
+    `    Recommended density: ${z.recommendedWidthPx}×${z.recommendedHeightPx}px of usable detail at 300 DPI within this zone.`,
+    '',
+    `• TEXT-SAFE ZONE — ${allocation.textPlacement} (~${textPct}% of the page)`,
+    `    Keep this region of the artwork visually calm and low-detail: sky, mist, soft terrain, plain ground, even background.`,
+    `    No important subjects, no fine pattern, no busy texture here — body text will overlay this zone.`,
+    `    Reserve enough negative space that long-form educational copy reads cleanly directly on the artwork (no paper card will be added).`,
+    '',
+    `• TYPOGRAPHY ZONE — just above the text-safe zone (upper-center)`,
+    `    The title sits directly on the artwork. Keep this band calm enough that bold display type reads without a backing panel.`,
+    '',
+    `Bleed safety: include at least ${z.bleedPaddingPx}px extra usable texture/detail around the outer page edges so trim/crop never reveals a missing zone.`,
+    z.overlaySafeArea,
+    'Do not render readable text, titles, labels, captions, page numbers, or typography inside the image. All typography is overlaid later by the layout engine.',
+    'The entire page is artwork. These zones only describe where each kind of content is allowed to live — never frame an interior box around the image.',
   ].join('\n');
 }
 
@@ -487,7 +498,7 @@ export function planPage(page: PageManifest, config: ProjectConfig, options: Pla
     '{SUBJECT}': page.imageSubject,
     '{SCIENTIFIC_DETAILS}': scientificDetails(page),
     '{COMPOSITION_NOTES}': [
-      asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? `Art slot follows ${selected.template}.`,
+      asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? `Image-priority zone follows ${selected.template}.`,
       artBriefText(page, allocation),
       labelTextRules(page),
     ].join('\n'),
@@ -519,7 +530,7 @@ export function planPage(page: PageManifest, config: ProjectConfig, options: Pla
       useCases: asset?.useCases ?? [],
       avoidWhen: asset?.avoidWhen ?? [],
       textZone: asset?.textZoneDescription ?? 'Text zone has not been analyzed yet.',
-      imageZone: asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? 'Image zone has not been analyzed yet.',
+      imageZone: asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? 'Image-priority zone has not been analyzed yet.',
       textFitRule: asset?.textFitRule ?? 'Run text-fit preview before image generation.',
     },
     prompt,
