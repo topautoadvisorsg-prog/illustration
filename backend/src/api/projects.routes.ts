@@ -1198,6 +1198,59 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     },
   );
 
+  // Operator/validation override: force a specific layout template onto ONE page,
+  // re-plan just that page through the full-page-artwork prompt, and invalidate the
+  // chapter's layout approval so it must be re-approved before any image spend.
+  // Mirrors the internal automated-quality-fix path (planPage + updatePagePlanning).
+  const ForceLayoutBodySchema = z.object({ layoutTemplate: LayoutTemplateIdSchema });
+  const ForceLayoutResponseSchema = z.object({
+    pageKey: z.string(),
+    layoutTemplate: z.string(),
+    promptSha256: z.string(),
+    warnings: z.array(z.string()),
+  });
+  app.post(
+    '/api/projects/:id/pages/:pageKey/force-layout',
+    {
+      schema: {
+        params: ProjectPageParamsSchema,
+        body: ForceLayoutBodySchema,
+        response: { 200: ForceLayoutResponseSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id, pageKey } = ProjectPageParamsSchema.parse(request.params);
+      const { layoutTemplate } = ForceLayoutBodySchema.parse(request.body);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      const config = parseProjectConfig(project);
+      const manifest = (await listManifests(id, 'PAGE'))
+        .map((row) => PageManifestSchema.parse(row.content))
+        .find((page) => page.pageId === pageKey);
+      if (!manifest) return reply.code(404).send({ error: 'Not Found', message: `Page manifest ${pageKey} not found.`, statusCode: 404 });
+      const decision = planPage(manifest, config, { forcedLayoutTemplate: layoutTemplate, reasonCode: 'operator_forced_layout' });
+      await updatePagePlanning(id, pageKey, {
+        layoutTemplate: decision.layoutTemplate,
+        imagePrompt: decision.prompt,
+        imagePromptSha256: decision.promptSha256,
+      });
+      // Invalidate the chapter's layout approval — the prompt changed, so the
+      // chapter must be re-approved before image generation (spend guard).
+      const pageRow = (await listPages(id)).find((p) => p.pageKey === pageKey);
+      if (pageRow) {
+        const approvals = { ...(config.layoutApprovals ?? {}) };
+        delete approvals[String(pageRow.chapterNumber)];
+        await updateProjectConfig(id, { ...config, layoutApprovals: approvals });
+      }
+      return {
+        pageKey,
+        layoutTemplate: decision.layoutTemplate,
+        promptSha256: decision.promptSha256,
+        warnings: decision.warnings,
+      };
+    },
+  );
+
   app.get(
     '/api/projects/:id/pages',
     { schema: { params: ProjectParamsSchema, response: { 200: PagesListResponseSchema, 404: ApiErrorSchema } } },
