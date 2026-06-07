@@ -3000,6 +3000,15 @@ function App() {
     await loadPageImages(page.id);
   }
 
+  async function setActiveImageVersion(version) {
+    const page = requireSelectedPage();
+    await call(`/api/pages/${page.id}/images/${version}/set-active`, { method: "POST", body: JSON.stringify({}) });
+    setMessage(`Set active image for ${page.pageKey} to version ${version}.`);
+    appendLog("success", `Set active image for ${page.pageKey} to version ${version}.`);
+    await loadPageImages(page.id);
+    await loadArtifacts(activeProjectId);
+  }
+
   async function regenerateSelectedPageImage() {
     const page = requireSelectedPage();
     const addendum = imageInstruction.trim();
@@ -3254,6 +3263,7 @@ function App() {
     });
     if (activeProjectId && selectedPageKeyValue) {
       loadInspector(selectedPageKeyValue);
+      if (selectedPage?.id) loadPageImages(selectedPage.id).catch(() => {});
     } else {
       setInspectorData(null);
     }
@@ -4549,12 +4559,9 @@ function App() {
             <div className="section-head">
               <div>
                 <h3>🛠 Page Generation Control Center</h3>
-                <p className="hint">The operator surface for the selected page — manuscript → layout → image generation → image result → final page, in five tabs. Generate/approve actions are below.</p>
+                <p className="hint">The operator surface for the selected page — manuscript → layout → image generation → image result → final page, in five tabs. Image versions load automatically.</p>
               </div>
               <div className="button-row">
-                <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages(), () => scrollToWorkspaceSection(".image-version-list"))}>
-                  Load Images for Selected Page
-                </button>
                 <button type="button" className="review-button" disabled={chatBusy || !activeProjectId} onClick={() => reviewStage("images")}>
                   Audit with Agent
                 </button>
@@ -4666,6 +4673,18 @@ function App() {
                       <div className="kv"><span>Split</span><b>{inspectorData.layout.artBrief.imagePercent}% image / {inspectorData.layout.artBrief.textPercent}% text</b></div>
                       <div className="kv"><span>Capacity (words)</span><b>{inspectorData.layout.capacity.minWords}–{inspectorData.layout.capacity.maxWords} (target {inspectorData.layout.capacity.targetWords})</b></div>
                       <div className="kv"><span>Why this layout</span><b>{inspectorData.layout.decisionTrace.layoutExplanation}</b></div>
+                      <div className="kv"><span>Rule</span><b>{inspectorData.layout.decisionTrace.layoutRule}</b></div>
+                      <div className="kv"><span>Content type</span><b>{inspectorData.layout.decisionTrace.contentTypeReason}</b></div>
+                      {inspectorData.layout.decisionTrace.alternativesConsidered.length > 0 && (
+                        <>
+                          <p className="inspector-subhead">Alternatives considered (and why rejected)</p>
+                          <ul className="zone-list">
+                            {inspectorData.layout.decisionTrace.alternativesConsidered.map((a, i) => (
+                              <li key={i}><b>{a.template}</b> — {a.skippedBecause}</li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
                       <p className="inspector-subhead">Zone map (schematic)</p>
                       <div className="zone-map">
                         {inspectorData.layout.artBrief.imagePriorityZones.map((z) => (
@@ -4773,15 +4792,49 @@ function App() {
                   {inspectorData && inspectorTab === "image" && (
                     <div className="inspector-pane">
                       <div className="kv"><span>Model</span><b>{inspectorData.model}</b></div>
-                      {inspectorData.images.length === 0 && <p className="empty">No image versions generated yet.</p>}
-                      <div className="inspector-images">
-                        {inspectorData.images.map((img) => (
-                          <div className="inspector-image-card" key={img.version}>
-                            <img alt={`version ${img.version}`} src={`${apiUrl}/api/pages/${inspectorData.page.pageId}/image?v=${img.version}`} />
-                            <div className="inspector-image-meta">v{img.version} · {img.status}{img.active ? " · active" : ""} · {img.widthPx}×{img.heightPx}</div>
-                          </div>
-                        ))}
+                      {!selectedChapterApproval && (
+                        <p className="empty">Chapter layout not approved — generation is locked until the chapter layout is approved.</p>
+                      )}
+                      <div className="button-row">
+                        <button disabled={busy || !selectedPage || !selectedChapterApproval || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady)} onClick={() => run("Generating selected page image...", generateSelectedPageImage)}>
+                          Generate Image
+                        </button>
+                        <button disabled={busy || !selectedPage || selectedPage?.status !== "APPROVED"} onClick={() => run("Upscaling approved image...", upscaleSelectedPageImage)}>
+                          Upscale Approved
+                        </button>
                       </div>
+                      <div className="image-version-list">
+                        {selectedImages.map((image) => (
+                          <article className={image.active ? "image-version active" : "image-version"} key={image.version}>
+                            {selectedPage && image.generatedPath && (
+                              <img className="image-version-preview" src={`${apiUrl}/api/pages/${selectedPage.id}/image?v=${image.version}`} alt={`Version ${image.version} illustration`} loading="lazy" />
+                            )}
+                            <div>
+                              <strong>Version {image.version}</strong>
+                              <span>{normalizeStatus(image.status)}{image.active ? " / active" : ""}</span>
+                              <small>{image.widthPx || "?"} x {image.heightPx || "?"} px</small>
+                            </div>
+                            <div className="button-row">
+                              <button disabled={busy || image.status === "REJECTED"} onClick={() => run("Approving image...", () => approveImageVersion(image.version))}>
+                                Approve v{image.version}
+                              </button>
+                              <button disabled={busy} onClick={() => run("Rejecting image...", () => rejectImageVersion(image.version))}>
+                                Reject v{image.version}
+                              </button>
+                              <button className="secondary" disabled={busy || image.active} onClick={() => run("Setting active image...", () => setActiveImageVersion(image.version))}>
+                                Set Active
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                        {selectedImages.length === 0 && <p className="empty">No image versions yet — Generate to create the first.</p>}
+                      </div>
+                      <Field label="Correction Request">
+                        <textarea className="notes-field" value={imageInstruction} onChange={(event) => setImageInstruction(event.target.value)} placeholder="Tell the image agent what to fix before regenerating." />
+                      </Field>
+                      <button disabled={busy || !selectedPage || !imageInstruction.trim()} onClick={() => run("Regenerating selected page image...", regenerateSelectedPageImage)}>
+                        Regenerate with Correction
+                      </button>
                     </div>
                   )}
 
@@ -4814,14 +4867,6 @@ function App() {
                 </button>
               </div>
             )}
-            <div className="button-row">
-              <button disabled={busy || !selectedPage || !selectedChapterApproval || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady)} onClick={() => run("Generating selected page image...", generateSelectedPageImage, () => scrollToWorkspaceSection(".image-version-list"))}>
-                Generate Image for Selected Page
-              </button>
-              <button disabled={busy || !selectedPage || selectedPage?.status !== "APPROVED"} onClick={() => run("Upscaling selected page image...", upscaleSelectedPageImage, () => scrollToWorkspaceSection(".image-version-list"))}>
-                Upscale Approved Image
-              </button>
-            </div>
             <details className="asset-library-panel" open>
               <summary>Project Image Library</summary>
               <div className="library-controls">
@@ -4906,52 +4951,6 @@ function App() {
                 {imageLibrary.assets.length === 0 && <p className="empty">No library assets loaded yet.</p>}
               </div>
             </details>
-            <Field label="Correction Request">
-              <textarea
-                className="notes-field"
-                value={imageInstruction}
-                onChange={(event) => setImageInstruction(event.target.value)}
-                placeholder="Tell the image agent what to fix before rejecting or regenerating."
-              />
-            </Field>
-            <div className="image-version-list">
-              {selectedImages.map((image) => (
-                <article className={image.active ? "image-version active" : "image-version"} key={image.version}>
-                  {selectedPage && image.generatedPath && (
-                    <img
-                      className="image-version-preview"
-                      src={`${apiUrl}/api/pages/${selectedPage.id}/image?v=${image.version}`}
-                      alt={`Version ${image.version} illustration`}
-                      loading="lazy"
-                    />
-                  )}
-                  <div>
-                    <strong>Version {image.version}</strong>
-                    <span>{normalizeStatus(image.status)}{image.active ? " / active" : ""}</span>
-                    <small>{image.widthPx || "?"} x {image.heightPx || "?"} px</small>
-                  </div>
-                  <div className="button-row">
-                    <button disabled={busy || image.status === "REJECTED"} onClick={() => run("Approving image...", () => approveImageVersion(image.version), () => scrollToWorkspaceSection(".image-version-list"))}>
-                      Approve Image v{image.version}
-                    </button>
-                    <button disabled={busy} onClick={() => run("Rejecting image...", () => rejectImageVersion(image.version))}>
-                      Reject Image v{image.version}
-                    </button>
-                  </div>
-                  {advancedMode && (
-                    <details className="advanced-details">
-                      <summary>File details</summary>
-                      <p>Generated: {image.generatedPath || "not stored"}</p>
-                      <p>Upscaled: {image.upscaledPath || "not upscaled"}</p>
-                    </details>
-                  )}
-                </article>
-              ))}
-              {selectedImages.length === 0 && <p className="empty">No image versions loaded for this page yet.</p>}
-            </div>
-            <button disabled={busy || !selectedPage || !imageInstruction.trim()} onClick={() => run("Regenerating selected page image...", regenerateSelectedPageImage, () => scrollToWorkspaceSection(".image-version-list"))}>
-              Regenerate Selected Page Image
-            </button>
           </section>
 
           <section className="review-card book-parts-card cc-export">
