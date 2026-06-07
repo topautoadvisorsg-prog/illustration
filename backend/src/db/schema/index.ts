@@ -48,6 +48,16 @@ export const imageStatusEnum = pgEnum('image_status', [
   'PRINT_READY',
   'FAILED',
 ]);
+// Pagination v1 — Stage 1.75. A printed page's role within its source entry.
+// `opener`       = first printed page of an entry; carries the image subject.
+// `continuation` = later printed pages of a multi-page entry; clean reading layout.
+// `compacted`    = single printed page carrying multiple short adjacent entries.
+export const pageRoleEnum = pgEnum('page_role', ['opener', 'continuation', 'compacted']);
+// Pagination v1 — how the assigned text fits the Reading Field for the printed page.
+// PENDING = not yet computed. FITS / TIGHT / OVERFLOW / UNDERFILL per SPEC §5.5.
+export const fitStatusEnum = pgEnum('fit_status', ['PENDING', 'FITS', 'TIGHT', 'OVERFLOW', 'UNDERFILL']);
+// Pagination v1 — audit log of operator decisions on the Text-In-Reading-Field preview.
+export const pageApprovalDecisionEnum = pgEnum('page_approval_decision', ['APPROVED', 'REJECTED', 'RESET']);
 export const jobTypeEnum = pgEnum('job_type', ['image-generation', 'upscale', 'layout', 'pdf-compile', 'epub-export']);
 export const jobStatusEnum = pgEnum('job_status', ['queued', 'active', 'completed', 'failed', 'dead-lettered']);
 export const exportKindEnum = pgEnum('export_kind', ['PREMIUM_PDF', 'KINDLE_EPUB']);
@@ -181,11 +191,50 @@ export const pages = pgTable(
     imagePrompt: text('image_prompt'),
     imagePromptSha256: text('image_prompt_sha256'),
     status: pageStatusEnum('status').default('PENDING').notNull(),
+    // Pagination v1 — Stage 1.75. See SPEC_PAGINATION_V1.md §4.
+    // `entryKey` points back to the opener page_key of the source entry; an
+    // opener has `entryKey === pageKey`. Continuations share the opener's
+    // entryKey but get suffixed pageKeys (e.g. CH01_P010_c1).
+    entryKey: text('entry_key'),
+    partN: integer('part_n').default(1).notNull(),
+    totalParts: integer('total_parts').default(1).notNull(),
+    pageRole: pageRoleEnum('page_role').default('opener').notNull(),
+    carriesSubject: boolean('carries_subject').default(true).notNull(),
+    compactedEntryKeys: jsonb('compacted_entry_keys'),
+    readingFieldText: text('reading_field_text'),
+    readingFieldChars: integer('reading_field_chars'),
+    readingFieldWords: integer('reading_field_words'),
+    fitStatus: fitStatusEnum('fit_status').default('PENDING').notNull(),
+    previewApproved: boolean('preview_approved').default(false).notNull(),
+    previewApprovedAt: timestamp('preview_approved_at', { withTimezone: true }),
+    previewApprovedBy: text('preview_approved_by'),
     ...timestamps,
   },
   (table) => ({
     projectPageKeyIdx: uniqueIndex('pages_project_page_key_idx').on(table.projectId, table.pageKey),
     projectStatusIdx: index('pages_project_status_idx').on(table.projectId, table.status),
+    projectEntryKeyIdx: index('pages_project_entry_key_idx').on(table.projectId, table.entryKey),
+    projectPreviewApprovedIdx: index('pages_project_preview_approved_idx').on(table.projectId, table.previewApproved),
+  }),
+);
+
+// Pagination v1 — Stage 1.75. Audit log of operator decisions on the
+// Text-In-Reading-Field preview. Every approve/reject/reset is logged so the
+// "who said yes to spending image credits on this page" trail is durable.
+export const pageApprovals = pgTable(
+  'page_approvals',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    decision: pageApprovalDecisionEnum('decision').notNull(),
+    reason: text('reason'),
+    decidedBy: text('decided_by').notNull(),
+    decidedAt: timestamp('decided_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    pageDecidedAtIdx: index('page_approvals_page_decided_at_idx').on(table.pageId, table.decidedAt),
   }),
 );
 

@@ -15,6 +15,13 @@
       "when": 1780365881625,
       "tag": "0001_wealthy_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780870172707,
+      "tag": "0002_pagination_v1",
+      "breakpoints": true
     }
   ]
 }
