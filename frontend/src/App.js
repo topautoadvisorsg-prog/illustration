@@ -76,6 +76,31 @@ function textFitCacheKey(projectId) {
   return `${TEXT_FIT_CACHE_PREFIX}${projectId}`;
 }
 
+// Parse the SUBJECT PACKAGE block out of the lean image prompt (format owned by the
+// backend's assembleLeanPrompt). Surfaces primary / supporting / environment / mood
+// as structured fields for the Image Generation tab without a backend round-trip.
+function parseSubjectPackage(promptText) {
+  const out = { primary: "", supporting: [], environment: "", mood: "" };
+  if (!promptText) return out;
+  let section = null;
+  for (const raw of String(promptText).split("\n")) {
+    const line = raw.trim();
+    if (line === "PRIMARY SUBJECT") { section = "primary"; continue; }
+    if (line === "SUPPORTING SUBJECTS") { section = "supporting"; continue; }
+    if (line === "ENVIRONMENT") { section = "environment"; continue; }
+    if (line === "MOOD") { section = "mood"; continue; }
+    if (line.startsWith("COMPOSITION") || line === "LAYOUT RULES") { section = null; continue; }
+    if (!section) continue;
+    const val = line.replace(/^-\s*/, "").trim();
+    if (!val) continue;
+    if (section === "primary") out.primary = out.primary || val;
+    else if (section === "supporting") out.supporting.push(val);
+    else if (section === "environment") out.environment = out.environment || val;
+    else if (section === "mood") out.mood = out.mood || val;
+  }
+  return out;
+}
+
 function fileNameFromPath(path) {
   return String(path || "").split(/[\\/]/).filter(Boolean).pop() || "";
 }
@@ -4503,8 +4528,8 @@ function App() {
           <section className="review-card image-review-card">
             <div className="section-head">
               <div>
-                <h3>4. Image Review</h3>
-                <p className="hint">Asset desk for the selected page: generate only after the chapter proof reads cleanly, then reuse, approve, reject, or upscale.</p>
+                <h3>🛠 Page Generation Control Center</h3>
+                <p className="hint">The operator surface for the selected page — manuscript → layout → image generation → image result → final page, in five tabs. Generate/approve actions are below.</p>
               </div>
               <div className="button-row">
                 <button disabled={busy || !selectedPage} onClick={() => run("Loading selected page images...", () => loadPageImages(), () => scrollToWorkspaceSection(".image-version-list"))}>
@@ -4532,14 +4557,6 @@ function App() {
                 {pages.length === 0 && <span className="empty-inline">No pages yet</span>}
               </div>
             </div>
-            {selectedPage && (
-              <div className="selected-page-summary">
-                <strong>{selectedPage.pageKey} / {selectedPageManifest?.entryTitle || "Untitled"}</strong>
-                <span>{layoutName(selectedPage.layoutTemplate || selectedPagePlan?.layoutTemplate)} / {normalizeStatus(selectedPage.status)}</span>
-                <span>{selectedChapterApproval ? "chapter layout approved" : "chapter layout pending"}</span>
-                <span>{selectedPagePlan?.promptReady ? "prompt ready" : selectedPage.imagePrompt ? "prompt stored" : "prompt pending"}</span>
-              </div>
-            )}
             {selectedPage && (
               <div className="page-inspector">
                 <div className="inspector-head">
@@ -4572,9 +4589,7 @@ function App() {
                   {[
                     ["manuscript", "Manuscript"],
                     ["layout", "Layout"],
-                    ["typography", "Typography"],
-                    ["imageplan", "Image Plan"],
-                    ["prompt", "Prompt"],
+                    ["imagegen", "Image Generation"],
                     ["image", "Image Result"],
                     ["finalpage", "Final Page"],
                   ].map(([key, label]) => (
@@ -4596,6 +4611,16 @@ function App() {
                     <div className="inspector-pane">
                       <div className="kv"><span>Subject</span><b>{inspectorData.manuscript.imageSubject}</b></div>
                       <div className="kv"><span>Words</span><b>{inspectorData.manuscript.wordCount}</b></div>
+                      <p className="inspector-subhead">Text allocation &amp; overflow</p>
+                      <div className="kv"><span>Font</span><b>{inspectorData.typography.bodyFont} · {inspectorData.typography.bodyPt}pt · {inspectorData.typography.lineHeight} lh</b></div>
+                      <div className="kv"><span>Fit</span><b className={`fit-tag fit-${inspectorData.typography.fit.status.toLowerCase()}`}>{inspectorData.typography.fit.status}</b></div>
+                      <div className="kv"><span>Characters</span><b>{inspectorData.typography.fit.charCount} / {inspectorData.typography.fit.capacityChars} capacity ({Math.round(inspectorData.typography.fit.fillRatio * 100)}%)</b></div>
+                      <div className="kv"><span>Lines</span><b>{inspectorData.typography.fit.estimatedLines} / {inspectorData.typography.fit.usableLines} usable</b></div>
+                      <div className="kv"><span>Words / page</span><b>opening {inspectorData.typography.wordsPerOpeningPage} · continuation {inspectorData.typography.wordsPerContinuationPage}</b></div>
+                      <div className="kv"><span>Estimated pages</span><b>{inspectorData.typography.estimatedRenderedPages}</b></div>
+                      {inspectorData.typography.fit.notes.length > 0 && (
+                        <ul className="zone-list">{inspectorData.typography.fit.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
+                      )}
                       {inspectorData.manifestStage && (
                         <details className="inspector-contract">
                           <summary>Manifest stage instructions — {inspectorData.manifestStage.name} ({inspectorData.manifestStage.runtime})</summary>
@@ -4652,6 +4677,11 @@ function App() {
                         ))}
                       </div>
                       <p className="inspector-subhead">Visual blueprint</p>
+                      <div className="bp-legend">
+                        <span><span className="zone-dot zone-text" /> RED = text-safe (+title)</span>
+                        <span><span className="zone-dot zone-image" /> BLUE = primary image</span>
+                        <span><span className="zone-dot zone-support" /> ORANGE = supporting image</span>
+                      </div>
                       {inspectorData.blueprint.available ? (
                         <img className="inspector-blueprint" alt="Layout blueprint composition map" src={`${apiUrl}${inspectorData.blueprint.url}`} />
                       ) : (
@@ -4672,55 +4702,36 @@ function App() {
                     </div>
                   )}
 
-                  {inspectorData && inspectorTab === "typography" && (
-                    <div className="inspector-pane">
-                      <div className="kv"><span>Font</span><b>{inspectorData.typography.bodyFont} · {inspectorData.typography.bodyPt}pt · {inspectorData.typography.lineHeight} lh</b></div>
-                      <div className="kv"><span>Fit</span><b className={`fit-tag fit-${inspectorData.typography.fit.status.toLowerCase()}`}>{inspectorData.typography.fit.status}</b></div>
-                      <div className="kv"><span>Characters</span><b>{inspectorData.typography.fit.charCount} / {inspectorData.typography.fit.capacityChars} capacity ({Math.round(inspectorData.typography.fit.fillRatio * 100)}%)</b></div>
-                      <div className="kv"><span>Lines</span><b>{inspectorData.typography.fit.estimatedLines} / {inspectorData.typography.fit.usableLines} usable</b></div>
-                      <div className="kv"><span>Words / page</span><b>opening {inspectorData.typography.wordsPerOpeningPage} · continuation {inspectorData.typography.wordsPerContinuationPage}</b></div>
-                      <div className="kv"><span>Estimated pages</span><b>{inspectorData.typography.estimatedRenderedPages}</b></div>
-                      {inspectorData.typography.fit.notes.length > 0 && (
-                        <>
-                          <p className="inspector-subhead">Notes</p>
-                          <ul className="zone-list">{inspectorData.typography.fit.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {inspectorData && inspectorTab === "imageplan" && (
-                    <div className="inspector-pane">
-                      <div className="kv"><span>Hero subject</span><b>{inspectorData.manuscript.imageSubject}</b></div>
-                      <div className="kv"><span>Placement</span><b>{inspectorData.layout.artBrief.placement}</b></div>
-                      <div className="kv"><span>Text placement</span><b>{inspectorData.layout.artBrief.textPlacement}</b></div>
-                      <p className="inspector-subhead">Illustration / supporting zones</p>
-                      <ul className="zone-list">
-                        {inspectorData.layout.artBrief.imagePriorityZones.map((z) => (
-                          <li key={z.id}><b>{z.role}</b> — {z.instruction}</li>
-                        ))}
-                      </ul>
-                      <p className="inspector-subhead">Layout instructions</p>
-                      <p>{inspectorData.layout.layoutInstructions.description}</p>
-                      <div className="kv"><span>Image zone</span><b>{inspectorData.layout.layoutInstructions.imageZone}</b></div>
-                      <div className="kv"><span>Text zone</span><b>{inspectorData.layout.layoutInstructions.textZone}</b></div>
-                      <p className="inspector-subhead">Blueprint composition instruction</p>
-                      <pre className="inspector-pre">{inspectorData.blueprint.instruction}</pre>
-                    </div>
-                  )}
-
-                  {inspectorData && inspectorTab === "prompt" && (
-                    <div className="inspector-pane">
-                      <div className="inspector-prompt-head">
-                        <span>sha {inspectorData.prompt.sha256.slice(0, 12)}… · {inspectorData.prompt.ready ? "ready" : "blocked"}</span>
-                        <button type="button" className="secondary" onClick={copyInspectorPrompt}>
-                          {inspectorPromptCopied ? "Copied!" : "Copy prompt"}
-                        </button>
+                  {inspectorData && inspectorTab === "imagegen" && (() => {
+                    const pkg = parseSubjectPackage(inspectorData.prompt.text);
+                    // Style DNA = everything before the SUBJECT PACKAGE block (ground truth: exactly what the backend sent).
+                    const styleDna = inspectorData.prompt.text.split("SUBJECT PACKAGE")[0].trim();
+                    return (
+                      <div className="inspector-pane">
+                        <div className="kv"><span>Hero subject</span><b>{pkg.primary || inspectorData.manuscript.imageSubject}</b></div>
+                        <p className="inspector-subhead">Supporting subjects (ORANGE zones)</p>
+                        {pkg.supporting.length > 0
+                          ? <ul className="zone-list">{pkg.supporting.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                          : <p className="empty">—</p>}
+                        <div className="kv"><span>Environment</span><b>{pkg.environment || "—"}</b></div>
+                        <div className="kv"><span>Mood</span><b>{pkg.mood || "—"}</b></div>
+                        <details className="inspector-contract">
+                          <summary>Master Style DNA</summary>
+                          <pre className="inspector-pre">{styleDna || "Style DNA not loaded — open the project config."}</pre>
+                        </details>
+                        <p className="inspector-subhead">Blueprint instructions (RED / BLUE / ORANGE)</p>
+                        <pre className="inspector-pre">{inspectorData.blueprint.instruction}</pre>
+                        <div className="inspector-prompt-head">
+                          <span>Exact final prompt · sha {inspectorData.prompt.sha256.slice(0, 12)}… · {inspectorData.prompt.ready ? "ready" : "blocked"}</span>
+                          <button type="button" className="secondary" onClick={copyInspectorPrompt}>
+                            {inspectorPromptCopied ? "Copied!" : "Copy prompt"}
+                          </button>
+                        </div>
+                        {inspectorData.prompt.blockers.length > 0 && <p className="empty">Blockers: {inspectorData.prompt.blockers.join(", ")}</p>}
+                        <pre className="inspector-pre inspector-prompt-text">{inspectorData.prompt.text}</pre>
                       </div>
-                      {inspectorData.prompt.blockers.length > 0 && <p className="empty">Blockers: {inspectorData.prompt.blockers.join(", ")}</p>}
-                      <pre className="inspector-pre inspector-prompt-text">{inspectorData.prompt.text}</pre>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {inspectorData && inspectorTab === "image" && (
                     <div className="inspector-pane">
