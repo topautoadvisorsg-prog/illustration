@@ -510,12 +510,12 @@ export function deriveSubjectPackage(page: PageManifest): SubjectPackage {
 
 const LEAN_LAYOUT_RULES = [
   'LAYOUT RULES',
-  '- Follow the blueprint image.',
-  '- Generate imagery only.',
-  '- Generate no readable text.',
-  '- Respect RED, BLUE, and ORANGE zones.',
-  '- Do not place important subjects in RED zones.',
-  '- Do not generate labels, captions, annotations, or typography.',
+  '- The page is one continuous illustrated page.',
+  '- BLUE = primary image priority. ORANGE = supporting studies. RED = the Reading Field (calm parchment).',
+  '- Open the illustration organically into the Reading Field; never wall it off with a box, panel, or hard edge.',
+  '- Keep the Reading Field calm, open, and low-detail; place no important subjects there.',
+  '- Supporting studies sit directly on the page like museum specimen studies — no cards, sticky notes, boxes, frames, or colored/yellow backgrounds.',
+  '- Generate imagery only. No words, letters, labels, captions, annotations, page numbers, or typography anywhere.',
 ].join('\n');
 
 /** Assemble the lean image prompt: Style DNA + SUBJECT PACKAGE + blueprint pointer + rules. */
@@ -537,13 +537,14 @@ export function assembleLeanPrompt(masterStyleDna: string, pkg: SubjectPackage):
     'MOOD',
     `- ${pkg.mood}`,
     '',
-    'COMPOSITION — follow the attached blueprint image.',
-    'RED zones: text-safe zones — keep calm and open; place no important subjects here.',
-    'BLUE zones: primary illustration zones — the primary subject and environmental scene.',
-    'ORANGE zones: supporting illustration zones — small supporting specimen studies.',
-    'Follow the blueprint composition exactly.',
+    'COMPOSITION — follow the attached blueprint image. The whole page is ONE continuous illustrated page.',
+    'RED zones = the READING FIELD: a calm, open, low-detail parchment area where typography will be placed later. It is NOT a box — place no important subjects here.',
+    'BLUE zones = primary image priority: the main subject and the environmental scene; concentrate the strongest detail here.',
+    'ORANGE zones = supporting study areas: small naturalist specimen studies placed directly on the page.',
+    'The illustration must OPEN ORGANICALLY into the Reading Field — let the artwork dissolve into it through a natural transition: mist, light sky, pale terrain, calm water, paper tone, or atmospheric fade. No hard edge, no seam, no rectangle.',
+    'Keep the Reading Field calm and open. The renderer/layout system owns final typography and readability — you only keep this area clear.',
     '',
-    'Supporting studies are rendered directly on the bare parchment as loose museum specimen studies — delicate watercolor/ink studies that sit naturally on the page itself. No cards, no frames, no boxes, no colored backgrounds, no rectangles behind them. They should feel hand-placed in a naturalist field journal, integrated into the same paper as the page.',
+    'Supporting studies feel like museum / naturalist studies placed directly on the page — delicate watercolor or ink specimen studies, hand-placed on the same paper. No cards. No sticky notes. No yellow or colored backgrounds. No boxes. No frames. No rectangles behind them.',
     '',
     LEAN_LAYOUT_RULES,
   ].join('\n');

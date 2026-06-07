@@ -43,7 +43,8 @@ describe('layout blueprint', () => {
   it('composition instruction tells the model to use the map and never render text', () => {
     expect(BLUEPRINT_COMPOSITION_INSTRUCTION).toContain('composition map');
     expect(BLUEPRINT_COMPOSITION_INSTRUCTION).toContain('PRIMARY_IMAGE_ZONE');
-    expect(BLUEPRINT_COMPOSITION_INSTRUCTION).toContain('TEXT_SAFE_ZONE');
+    expect(BLUEPRINT_COMPOSITION_INSTRUCTION).toContain('READING_FIELD_ZONE');
+    expect(BLUEPRINT_COMPOSITION_INSTRUCTION.toLowerCase()).toContain('reading field');
     expect(BLUEPRINT_COMPOSITION_INSTRUCTION.toLowerCase()).toContain('do not reproduce its flat colors');
     expect(BLUEPRINT_COMPOSITION_INSTRUCTION.toLowerCase()).toContain('do not generate words');
   });

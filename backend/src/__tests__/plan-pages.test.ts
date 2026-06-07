@@ -107,7 +107,9 @@ describe('planPage', () => {
     expect(decision.prompt).toContain('BLUE zones');
     expect(decision.prompt).toContain('ORANGE zones');
     expect(decision.prompt).toContain('LAYOUT RULES');
-    expect(decision.prompt).toContain('Generate no readable text.');
+    expect(decision.prompt).toContain('Generate imagery only.');
+    expect(decision.prompt).toContain('READING FIELD'); // RED is now the Reading Field, not a text-safe box
+    expect(decision.prompt).toContain('OPEN ORGANICALLY'); // organic transition language present
     // The verbose/legacy language is gone.
     expect(decision.prompt).not.toContain('PAGE COMPOSITION BRIEF');
     expect(decision.prompt).not.toContain('{SUBJECT}');

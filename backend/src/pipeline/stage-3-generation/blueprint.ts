@@ -55,10 +55,11 @@ export async function renderBlueprintPng(
  * it is surfaced in the Inspector so the operator can read the blueprint's meaning.
  */
 export const BLUEPRINT_COMPOSITION_INSTRUCTION = [
-  'A layout blueprint image is attached as the composition map.',
-  'BLUE regions = PRIMARY_IMAGE_ZONE — the primary subject and environmental scene.',
-  'ORANGE regions = SUPPORTING_IMAGE_ZONE — small supporting specimen studies.',
-  'RED regions = TEXT_SAFE_ZONE (and title) — keep calm, low-contrast, and free of important subject matter.',
-  'The blueprint defines composition ONLY — do NOT reproduce its flat colors, boxes, rectangles, or rounded corners; render the natural illustration within those regions so the page reads as one continuous artwork.',
+  'A layout blueprint image is attached as the composition map. The whole page is ONE continuous illustrated page.',
+  'BLUE regions = PRIMARY_IMAGE_ZONE — the primary subject and the environmental scene; concentrate the strongest detail here.',
+  'ORANGE regions = SUPPORTING_IMAGE_ZONE — small naturalist specimen studies placed directly on the page (no cards, sticky notes, boxes, frames, or colored/yellow backgrounds).',
+  'RED regions = READING_FIELD_ZONE (and title) — a calm, open, low-detail parchment area for later typography; keep it clear of important subject matter. It is not a box.',
+  'The illustration must open organically into the Reading Field: let the artwork dissolve into it through mist, light sky, pale terrain, calm water, paper tone, or atmospheric fade — no hard edge, seam, or rectangle.',
+  'The blueprint defines composition ONLY — do not reproduce its flat colors, boxes, rectangles, or rounded corners; render one natural illustration across the whole page.',
   'Do not generate words, letters, labels, captions, page numbers, or readable text.',
 ].join(' ');
