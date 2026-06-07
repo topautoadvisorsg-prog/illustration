@@ -286,11 +286,28 @@ function fullPageArtworkCss(t: Typography, c: Palette): string {
      treatment — the artwork itself is the visual identity. */
   .pagedjs_sheet.has-artwork::before,
   .pagedjs_sheet.has-artwork::after { content: none; }
-  /* READING ZONE: feathered parchment veil behind the body text. Elliptical
-     gradient — calm in the text core, fading to transparent at the panel edges so
-     it blends into the artwork. No border, no radius, no hard box. */
-  .text-panel { position: relative; z-index: 2; padding: 10pt 14pt; background: radial-gradient(ellipse 116% 96% at 50% 46%, ${rzPaper(c.paper, 0.84)} 0%, ${rzPaper(c.paper, 0.80)} 52%, ${rzPaper(c.paper, 0.45)} 82%, ${rzPaper(c.paper, 0)} 100%); }
-  .text-panel p, .text-panel li, .text-panel h3, .text-panel strong, .text-panel .section-header, .text-panel .section-body { text-shadow: 0 0 2px ${c.paper}, 0 0 4px ${c.paper}, 0 0 6px ${c.paper}; }
+  /* READING ZONE: feathered parchment veil behind the body text. The veil lives on
+     a ::before layer (NOT the panel itself, so the text stays crisp) and is BOTH
+     drawn as a soft elliptical gradient AND masked by a second ellipse that forces
+     every edge — left, top, right, bottom — to dissolve to nothing. A bare radial
+     gradient inside a rectangle always clips to straight edges where it is still
+     opaque (the old "card" look); the mask removes those straight edges entirely.
+     Low core opacity + early fade keep the artwork visible: organic, not a panel. */
+  .text-panel { position: relative; z-index: 2; padding: 12pt 16pt; }
+  .text-panel::before {
+    content: ""; position: absolute; inset: -10pt -8pt; z-index: -1; pointer-events: none;
+    background: radial-gradient(ellipse 128% 120% at 50% 44%,
+      ${rzPaper(c.paper, 0.62)} 0%,
+      ${rzPaper(c.paper, 0.58)} 24%,
+      ${rzPaper(c.paper, 0.42)} 52%,
+      ${rzPaper(c.paper, 0.20)} 78%,
+      ${rzPaper(c.paper, 0)} 100%);
+    -webkit-mask-image: radial-gradient(ellipse 84% 90% at 50% 46%,
+      #000 0%, #000 22%, rgba(0,0,0,0.45) 64%, rgba(0,0,0,0.12) 86%, transparent 100%);
+    mask-image: radial-gradient(ellipse 84% 90% at 50% 46%,
+      #000 0%, #000 22%, rgba(0,0,0,0.45) 64%, rgba(0,0,0,0.12) 86%, transparent 100%);
+  }
+  .text-panel p, .text-panel li, .text-panel h3, .text-panel strong, .text-panel .section-header, .text-panel .section-body { text-shadow: 0 0 3px ${c.paper}, 0 0 5px ${c.paper}, 0 0 8px ${c.paper}; }
   /* Planning preview (no image yet): three-zone overlay teaches "the page IS artwork".
      Outlines only — never a filled box. Labels float at the edges; the page stays paper-clean. */
   .planning-zones { position: relative; box-sizing: border-box; width: 100%; page-break-inside: avoid; margin-bottom: 14pt; }

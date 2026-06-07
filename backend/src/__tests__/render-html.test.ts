@@ -81,8 +81,11 @@ describe('buildPageHtml', () => {
     // Sheet background is the raw image, painted clean.
     expect(html).toContain('url("data:image/png;base64,AAAA")');
     expect(html).toContain('background-size: cover');
-    // The reading-zone veil is a radial gradient on the TEXT PANEL (not over the sheet).
-    expect(html).toMatch(/\.text-panel \{[^}]*radial-gradient\(ellipse/);
+    // The reading-zone veil lives on a ::before layer behind the text (so the text
+    // stays crisp), painted as a soft elliptical gradient AND masked so every edge
+    // dissolves — no hard rectangle / card.
+    expect(html).toMatch(/\.text-panel::before \{[^}]*radial-gradient\(ellipse/);
+    expect(html).toMatch(/\.text-panel::before \{[^}]*mask-image: radial-gradient\(ellipse/);
   });
 
   it('paints the hero artwork only on the entry first sheet so continuation sheets stay clean (Phase 2)', () => {
