@@ -3422,30 +3422,33 @@ button.secondary {
    the non-active buckets — active sections keep their natural display (grids stay
    intact). Untagged sections (e.g. topbar, Active Project picker) always show.
    Nothing is removed; views simply group what is shown. */
-.shell.nav-control .cc-setup,
-.shell.nav-control .cc-library,
-.shell.nav-control .cc-intel,
-.shell.nav-control .cc-export { display: none !important; }
+/* Multi-tag rule: a panel can carry MULTIPLE bucket tags (e.g. "cc-intel cc-control"
+   to appear on both Intelligence and Control Center). The :not() selector means a
+   panel is only hidden on a tab if it does NOT also carry the active tab's tag. */
+.shell.nav-control .cc-setup:not(.cc-control),
+.shell.nav-control .cc-library:not(.cc-control),
+.shell.nav-control .cc-intel:not(.cc-control),
+.shell.nav-control .cc-export:not(.cc-control) { display: none !important; }
 
-.shell.nav-setup .cc-control,
-.shell.nav-setup .cc-library,
-.shell.nav-setup .cc-intel,
-.shell.nav-setup .cc-export { display: none !important; }
+.shell.nav-setup .cc-control:not(.cc-setup),
+.shell.nav-setup .cc-library:not(.cc-setup),
+.shell.nav-setup .cc-intel:not(.cc-setup),
+.shell.nav-setup .cc-export:not(.cc-setup) { display: none !important; }
 
-.shell.nav-library .cc-control,
-.shell.nav-library .cc-setup,
-.shell.nav-library .cc-intel,
-.shell.nav-library .cc-export { display: none !important; }
+.shell.nav-library .cc-control:not(.cc-library),
+.shell.nav-library .cc-setup:not(.cc-library),
+.shell.nav-library .cc-intel:not(.cc-library),
+.shell.nav-library .cc-export:not(.cc-library) { display: none !important; }
 
-.shell.nav-intelligence .cc-control,
-.shell.nav-intelligence .cc-setup,
-.shell.nav-intelligence .cc-library,
-.shell.nav-intelligence .cc-export { display: none !important; }
+.shell.nav-intelligence .cc-control:not(.cc-intelligence),
+.shell.nav-intelligence .cc-setup:not(.cc-intelligence),
+.shell.nav-intelligence .cc-library:not(.cc-intelligence),
+.shell.nav-intelligence .cc-export:not(.cc-intelligence) { display: none !important; }
 
-.shell.nav-export .cc-control,
-.shell.nav-export .cc-setup,
-.shell.nav-export .cc-library,
-.shell.nav-export .cc-intel { display: none !important; }
+.shell.nav-export .cc-control:not(.cc-export),
+.shell.nav-export .cc-setup:not(.cc-export),
+.shell.nav-export .cc-library:not(.cc-export),
+.shell.nav-export .cc-intel:not(.cc-export) { display: none !important; }
 
 .sidebar-topnav .sidebar-primary { width: 100%; text-align: left; margin: 2px 0; }
 
@@ -3547,6 +3550,38 @@ button.danger, .button.danger {
 button.danger:hover:not(:disabled) {
   background: #fdf2e9;
 }
+.empty-state-card {
+  border: 2px dashed #b4541f;
+  background: #fdf2e9;
+  border-radius: 10px;
+  padding: 22px 24px;
+  margin: 14px 0;
+  text-align: center;
+}
+.empty-state-card h3 {
+  margin: 0 0 6px;
+  color: #2f2a23;
+  font-size: 1.15rem;
+}
+.empty-state-card p {
+  margin: 0 0 14px;
+  color: #6d6258;
+  font-size: 0.92rem;
+}
+.empty-state-card button.primary {
+  background: #2f4a2b;
+  color: #faf6ee;
+  border: 0;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.empty-state-card button.primary:hover:not(:disabled) {
+  background: #3d6038;
+}
+
 .asset-source-badge {
   display: inline-block;
   font-size: 0.66rem;

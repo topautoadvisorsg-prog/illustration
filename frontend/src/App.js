@@ -1879,6 +1879,39 @@ function App() {
     }[key] || ".review-board";
   }
 
+  // Each workflow step lives on a specific top-nav view. Clicking a sidebar
+  // step must switch to that view first, otherwise scrollToWorkspaceSection
+  // targets a hidden element and nothing happens.
+  function topNavForStage(key) {
+    return {
+      project: "setup",
+      standards: "setup",
+      manuscript: "control",
+      breakdown: "control",
+      plan: "control",
+      textfit: "control",
+      quality: "control",
+      layout: "control",
+      images: "control",
+      proof: "export",
+      export: "export",
+    }[key] || "control";
+  }
+
+  function jumpToWorkflowStage(stageKey) {
+    const targetNav = topNavForStage(stageKey);
+    const selector = reviewSelectorForStage(stageKey);
+    if (topNav !== targetNav) {
+      setTopNav(targetNav);
+      // CSS hides/shows panels off the active nav class — wait one paint so the
+      // target section is visible before scrolling, otherwise the scroll target
+      // is still display:none and the call is a no-op.
+      window.setTimeout(() => scrollToWorkspaceSection(selector), 80);
+    } else {
+      scrollToWorkspaceSection(selector);
+    }
+  }
+
   function currentStagePrimaryAction() {
     const label = String(currentStageResult.primaryLabel || "").toLowerCase();
     const shouldRunStage = ["create", "choose", "upload", "start", "generate", "run", "approve", "render", "load"].some((word) => label.startsWith(word));
@@ -3584,7 +3617,7 @@ function App() {
           </div>
         </div>
         <div className="sidebar-section sidebar-topnav">
-          <span>Workspace</span>
+          <span>Views</span>
           {[
             ["control", "🛠 Control Center"],
             ["setup", "Setup"],
@@ -3610,7 +3643,7 @@ function App() {
                 type="button"
                 className={`sidebar-stage ${stage.state || "locked"}`}
                 key={stage.key}
-                onClick={() => scrollToWorkspaceSection(reviewSelectorForStage(stage.key))}
+                onClick={() => jumpToWorkflowStage(stage.key)}
               >
                 <em>{stage.index}</em>
                 <strong>{stage.label}</strong>
@@ -3681,7 +3714,7 @@ function App() {
 
       {(message || error) && <section className={`notice ${error ? "error" : ""}`}>{error || message}</section>}
 
-      <section className="dashboard-hero cc-intel">
+      <section className="dashboard-hero cc-intel cc-control">
         <div className="project-cover-card" aria-hidden="true">
           <span>New England</span>
           <strong>Wildlands</strong>
@@ -3822,7 +3855,7 @@ function App() {
         </div>
       </section>
 
-      <section className="operator-grid cc-intel">
+      <section className="operator-grid cc-intel cc-control">
         <section className="panel command-panel">
           <div className="section-head">
             <div>
@@ -3831,6 +3864,23 @@ function App() {
             </div>
             <span className="mode-pill">{busy ? "Running" : "Ready"}</span>
           </div>
+          {projects.length === 0 && (
+            <div className="empty-state-card">
+              <h3>Welcome — start your first project</h3>
+              <p>No projects yet. Create one to unlock manuscript upload, page planning, image generation, and final export.</p>
+              <button
+                type="button"
+                className="primary"
+                disabled={busy}
+                onClick={() => {
+                  setTopNav("setup");
+                  window.setTimeout(() => scrollToWorkspaceSection(".setup-panel"), 80);
+                }}
+              >
+                Create Your First Project
+              </button>
+            </div>
+          )}
           <div className="phase-row project-row">
             <label htmlFor="project-select">Project</label>
             <div className="project-picker" id="project-select" role="listbox" aria-label="Projects">
@@ -6284,35 +6334,6 @@ function App() {
             </div>
           </section>
           )}
-
-          <section className="panel">
-            <h2>Active Project</h2>
-            <div className="project-picker compact" role="listbox" aria-label="Active project">
-              {projects.map((project) => (
-                <div className="project-item" key={project.id}>
-                  <button
-                    type="button"
-                    className={project.id === activeProjectId ? "picker-button active" : "picker-button"}
-                    onClick={() => selectProject(project.id)}
-                  >
-                    <strong>{project.title}</strong>
-                    <span>{normalizeStatus(project.status)}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="project-delete"
-                    title="Delete this project permanently"
-                    disabled={busy}
-                    onClick={() => run("Deleting project...", () => deleteProjectById(project.id, project.title || project.id.slice(0, 8)))}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              {projects.length === 0 && <span className="empty-inline">No project selected</span>}
-            </div>
-            {selectedProject && <p className="meta">Selected: {selectedProject.id}</p>}
-          </section>
 
           {(advancedMode || topNav === "library") && (
           <section className="panel template-panel cc-library">
