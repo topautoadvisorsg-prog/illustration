@@ -1381,6 +1381,14 @@ function App() {
   const [imageLibrary, setImageLibrary] = useState({ total: 0, assets: [] });
   const [imageLibraryFilter, setImageLibraryFilter] = useState({ q: "", status: "", layout: "", chapter: "" });
   const [selectedPageId, setSelectedPageId] = useState("");
+  // Page Generation Inspector (operator visibility — read-only).
+  const [inspectorTab, setInspectorTab] = useState("manuscript");
+  const [inspectorData, setInspectorData] = useState(null);
+  const [inspectorLoading, setInspectorLoading] = useState(false);
+  const [inspectorError, setInspectorError] = useState("");
+  const [inspectorPreviewUrl, setInspectorPreviewUrl] = useState("");
+  const [inspectorPreviewLoading, setInspectorPreviewLoading] = useState(false);
+  const [inspectorPromptCopied, setInspectorPromptCopied] = useState(false);
   const [imageInstruction, setImageInstruction] = useState("");
   const [pdfPreview, setPdfPreview] = useState({ title: "", url: "", meta: "", kind: "", chapterNumber: null, pageKey: "" });
   const [proofThumbnails, setProofThumbnails] = useState([]);
@@ -1949,6 +1957,59 @@ function App() {
       blob: await response.blob(),
       headers: response.headers,
     };
+  }
+
+  // Fetch the read-only construction chain for the selected page (Inspector).
+  async function loadInspector(pageKey) {
+    if (!activeProjectId || !pageKey) {
+      setInspectorData(null);
+      return;
+    }
+    setInspectorLoading(true);
+    setInspectorError("");
+    try {
+      const data = await call(`/api/projects/${activeProjectId}/pages/${encodeURIComponent(pageKey)}/inspector`);
+      setInspectorData(data);
+    } catch (error) {
+      setInspectorData(null);
+      setInspectorError(error.message || "Failed to load inspector.");
+    } finally {
+      setInspectorLoading(false);
+    }
+  }
+
+  // Tab 7 — render the final single page to PDF and embed it (exact export fidelity).
+  async function loadInspectorPreview(pageKey) {
+    if (!activeProjectId || !pageKey) return;
+    setInspectorPreviewLoading(true);
+    try {
+      const { blob } = await callPdf(`/api/projects/${activeProjectId}/pages/${encodeURIComponent(pageKey)}/render`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const url = URL.createObjectURL(blob);
+      setInspectorPreviewUrl((old) => {
+        if (old) URL.revokeObjectURL(old);
+        return url;
+      });
+    } catch (error) {
+      setError(error.message || "Final page preview failed.");
+    } finally {
+      setInspectorPreviewLoading(false);
+    }
+  }
+
+  async function copyInspectorPrompt() {
+    const text = inspectorData?.prompt?.text || "";
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setInspectorPromptCopied(true);
+      setTimeout(() => setInspectorPromptCopied(false), 1800);
+    } catch {
+      setError("Clipboard not available in this browser.");
+    }
   }
 
   function resetProofDesk(status = "") {
@@ -3153,6 +3214,22 @@ function App() {
       storeString(selectedPageKey(activeProjectId), selectedPageId);
     }
   }, [activeProjectId, selectedPageId]);
+
+  // Load the Page Generation Inspector whenever the selected page changes.
+  // Read-only; resets the stale final-page preview so it isn't shown for another page.
+  const selectedPageKeyValue = selectedPage?.pageKey || "";
+  useEffect(() => {
+    setInspectorPreviewUrl((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return "";
+    });
+    if (activeProjectId && selectedPageKeyValue) {
+      loadInspector(selectedPageKeyValue);
+    } else {
+      setInspectorData(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId, selectedPageKeyValue]);
 
   useEffect(() => {
     if (!apiUrl || !activeProjectId || !projects.some((project) => project.id === activeProjectId)) return;
@@ -4461,6 +4538,164 @@ function App() {
                 <span>{layoutName(selectedPage.layoutTemplate || selectedPagePlan?.layoutTemplate)} / {normalizeStatus(selectedPage.status)}</span>
                 <span>{selectedChapterApproval ? "chapter layout approved" : "chapter layout pending"}</span>
                 <span>{selectedPagePlan?.promptReady ? "prompt ready" : selectedPage.imagePrompt ? "prompt stored" : "prompt pending"}</span>
+              </div>
+            )}
+            {selectedPage && (
+              <div className="page-inspector">
+                <div className="inspector-head">
+                  <strong>Page Generation Inspector</strong>
+                  <span className="inspector-status">
+                    {inspectorLoading
+                      ? "loading…"
+                      : inspectorData
+                        ? `${inspectorData.page.pageKey} · ${inspectorData.layout.label} · ${inspectorData.page.status}`
+                        : inspectorError || "no data"}
+                  </span>
+                  <button type="button" className="secondary" disabled={inspectorLoading} onClick={() => loadInspector(selectedPage.pageKey)}>
+                    Refresh
+                  </button>
+                </div>
+                <div className="inspector-tabs" role="tablist">
+                  {[
+                    ["manuscript", "Manuscript"],
+                    ["layout", "Layout"],
+                    ["typography", "Typography"],
+                    ["imageplan", "Image Plan"],
+                    ["prompt", "Prompt"],
+                    ["image", "Image Result"],
+                    ["finalpage", "Final Page"],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      className={inspectorTab === key ? "inspector-tab active" : "inspector-tab"}
+                      onClick={() => setInspectorTab(key)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="inspector-body">
+                  {!inspectorData && <p className="empty">{inspectorLoading ? "Loading inspector…" : inspectorError || "No inspector data for this page."}</p>}
+
+                  {inspectorData && inspectorTab === "manuscript" && (
+                    <div className="inspector-pane">
+                      <div className="kv"><span>Subject</span><b>{inspectorData.manuscript.imageSubject}</b></div>
+                      <div className="kv"><span>Words</span><b>{inspectorData.manuscript.wordCount}</b></div>
+                      <p className="inspector-subhead">Source text</p>
+                      <pre className="inspector-pre">{inspectorData.manuscript.bodyMarkdown}</pre>
+                    </div>
+                  )}
+
+                  {inspectorData && inspectorTab === "layout" && (
+                    <div className="inspector-pane">
+                      <div className="kv"><span>Template</span><b>{inspectorData.layout.template}</b></div>
+                      <div className="kv"><span>Reference</span><b>{inspectorData.layout.label}</b></div>
+                      <div className="kv"><span>Content type</span><b>{inspectorData.layout.contentType}</b></div>
+                      <div className="kv"><span>Split</span><b>{inspectorData.layout.artBrief.imagePercent}% image / {inspectorData.layout.artBrief.textPercent}% text</b></div>
+                      <div className="kv"><span>Capacity (words)</span><b>{inspectorData.layout.capacity.minWords}–{inspectorData.layout.capacity.maxWords} (target {inspectorData.layout.capacity.targetWords})</b></div>
+                      <div className="kv"><span>Why this layout</span><b>{inspectorData.layout.decisionTrace.layoutExplanation}</b></div>
+                      <p className="inspector-subhead">Visual blueprint</p>
+                      {inspectorData.blueprint.available ? (
+                        <img className="inspector-blueprint" alt="Layout blueprint composition map" src={`${apiUrl}${inspectorData.blueprint.url}`} />
+                      ) : (
+                        <p className="empty">No blueprint generated for this page yet.</p>
+                      )}
+                      <p className="inspector-subhead">Zones</p>
+                      <ul className="zone-list">
+                        {inspectorData.layout.artBrief.imagePriorityZones.map((z) => (
+                          <li key={z.id}><span className="zone-dot zone-image" /> {z.id} — {z.xPct}%,{z.yPct}% · {z.widthPct}×{z.heightPct}%</li>
+                        ))}
+                        {inspectorData.layout.artBrief.textSafeZones.map((z) => (
+                          <li key={z.id}><span className="zone-dot zone-text" /> {z.id} — {z.xPct}%,{z.yPct}% · {z.widthPct}×{z.heightPct}%</li>
+                        ))}
+                        {inspectorData.layout.artBrief.typographyZones.map((z) => (
+                          <li key={z.id}><span className="zone-dot zone-title" /> {z.id} — {z.xPct}%,{z.yPct}% · {z.widthPct}×{z.heightPct}%</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {inspectorData && inspectorTab === "typography" && (
+                    <div className="inspector-pane">
+                      <div className="kv"><span>Font</span><b>{inspectorData.typography.bodyFont} · {inspectorData.typography.bodyPt}pt · {inspectorData.typography.lineHeight} lh</b></div>
+                      <div className="kv"><span>Fit</span><b className={`fit-tag fit-${inspectorData.typography.fit.status.toLowerCase()}`}>{inspectorData.typography.fit.status}</b></div>
+                      <div className="kv"><span>Characters</span><b>{inspectorData.typography.fit.charCount} / {inspectorData.typography.fit.capacityChars} capacity ({Math.round(inspectorData.typography.fit.fillRatio * 100)}%)</b></div>
+                      <div className="kv"><span>Lines</span><b>{inspectorData.typography.fit.estimatedLines} / {inspectorData.typography.fit.usableLines} usable</b></div>
+                      <div className="kv"><span>Words / page</span><b>opening {inspectorData.typography.wordsPerOpeningPage} · continuation {inspectorData.typography.wordsPerContinuationPage}</b></div>
+                      <div className="kv"><span>Estimated pages</span><b>{inspectorData.typography.estimatedRenderedPages}</b></div>
+                      {inspectorData.typography.fit.notes.length > 0 && (
+                        <>
+                          <p className="inspector-subhead">Notes</p>
+                          <ul className="zone-list">{inspectorData.typography.fit.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {inspectorData && inspectorTab === "imageplan" && (
+                    <div className="inspector-pane">
+                      <div className="kv"><span>Hero subject</span><b>{inspectorData.manuscript.imageSubject}</b></div>
+                      <div className="kv"><span>Placement</span><b>{inspectorData.layout.artBrief.placement}</b></div>
+                      <div className="kv"><span>Text placement</span><b>{inspectorData.layout.artBrief.textPlacement}</b></div>
+                      <p className="inspector-subhead">Illustration / supporting zones</p>
+                      <ul className="zone-list">
+                        {inspectorData.layout.artBrief.imagePriorityZones.map((z) => (
+                          <li key={z.id}><b>{z.role}</b> — {z.instruction}</li>
+                        ))}
+                      </ul>
+                      <p className="inspector-subhead">Layout instructions</p>
+                      <p>{inspectorData.layout.layoutInstructions.description}</p>
+                      <div className="kv"><span>Image zone</span><b>{inspectorData.layout.layoutInstructions.imageZone}</b></div>
+                      <div className="kv"><span>Text zone</span><b>{inspectorData.layout.layoutInstructions.textZone}</b></div>
+                    </div>
+                  )}
+
+                  {inspectorData && inspectorTab === "prompt" && (
+                    <div className="inspector-pane">
+                      <div className="inspector-prompt-head">
+                        <span>sha {inspectorData.prompt.sha256.slice(0, 12)}… · {inspectorData.prompt.ready ? "ready" : "blocked"}</span>
+                        <button type="button" className="secondary" onClick={copyInspectorPrompt}>
+                          {inspectorPromptCopied ? "Copied!" : "Copy prompt"}
+                        </button>
+                      </div>
+                      {inspectorData.prompt.blockers.length > 0 && <p className="empty">Blockers: {inspectorData.prompt.blockers.join(", ")}</p>}
+                      <pre className="inspector-pre inspector-prompt-text">{inspectorData.prompt.text}</pre>
+                    </div>
+                  )}
+
+                  {inspectorData && inspectorTab === "image" && (
+                    <div className="inspector-pane">
+                      <div className="kv"><span>Model</span><b>{inspectorData.model}</b></div>
+                      {inspectorData.images.length === 0 && <p className="empty">No image versions generated yet.</p>}
+                      <div className="inspector-images">
+                        {inspectorData.images.map((img) => (
+                          <div className="inspector-image-card" key={img.version}>
+                            <img alt={`version ${img.version}`} src={`${apiUrl}/api/pages/${inspectorData.page.pageId}/image?v=${img.version}`} />
+                            <div className="inspector-image-meta">v{img.version} · {img.status}{img.active ? " · active" : ""} · {img.widthPx}×{img.heightPx}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {inspectorData && inspectorTab === "finalpage" && (
+                    <div className="inspector-pane">
+                      <div className="inspector-prompt-head">
+                        <span>Exact exported page (PDF)</span>
+                        <button type="button" className="secondary" disabled={inspectorPreviewLoading} onClick={() => loadInspectorPreview(selectedPage.pageKey)}>
+                          {inspectorPreviewLoading ? "Rendering…" : inspectorPreviewUrl ? "Re-render" : "Render final page"}
+                        </button>
+                      </div>
+                      {inspectorPreviewUrl ? (
+                        <iframe title="Final page preview" className="inspector-final-preview" src={inspectorPreviewUrl} />
+                      ) : (
+                        <p className="empty">{inspectorPreviewLoading ? "Rendering the final page…" : "Render to see the exact exported page (image + typography)."}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {selectedPage && !selectedChapterApproval && (
