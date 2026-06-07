@@ -14,9 +14,13 @@ import { createHash } from 'node:crypto';
 import { LayoutTemplateIdSchema, ProjectConfigSchema } from '@wildlands/shared';
 import {
   generateImage as defaultGenerateImage,
+  generateImageFromBlueprint,
   type GenerateImageInput,
   type GeneratedImage,
 } from '../../services/openai/openai.js';
+import { computePageGeometry } from '../stage-6-layout/page-geometry.js';
+import { directLayout } from '../stage-6-layout/layout-director.js';
+import { renderBlueprintPng, BLUEPRINT_COMPOSITION_INSTRUCTION } from './blueprint.js';
 import { getPageById, setPageStatus } from '../../db/repositories/manifests.repo.js';
 import { getProject } from '../../db/repositories/projects.repo.js';
 import { insertImage, listImagesForPage } from '../../db/repositories/images.repo.js';
@@ -108,6 +112,12 @@ export interface GeneratePageImageOptions {
   storage?: ProjectStorage;
   /** Optional operator tweak appended to the locked prompt on regeneration. */
   promptAddendum?: string;
+  /**
+   * Reference-image mode: build a layout blueprint from the page's zones and hand it
+   * to the image agent as a composition map, so the illustration is composed into the
+   * correct regions (text-safe zone left calm) at generation time.
+   */
+  useBlueprint?: boolean;
 }
 
 export interface GeneratePageImageResult {
@@ -115,6 +125,8 @@ export interface GeneratePageImageResult {
   imageId: string;
   version: number;
   generatedPath: string;
+  /** Path to the layout blueprint used (only when useBlueprint was set). */
+  blueprintPath?: string;
   widthPx: number;
   heightPx: number;
   model: string;
@@ -143,9 +155,35 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
   const layoutAwarePrompt = appendImageShapeInstruction(page.imagePrompt!, imageShape);
   const { prompt: finalPrompt, sha256: promptSha256 } = finalizePrompt(layoutAwarePrompt, opts.promptAddendum);
 
-  logger.info({ pageId: page.id, pageKey: page.pageKey, version, imageSize: imageShape.size, imageShape: imageShape.shape }, 'Stage 3: generating image');
+  logger.info({ pageId: page.id, pageKey: page.pageKey, version, imageSize: imageShape.size, imageShape: imageShape.shape, useBlueprint: Boolean(opts.useBlueprint) }, 'Stage 3: generating image');
 
-  const image = await generator({ prompt: finalPrompt, size: imageShape.size });
+  let image: GeneratedImage;
+  let blueprintPath: string | undefined;
+  if (opts.useBlueprint) {
+    // Build the layout blueprint from the page's deterministic zones and pass it to
+    // the image agent as a composition map. Zone geometry depends only on the layout
+    // (slot + coverage), so an empty body is fine here.
+    const geometry = computePageGeometry(config.trimSize);
+    const allocation = directLayout({
+      bodyMarkdown: '',
+      layoutTemplate,
+      geometry,
+      bodyPt: config.typography.bodyPt,
+      lineHeight: config.typography.lineHeight,
+    });
+    const [bw, bh] = imageShape.size === 'auto' ? [1024, 1536] : imageShape.size.split('x').map(Number);
+    const { png: blueprintPng } = await renderBlueprintPng(allocation, bw ?? 1024, bh ?? 1536);
+    const bpStored = await storage.writeProjectFile(
+      page.projectId,
+      ['blueprints', `${page.pageKey}.png`],
+      blueprintPng,
+    );
+    blueprintPath = bpStored.relativePath;
+    const blueprintPrompt = `${finalPrompt}\n\n${BLUEPRINT_COMPOSITION_INSTRUCTION}`;
+    image = await generateImageFromBlueprint({ prompt: blueprintPrompt, blueprintPng, size: imageShape.size });
+  } else {
+    image = await generator({ prompt: finalPrompt, size: imageShape.size });
+  }
 
   const stored = await storage.writeProjectFile(
     page.projectId,
@@ -189,6 +227,7 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
     imageId: imageRow.id,
     version,
     generatedPath: stored.relativePath,
+    blueprintPath,
     widthPx: image.widthPx,
     heightPx: image.heightPx,
     model: image.model,

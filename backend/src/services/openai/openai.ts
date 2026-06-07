@@ -8,7 +8,7 @@
  * instruction to render text â€” all typography is added later by the layout engine.
  */
 
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 import { getEnv, isPlaceholder } from '../../env.js';
 
 let client: OpenAI | null = null;
@@ -66,6 +66,43 @@ export async function generateImage(input: GenerateImageInput): Promise<Generate
   const b64 = response.data?.[0]?.b64_json;
   if (!b64) {
     throw new Error('OpenAI returned no image data (expected base64 PNG).');
+  }
+
+  const { widthPx, heightPx } = sizeToPixels(size);
+  return { pngBuffer: Buffer.from(b64, 'base64'), model: env.OPENAI_IMAGE_MODEL, size, widthPx, heightPx };
+}
+
+export interface GenerateFromBlueprintInput {
+  prompt: string;
+  /** PNG of the layout blueprint (composition map) handed to the model as a reference. */
+  blueprintPng: Buffer;
+  size?: ImageSize;
+}
+
+/**
+ * Reference-image mode: generate an illustration using a layout blueprint PNG as the
+ * composition map via the image edits endpoint. The model composes the illustration
+ * into the blueprint's zones (and leaves the text-safe zone calm) at generation time.
+ */
+export async function generateImageFromBlueprint(input: GenerateFromBlueprintInput): Promise<GeneratedImage> {
+  const env = getEnv();
+  const openai = getClient();
+  const size: ImageSize = input.size ?? '1024x1536';
+  const imageFile = await toFile(input.blueprintPng, 'blueprint.png', { type: 'image/png' });
+
+  // gpt-image params differ from the DALL-E edit type union; cast like generateImage.
+  const params = {
+    model: env.OPENAI_IMAGE_MODEL,
+    image: imageFile,
+    prompt: input.prompt,
+    size,
+    n: 1,
+  } as unknown as OpenAI.Images.ImageEditParams;
+
+  const response = await openai.images.edit(params);
+  const b64 = response.data?.[0]?.b64_json;
+  if (!b64) {
+    throw new Error('OpenAI returned no image data from blueprint edit (expected base64 PNG).');
   }
 
   const { widthPx, heightPx } = sizeToPixels(size);

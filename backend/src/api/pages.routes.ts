@@ -16,11 +16,14 @@ import { UpscaleBlockedError, upscalePageImage } from '../pipeline/stage-5-upsca
 import { isChromiumAvailable, renderSampleChapterPdf, renderSamplePagePdf } from '../pipeline/stage-6-layout/render-check.js';
 import { getContentTypeGuide } from '../pipeline/stage-2-planner/layered-layout.js';
 import { getActiveImage, getImageById, getImageVersion } from '../db/repositories/images.repo.js';
+import { getPageById } from '../db/repositories/manifests.repo.js';
 import { getProjectStorage } from '../services/storage/project-storage.js';
 
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
 const ImageParamsSchema = z.object({ imageId: z.string().uuid() });
 const ImageVersionParamsSchema = z.object({ pageId: z.string().uuid(), version: z.coerce.number().int().positive() });
+
+const GenerateImageBodySchema = z.object({ useBlueprint: z.boolean().optional() });
 
 const GenerateImageResponseSchema = z.object({
   image: z.object({
@@ -28,6 +31,7 @@ const GenerateImageResponseSchema = z.object({
     imageId: z.string(),
     version: z.number(),
     generatedPath: z.string(),
+    blueprintPath: z.string().optional(),
     widthPx: z.number(),
     heightPx: z.number(),
     model: z.string(),
@@ -67,8 +71,9 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { pageId } = PageParamsSchema.parse(request.params);
+      const { useBlueprint } = GenerateImageBodySchema.parse(request.body ?? {});
       try {
-        const image = await generatePageImage({ pageId });
+        const image = await generatePageImage({ pageId, useBlueprint });
         return { image };
       } catch (error) {
         if (error instanceof GenerationBlockedError) {
@@ -120,6 +125,23 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
       return reply.send(buf);
     } catch {
       return reply.code(404).send({ error: 'Not Found', message: 'Image file missing on disk.', statusCode: 404 });
+    }
+  });
+
+  // Serve the layout blueprint (composition map) handed to the image agent, so the
+  // operator can SEE the map the illustration was composed against.
+  app.get('/api/pages/:pageId/blueprint', async (request, reply) => {
+    const { pageId } = PageParamsSchema.parse(request.params);
+    const page = await getPageById(pageId);
+    if (!page) return reply.code(404).send({ error: 'Not Found', message: 'Page not found.', statusCode: 404 });
+    const path = `${page.projectId}/blueprints/${page.pageKey}.png`;
+    try {
+      const buf = await getProjectStorage().readProjectFile(path);
+      reply.header('content-type', 'image/png');
+      reply.header('cache-control', 'no-store');
+      return reply.send(buf);
+    } catch {
+      return reply.code(404).send({ error: 'Not Found', message: 'No blueprint for this page yet.', statusCode: 404 });
     }
   });
 
