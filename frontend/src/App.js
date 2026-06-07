@@ -3788,6 +3788,7 @@ function App() {
         </div>
       )}
 
+      {projects.length > 0 && (
       <section className={`current-stage-result ${operatorGuidance.stageKey}`}>
         <div className="stage-result-head">
           <div>
@@ -3854,6 +3855,7 @@ function App() {
           <span>{currentStageResult.artifactLabel}</span>
         </div>
       </section>
+      )}
 
       <section className="operator-grid cc-intel cc-control">
         <section className="panel command-panel">
@@ -3881,6 +3883,7 @@ function App() {
               </button>
             </div>
           )}
+          {projects.length > 0 && (
           <div className="phase-row project-row">
             <label htmlFor="project-select">Project</label>
             <div className="project-picker" id="project-select" role="listbox" aria-label="Projects">
@@ -3947,6 +3950,7 @@ function App() {
               event.target.value = "";
             }}
           />
+          )}
           <div className="operator-log" aria-live="polite">
             {operatorLog.map((entry, index) => (
               <div className={`log-row ${entry.level}`} key={`${entry.time}-${index}`}>
