@@ -6289,15 +6289,25 @@ function App() {
             <h2>Active Project</h2>
             <div className="project-picker compact" role="listbox" aria-label="Active project">
               {projects.map((project) => (
-                <button
-                  type="button"
-                  className={project.id === activeProjectId ? "picker-button active" : "picker-button"}
-                  key={project.id}
-                  onClick={() => selectProject(project.id)}
-                >
-                  <strong>{project.title}</strong>
-                  <span>{normalizeStatus(project.status)}</span>
-                </button>
+                <div className="project-item" key={project.id}>
+                  <button
+                    type="button"
+                    className={project.id === activeProjectId ? "picker-button active" : "picker-button"}
+                    onClick={() => selectProject(project.id)}
+                  >
+                    <strong>{project.title}</strong>
+                    <span>{normalizeStatus(project.status)}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="project-delete"
+                    title="Delete this project permanently"
+                    disabled={busy}
+                    onClick={() => run("Deleting project...", () => deleteProjectById(project.id, project.title || project.id.slice(0, 8)))}
+                  >
+                    ✕
+                  </button>
+                </div>
               ))}
               {projects.length === 0 && <span className="empty-inline">No project selected</span>}
             </div>
