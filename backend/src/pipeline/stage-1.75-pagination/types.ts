@@ -17,7 +17,9 @@ import type { LayoutAllocation } from '../stage-6-layout/layout-director.js';
 export const PageRoleSchema = z.enum(['opener', 'continuation', 'compacted']);
 export type PageRole = z.infer<typeof PageRoleSchema>;
 
-/** Mirrors the `fit_status` enum in the DB schema. */
+/** Mirrors the `fit_status` enum in the DB schema. Re-exports the existing
+ *  type alias from capacity.ts so consumers can import either the schema
+ *  (this module) or the string-union type without crossing modules. */
 export const PaginationFitStatusSchema = z.enum([
   'PENDING',
   'FITS',
@@ -25,6 +27,7 @@ export const PaginationFitStatusSchema = z.enum([
   'OVERFLOW',
   'UNDERFILL',
 ]);
+export type { PaginationFitStatus } from './capacity.js';
 
 /** Mirrors the `page_approval_decision` enum in the DB schema. */
 export const PageApprovalDecisionSchema = z.enum(['APPROVED', 'REJECTED', 'RESET']);

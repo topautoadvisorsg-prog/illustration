@@ -3,6 +3,7 @@ import {
   GenerationBlockedError,
   assertLayoutApprovedForImageSpend,
   assertGeneratable,
+  assertPreviewApprovedForImageSpend,
   finalizePrompt,
   nextImageVersion,
 } from '../pipeline/stage-3-generation/generate-image.js';
@@ -50,6 +51,55 @@ describe('assertGeneratable (Stage 3 spend gate)', () => {
   it('allows regeneration from REVIEW and retry from FAILED', () => {
     expect(() => assertGeneratable({ ...ok, status: 'REVIEW' })).not.toThrow();
     expect(() => assertGeneratable({ ...ok, status: 'FAILED' })).not.toThrow();
+  });
+});
+
+describe('assertPreviewApprovedForImageSpend (Pagination v1 gate)', () => {
+  const page = { pageKey: 'CH01_P010', previewApproved: false, carriesSubject: true };
+
+  it('is a no-op when the feature flag is off (preserves legacy behavior)', () => {
+    expect(() => assertPreviewApprovedForImageSpend(page, false)).not.toThrow();
+    expect(() => assertPreviewApprovedForImageSpend({ ...page, carriesSubject: false }, false)).not.toThrow();
+  });
+
+  it('blocks when the flag is on and previewApproved is false', () => {
+    try {
+      assertPreviewApprovedForImageSpend(page, true);
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(GenerationBlockedError);
+      expect((e as GenerationBlockedError).code).toBe('preview_not_approved');
+    }
+  });
+
+  it('blocks when the flag is on and previewApproved is null/undefined', () => {
+    try {
+      assertPreviewApprovedForImageSpend({ ...page, previewApproved: null }, true);
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect((e as GenerationBlockedError).code).toBe('preview_not_approved');
+    }
+  });
+
+  it('blocks continuation pages with carriesSubject=false (no image regardless of approval)', () => {
+    try {
+      assertPreviewApprovedForImageSpend(
+        { ...page, previewApproved: true, carriesSubject: false },
+        true,
+      );
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect((e as GenerationBlockedError).code).toBe('continuation_no_image');
+    }
+  });
+
+  it('allows generation when the flag is on, page is approved, and carries subject', () => {
+    expect(() =>
+      assertPreviewApprovedForImageSpend(
+        { ...page, previewApproved: true, carriesSubject: true },
+        true,
+      ),
+    ).not.toThrow();
   });
 });
 

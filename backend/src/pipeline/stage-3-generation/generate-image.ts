@@ -12,6 +12,7 @@
 
 import { createHash } from 'node:crypto';
 import { LayoutTemplateIdSchema, ProjectConfigSchema } from '@wildlands/shared';
+import { getEnv } from '../../env.js';
 import {
   generateImage as defaultGenerateImage,
   generateImageFromBlueprint,
@@ -68,6 +69,40 @@ export interface LayoutApprovalGatePage {
   chapterNumber: number;
   pageKey: string;
   imagePromptSha256: string | null;
+}
+
+/**
+ * Pagination v1 — per-page Reading-Field preview gate.
+ *
+ * When PAGINATION_V1_ENABLED is false, this is a no-op and the existing
+ * Stage 2 + chapter-layout gates remain the only spend guards. When true,
+ * image generation is blocked unless the operator has approved the
+ * Text-In-Reading-Field preview for THIS page (and continuation pages
+ * never get their own image regardless).
+ */
+export interface PreviewApprovalGatePage {
+  pageKey: string;
+  previewApproved?: boolean | null;
+  carriesSubject?: boolean | null;
+}
+export function assertPreviewApprovedForImageSpend(
+  page: PreviewApprovalGatePage,
+  enabled: boolean,
+): void {
+  if (!enabled) return;
+  if (page.carriesSubject === false) {
+    throw new GenerationBlockedError(
+      `Page ${page.pageKey} is a continuation page and does not carry its own image subject.`,
+      'continuation_no_image',
+    );
+  }
+  if (page.previewApproved !== true) {
+    throw new GenerationBlockedError(
+      `Page ${page.pageKey} does not have an approved Reading-Field preview. ` +
+        `Approve the preview in Page Production before spending image credits.`,
+      'preview_not_approved',
+    );
+  }
 }
 
 export function assertLayoutApprovedForImageSpend(
@@ -138,6 +173,14 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
   if (!page) throw new GenerationBlockedError('Page not found.', 'not_found');
 
   assertGeneratable(page);
+  assertPreviewApprovedForImageSpend(
+    {
+      pageKey: page.pageKey,
+      previewApproved: (page as { previewApproved?: boolean | null }).previewApproved,
+      carriesSubject: (page as { carriesSubject?: boolean | null }).carriesSubject,
+    },
+    getEnv().PAGINATION_V1_ENABLED,
+  );
   const project = await getProject(page.projectId);
   if (!project) throw new GenerationBlockedError('Project not found.', 'not_found');
   const config = ProjectConfigSchema.parse(project.config);
