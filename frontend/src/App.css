@@ -1667,7 +1667,10 @@ button.secondary {
 }
 
 .image-review-card {
-  order: 4;
+  /* Page Generation Control Center = the primary operator surface: first in the
+     grid and full-width so it sits at the top instead of buried mid-page. */
+  order: -1;
+  grid-column: 1 / -1;
 }
 
 .book-parts-card {
