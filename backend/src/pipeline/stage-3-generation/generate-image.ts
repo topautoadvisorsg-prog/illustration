@@ -20,7 +20,7 @@ import {
 } from '../../services/openai/openai.js';
 import { computePageGeometry } from '../stage-6-layout/page-geometry.js';
 import { directLayout } from '../stage-6-layout/layout-director.js';
-import { renderBlueprintPng, BLUEPRINT_COMPOSITION_INSTRUCTION } from './blueprint.js';
+import { renderBlueprintPng } from './blueprint.js';
 import { getPageById, setPageStatus } from '../../db/repositories/manifests.repo.js';
 import { getProject } from '../../db/repositories/projects.repo.js';
 import { insertImage, listImagesForPage } from '../../db/repositories/images.repo.js';
