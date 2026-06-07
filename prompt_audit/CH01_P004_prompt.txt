@@ -1,0 +1,97 @@
+VINTAGE NATURALIST
+
+MASTER STYLE DNA v1.0
+
+This block defines the permanent visual identity of the Vintage Naturalist publishing system.
+
+All future layout instructions and subject instructions must inherit this visual language.
+
+This block defines style only.
+
+It does not define subject matter, specimen type, page structure, composition arrangement, illustration placement, typography placement, or educational purpose.
+
+Those instructions are supplied separately.
+
+Create imagery in the style of a premium collector's edition natural history atlas.
+
+The visual language should blend antique botanical illustration, historical naturalist field journals, museum specimen plates, scientific atlases, wilderness archive collections, and explorer notebooks.
+
+The artwork should feel documented, preserved, collected, and curated.
+
+Draw inspiration from historical natural history illustration traditions, antique botanical atlases, museum natural history collections, explorer field journals, scientific specimen plates, and wilderness archival documentation while remaining entirely original and never recreating copyrighted artwork, illustrations, or compositions.
+
+Rendering style: watercolor illustration, naturalist ink work, delicate linework, museum-quality specimen rendering, subtle brush textures, hand-crafted appearance, scientific elegance, archival craftsmanship.
+
+Surface characteristics: warm parchment paper, archival paper textures, subtle aging, natural paper grain, collector-edition presentation.
+
+Color characteristics: muted earth tones, restrained saturation, botanical greens, woodland browns, parchment creams, faded natural pigments, soft natural color transitions.
+
+Supporting visual language: naturalist annotations, specimen markings, field observations, scientific callouts, explorer notes, collection references, observational markings. These elements should feel archival and observational rather than modern or graphic.
+
+Avoid modern infographic aesthetics, glossy commercial design, digital poster aesthetics, contemporary UI styling, comic-book styling, fantasy aesthetics, hyper-saturated colors, and artificial visual effects.
+
+Emotional tone: timeless, scholarly, elegant, educational, exploratory, museum quality, collectible, archival.
+
+The viewer should feel they are examining a rare plate from a beautifully preserved natural history collection.
+
+Create a single encyclopedia page for New England terrain feature: flowing river and forest understory.
+
+Subject and scientific context:
+Before there were trails, there were paths. Before there were paths, there was a people who had learned this landscape so completely — its plants, its animals, its water, its seasons — that they were able to live in it not as visitors but as inhabitants, for ten thousand years after the glacier retreated. The Abenaki people inhabited the interior of what is now Vermont, New Hampshire, and western Maine — the mountain zones, the river corridors, the boreal forests. They knew the sugar maple, the fiddlehead fern, the ramp, and the trout long before any field guide existed. They knew which rivers ran which direction and why, which slopes held snow in May and which didn't, which mushrooms would kill you and which ones were worth the walk. The Penobscot people — whose name belongs now to the great river that drains the Maine wilderness — lived along that river system and its tributaries, a re
+
+Page structure:
+- The illustration acts as a visual header for the topic.
+- Minimal callouts may appear within the illustration.
+
+Visual balance:
+- Lower 60-65% serves as the text-safe zone (calm artwork supporting overlaid body text).
+- The image IS the full page. The "upper" and "lower" portions are zones of one full-bleed artwork — not separate compartments. Compose the image-priority zone with focal content and keep the text-safe zone calm and low-detail.
+- Preserve generous reading space.
+
+Composition notes:
+LAYOUT CONTEXT: Feature banner page. The image IS the full page; the upper 35-40% is the image-priority zone (focal terrain/subject) and the lower 60-65% is the text-safe zone (calm artwork supporting overlaid body text).
+PAGE COMPOSITION BRIEF
+The image IS the entire page (full-bleed artwork — no boxes, no frames, no cards). Compose the artwork so it honors the three zones below.
+
+• IMAGE-PRIORITY ZONE — upper image-priority zone within one full-page artwork (~40% of the page)
+    Subject anchor: New England terrain feature: flowing river and forest understory.
+    Recommended density: 1688×1050px of usable detail at 300 DPI within this zone.
+
+• TEXT-SAFE ZONE — body text sits in the calmer lower text-safe zone (~60% of the page)
+    CRITICAL — this zone is reserved for overlaid body text and MUST be painted as a calm, near-empty field. Let the artwork dissolve here into a soft, even, LIGHT surface — near-solid warm parchment, open pale sky, still water, or distant haze that settles toward the page color — so dark body text reads cleanly directly on the artwork with NO scrim, card, panel, or overlay added afterward.
+    Forbidden in this zone: focal subjects, foreground elements, branches, foliage, rocks, animals, specimens, landmarks, structures, fine texture, sharp edges, strong shadows, high contrast, or any busy pattern that competes with text.
+    It must stay part of one continuous illustration — never a hard edge, rectangle, or pasted-on block. Lower 60-65% serves as the text-safe zone (calm artwork supporting overlaid body text).
+    Hold the values here light and uniform so long-form educational copy is legible on the bare artwork without any readability treatment.
+
+• TYPOGRAPHY ZONE — just above the text-safe zone (upper-center)
+    The title sits directly on the artwork. Keep this band calm enough that bold display type reads without a backing panel.
+
+Bleed safety: include at least 38px extra usable texture/detail around the outer page edges so trim/crop never reveals a missing zone.
+Leave calm negative space for layout-typeset title/caption overlays; render no text in the image.
+Do not render readable text, titles, labels, captions, page numbers, or typography inside the image. All typography is overlaid later by the layout engine.
+The entire page is artwork. These zones only describe where each kind of content is allowed to live — never frame an interior box around the image.
+Render NO text of any kind in the image — not even the subject name. The subject "THE FIRST PEOPLES OF THIS LAND" and all labels/annotations are typeset later by the layout system, never drawn by the image model. Do not invent captions, names, notes, measurements, reference blurbs, article text, arrows, or labels.
+
+The page should provide immediate visual context before transitioning into educational content.
+Museum-quality natural history encyclopedia presentation.
+Do not render final body text, page numbers, titles, labels, captions, or typography.
+
+LAYOUT SYSTEM RULES
+
+Treat the selected layout as a strong reference template, not a rigid rule. Minor composition adjustments are allowed when they improve readability, subject presentation, or overall page quality.
+
+Generate clean artwork only. The illustration must contain ZERO readable text of any kind: no subject names, labels, captions, titles, headings, paragraphs, article text, fake encyclopedia text, page numbers, headers, reference notes, measurements, callouts, or annotations. Do not draw arrows, leader lines, or pointer marks with text. All labels, names, annotations, arrows, and typography are added later by the layout/composition system - never by the image model.
+
+Do not generate readable text by default. If a future prompt explicitly supplies an explicit subject-name label, render exactly that supplied label, large and legible, with no extra words. This planner currently supplies no such label text.
+
+Use minimal annotation only when structurally necessary. Limit callouts to 0-2 major, obvious educational features per subject. Avoid dense labeling systems, technical breakdowns, scientific poster layouts, and small-detail callouts.
+
+Do not build scientific-poster layouts, dense labeling systems, or technical breakdowns. The image is pure subject artwork; the educational markup is overlaid afterward.
+
+Layouts define text-safe zones, overlay typography zones, image-priority zones, negative space, reading flow, and visual hierarchy. They do not define subject matter, article content, or detailed scientific analysis.
+
+Subject-specific flexibility is allowed for mountains, rivers, mushrooms, trees, animal tracks, ecosystems, and other wilderness subjects, as long as the intended text zones remain clear.
+
+Negative space is intentional. Do not fill empty areas simply because space is available.
+
+Final rule: the educational knowledge belongs primarily in the written article. The illustration supports the lesson; it does not replace it.

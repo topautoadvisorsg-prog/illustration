@@ -1,0 +1,120 @@
+CINEMATIC NATURALIST
+MASTER VISUAL DNA
+
+Generate an original illustration belonging to the same visual universe as the entire Wild Lands publishing platform.
+
+VISUAL IDENTITY
+
+Blend:
+- cinematic environmental realism
+- premium natural history illustration
+- wilderness expedition storytelling
+- museum-quality educational publishing
+
+Primary influences:
+- Albert Bierstadt (environmental atmosphere and scale)
+- Louis Agassiz Fuertes (natural history and wildlife realism)
+
+These are influences only.
+Do not imitate specific artists.
+Maintain one consistent visual language across the entire series.
+
+RENDERING STYLE
+- highly detailed
+- painterly realism
+- realistic ecology
+- realistic wildlife
+- realistic geology
+- atmospheric depth
+- natural textures
+- premium collector-edition quality
+
+Avoid:
+- cartoon styles
+- anime styles
+- comic-book aesthetics
+- CGI appearance
+- synthetic AI appearance
+- plastic textures
+
+COLOR
+
+Use natural, believable environmental color.
+Colors should feel:
+- natural
+- alive
+- rich
+- ecological
+- premium
+
+Avoid:
+- neon colors
+- fantasy saturation
+- artificial HDR
+- synthetic glow
+
+COMPOSITION
+
+Use:
+- foreground, midground, background
+- environmental storytelling
+- natural framing
+- atmospheric perspective
+- realistic scale
+
+Avoid:
+- poster compositions
+- floating subjects
+- infographic layouts
+- isolated objects without context
+
+TEXT-SAFE ZONES
+
+The artwork is the page.
+When text-safe zones are required:
+- integrate them naturally into the composition
+- use calm terrain, mist, sky, haze, or open environmental space
+- never create boxes, panels, cards, labels, or cutouts
+- transitions must feel painted into the artwork
+
+The reader should not notice the text-safe zone.
+The page should simply feel easy to read.
+
+FINAL GOAL
+
+Create a timeless, immersive, educational wilderness illustration that feels like it belongs in a premium natural history encyclopedia.
+
+Ultra-detailed.
+Cinematic.
+Naturalist. with strong pigmentation
+Collector-edition quality.
+
+SUBJECT PACKAGE
+
+PRIMARY SUBJECT
+- New England terrain feature: flowing river and forest understory
+
+SUPPORTING SUBJECTS
+- River stones
+- Fern cluster
+- Moss-covered log
+
+ENVIRONMENT
+- New England river corridor and woodland
+
+MOOD
+- Quiet morning atmosphere; soft natural light
+
+COMPOSITION — follow the attached blueprint image.
+RED zones: text-safe zones — keep calm and open; place no important subjects here.
+BLUE zones: primary illustration zones — the primary subject and environmental scene.
+ORANGE zones: supporting illustration zones — small supporting specimen studies.
+Follow the blueprint composition exactly.
+
+LAYOUT RULES
+- Follow the blueprint image.
+- Generate imagery only.
+- Generate no readable text.
+- Respect RED, BLUE, and ORANGE zones.
+- Do not place important subjects in RED zones.
+- Do not generate labels, captions, annotations, or typography.

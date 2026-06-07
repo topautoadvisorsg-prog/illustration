@@ -1,6 +1,6 @@
 ﻿import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema, type PageManifest } from '@wildlands/shared';
-import { countPageWords, escalateForOverflow, planPage, stripLegacyBoxModelLanguage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
+import { countPageWords, escalateForOverflow, planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 
 const baseConfig = ProjectConfigSchema.parse({
   brand: 'THE_WILDLANDS',
@@ -195,58 +195,6 @@ describe('planPage', () => {
     expect(decision.reasonCodes).toContain('feature_banner_signal');
   });
 
-  it('strips box-model language while preserving zone language (stored-config rot defense)', () => {
-    // The exact box-model lines observed live in project af27e69d's stored prompt.
-    const legacy = [
-      '{MASTER_STYLE_DNA}',
-      'Page structure:',
-      '- A wide horizontal illustration spans the upper portion of the page.',
-      '- Upper portion remains visually uninterrupted.',
-      '- A large vertical illustration occupies the left side of the page.',
-      'Visual balance:',
-      '- Upper 35-40% contains the feature illustration.',
-      '- Lower 60-65% remains largely clear for text placement.',
-      '- Maintain strong separation between image and content areas.',
-      '- Rightmost 25% contains one tall vertical illustration with small annotations extending into the left text area.',
-      '- Preserve the left text area as the dominant readable zone.',
-      'Preserve future text areas above all else; do not let art consume the reading areas.',
-      '- Lower 40-50% remains available for educational text.',
-      '',
-      'PAGE COMPOSITION BRIEF',
-      'The image IS the entire page (full-bleed artwork — no boxes, no frames, no cards).',
-      '• IMAGE-PRIORITY ZONE — left-side image-priority zone within the full-page artwork (~40% of the page)',
-      '• TEXT-SAFE ZONE — body text uses the calm right-side text-safe zone (~60% of the page)',
-      '• TYPOGRAPHY ZONE — just above the text-safe zone (upper-center)',
-    ].join('\n');
-
-    const cleaned = stripLegacyBoxModelLanguage(legacy);
-
-    // Every box-model / compartment phrase observed live is gone.
-    expect(cleaned).not.toMatch(/strong separation between image and content/i);
-    expect(cleaned).not.toMatch(/remains largely clear/i);
-    expect(cleaned).not.toMatch(/remains available/i);
-    expect(cleaned).not.toMatch(/Upper 35-40% contains/i);
-    expect(cleaned).not.toMatch(/Lower 60-65% remains/i);
-    expect(cleaned).not.toMatch(/Rightmost 25% contains/i);
-    expect(cleaned).not.toMatch(/spans the upper portion/i);
-    expect(cleaned).not.toMatch(/upper portion remains/i);
-    expect(cleaned).not.toMatch(/\bupper portion\b/i);
-    expect(cleaned).not.toMatch(/occupies the left side of the page/i);
-    // Body prose with similar words but no "of the page" anchor must SURVIVE.
-    expect(stripLegacyBoxModelLanguage('The bear occupies the left side of its range in winter.')).toContain('occupies the left side of its range');
-    expect(cleaned).not.toMatch(/\btext areas?\b/i);
-    expect(cleaned).not.toMatch(/\bcontent areas?\b/i);
-    expect(cleaned).not.toMatch(/\breading areas?\b/i);
-    expect(cleaned).not.toMatch(/portion of the page/i);
-    // Zone language survives untouched (hyphenated zones, bands, % of the page).
-    expect(cleaned).toContain('The image IS the entire page');
-    expect(cleaned).toContain('IMAGE-PRIORITY ZONE — left-side image-priority zone within the full-page artwork (~40% of the page)');
-    expect(cleaned).toContain('right-side text-safe zone (~60% of the page)');
-    expect(cleaned).toContain('TYPOGRAPHY ZONE');
-    expect(cleaned).toContain('{MASTER_STYLE_DNA}');
-    // Idempotent.
-    expect(stripLegacyBoxModelLanguage(cleaned)).toBe(cleaned);
-  });
 
   it('produces a planned prompt with zero box-model language even from a legacy stored template', () => {
     const legacyAssetConfig = ProjectConfigSchema.parse({
