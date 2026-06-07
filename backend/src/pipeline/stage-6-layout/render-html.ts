@@ -341,18 +341,25 @@ function buildEntryArticle(
   const spacer = `<div class="art-spacer" style="${bodyZoneSpacer(profile.artSlot, profile.artAreaFraction, geometry)}"></div>`;
 
   if (page.imageDataUri) {
-    const sheetSel = perEntry ? `.pagedjs_${pageName}_page .pagedjs_sheet` : '.pagedjs_sheet';
     const register = perEntry ? `@page ${pageName} {}\n  ` : '';
     const pageAttr = perEntry ? ` style="page: ${pageName};"` : '';
+    // Phase 2 — clean continuation pages. Paint the hero artwork ONLY on the entry's
+    // FIRST sheet (Paged.js adds `pagedjs_{name}_first_page` to it). Continuation
+    // sheets get NO image — they fall back to the @page parchment + the Layer-3
+    // ornament, so overflow text reads on clean parchment instead of sitting on the
+    // reused busy illustration. Suppress the ornament only on the first sheet (where
+    // the artwork already is).
+    const firstSheetSel = perEntry
+      ? `.pagedjs_${pageName}_first_page .pagedjs_sheet`
+      : '.pagedjs_first_page .pagedjs_sheet';
     const article = `<article class="book-page art-page arch-${profile.artSlot}${danger}"${idAttr}${pageAttr}>
   ${title}
   ${spacer}
   <div class="text-panel">${scientific}${bodyToHtml(page.bodyMarkdown)}</div>
 </article>`;
-    // Mark the sheet as having artwork so the continuation ornament suppresses.
     const artworkCss = register
-      + artworkSheetCss(sheetSel, page.imageDataUri)
-      + `\n  ${sheetSel} { /* artwork present */ }\n  ${sheetSel}::before, ${sheetSel}::after { content: none !important; }\n  ${panelCss}`;
+      + artworkSheetCss(firstSheetSel, page.imageDataUri)
+      + `\n  ${firstSheetSel}::before, ${firstSheetSel}::after { content: none !important; }\n  ${panelCss}`;
     return { article, css: artworkCss };
   }
 

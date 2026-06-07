@@ -1,6 +1,6 @@
 ﻿import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema, type PageManifest } from '@wildlands/shared';
-import { countPageWords, planPage, stripLegacyBoxModelLanguage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
+import { countPageWords, escalateForOverflow, planPage, stripLegacyBoxModelLanguage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 
 const baseConfig = ProjectConfigSchema.parse({
   brand: 'THE_WILDLANDS',
@@ -293,5 +293,31 @@ describe('planPage', () => {
     );
 
     expect(decision.layoutTemplate).toBe('LAYOUT_13_FEATURE_BANNER');
+  });
+});
+
+describe('escalateForOverflow (Phase 2 overflow auto-routing)', () => {
+  it('escalates a general layout that overflows to a higher-capacity general layout', () => {
+    // LAYOUT_3 capacity maxWords = 240; 300 words overflows -> next general layout that fits.
+    expect(escalateForOverflow('LAYOUT_3_ILLUSTRATION_DOMINANT', 300)).toBe('LAYOUT_1_STANDARD');
+  });
+
+  it('escalates to the highest-capacity general layout when nothing fits', () => {
+    expect(escalateForOverflow('LAYOUT_3_ILLUSTRATION_DOMINANT', 5000)).toBe('LAYOUT_2_TEXT_HEAVY');
+  });
+
+  it('returns null when the layout already fits', () => {
+    expect(escalateForOverflow('LAYOUT_1_STANDARD', 300)).toBeNull();
+  });
+
+  it('never reroutes semantic layouts (they keep identity, clean continuation handles overflow)', () => {
+    expect(escalateForOverflow('LAYOUT_4_DANGER_WARNING', 5000)).toBeNull();
+    expect(escalateForOverflow('LAYOUT_5_CHAPTER_OPENER', 5000)).toBeNull();
+    expect(escalateForOverflow('LAYOUT_7_SCATTERED_VIGNETTES', 5000)).toBeNull();
+    expect(escalateForOverflow('LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD', 5000)).toBeNull();
+  });
+
+  it('returns null when already at the highest-capacity general layout', () => {
+    expect(escalateForOverflow('LAYOUT_2_TEXT_HEAVY', 5000)).toBeNull();
   });
 });

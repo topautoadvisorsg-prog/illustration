@@ -168,6 +168,36 @@ const DEFAULT_LAYOUT_CAPACITY: Record<LayoutTemplateId, { minWords: number; targ
 
 const REQUIRED_LAYOUT_TEMPLATES = Object.keys(DEFAULT_LAYOUT_CAPACITY) as LayoutTemplateId[];
 
+/**
+ * Phase 2 — overflow auto-routing. ONLY the generic word-count layouts (in ascending
+ * text capacity) may be auto-escalated when the body exceeds the chosen layout's word
+ * capacity. SEMANTIC layouts chosen from a signal (terrain banner, sidebar/margin
+ * tall-subject, danger, comparison, chapter opener, diagnostic, plate, landscape
+ * spread, progression, cutaway, back-matter, scattered) keep their identity — clean
+ * continuation pages absorb their overflow instead, so the page's character is not
+ * silently swapped for a text-heavy layout.
+ */
+const REROUTABLE_BY_CAPACITY: LayoutTemplateId[] = [
+  'LAYOUT_3_ILLUSTRATION_DOMINANT', // 240
+  'LAYOUT_1_STANDARD', // 420
+  'LAYOUT_2_TEXT_HEAVY', // 720 (highest)
+];
+
+/**
+ * If a generic layout would overflow its word capacity, return the smallest
+ * higher-capacity generic layout that fits (or the highest-capacity one if nothing
+ * fits — clean continuation pages then absorb the remainder). Returns null when no
+ * reroute is needed or the layout is semantic/forced.
+ */
+export function escalateForOverflow(template: LayoutTemplateId, wordCount: number): LayoutTemplateId | null {
+  if (!REROUTABLE_BY_CAPACITY.includes(template)) return null;
+  if (wordCount <= DEFAULT_LAYOUT_CAPACITY[template].maxWords) return null;
+  const fits = REROUTABLE_BY_CAPACITY.find((t) => DEFAULT_LAYOUT_CAPACITY[t].maxWords >= wordCount);
+  const target = fits ?? REROUTABLE_BY_CAPACITY[REROUTABLE_BY_CAPACITY.length - 1];
+  if (!target || target === template) return null;
+  return target;
+}
+
 export interface LayoutLibraryIssue {
   templateId: LayoutTemplateId;
   severity: 'BLOCKER' | 'WARNING';
@@ -607,6 +637,20 @@ export function planPage(page: PageManifest, config: ProjectConfig, options: Pla
         alternatives: [],
       }
     : chooseLayout(page, wordCount, config);
+
+  // Phase 2 — overflow auto-routing. If an auto-selected general layout would
+  // overflow its capacity, escalate to a higher-capacity general layout. Operator-
+  // forced and semantic layouts are left untouched (clean continuation handles them).
+  if (!options.forcedLayoutTemplate) {
+    const escalated = escalateForOverflow(selected.template, wordCount);
+    if (escalated) {
+      const from = selected.template;
+      selected.template = escalated;
+      selected.reasons = [...selected.reasons, `overflow_autoroute_to_${escalated.toLowerCase()}`];
+      selected.rule = 'overflow_autoroute';
+      selected.explanation = `${selected.explanation} Auto-routed from ${from} to ${escalated} because ${wordCount} words exceed the original layout's capacity.`;
+    }
+  }
   // Layered model: classify the page's purpose (first-class), and decompose the
   // chosen render template into its coverage + architecture axes so the operator
   // sees what actually renders. Rendering still flows through `selected.template`.

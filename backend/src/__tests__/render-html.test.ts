@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema, type PageManifest } from '@wildlands/shared';
-import { buildPageHtml, inlineMarkdown } from '../pipeline/stage-6-layout/render-html.js';
+import { buildChapterHtml, buildPageHtml, inlineMarkdown } from '../pipeline/stage-6-layout/render-html.js';
 import { computePageGeometry } from '../pipeline/stage-6-layout/page-geometry.js';
 
 const config = ProjectConfigSchema.parse({
@@ -84,6 +84,22 @@ describe('buildPageHtml', () => {
     expect(html).not.toContain('radial-gradient');
     expect(html).not.toContain('linear-gradient(to bottom');
     expect(html).not.toContain('linear-gradient(to right');
+  });
+
+  it('paints the hero artwork only on the entry first sheet so continuation sheets stay clean (Phase 2)', () => {
+    const html = buildPageHtml(page(), config, { geometry, imageDataUri: 'data:image/png;base64,AAAA' });
+    // Artwork background is scoped to the FIRST sheet, not every sheet of the entry.
+    expect(html).toContain('.pagedjs_first_page .pagedjs_sheet { background-image: url("data:image/png;base64,AAAA")');
+  });
+
+  it('scopes chapter-entry artwork to the named first sheet (Phase 2 clean continuation)', () => {
+    const html = buildChapterHtml(
+      [{ entryTitle: 'Region', bodyMarkdown: 'A long body paragraph.', layoutTemplate: 'LAYOUT_13_FEATURE_BANNER', imageDataUri: 'data:image/png;base64,AAAA' }],
+      config,
+      { chapterNumber: 1, chapterTitle: 'Know Your Region' },
+      { geometry },
+    );
+    expect(html).toMatch(/pagedjs_[a-z0-9]+_first_page \.pagedjs_sheet \{ background-image: url\("data:image\/png;base64,AAAA"\)/);
   });
 
   it('omits the Paged.js script unless a polyfill is provided (browser-free HTML)', () => {
