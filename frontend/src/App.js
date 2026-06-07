@@ -4179,7 +4179,7 @@ function App() {
         </section>
 
         <div className="review-grid">
-          <section className="review-card cc-setup">
+          <section className="review-card cc-setup cc-control">
             <div className="section-head">
               <div>
                 <h3>1. Manuscript Breakdown</h3>
@@ -4228,7 +4228,7 @@ function App() {
             </div>
           </section>
 
-          <section className="review-card cc-setup">
+          <section className="review-card cc-setup cc-control">
             <div className="section-head">
               <div>
                 <h3>2. Page Plan Review</h3>
@@ -5116,7 +5116,7 @@ function App() {
             <p className="hint">Render full book and cover proofs from the Render Proof Review panel so proof actions stay in one place.</p>
           </section>
 
-          <section className="review-card preview-review-card cc-export">
+          <section className="review-card preview-review-card cc-export cc-control">
             <div className="section-head">
               <div>
                 <h3>3. Render Proof Review</h3>
