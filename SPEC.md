@@ -1,119 +1,116 @@
-# SPEC — Book Generation v2.0: Layout-First, Composed-at-Generation
+# SPEC — Book Generation v2.1: Full-Page Illustration + Reading Zone
 
 **Author:** Claudio (CTO)
-**Date:** 2026-06-06
-**Status:** Proposed — awaiting approval. **No new build until approved.**
-**Supersedes:** the compositor-masking approach (reverted in commit 74760f9).
+**Date:** 2026-06-07
+**Status:** Active architecture. Supersedes the "renderer must never mask/fade/erase"
+rule from v2.0.
 
 ---
 
-## Objective
-
-Pages must be **composed correctly by the image agent at generation time** — the
-illustration itself already leaves the text-safe zone calm, so text drops straight in.
-
-The renderer / typography engine **places text only**. It must **never** erase, fade,
-mask, cover, or otherwise repair the illustration after generation. Repairing
-composition afterward damages the art (over-wipes, empty parchment gaps) and is the
-wrong layer. That approach was tried, proven wrong, and reverted.
+## Core architecture
 
 ```
-Layout Blueprint  →  Image Agent  →  Correctly Composed Illustration  →  Typography Engine  →  Final Page
-   (structure)        (illustration only)                                  (text only)
+Layout Blueprint  →  Image Agent  →  Full-page illustration  →  Typography Engine (Reading Zone)  →  Final Page
 ```
 
----
-
-## Why the previous approach was wrong
-
-The compositor masked the text-safe + title zones to parchment **after** generation.
-It "worked" for readability but:
-
-- it covered/erased real illustration, leaving visually empty gaps;
-- it fought the image instead of fixing the source;
-- it treated a generation problem at the render layer.
-
-**Root cause restated:** the image model was not respecting the layout — *because we
-never gave it the layout*. We only described zones in words. The fix is to give the
-agent the actual **blueprint image** of the page so it composes into the zones.
+- **Image agent** generates ONE rich, full-page illustration. It is never asked to
+  leave a large empty area. The page should feel like a single complete illustrated
+  page, not separate boxes.
+- **Typography engine (renderer)** owns the **Reading Zone**: wherever the real text
+  lands, it creates a clean, readable area by softening/cleaning the artwork directly
+  under the text and **feathering the edges organically** into the surrounding
+  illustration.
 
 ---
 
-## The fix — teach the image agent to compose from a blueprint image
+## Zone meanings (blueprint — RED / BLUE / ORANGE)
 
-For every page, generate a **layout blueprint image** (a visual zone map) and hand it
-to the image agent together with the Style DNA, the fixed prompt, and the subject. The
-blueprint shows the model exactly:
+The blueprint is a composition **guide** handed to the image agent. Its colors exist
+only in the blueprint, never in the final page.
 
-- **IMAGE-PRIORITY zone** — where the main illustration goes.
-- **SUPPORTING-ART spots** — where small elements may go (track, pinecone, specimen).
-- **TEXT-SAFE zone** — leave visually calm (parchment / sky / low detail). No subjects.
-- **TITLE zone** — keep calm enough for display type.
-
-The model then builds the illustration into those regions and leaves the text-safe zone
-open **in the image itself**. Typography places text into that reserved zone afterward —
-with nothing painted over the art.
-
-**We already have the geometry:** `layout-director.ts` emits `imagePriorityZones`,
-`textSafeZones`, `typographyZones` as rectangles (`xPct/yPct/widthPct/heightPct`). The
-blueprint image is a direct render of those rectangles — no new layout math needed.
-
-### Open technical choice (lock when the operator's prompt arrives)
-
-1. **Inpainting mask (hard guarantee):** pass the blueprint as an edit **mask** so the
-   image API can only paint inside the illustration region; the text-safe zone is
-   physically protected at generation. Strongest enforcement.
-2. **Reference image (soft guidance):** pass the blueprint as a reference/condition
-   image alongside the prompt. Simpler; relies on the model following the reference.
-
-Recommendation: prototype the **reference-image** path first (works with the current
-generate call), escalate to the **inpainting mask** if composition isn't reliable.
+- **BLUE — PRIMARY_IMAGE_ZONE:** the primary subject / main visual focus.
+- **ORANGE — SUPPORTING_IMAGE_ZONE:** supporting artifacts / specimen studies, rendered
+  **directly on the bare parchment** (no cards, frames, boxes, or colored backgrounds).
+- **RED — READING ZONE GUIDE (only):** approximately where text will live. RED is a
+  **small guide**, NOT a demand for a large empty blank area. The image agent should
+  avoid placing major subjects / important detail there, but it should still fill the
+  page richly — the renderer creates the final readable area.
 
 ---
 
-## Phases & priority order
+## THE READING ZONE PRINCIPLE (the rule that governs the renderer)
 
-1. **Renderer is clean** — paints the illustration full-bleed, no mask/fade/cover.
-   Typography places text only. **(DONE — commit 74760f9.)**
-2. **Blueprint-image generator** — render each page's zone rectangles to a blueprint
-   image (image-priority / supporting / text-safe / title), driven by the existing
-   `LayoutAllocation`. No image spend.
-3. **Fix the generation prompt + wire the blueprint to the image agent** — the agent
-   receives Style DNA + blueprint image + subject; prompt instructs it to compose the
-   illustration into the image zones and leave the text-safe zone calm.
-4. **Validate with new images** — generate a small Chapter 1 set; confirm the text-safe
-   zone is calm **in the raw image** (no renderer help). Requires a spend green-light.
-5. **Then** capacity-char enforcement (self-contained pages) and typography polish.
+**The renderer MAY create a Reading Zone.**
 
----
+A **Reading Zone** is a *localized, typography-driven* area where artwork is softened,
+cleaned, or removed **only behind the actual text** to support readability, blended
+organically into the illustrated page.
 
-## Acceptance criteria
+This **supersedes** the older rule ("the renderer must never mask/fade/erase/modify
+artwork"). That rule existed to stop **large empty masked zones that destroyed the
+illustration** — that failure mode is still banned. The Reading Zone is the opposite:
+small, local, feathered, and integrated.
 
-- The raw generated image already has a calm, low-detail text-safe zone — verifiable
-  before any text is placed.
-- The renderer adds **zero** parchment, mask, fade, or veil over the artwork.
-- Text placed in the reserved zone is readable on the as-generated illustration.
-- A small amount of text over low-detail artwork (sky, faded edge) is acceptable;
-  paragraphs over forests / wildlife / detailed terrain are not.
+**The Reading Zone IS:**
+- Localized to where the **actual rendered text** sits (follows the text, not a fixed
+  zone-wide wipe).
+- Feathered/blended at the edges so it dissolves into the surrounding artwork.
+- Subtle — the artwork stays visible (veil ≈ 0.8, not opaque). You still see the whole
+  page as one illustration.
+- Owned and produced by the renderer/typography engine.
 
----
+**The Reading Zone IS NOT:**
+- A large empty masked area or a zone-wide parchment wipe.
+- A card, box, panel, sticky-note, or modern UI surface.
+- A hard rectangle, border, or radius.
+- A flat overlay that hides the illustration.
 
-## Constraints / guardrails
-
-- **No new build until this SPEC is approved.**
-- No new image generation until an explicit spend green-light (Phase 4).
-- Renderer/typography never modifies the illustration.
-- Do not touch Style DNA, the subject system, or the 16 templates as templates.
-- Every change: `npx tsc --noEmit` clean + full test suite green before commit.
+**Goal:** make the readable area feel like the page was *designed that way from the
+start* — one continuous illustrated page with text that reads cleanly.
 
 ---
 
-## Open questions
+## Responsibilities (do not combine)
 
-- Blueprint delivery: inpainting **mask** vs **reference image** (see above) — to be
-  locked when the operator provides the page-image prompt.
-- Blueprint visual encoding: how literal should the zone map look to the model
-  (flat color regions vs. labeled boxes vs. a faint parchment+art mock)? Decide in the
-  Phase 2 sub-spec.
-- Whether the blueprint also encodes supporting-art and decoration spots in v1 or only
-  image-priority + text-safe to start.
+- **Image agent** — illustration only. Full-page, rich. BLUE primary subject, ORANGE
+  supporting studies on parchment, RED kept relatively calm as a guide. **No text of
+  any kind.**
+- **Renderer / typography engine** — places all text, and **owns the final Reading
+  Zone** (the feathered clean behind the text). Never paints letters into the image;
+  never wipes whole zones to empty parchment.
+
+---
+
+## Implementation (current)
+
+- **Blueprint** (`blueprint.ts`): RED/BLUE/ORANGE, with a clean GUTTER between RED and
+  BLUE (no overlap). RED is a smaller guide.
+- **Lean prompt** (`plan-pages.ts`): Style DNA + Subject Package (primary / supporting /
+  environment / mood) + blueprint pointer + short rules. Supporting studies instructed
+  to render directly on parchment (no cards/frames/boxes).
+- **Renderer** (`render-html.ts`):
+  - Paints the illustration full-bleed and **clean** (no mask stacked over the sheet).
+  - Binds the first-page text panel to the RED rect (position).
+  - Applies the **Reading Zone veil**: a feathered radial parchment gradient on the
+    `.text-panel` background — calm in the text core, fading to transparent at the panel
+    edges — plus a per-glyph halo. Localized to the text; blends into the artwork.
+
+---
+
+## Guardrails (unchanged)
+
+- The image agent generates **imagery only** — no readable text anywhere. If text
+  appears in image output, the image is incorrect.
+- No image spend without explicit operator approval.
+- Deterministic where possible; `tsc --noEmit` clean + full test suite green before commit.
+- The Reading Zone must never regress into the banned failure mode (large empty masked
+  areas / cards / boxes / overlays).
+
+---
+
+## Superseded
+
+- v2.0 rule "Renderer must never mask, fade, erase, or modify artwork" — **replaced** by
+  the Reading Zone Principle above. The intent (no large empty masked areas destroying
+  the illustration) is preserved; the mechanism (a small feathered local Reading Zone)
+  is now allowed and owned by the renderer.

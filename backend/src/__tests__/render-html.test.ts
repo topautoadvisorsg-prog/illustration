@@ -70,20 +70,19 @@ describe('buildPageHtml', () => {
     expect(html).not.toContain('IMAGE ZONE'); // exclusion marker is planning-only
   });
 
-  it('paints the illustration full-bleed without masking, fading, or covering the artwork', () => {
-    // The renderer must NOT repair composition after generation — no parchment mask
-    // or fade veil over the artwork. The image is painted clean; the image agent is
-    // responsible for composing the calm text-safe zone at generation time.
+  it('paints the artwork clean (no mask over the sheet) and adds a feathered reading-zone veil behind text', () => {
+    // Reading-Zone system: the artwork sheet is painted clean (no parchment mask
+    // stacked over the image). The readable area is created by a feathered veil on the
+    // TEXT PANEL only — localized behind the actual text, fading into the artwork.
     const html = buildPageHtml(page({ layoutTemplate: 'LAYOUT_13_FEATURE_BANNER' }), config, {
       geometry,
       imageDataUri: 'data:image/png;base64,AAAA',
     });
+    // Sheet background is the raw image, painted clean.
     expect(html).toContain('url("data:image/png;base64,AAAA")');
     expect(html).toContain('background-size: cover');
-    // No compositor mask/fade layers stacked over the artwork.
-    expect(html).not.toContain('radial-gradient');
-    expect(html).not.toContain('linear-gradient(to bottom');
-    expect(html).not.toContain('linear-gradient(to right');
+    // The reading-zone veil is a radial gradient on the TEXT PANEL (not over the sheet).
+    expect(html).toMatch(/\.text-panel \{[^}]*radial-gradient\(ellipse/);
   });
 
   it('paints the hero artwork only on the entry first sheet so continuation sheets stay clean (Phase 2)', () => {

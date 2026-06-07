@@ -160,7 +160,8 @@ text-fit, sanitizer, subject derivation, blueprint, renderer) is deterministic.
 ## Stage 6b — Final Page Preview (render)
 
 1. **Step:** Compose the final page — illustration painted full-bleed, typography
-   placed in the reserved zone (renderer never masks/repairs the art).
+   placed in the reserved zone; the renderer creates a localized feathered Reading
+   Zone behind the actual text (never a zone-wide wipe) — see SPEC.md.
 2. **Responsible:** `stage-6-layout` renderer (Paged.js), deterministic.
 3. **Input:** active image + body text + layout.
 4. **Output:** the exact single-page PDF (what exports).

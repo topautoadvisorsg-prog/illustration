@@ -199,12 +199,13 @@ function priorityEdgeFor(slot: ArtSlot): PriorityEdge {
   }
 }
 /**
- * Sheet background = the correctly-composed illustration, painted full-bleed. The
- * image IS the page. The renderer does NOT erase, fade, mask, or cover any part of
- * the artwork — the text-safe zone must already be composed calm by the image agent
- * at generation time (Layout Blueprint → Image Agent → Correctly Composed
- * Illustration). Typography is then placed into that reserved zone; it never modifies
- * the illustration.
+ * Sheet background = the full-page illustration, painted full-bleed and CLEAN — no
+ * mask/veil is ever stacked over the SHEET (the artwork is never zone-wiped). The
+ * readable area is created separately as the Reading Zone: a localized, feathered
+ * parchment veil on the `.text-panel` only (see fullPageArtworkCss), which softens the
+ * artwork behind the actual text and blends into the surrounding illustration. The
+ * image stays one rich full-page illustration; the renderer owns the Reading Zone.
+ * (Architecture: SPEC.md — Full-Page Illustration + Reading Zone.)
  */
 function artworkSheetCss(selector: string, dataUri: string): string {
   return `${selector} { background-image: url("${dataUri}") !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }`;
@@ -240,11 +241,23 @@ function textPanelBinding(layoutTemplate: LayoutTemplateId, geometry: PageGeomet
     panelCss: `${firstPageSel} .text-panel { margin-left: ${r1(marginLeftPct)}%; width: ${r1(widthPct)}%; }`,
   };
 }
+function rzHexToRgb(hex: string): [number, number, number] {
+  const h = (hex || '#F5EDD6').replace('#', '').trim();
+  const v = h.length === 3 ? h.split('').map((x) => x + x).join('') : h;
+  return [parseInt(v.slice(0, 2), 16) || 245, parseInt(v.slice(2, 4), 16) || 237, parseInt(v.slice(4, 6), 16) || 214];
+}
+function rzPaper(paper: string, a: number): string {
+  const [r, g, b] = rzHexToRgb(paper);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
 /**
  * Shared CSS for the full-page artwork model. The artwork IS the page (painted on
  * the sheet). The TITLE sits on the art, bold with a paper halo so it is readable.
- * The BODY sits on a near-opaque paper panel so small text is always legible. Text
- * on the image is allowed when readable — never a hard ban, never lost on busy art.
+ * The BODY sits in a feathered READING ZONE: a soft parchment veil rendered as the
+ * text-panel background that calms the artwork directly under the text and fades to
+ * transparent at the panel edges — blending organically into the illustration. The
+ * artwork stays visible (veil ~0.82); it is NOT a card, box, or hard rectangle.
  */
 function fullPageArtworkCss(t: Typography, c: Palette): string {
   return `.pagedjs_pagebox, .pagedjs_area { background: transparent !important; }
@@ -273,13 +286,10 @@ function fullPageArtworkCss(t: Typography, c: Palette): string {
      treatment — the artwork itself is the visual identity. */
   .pagedjs_sheet.has-artwork::before,
   .pagedjs_sheet.has-artwork::after { content: none; }
-  /* Text sits DIRECTLY on the artwork in the reserved text-safe zone. The image
-     model now paints that zone as a calm, light parchment field (see the TEXT-SAFE
-     ZONE brief), so NO scrim, card, or panel background is drawn here — only a tight
-     per-glyph paper halo gives the letters crisp edges. The halo hugs each glyph; it
-     is not a rectangle. If a page ever reads poorly, fix the artwork's calm zone in
-     the prompt — do NOT reintroduce a panel, gradient, or translucent block. */
-  .text-panel { position: relative; z-index: 2; padding: 0 2pt; background: transparent; }
+  /* READING ZONE: feathered parchment veil behind the body text. Elliptical
+     gradient — calm in the text core, fading to transparent at the panel edges so
+     it blends into the artwork. No border, no radius, no hard box. */
+  .text-panel { position: relative; z-index: 2; padding: 10pt 14pt; background: radial-gradient(ellipse 116% 96% at 50% 46%, ${rzPaper(c.paper, 0.84)} 0%, ${rzPaper(c.paper, 0.80)} 52%, ${rzPaper(c.paper, 0.45)} 82%, ${rzPaper(c.paper, 0)} 100%); }
   .text-panel p, .text-panel li, .text-panel h3, .text-panel strong, .text-panel .section-header, .text-panel .section-body { text-shadow: 0 0 2px ${c.paper}, 0 0 4px ${c.paper}, 0 0 6px ${c.paper}; }
   /* Planning preview (no image yet): three-zone overlay teaches "the page IS artwork".
      Outlines only — never a filled box. Labels float at the edges; the page stays paper-clean. */

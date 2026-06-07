@@ -108,7 +108,7 @@ mask):**
 - Treat readability as **type rendering**, not artwork modification: a light per-glyph
   paper halo (soft `text-shadow`), slightly heavier display weight, and generous
   leading — applied to the **text**, leaving the illustration untouched. This honors
-  "artwork dominant, renderer never repairs the image."
+  "artwork dominant; the renderer adds only a localized feathered Reading Zone behind the text (SPEC.md)."
 - Apply it **only where text overlaps artwork** (titles on busy openers); pure
   parchment zones need none.
 - Add **life, not noise:** the ORANGE supporting studies + restrained ornaments +
