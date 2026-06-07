@@ -3415,6 +3415,39 @@ button.secondary {
 .zone-support { background: #e08a2e; } /* ORANGE — supporting image */
 .bp-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 2px 0 6px; font-size: 0.75rem; opacity: 0.85; }
 .bp-legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+/* ── Top-level operator navigation ─────────────────────────────────────────
+   Each content section is tagged with its tool bucket (cc-control / cc-setup /
+   cc-library / cc-intel / cc-export). The shell carries nav-<tool>. We ONLY hide
+   the non-active buckets — active sections keep their natural display (grids stay
+   intact). Untagged sections (e.g. topbar, Active Project picker) always show.
+   Nothing is removed; views simply group what is shown. */
+.shell.nav-control .cc-setup,
+.shell.nav-control .cc-library,
+.shell.nav-control .cc-intel,
+.shell.nav-control .cc-export { display: none !important; }
+
+.shell.nav-setup .cc-control,
+.shell.nav-setup .cc-library,
+.shell.nav-setup .cc-intel,
+.shell.nav-setup .cc-export { display: none !important; }
+
+.shell.nav-library .cc-control,
+.shell.nav-library .cc-setup,
+.shell.nav-library .cc-intel,
+.shell.nav-library .cc-export { display: none !important; }
+
+.shell.nav-intelligence .cc-control,
+.shell.nav-intelligence .cc-setup,
+.shell.nav-intelligence .cc-library,
+.shell.nav-intelligence .cc-export { display: none !important; }
+
+.shell.nav-export .cc-control,
+.shell.nav-export .cc-setup,
+.shell.nav-export .cc-library,
+.shell.nav-export .cc-intel { display: none !important; }
+
+.sidebar-topnav .sidebar-primary { width: 100%; text-align: left; margin: 2px 0; }
 .fit-tag { padding: 1px 8px; border-radius: 999px; font-size: 0.78rem; }
 .fit-fits { background: rgba(95, 168, 91, 0.2); color: #2f6e2c; }
 .fit-tight { background: rgba(224, 169, 46, 0.22); color: #8a6410; }

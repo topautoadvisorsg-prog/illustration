@@ -1406,6 +1406,10 @@ function App() {
   const [imageLibrary, setImageLibrary] = useState({ total: 0, assets: [] });
   const [imageLibraryFilter, setImageLibraryFilter] = useState({ q: "", status: "", layout: "", chapter: "" });
   const [selectedPageId, setSelectedPageId] = useState("");
+  // Top-level operator navigation. Control Center is the default primary workspace;
+  // the other tools (setup/library/intelligence/export) are grouped behind the nav —
+  // grouped, never hidden/removed (every section stays reachable).
+  const [topNav, setTopNav] = useState("control");
   // Page Generation Inspector (operator visibility — read-only).
   const [inspectorTab, setInspectorTab] = useState("manuscript");
   const [inspectorData, setInspectorData] = useState(null);
@@ -3527,9 +3531,25 @@ function App() {
             <small>Publishing Platform</small>
           </div>
         </div>
-        <button type="button" className="sidebar-primary active" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-          Dashboard
-        </button>
+        <div className="sidebar-section sidebar-topnav">
+          <span>Workspace</span>
+          {[
+            ["control", "🛠 Control Center"],
+            ["setup", "Setup"],
+            ["library", "Library"],
+            ["intelligence", "Intelligence"],
+            ["export", "Export"],
+          ].map(([key, label]) => (
+            <button
+              type="button"
+              key={key}
+              className={`sidebar-primary ${topNav === key ? "active" : ""}`}
+              onClick={() => { setTopNav(key); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="sidebar-section">
           <span>Publishing Workflow</span>
           <div className="sidebar-workflow">
@@ -3571,7 +3591,7 @@ function App() {
         </div>
       </aside>
 
-      <div className="shell">
+      <div className={`shell nav-${topNav}`}>
       <section className="topbar">
         <div>
           <p className="eyebrow">Wildlands Publishing Workspace</p>
@@ -3590,7 +3610,7 @@ function App() {
       </section>
 
       {advancedMode && (
-      <section className="panel backend-panel">
+      <section className="panel backend-panel cc-setup">
         <Field label="Backend URL">
           <div className="inline-form">
             <input
@@ -3609,7 +3629,7 @@ function App() {
 
       {(message || error) && <section className={`notice ${error ? "error" : ""}`}>{error || message}</section>}
 
-      <section className="dashboard-hero">
+      <section className="dashboard-hero cc-intel">
         <div className="project-cover-card" aria-hidden="true">
           <span>New England</span>
           <strong>Wildlands</strong>
@@ -3750,7 +3770,7 @@ function App() {
         </div>
       </section>
 
-      <section className="operator-grid">
+      <section className="operator-grid cc-intel">
         <section className="panel command-panel">
           <div className="section-head">
             <div>
@@ -3858,7 +3878,7 @@ function App() {
         )}
       </section>
 
-      <section className="panel chat-panel" ref={chatPanelRef}>
+      <section className="panel chat-panel cc-intel" ref={chatPanelRef}>
         <div className="section-head">
           <h2>💬 Chat with the Agent</h2>
           <span className="hint">Ask what happened, what's wrong, or what to do next — it knows this project's live state. Review verdicts appear here too.</span>
@@ -3892,7 +3912,7 @@ function App() {
         </form>
       </section>
 
-      <section className="panel review-board">
+      <section className="panel review-board cc-intel">
         <div className="section-head">
           <div>
             <p className="eyebrow">Current Workflow Step</p>
@@ -3952,7 +3972,7 @@ function App() {
           <p className="agent-help-note">Need changes or fixes? Use chat for project questions, Audit Current Stage for a structured review, and the page/image controls inside each stage for direct edits.</p>
         </section>
 
-        <section className="production-dashboard">
+        <section className="production-dashboard cc-intel">
           <div className="section-head compact">
             <div>
               <p className="eyebrow">Production Dashboard</p>
@@ -4053,7 +4073,7 @@ function App() {
         </section>
 
         <div className="review-grid">
-          <section className="review-card">
+          <section className="review-card cc-setup">
             <div className="section-head">
               <div>
                 <h3>1. Manuscript Breakdown</h3>
@@ -4102,7 +4122,7 @@ function App() {
             </div>
           </section>
 
-          <section className="review-card">
+          <section className="review-card cc-setup">
             <div className="section-head">
               <div>
                 <h3>2. Page Plan Review</h3>
@@ -4525,7 +4545,7 @@ function App() {
             </div>
           </section>
 
-          <section className="review-card image-review-card">
+          <section className="review-card image-review-card cc-control">
             <div className="section-head">
               <div>
                 <h3>🛠 Page Generation Control Center</h3>
@@ -4917,7 +4937,7 @@ function App() {
             </button>
           </section>
 
-          <section className="review-card book-parts-card">
+          <section className="review-card book-parts-card cc-export">
             <div className="section-head">
               <div>
                 <h3>5. Book Parts + Export Assembly</h3>
@@ -4937,7 +4957,7 @@ function App() {
             <p className="hint">Render full book and cover proofs from the Render Proof Review panel so proof actions stay in one place.</p>
           </section>
 
-          <section className="review-card preview-review-card">
+          <section className="review-card preview-review-card cc-export">
             <div className="section-head">
               <div>
                 <h3>3. Render Proof Review</h3>
@@ -5183,7 +5203,7 @@ function App() {
       </section>
 
       {advancedMode && (
-      <section className="panel intelligence-panel">
+      <section className="panel intelligence-panel cc-intel">
         <div className="section-head">
           <div>
             <p className="eyebrow">Publishing Intelligence</p>
@@ -5478,7 +5498,7 @@ function App() {
       </section>
       )}
 
-      <section className="pipeline-grid">
+      <section className="pipeline-grid cc-intel">
 
         {advancedMode && (
         <section className="panel">
@@ -5560,7 +5580,7 @@ function App() {
       </section>
 
       <section className="workspace-grid">
-        <section className="panel setup-panel">
+        <section className="panel setup-panel cc-setup">
           <div className="section-head">
             <div>
               <h2>1. Project Setup</h2>
@@ -6121,7 +6141,7 @@ function App() {
 
         <aside className="side-stack">
           {advancedMode && (
-          <section className="panel preview-panel">
+          <section className="panel preview-panel cc-intel">
             <h2>Operator Preview</h2>
             <div className="book-preview" style={{ backgroundColor: projectConfig.colorPalette.paper }}>
               <p className="preview-kicker" style={{ color: projectConfig.colorPalette.accent }}>
@@ -6180,7 +6200,7 @@ function App() {
           </section>
 
           {advancedMode && (
-          <section className="panel template-panel">
+          <section className="panel template-panel cc-library">
             <h2>16 Layout Templates</h2>
             {LAYOUT_TEMPLATES.map(([id, name, description]) => (
               <div className="template-row" key={id}>
