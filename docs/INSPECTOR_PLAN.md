@@ -6,8 +6,10 @@ before further work. Real tab names are used throughout.
 
 **Tabs:** Manuscript · Layout · Typography · Image Plan · Prompt · Image Result · Final Page
 
-**Determinism note:** only two stages use a live LLM — Stage 1.5 (manifest
-generation, Claude) and the advisory "Audit with Agent" reviewers
+**Determinism note (corrected):** the manifest stage runs **deterministically**
+today (MANUSCRIPT_ANALYST `realityNote`: "No LLM call runs under this name
+today" — deterministic Markdown parsing + deterministic `deriveVisualSubject`).
+The only live LLMs are the advisory "Audit with Agent" reviewers
 (OPERATOR_ADVISER / STAGE_REVIEWER). Everything else (planner, layout director,
 text-fit, sanitizer, subject derivation, blueprint, renderer) is deterministic.
 
@@ -29,9 +31,9 @@ text-fit, sanitizer, subject derivation, blueprint, renderer) is deterministic.
 
 1. **Step:** Turn the manuscript into structured page manifests; derive each
    page's `imageSubject`; optionally classify `contentType`.
-2. **Responsible:** `stage-1.5-manifests/generate-manifests.ts` — **Claude**
-   for structuring/classification; **deterministic** `deriveVisualSubject`
-   (page-context-first concrete-subject extractor) for the image subject.
+2. **Responsible:** `stage-1.5-manifests/generate-manifests.ts` — **deterministic**
+   today (Markdown structure + `deriveVisualSubject`, a page-context-first
+   concrete-subject extractor). Governed by the MANUSCRIPT_ANALYST contract.
 3. **Input:** stored manuscript text + project config.
 4. **Output:** `PageManifest` rows (`entryTitle`, `scientificName`,
    `bodyMarkdown`, `imageSubject`, `chapterNumber`, optional `contentType`).
@@ -182,18 +184,24 @@ text-fit, sanitizer, subject derivation, blueprint, renderer) is deterministic.
 
 ---
 
-## Gaps to confirm before we extend (nothing blocking; your call)
+## Gaps — resolution status
 
-1. **Stage 1.5 Claude manifest prompt** is not surfaced — add to Manuscript tab?
-2. **Blueprint composition instruction** is only inside the per-version prompt —
-   call it out explicitly in Image Plan?
-3. **Agent advisory output** (OPERATOR_ADVISER / STAGE_REVIEWER "Audit with
-   Agent") is not shown in any inspector tab — add an "Agent Notes" strip?
-4. **Per-continuation-sheet content** (which paragraphs land on page 2/3) is not
-   shown — Typography shows the count + overflow only. Full per-sheet breakdown is
-   Phase 2 (capacity-char hard split) work.
-5. **Chapter approval state** is shown in the page summary but not as an explicit
-   inspector status line — promote it into the inspector header?
+1. ✅ **DONE** — Manuscript tab surfaces the **manifest stage instructions**
+   (MANUSCRIPT_ANALYST contract: mission, frame, rules, required outputs, runtime
+   + truthful realityNote). Labeled as the governing spec, not a fake LLM prompt.
+2. ✅ **DONE** — Image Plan tab shows the **Blueprint Composition Instruction**
+   directly (endpoint returns `blueprint.instruction`).
+3. ✅ **DONE** — **Agent Notes** strip renders the per-page Publishing Director
+   advisory (why / recommended fix) when available; advisory, never blocking.
+   (Reviewer LLM chat output remains transient; run "Audit with Agent" for a
+   fresh pass.)
+4. ⏸️ **DEFERRED to Phase 2** — per-continuation-sheet content (which paragraphs
+   land on page 2/3). Typography shows count + overflow only; the full per-sheet
+   breakdown comes with the capacity-char hard-split work.
+5. ✅ **DONE** — **Chapter approval state** promoted into the Inspector header as
+   an approved/pending (images-locked) chip.
+
+**Inspector structure: DONE** (gaps 1, 2, 3, 5 folded in; gap 4 is Phase 2).
 
 ## Operator actions, by tab (summary)
 
