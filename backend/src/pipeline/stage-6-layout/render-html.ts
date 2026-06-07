@@ -13,6 +13,7 @@
 import type { LayoutTemplateId, PageManifest, ProjectConfig } from '@wildlands/shared';
 import type { PageGeometry } from './page-geometry.js';
 import { LAYOUT_PROFILES, getLayoutProfile, type ArtSlot } from './layout-profiles.js';
+import { directLayout } from './layout-director.js';
 
 export interface RenderHtmlOptions {
   geometry: PageGeometry;
@@ -208,29 +209,36 @@ function priorityEdgeFor(slot: ArtSlot): PriorityEdge {
 function artworkSheetCss(selector: string, dataUri: string): string {
   return `${selector} { background-image: url("${dataUri}") !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }`;
 }
-/** Spacer that drops the body panel into the text-safe zone, clearing the image-priority area. */
-function bodyZoneSpacer(slot: ArtSlot, coverage: number, geometry: PageGeometry): string {
-  const th = geometry.textHeightIn;
-  const edge = priorityEdgeFor(slot);
-  if (edge === 'top') return `height:${Math.round(Math.max(0.28, Math.min(0.6, coverage)) * th * 100) / 100}in;`;
-  if (edge === 'full') return `height:${Math.round(0.74 * th * 100) / 100}in;`;
-  return 'height:0.12in;';
-}
 /**
- * Body-panel side style — keeps text off the image side ONLY on the first sheet
- * of the entry. On continuation pages there is no image to defer to, so the body
- * should use the full text frame. Returns CSS rules scoped per sheet position so
- * Paged.js applies the right one to the right page automatically.
+ * Bind the first-page text panel to the RED (text-safe) zone geometry, so the text
+ * box is placed EXACTLY where the image was told to stay calm. The RED rect comes
+ * from the same layout-director allocation the blueprint uses; we convert its
+ * page-relative percentages into the text frame's coordinate space (the frame is
+ * inset by the page margins) and emit a spacer (top offset) + panel margin-left/width.
+ * Text right-edge = RED right-edge, so it never crosses the gutter into the image.
+ * Continuation pages are unaffected (this is scoped to the entry's first page only).
  */
-function bodyPanelSideCss(slot: ArtSlot): string {
-  const edge = priorityEdgeFor(slot);
-  if (edge === 'left') {
-    return `.pagedjs_first_page .text-panel { margin-left: 46%; }`;
-  }
-  if (edge === 'right') {
-    return `.pagedjs_first_page .text-panel { margin-right: 46%; }`;
-  }
-  return '';
+function textPanelBinding(layoutTemplate: LayoutTemplateId, geometry: PageGeometry, firstPageSel: string): { spacerStyle: string; panelCss: string } {
+  const alloc = directLayout({ bodyMarkdown: '', layoutTemplate, geometry, bodyPt: 11, lineHeight: 1.4 });
+  const red = alloc.textSafeZones[0];
+  if (!red) return { spacerStyle: 'height:0.12in;', panelCss: '' };
+  const Wp = geometry.pageWidthIn;
+  const Hp = geometry.pageHeightIn;
+  const Wf = geometry.textWidthIn;
+  const frameLeftIn = geometry.margins.gutterIn;
+  const frameTopIn = geometry.margins.topIn;
+  const redX0In = (red.xPct / 100) * Wp;
+  const redX1In = ((red.xPct + red.widthPct) / 100) * Wp;
+  const redY0In = (red.yPct / 100) * Hp;
+  const panelLeftIn = Math.max(redX0In, frameLeftIn); // text cannot enter the page margin
+  const marginLeftPct = Math.max(0, ((panelLeftIn - frameLeftIn) / Wf) * 100);
+  const widthPct = Math.max(20, Math.min(100 - marginLeftPct, ((redX1In - panelLeftIn) / Wf) * 100));
+  const spacerIn = Math.max(0, Math.round((redY0In - frameTopIn) * 100) / 100);
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  return {
+    spacerStyle: `height:${spacerIn}in;`,
+    panelCss: `${firstPageSel} .text-panel { margin-left: ${r1(marginLeftPct)}%; width: ${r1(widthPct)}%; }`,
+  };
 }
 /**
  * Shared CSS for the full-page artwork model. The artwork IS the page (painted on
@@ -337,8 +345,11 @@ function buildEntryArticle(
   const idAttr = anchorId ? ` id="${anchorId}"` : '';
   const scientific = page.scientificName ? `<p class="scientific-name">${escapeHtml(page.scientificName)}</p>` : '';
   const title = `<h1 class="entry-title">${escapeHtml(page.entryTitle)}</h1>`;
-  const panelCss = bodyPanelSideCss(profile.artSlot);
-  const spacer = `<div class="art-spacer" style="${bodyZoneSpacer(profile.artSlot, profile.artAreaFraction, geometry)}"></div>`;
+  const firstPageSel = perEntry ? `.pagedjs_${pageName}_first_page` : '.pagedjs_first_page';
+  // Bind the first-page text panel to the RED text-safe rectangle (same allocation the
+  // blueprint uses) so text placement == the calm zone the image honored.
+  const { spacerStyle, panelCss } = textPanelBinding(page.layoutTemplate, geometry, firstPageSel);
+  const spacer = `<div class="art-spacer" style="${spacerStyle}"></div>`;
 
   if (page.imageDataUri) {
     const register = perEntry ? `@page ${pageName} {}\n  ` : '';

@@ -215,32 +215,48 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation
     'Overlay title/heading sits directly on the artwork; composition should provide calm value contrast and negative space.',
   );
 
+  // Clean gutter between the BLUE image zone and the RED text-safe zone — no shared
+  // collision strip. Every layout reserves GUTTER% of empty space between them.
+  const GUTTER = 4;
+  const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
   switch (slot) {
-    case 'TOP_BAND':
+    case 'TOP_BAND': {
+      const imgH = clamp(imagePercent, 30, 55);
+      const textY = imgH + GUTTER;
       return {
         typographyZones: [title],
-        imagePriorityZones: [zone('image-priority-top', 'primary-art', 0, 0, 100, imagePercent, 'Concentrate focal visual detail in the upper artwork zone; frame the text-safe zone naturally.')],
-        textSafeZones: [zone('text-safe-lower', 'body', 10, Math.max(28, imagePercent), 80, Math.max(28, textPct), 'Reserve calm, low-detail artwork for readable body text. Do not draw a panel, box, card, or empty cutout.', 'organic')],
+        imagePriorityZones: [zone('image-priority-top', 'primary-art', 0, 0, 100, imgH, 'Concentrate focal visual detail in the upper artwork zone; below it stays calm for text.')],
+        textSafeZones: [zone('text-safe-lower', 'body', 8, textY, 84, Math.max(24, 96 - textY), 'Reserve calm, low-detail artwork for readable body text. Do not draw a panel, box, card, or empty cutout.', 'organic')],
       };
-    case 'BOTTOM_BAND':
+    }
+    case 'BOTTOM_BAND': {
+      const imgH = clamp(imagePercent, 30, 55);
+      const imgY = 100 - imgH;
       return {
         typographyZones: [title],
-        imagePriorityZones: [zone('image-priority-bottom', 'primary-art', 0, Math.max(35, textPct), 100, imagePercent, 'Concentrate focal visual detail in the lower artwork zone; keep upper body area calm.')],
-        textSafeZones: [zone('text-safe-upper', 'body', 10, 22, 80, Math.max(30, textPct - 8), 'Reserve calm upper artwork for readable body text. No boxes or paper panels.', 'organic')],
+        imagePriorityZones: [zone('image-priority-bottom', 'primary-art', 0, imgY, 100, imgH, 'Concentrate focal visual detail in the lower artwork zone; keep upper body area calm.')],
+        textSafeZones: [zone('text-safe-upper', 'body', 8, 4, 84, Math.max(24, imgY - GUTTER - 4), 'Reserve calm upper artwork for readable body text. No boxes or paper panels.', 'organic')],
       };
-    case 'FLOAT_LEFT':
+    }
+    case 'FLOAT_LEFT': {
+      const imgW = clamp(imagePercent, 40, 60);
+      const textX = imgW + GUTTER;
       return {
         typographyZones: [title],
-        imagePriorityZones: [zone('image-priority-left', 'primary-art', 0, 12, Math.max(18, imagePercent), 58, 'Focal visual detail lives along the left side while the full page remains one illustration.')],
-        textSafeZones: [zone('text-safe-right', 'body', Math.min(46, imagePercent + 8), 24, Math.max(44, textPct - 8), 58, 'Keep the right/lower artwork calm for body text; artwork remains visible under text.', 'organic')],
+        imagePriorityZones: [zone('image-priority-left', 'primary-art', 0, 8, imgW, 84, 'Focal visual detail lives along the left side while the full page remains one illustration.')],
+        textSafeZones: [zone('text-safe-right', 'body', textX, 22, Math.max(34, 94 - textX), 70, 'Keep the right column calm for body text; artwork remains visible under text.', 'organic')],
       };
+    }
     case 'FLOAT_RIGHT':
-    case 'SIDEBAR_RIGHT':
+    case 'SIDEBAR_RIGHT': {
+      const imgW = clamp(imagePercent, 40, 60);
+      const imgX = 100 - imgW;
       return {
         typographyZones: [title],
-        imagePriorityZones: [zone('image-priority-right', 'primary-art', Math.max(52, textPct), 12, Math.max(18, imagePercent), 72, 'Focal visual detail lives along the right side while the full page remains one illustration.')],
-        textSafeZones: [zone('text-safe-left', 'body', 8, 24, Math.min(62, textPct), 60, 'Keep the left artwork calm for body text; no box, card, or hard separation.', 'organic')],
+        imagePriorityZones: [zone('image-priority-right', 'primary-art', imgX, 8, imgW, 84, 'Focal visual detail lives along the right side while the full page remains one illustration.')],
+        textSafeZones: [zone('text-safe-left', 'body', 6, 22, Math.max(34, imgX - GUTTER - 6), 70, 'Keep the left column calm for body text; no box, card, or hard separation.', 'organic')],
       };
+    }
     case 'SCATTERED':
       return {
         typographyZones: [title],

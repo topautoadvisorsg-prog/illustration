@@ -543,6 +543,8 @@ export function assembleLeanPrompt(masterStyleDna: string, pkg: SubjectPackage):
     'ORANGE zones: supporting illustration zones — small supporting specimen studies.',
     'Follow the blueprint composition exactly.',
     '',
+    'Supporting studies are rendered directly on the bare parchment as loose museum specimen studies — delicate watercolor/ink studies that sit naturally on the page itself. No cards, no frames, no boxes, no colored backgrounds, no rectangles behind them. They should feel hand-placed in a naturalist field journal, integrated into the same paper as the page.',
+    '',
     LEAN_LAYOUT_RULES,
   ].join('\n');
 }
