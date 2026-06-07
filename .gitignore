@@ -52,3 +52,15 @@ coverage/
 .cache/
 
 repomix-output.xml
+
+# Local validation/proof artifacts (Claudio review sessions)
+ch1_pages/
+ch1_val_pages/
+compare/
+raw_imgs/
+showcase/
+validation-artifacts/
+BEFORE_AFTER_*.png
+CHAPTER1_5PAGE_PROOF.pdf
+ch1_proof_v2*.pdf
+ch1_validation.pdf
