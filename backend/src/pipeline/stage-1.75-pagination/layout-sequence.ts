@@ -16,6 +16,7 @@
 
 import type { ContentType, LayoutTemplateId, PageManifest, ProjectConfig } from '@wildlands/shared';
 import { isDangerPage } from '../stage-2-planner/content-signals.js';
+import { countWords } from '../shared/markdown-text.js';
 
 /** v1 continuation/reading layout. SPEC §5.6 notes a future LAYOUT_17_CONTINUATION. */
 export const DEFAULT_CONTINUATION_LAYOUT: LayoutTemplateId = 'LAYOUT_2_TEXT_HEAVY';
@@ -72,22 +73,6 @@ export function preferredOpenerLayout(
     default:
       return config.layoutPolicy.defaultTemplate;
   }
-}
-
-/**
- * Strip markdown and count words. Local copy so this module is independent
- * of plan-pages.ts (avoids accidental coupling to the legacy splitter design).
- */
-function countWords(markdown: string): number {
-  const text = markdown
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`[^`]*`/g, ' ')
-    .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
-    .replace(/\[[^\]]*]\([^)]*\)/g, ' ')
-    .replace(/[#>*_~|`-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return text ? text.split(/\s+/).filter(Boolean).length : 0;
 }
 
 /**

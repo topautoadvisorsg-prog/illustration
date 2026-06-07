@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema, type PageManifest, type ProjectConfig } from '@wildlands/shared';
 import { paginateProject } from '../paginate.js';
+import { PaginatedPageSchema } from '../types.js';
 
 function makeConfig(): ProjectConfig {
   return ProjectConfigSchema.parse({ volume: 1, title: 'T', authorName: 'A' });
@@ -107,6 +108,33 @@ describe('paginateProject — end-to-end orchestrator', () => {
     }
     for (const p of result.pages) {
       expect(p.totalParts).toBe(partsByEntry.get(p.entryKey));
+    }
+  });
+
+  it('assigns sequential 1-based plannedPageNumber across the whole book', () => {
+    const entries: PageManifest[] = [
+      makeEntry({ pageId: 'CH01_P001', entryTitle: 'A', bodyMarkdown: bodyOf(2, 30), contentType: 'SPECIES_PROFILE' }),
+      makeEntry({ pageId: 'CH01_P002', entryTitle: 'B', bodyMarkdown: bodyOf(20, 80), contentType: 'SPECIES_PROFILE' }),
+      makeEntry({ pageId: 'CH01_P003', entryTitle: 'C', bodyMarkdown: 'Short.', contentType: 'WARNING_PAGE' }),
+    ];
+    const { pages } = paginateProject({ entries, config: makeConfig() });
+    expect(pages.length).toBeGreaterThan(0);
+    pages.forEach((page, idx) => {
+      expect(page.plannedPageNumber).toBe(idx + 1);
+    });
+  });
+
+  it('every returned page passes PaginatedPageSchema validation', () => {
+    const entries: PageManifest[] = [
+      makeEntry({ pageId: 'CH01_P001', entryTitle: 'Opener', bodyMarkdown: bodyOf(1, 20), contentType: 'CHAPTER_OPENER' }),
+      makeEntry({ pageId: 'CH01_P002', entryTitle: 'Species', bodyMarkdown: bodyOf(10, 80), contentType: 'SPECIES_PROFILE' }),
+    ];
+    const { pages } = paginateProject({ entries, config: makeConfig() });
+    for (const page of pages) {
+      // Throws on any schema violation; the orchestrator already runs this,
+      // but we re-run to assert the schema is exported correctly and that
+      // every field is present on the returned objects.
+      expect(() => PaginatedPageSchema.parse(page)).not.toThrow();
     }
   });
 

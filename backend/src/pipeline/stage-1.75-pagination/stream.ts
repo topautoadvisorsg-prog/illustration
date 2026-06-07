@@ -10,7 +10,7 @@
  */
 
 import type { ContentType, PageManifest } from '@wildlands/shared';
-import { stripMarkdown } from '../stage-2-planner/plan-pages.js';
+import { countChars, countWords as countWordsShared } from '../shared/markdown-text.js';
 
 /** A token's source position in the manuscript, for debugging + future operator UI. */
 export interface StreamTokenSource {
@@ -61,20 +61,28 @@ export type StreamToken =
 /**
  * Operator-tunable entry-break policy. Lives on `config.layoutPolicy` so a
  * project can dial how aggressively the flow engine compacts entries.
+ *
+ * The `alwaysHardBreak` array is `readonly` so callers can't mutate the
+ * shared default policy through a returned reference.
  */
 export interface EntryBreakPolicy {
   kind: 'hybrid';
   /** Soft-break only if at least this many lines remain in the current block. */
   softBreakMinLinesRemaining: number;
   /** Content types that ALWAYS hard-break to a fresh page. */
-  alwaysHardBreak: ContentType[];
+  alwaysHardBreak: readonly ContentType[];
 }
 
-export const DEFAULT_ENTRY_BREAK_POLICY: EntryBreakPolicy = {
+export const DEFAULT_ENTRY_BREAK_POLICY: EntryBreakPolicy = Object.freeze({
   kind: 'hybrid',
   softBreakMinLinesRemaining: 8,
-  alwaysHardBreak: ['WARNING_PAGE', 'CHAPTER_OPENER', 'BOTANICAL_PLATE', 'DIAGNOSTIC_DIAGRAM'],
-};
+  alwaysHardBreak: Object.freeze<ContentType[]>([
+    'WARNING_PAGE',
+    'CHAPTER_OPENER',
+    'BOTANICAL_PLATE',
+    'DIAGNOSTIC_DIAGRAM',
+  ]),
+});
 
 /**
  * Derive the entry's break behavior from the policy. The flow engine just
@@ -90,15 +98,10 @@ export function breakBehaviorFor(
   return policy.alwaysHardBreak.includes(contentType) ? 'hard' : 'soft';
 }
 
-function countWords(text: string): number {
-  const stripped = stripMarkdown(text);
-  if (!stripped) return 0;
-  return stripped.split(/\s+/).filter(Boolean).length;
-}
-
-function charCount(text: string): number {
-  return stripMarkdown(text).length;
-}
+// Thin aliases that match this file's older call sites; the implementations
+// now live in the shared markdown-text helper.
+const countWords = countWordsShared;
+const charCount = countChars;
 
 /**
  * Parse one entry's bodyMarkdown into an ordered list of body tokens. Code

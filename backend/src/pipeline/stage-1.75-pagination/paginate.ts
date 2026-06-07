@@ -15,8 +15,11 @@
 import type { PageManifest, ProjectConfig, TrimSize } from '@wildlands/shared';
 import { buildLayoutSequence, type LayoutSequence } from './layout-sequence.js';
 import { entriesToStream, type EntryBreakPolicy, type StreamToken } from './stream.js';
-import { flowEngine, type EntryMeta, type EntryMetaMap, type PaginatedPage } from './flow-engine.js';
+import { flowEngine, type EntryMeta, type EntryMetaMap } from './flow-engine.js';
 import { tailRebalance } from './tail-rebalance.js';
+import { PaginatedPageSchema, type PaginatedPage } from './types.js';
+
+export type { PaginatedPage } from './types.js';
 
 export interface PaginateProjectInput {
   /** Ordered PAGE manifests (one per Breakdown entry) for the project. */
@@ -109,13 +112,23 @@ export function paginateProject(input: PaginateProjectInput): PaginateProjectRes
   // a future UI). The warning lets the operator know what could be improved.
   const rebalance = tailRebalance({ pages: flowResult.pages });
 
+  // Assign global 1-based printed page numbers across the whole book. This is
+  // the orchestrator's job — the flow engine doesn't know the final order
+  // until tail-rebalance has run.
+  const numbered = rebalance.pages.map((page, idx) => ({ ...page, plannedPageNumber: idx + 1 }));
+
+  // Runtime validation: a Zod parse before the result leaves the orchestrator
+  // catches any engine bug that would otherwise silently land bad rows in the
+  // pages table. Throws if any required field is missing or out of range.
+  const validated = numbered.map((p) => PaginatedPageSchema.parse(p));
+
   const warnings = [...flowResult.warnings, ...rebalance.warnings];
 
   return {
-    pages: rebalance.pages,
+    pages: validated,
     sequence,
     stream,
     warnings,
-    summary: summarize(rebalance.pages, input.entries.length),
+    summary: summarize(validated, input.entries.length),
   };
 }

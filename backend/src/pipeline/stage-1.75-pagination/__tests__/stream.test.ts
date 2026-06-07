@@ -44,6 +44,21 @@ describe('breakBehaviorFor', () => {
     expect(breakBehaviorFor('REFERENCE_PAGE', policy)).toBe('hard');
     expect(breakBehaviorFor('WARNING_PAGE', policy)).toBe('soft');
   });
+
+  it('DEFAULT_ENTRY_BREAK_POLICY is frozen — mutation attempts throw or are ignored', () => {
+    // `as any` to defeat the compile-time readonly check; we want to verify
+    // the runtime guard (Object.freeze) actually holds.
+    const original = [...DEFAULT_ENTRY_BREAK_POLICY.alwaysHardBreak];
+    expect(() => {
+      (DEFAULT_ENTRY_BREAK_POLICY as { softBreakMinLinesRemaining: number }).softBreakMinLinesRemaining = 99;
+    }).toThrow();
+    // alwaysHardBreak itself is also frozen.
+    expect(() => {
+      (DEFAULT_ENTRY_BREAK_POLICY.alwaysHardBreak as unknown as string[]).push('REFERENCE_PAGE');
+    }).toThrow();
+    // After the failed mutations, the policy is unchanged.
+    expect([...DEFAULT_ENTRY_BREAK_POLICY.alwaysHardBreak]).toEqual(original);
+  });
 });
 
 describe('entriesToStream — token shape', () => {

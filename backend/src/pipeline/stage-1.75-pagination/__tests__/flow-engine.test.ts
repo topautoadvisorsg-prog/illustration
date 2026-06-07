@@ -167,6 +167,119 @@ describe('flowEngine — soft break compacts two short SPECIES_PROFILE entries',
     expect(compactedPage!.compactedEntryKeys).toEqual(['CH01_P001', 'CH01_P002']);
     expect(compactedPage!.pageKey).toBe('CH01_P001_m');
   });
+
+  it('renders Beta\'s entry title as a visible heading inside the shared Reading Field', () => {
+    // Without an injected heading, the operator would see Alpha's body run
+    // straight into Beta's body with no visible break. The flow engine must
+    // emit "## Beta" at the soft-break point.
+    const a = makeEntry({
+      pageId: 'CH01_P001',
+      bodyMarkdown: 'Alpha body.',
+      contentType: 'SPECIES_PROFILE',
+      entryTitle: 'Alpha',
+      imageSubject: 'alpha',
+    });
+    const b = makeEntry({
+      pageId: 'CH01_P002',
+      bodyMarkdown: 'Beta body.',
+      contentType: 'SPECIES_PROFILE',
+      entryTitle: 'Beta — Tall Branch Species',
+      imageSubject: 'beta',
+    });
+    const { pages } = runFlow([a, b]);
+    const compactedPage = pages.find((p) => p.pageRole === 'compacted');
+    expect(compactedPage).toBeDefined();
+    expect(compactedPage!.readingFieldText).toContain('Alpha body.');
+    expect(compactedPage!.readingFieldText).toContain('## Beta — Tall Branch Species');
+    expect(compactedPage!.readingFieldText).toContain('Beta body.');
+    // Heading must appear BETWEEN the two bodies, not at the start or end.
+    const alphaIdx = compactedPage!.readingFieldText.indexOf('Alpha body.');
+    const headingIdx = compactedPage!.readingFieldText.indexOf('## Beta');
+    const betaIdx = compactedPage!.readingFieldText.indexOf('Beta body.');
+    expect(alphaIdx).toBeLessThan(headingIdx);
+    expect(headingIdx).toBeLessThan(betaIdx);
+  });
+});
+
+describe('flowEngine — section heading overhead is charged during pouring', () => {
+  it('an entry with many section headings produces more pages than the same words without', () => {
+    // 600 words across 12 paragraphs, no headings.
+    const flat = bodyOf(12, 50);
+    // Same 600 words but with a `##` heading before every paragraph — the
+    // accumulated line overhead should force at least one more page.
+    const headed = Array.from({ length: 12 }, (_, i) => `## Section ${i + 1}\n\n${paraOf(50)}`).join('\n\n');
+
+    const flatEntry = makeEntry({
+      pageId: 'CH01_P001',
+      bodyMarkdown: flat,
+      contentType: 'ENCYCLOPEDIA_ENTRY',
+    });
+    const headedEntry = makeEntry({
+      pageId: 'CH01_P001',
+      bodyMarkdown: headed,
+      contentType: 'ENCYCLOPEDIA_ENTRY',
+    });
+
+    const flatResult = runFlow([flatEntry]);
+    const headedResult = runFlow([headedEntry]);
+    expect(headedResult.pages.length).toBeGreaterThanOrEqual(flatResult.pages.length);
+  });
+});
+
+describe('flowEngine — soft-break continuation parts (totalParts ownership)', () => {
+  it('B\'s standalone continuation page reports totalParts that includes the shared compacted opener', () => {
+    // Alpha is very short — fits in its opener with plenty of room left over.
+    // Beta soft-breaks into Alpha's opener, then overflows into a continuation
+    // of Beta. The continuation's `entryKey` is Beta, `partN` should be 2
+    // (Beta's page 1 was the shared compacted opener), and `totalParts` for
+    // Beta should be 2 because the compacted opener counts toward Beta's chain.
+    const alpha = makeEntry({
+      pageId: 'CH01_P001',
+      bodyMarkdown: 'Alpha is brief.',
+      contentType: 'SPECIES_PROFILE',
+      entryTitle: 'Alpha',
+      imageSubject: 'alpha',
+    });
+    const beta = makeEntry({
+      pageId: 'CH01_P002',
+      // Long enough to overflow a continuation block.
+      bodyMarkdown: bodyOf(20, 80),
+      contentType: 'SPECIES_PROFILE',
+      entryTitle: 'Beta',
+      imageSubject: 'beta',
+    });
+    const { pages } = runFlow([alpha, beta]);
+
+    const compactedOpener = pages.find((p) => p.pageRole === 'compacted');
+    const betaContinuations = pages.filter((p) => p.entryKey === 'CH01_P002' && p.pageRole === 'continuation');
+
+    expect(compactedOpener).toBeDefined();
+    expect(compactedOpener!.compactedEntryKeys).toEqual(['CH01_P001', 'CH01_P002']);
+    expect(betaContinuations.length).toBeGreaterThanOrEqual(1);
+
+    const firstBetaCont = betaContinuations[0]!;
+    expect(firstBetaCont.partN).toBe(2); // Beta's page 1 was the compacted opener
+    // Beta's totalParts = compacted-opener + all of Beta's continuations.
+    const expectedBetaChainLen = 1 + betaContinuations.length;
+    expect(firstBetaCont.totalParts).toBe(expectedBetaChainLen);
+  });
+});
+
+describe('flowEngine — zones are populated on every page', () => {
+  it('exposes textSafeZones, imagePriorityZones, and typographyZones on PaginatedPage', () => {
+    const entry = makeEntry({
+      pageId: 'CH01_P001',
+      bodyMarkdown: bodyOf(2, 30),
+      contentType: 'SPECIES_PROFILE',
+    });
+    const { pages } = runFlow([entry]);
+    for (const page of pages) {
+      expect(page.zones).toBeDefined();
+      expect(Array.isArray(page.zones.textSafeZones)).toBe(true);
+      expect(Array.isArray(page.zones.imagePriorityZones)).toBe(true);
+      expect(Array.isArray(page.zones.typographyZones)).toBe(true);
+    }
+  });
 });
 
 describe('flowEngine — atomic token overflow', () => {

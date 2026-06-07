@@ -1,10 +1,35 @@
 import { describe, expect, it } from 'vitest';
 import type { LayoutTemplateId } from '@wildlands/shared';
 import { tailRebalance } from '../tail-rebalance.js';
-import type { PaginatedPage } from '../flow-engine.js';
+import type { PaginatedPage } from '../types.js';
+
+// Tail-rebalance only reads pageRole, layoutTemplate, and fitStatus. The
+// synthetic `zones` object is just enough to satisfy the TS shape; it is
+// never inspected by the rebalancer.
+const emptyZones = {
+  priorityEdge: 'LEFT',
+  imagePriorityZone: { xPct: 0, yPct: 0, widthPct: 0, heightPct: 0 },
+  textSafeZones: [],
+  typographyZones: [],
+  imagePriorityZones: [],
+  regions: [],
+  imagePlacement: '',
+  textPlacement: '',
+  openingPageImagePercent: 0,
+  openingPageTextPercent: 0,
+  continuationPageImagePercent: 0,
+  continuationPageTextPercent: 0,
+  estimatedRenderedPages: 1,
+  wordsPerOpeningPage: 0,
+  wordsPerContinuationPage: 0,
+  notes: [],
+  architecture: 'FLOAT_LEFT',
+  artBox: { xPct: 0, yPct: 0, widthPct: 0, heightPct: 0 },
+} as unknown as PaginatedPage['zones'];
 
 function page(o: Partial<PaginatedPage> & Pick<PaginatedPage, 'entryKey' | 'pageKey' | 'layoutTemplate' | 'fitStatus' | 'pageRole'>): PaginatedPage {
   return {
+    plannedPageNumber: 1,
     entryTitle: 'T',
     chapterNumber: 1,
     partN: 1,
@@ -15,6 +40,7 @@ function page(o: Partial<PaginatedPage> & Pick<PaginatedPage, 'entryKey' | 'page
     readingFieldText: '',
     readingFieldChars: 0,
     readingFieldWords: 0,
+    zones: emptyZones,
     warnings: [],
     ...o,
   };

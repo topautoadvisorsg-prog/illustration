@@ -19,44 +19,19 @@ import { DEFAULT_CONTINUATION_LAYOUT, type LayoutSequence } from './layout-seque
 import {
   DEFAULT_ENTRY_BREAK_POLICY,
   type EntryBreakPolicy,
+  type SectionHeadingToken,
   type StreamToken,
 } from './stream.js';
+import { countChars, countWords } from '../shared/markdown-text.js';
 import { computePageGeometry } from '../stage-6-layout/page-geometry.js';
-import { analyzeTextFit } from '../stage-6-layout/text-fit.js';
+import { LINES_PER_SECTION_HEADER, analyzeTextFit } from '../stage-6-layout/text-fit.js';
+import { directLayout, type LayoutAllocation } from '../stage-6-layout/layout-director.js';
+import type { PaginatedPage } from './types.js';
 
-/** A single printed page produced by the flow engine. Mirrors the durable
- *  `pages` table shape from SPEC §4. The engine produces these in order; the
- *  caller persists them. */
-export interface PaginatedPage {
-  /** The opener entry whose chain this page belongs to (for compacted pages,
-   *  the FIRST entry that landed on the page). */
-  entryKey: string;
-  entryTitle: string;
-  /** Display key for this printed page — opener uses the entry key verbatim,
-   *  continuations append `_c{N}`, compacted openers append `_m`. */
-  pageKey: string;
-  chapterNumber: number;
-  /** N-th printed page in this entry's chain (1 = opener). */
-  partN: number;
-  /** Filled in after flow completes; engine writes 0 temporarily. */
-  totalParts: number;
-  pageRole: 'opener' | 'continuation' | 'compacted';
-  /** True only for the opener that drives the page's illustration. */
-  carriesSubject: boolean;
-  /** Set on compacted pages — the ordered list of entries living on the page. */
-  compactedEntryKeys: string[] | null;
-  /** Image subject string carried over from the opener entry (used by Stage 3
-   *  later; null on continuation pages where carriesSubject = false). */
-  imageSubject: string | null;
-  layoutTemplate: LayoutTemplateId;
-  readingFieldText: string;
-  readingFieldChars: number;
-  readingFieldWords: number;
-  fitStatus: PaginationFitStatus;
-  /** Optional engine-level note (e.g. atomic-token overflow, hard-broken
-   *  short of capacity). Surfaces in pagination_report. */
-  warnings: string[];
-}
+// PaginatedPage is the engine's output row. Definition + Zod schema live in
+// `types.ts` so both the engine and the future persistence layer share one
+// authoritative shape.
+export type { PaginatedPage } from './types.js';
 
 export interface FlowEngineInput {
   stream: StreamToken[];
@@ -117,18 +92,6 @@ interface WorkingBlock {
 
 function joinMarkdown(chunks: string[]): string {
   return chunks.join('\n\n').trim();
-}
-
-function countWordsLoose(markdown: string): number {
-  const text = markdown
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`[^`]*`/g, ' ')
-    .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
-    .replace(/\[[^\]]*]\([^)]*\)/g, ' ')
-    .replace(/[#>*_~|`-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return text ? text.split(/\s+/).filter(Boolean).length : 0;
 }
 
 /**
@@ -199,6 +162,17 @@ function finalizeBlock(block: WorkingBlock, trimSize: TrimSize, bodyPt: number, 
     lineHeight,
   });
 
+  // Layout zones (text-safe / image-priority / typography) so Stage 1.8 preview
+  // renderer can place text in the right rectangle without re-running directLayout.
+  const geometry = computePageGeometry(trimSize);
+  const zones = directLayout({
+    bodyMarkdown: text,
+    layoutTemplate: block.layoutTemplate,
+    geometry,
+    bodyPt,
+    lineHeight,
+  });
+
   const isCompacted = block.entryKeysOnPage.length > 1;
   const pageRole: PaginatedPage['pageRole'] = isCompacted
     ? 'compacted'
@@ -215,6 +189,11 @@ function finalizeBlock(block: WorkingBlock, trimSize: TrimSize, bodyPt: number, 
   const finalStatus: PaginationFitStatus = block.overflowedAtomic ? 'OVERFLOW' : fit.status;
 
   return {
+    // plannedPageNumber is set by the orchestrator after the full page list
+    // is known. Start at 0 here so the engine's intermediate result is shape-
+    // complete (Zod validation rejects 0, so DO NOT validate before the
+    // orchestrator finalizes).
+    plannedPageNumber: 0,
     entryKey: block.primaryEntryKey,
     entryTitle: block.primaryEntryTitle,
     pageKey,
@@ -228,8 +207,9 @@ function finalizeBlock(block: WorkingBlock, trimSize: TrimSize, bodyPt: number, 
     layoutTemplate: block.layoutTemplate,
     readingFieldText: text,
     readingFieldChars: fit.charCount,
-    readingFieldWords: countWordsLoose(text),
+    readingFieldWords: countWords(text),
     fitStatus: finalStatus,
+    zones,
     warnings: block.warnings,
   };
 }
@@ -239,10 +219,21 @@ function linesRemaining(block: WorkingBlock): number {
   return Math.floor(charsLeft / Math.max(1, block.charsPerLine));
 }
 
+/**
+ * Account for an extra full line of capacity consumed by a section heading.
+ * The Stage 6 text-fit model charges `LINES_PER_SECTION_HEADER` lines on top
+ * of the heading's own characters — pagination has to do the same or it will
+ * over-pour into a block and then surprise the operator at finalize time.
+ */
+function sectionHeadingExtraChars(block: WorkingBlock): number {
+  return LINES_PER_SECTION_HEADER * block.charsPerLine;
+}
+
 function pushToken(block: WorkingBlock, token: StreamToken): void {
   if (token.kind === 'entry-start') return; // titles never enter the body text
   block.textChunks.push(token.markdown);
   block.charsUsed += token.chars;
+  if (token.kind === 'section-heading') block.charsUsed += sectionHeadingExtraChars(block);
   if (token.kind === 'paragraph') block.wordsUsed += token.words;
 }
 
@@ -351,10 +342,26 @@ export function flowEngine(input: FlowEngineInput, entryMeta: EntryMetaMap): Flo
         // Soft break: keep the current block, record the entry as compacted.
         // The current block's primary identity (entryKey + image subject) does
         // NOT change — the first entry keeps the image slot, per SPEC §5.5.
-        // But the BODY pointer advances so that an overflow while pouring B's
-        // text creates a continuation page belonging to B (not A).
         open.entryKeysOnPage.push(token.entryKey);
+        // Inject a visible h2 heading so the operator (and the preview
+        // renderer) can SEE where the second entry begins inside the shared
+        // Reading Field. Without this the readingFieldText would jump from
+        // A's body straight into B's body with no break.
+        const headingMarkdown = `## ${token.entryTitle}`;
+        const headingChars = countChars(headingMarkdown);
+        const headingToken: SectionHeadingToken = {
+          kind: 'section-heading',
+          markdown: headingMarkdown,
+          chars: headingChars,
+          source: token.source,
+        };
+        pushToken(open, headingToken);
+        // The body pointer advances so that an overflow while pouring B's text
+        // creates a continuation page belonging to B (not A). Seed B's
+        // partN counter to 2 — B's "page 1" is THIS shared compacted opener,
+        // so B's first standalone continuation is partN=2.
         open.currentBodyEntryKey = token.entryKey;
+        partCounterByEntry.set(token.entryKey, 2);
       }
       continue;
     }
@@ -366,7 +373,11 @@ export function flowEngine(input: FlowEngineInput, entryMeta: EntryMetaMap): Flo
       continue;
     }
 
-    if (open.charsUsed + token.chars <= open.capacityChars) {
+    // Effective cost includes the section-heading line surcharge, so a
+    // heading near the end of a block doesn't squeak past the fit check
+    // only to be discovered as TIGHT/OVERFLOW at finalize time.
+    const overhead = token.kind === 'section-heading' ? sectionHeadingExtraChars(open) : 0;
+    if (open.charsUsed + token.chars + overhead <= open.capacityChars) {
       pushToken(open, token);
       continue;
     }
@@ -393,11 +404,21 @@ export function flowEngine(input: FlowEngineInput, entryMeta: EntryMetaMap): Flo
 
   closeAndPushBlock();
 
-  // Fill totalParts now that the chain is known. Compacted pages count toward
-  // their primary entry's chain too (they're a real printed page).
+  // Fill totalParts now that the chain is known. An entry's chain length is
+  // the count of pages where ANY of the following is true:
+  //   - the page's primary entry IS this entry (entryKey match), OR
+  //   - this entry appears in the page's compactedEntryKeys list.
+  // That way a secondary entry on a compacted opener (its only on-page
+  // appearance) still contributes to its own totalParts.
   const partsByEntry = new Map<string, number>();
   for (const page of pages) {
-    partsByEntry.set(page.entryKey, (partsByEntry.get(page.entryKey) ?? 0) + 1);
+    const seen = new Set<string>([page.entryKey]);
+    if (page.compactedEntryKeys) {
+      for (const key of page.compactedEntryKeys) seen.add(key);
+    }
+    for (const key of seen) {
+      partsByEntry.set(key, (partsByEntry.get(key) ?? 0) + 1);
+    }
   }
   for (const page of pages) {
     page.totalParts = partsByEntry.get(page.entryKey) ?? 1;
