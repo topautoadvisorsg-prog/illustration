@@ -98,6 +98,32 @@ describe('previewCacheKey', () => {
     const b = previewCacheKey({ page, config: altConfig });
     expect(a).not.toBe(b);
   });
+
+  it('changes the key when colorPalette.ink changes (fix #2 regression guard)', () => {
+    const page = makePage();
+    const a = previewCacheKey({ page, config: makeConfig() });
+    const altConfig = ProjectConfigSchema.parse({
+      volume: 1,
+      title: 'T',
+      authorName: 'A',
+      colorPalette: { ink: '#000000' },
+    });
+    const b = previewCacheKey({ page, config: altConfig });
+    expect(a).not.toBe(b);
+  });
+
+  it('changes the key when colorPalette.accent changes', () => {
+    const page = makePage();
+    const a = previewCacheKey({ page, config: makeConfig() });
+    const altConfig = ProjectConfigSchema.parse({
+      volume: 1,
+      title: 'T',
+      authorName: 'A',
+      colorPalette: { accent: '#abcdef' },
+    });
+    const b = previewCacheKey({ page, config: altConfig });
+    expect(a).not.toBe(b);
+  });
 });
 
 describe('preview cache read/write', () => {

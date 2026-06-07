@@ -51,7 +51,11 @@ export function previewCacheKey(input: PreviewCacheKeyInput): string {
     // Typography + trim drive every glyph position in the rendered PDF.
     typography: config.typography,
     trimSize: config.trimSize,
-    paper: config.colorPalette.paper,
+    // Full colorPalette — any color change (paper / ink / accent / warning /
+    // anything else added later) repaints the preview, so all of them
+    // invalidate the cache. Previously only `paper` was included, which left
+    // stale entries when ink / accent moved.
+    colorPalette: config.colorPalette,
   });
   return createHash('sha256').update(sig).digest('hex');
 }
@@ -71,11 +75,19 @@ export async function readPreviewFromCache(key: string): Promise<Buffer | null> 
   }
 }
 
-/** Write a freshly-rendered preview PDF into the cache. Idempotent. */
+/**
+ * Write a freshly-rendered preview PDF into the cache. Idempotent. Atomic:
+ * writes to a `${pid}.tmp` sibling file first, then renames into place. A
+ * crash mid-write leaves the destination file unchanged (a tmp file may
+ * remain — harmless; subsequent renders overwrite it).
+ */
 export async function writePreviewToCache(key: string, buffer: Buffer): Promise<void> {
   const root = previewCacheRoot();
   await fs.mkdir(root, { recursive: true });
-  await fs.writeFile(pathForKey(key), buffer);
+  const finalPath = pathForKey(key);
+  const tmpPath = `${finalPath}.${process.pid}.tmp`;
+  await fs.writeFile(tmpPath, buffer);
+  await fs.rename(tmpPath, finalPath);
 }
 
 /** Clear the entire preview cache. Used by tests + manual cache invalidation. */

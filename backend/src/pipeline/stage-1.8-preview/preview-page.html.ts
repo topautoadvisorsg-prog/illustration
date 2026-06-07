@@ -14,6 +14,19 @@
 import type { ProjectConfig } from '@wildlands/shared';
 import { computePageGeometry } from '../stage-6-layout/page-geometry.js';
 import type { PaginatedPage } from '../stage-1.75-pagination/types.js';
+import { safeCssColor, safeCssFontName } from './css-safety.js';
+
+/** Hard-coded safe fallbacks used when a project config string fails the
+ *  CSS-safety check. Picked to be visually obvious (so an operator notices a
+ *  sanitization fallback) while still rendering a readable preview. */
+const FALLBACK = {
+  paper: '#faf6ee',
+  ink: '#2a2419',
+  accent: '#8b6b3a',
+  bodyFont: 'Georgia',
+  headingFont: 'Georgia',
+  captionFont: 'Georgia',
+};
 
 export interface PreviewPageHtmlInput {
   page: PaginatedPage;
@@ -70,9 +83,9 @@ function inlineMarkdown(escaped: string): string {
  *  just see typography on parchment. */
 const READING_FIELD_GUIDE_COLOR = '#b4541f';
 
-function fontLinkTags(t: ProjectConfig['typography']): string {
+function fontLinkTags(safeFonts: { heading: string; body: string; caption: string }): string {
   const families = Array.from(
-    new Set([t.headingFont, t.bodyFont, t.captionFont].map((f) => f.trim()).filter(Boolean)),
+    new Set([safeFonts.heading, safeFonts.body, safeFonts.caption].filter(Boolean)),
   );
   if (families.length === 0) return '';
   const weights = 'ital,wght@0,400;0,500;0,600;0,700;1,400';
@@ -110,6 +123,18 @@ export function buildPreviewPageHtml(input: PreviewPageHtmlInput): string {
   const geometry = computePageGeometry(config.trimSize);
   const t = config.typography;
   const c = config.colorPalette;
+
+  // Sanitize every config-derived CSS value before interpolation.
+  // ProjectConfigSchema does not constrain these to valid CSS, so a
+  // malicious or malformed palette/font would otherwise inject arbitrary CSS.
+  const safe = {
+    paper: safeCssColor(c.paper, FALLBACK.paper),
+    ink: safeCssColor(c.ink, FALLBACK.ink),
+    accent: safeCssColor(c.accent, FALLBACK.accent),
+    bodyFont: safeCssFontName(t.bodyFont, FALLBACK.bodyFont),
+    headingFont: safeCssFontName(t.headingFont, FALLBACK.headingFont),
+    captionFont: safeCssFontName(t.captionFont, FALLBACK.captionFont),
+  };
 
   const bodyHtml = bodyToHtml(page.readingFieldText);
   const titleText = escapeHtml(titleBandText(page));
@@ -149,25 +174,25 @@ export function buildPreviewPageHtml(input: PreviewPageHtmlInput): string {
 <head>
 <meta charset="utf-8">
 <title>Preview — ${escapeHtml(page.entryTitle)} (page ${page.plannedPageNumber})</title>
-${fontLinkTags(t)}
+${fontLinkTags({ heading: safe.headingFont, body: safe.bodyFont, caption: safe.captionFont })}
 <style>
   @page {
     size: ${geometry.pageWidthIn}in ${geometry.pageHeightIn}in;
     margin: 0;
-    background: ${c.paper};
+    background: ${safe.paper};
     @bottom-center {
       content: "${stamp}";
-      font-family: '${t.captionFont}', Georgia, serif;
+      font-family: '${safe.captionFont}', Georgia, serif;
       font-size: ${t.captionPt}pt;
-      color: ${c.accent};
+      color: ${safe.accent};
     }
   }
   html, body {
-    background: ${c.paper};
+    background: ${safe.paper};
     margin: 0;
     padding: 0;
-    color: ${c.ink};
-    font-family: '${t.bodyFont}', Georgia, serif;
+    color: ${safe.ink};
+    font-family: '${safe.bodyFont}', Georgia, serif;
     font-size: ${t.bodyPt}pt;
     line-height: ${t.lineHeight};
     -webkit-print-color-adjust: exact;
@@ -179,10 +204,10 @@ ${fontLinkTags(t)}
     height: ${geometry.pageHeightIn}in;
   }
   .title-band {
-    font-family: '${t.headingFont}', Georgia, serif;
+    font-family: '${safe.headingFont}', Georgia, serif;
     font-weight: 600;
     font-size: ${t.entryTitlePt}pt;
-    color: ${c.ink};
+    color: ${safe.ink};
     text-transform: uppercase;
     letter-spacing: 0.04em;
     overflow: hidden;
@@ -194,12 +219,12 @@ ${fontLinkTags(t)}
     box-sizing: border-box;
   }
   .reading-field .rf-heading {
-    font-family: '${t.headingFont}', Georgia, serif;
+    font-family: '${safe.headingFont}', Georgia, serif;
     font-weight: 600;
     font-size: ${t.sectionHeadingPt}pt;
     letter-spacing: 0.04em;
     margin: 10pt 0 4pt 0;
-    color: ${c.ink};
+    color: ${safe.ink};
   }
   .reading-field .rf-body {
     margin: 0 0 8pt 0;
@@ -214,7 +239,7 @@ ${fontLinkTags(t)}
     white-space: pre-wrap;
   }
   .reading-field .rf-empty {
-    color: ${c.accent};
+    color: ${safe.accent};
     font-style: italic;
   }
   .image-zone {
@@ -225,9 +250,9 @@ ${fontLinkTags(t)}
       rgba(0,0,0,0.07) 6pt,
       rgba(0,0,0,0.07) 12pt
     );
-    border: 0.75pt solid ${c.accent};
-    color: ${c.accent};
-    font-family: '${t.captionFont}', Georgia, serif;
+    border: 0.75pt solid ${safe.accent};
+    color: ${safe.accent};
+    font-family: '${safe.captionFont}', Georgia, serif;
     font-style: italic;
     font-size: ${t.captionPt}pt;
     display: flex;

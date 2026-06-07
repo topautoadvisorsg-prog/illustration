@@ -150,3 +150,34 @@ describe('buildPreviewPageHtml — empty body', () => {
     expect(html).toContain('(no body text)');
   });
 });
+
+describe('buildPreviewPageHtml — CSS sanitization (fix #1)', () => {
+  it('rejects a CSS-injection payload in colorPalette.paper and falls back', () => {
+    const evilConfig = ProjectConfigSchema.parse({
+      volume: 1,
+      title: 'T',
+      authorName: 'A',
+      colorPalette: {
+        paper: 'red; } body { display: none } .x{ color: blue',
+      },
+    });
+    const html = buildPreviewPageHtml({ page: makePage(), config: evilConfig });
+    // The malicious payload never reaches the rendered CSS.
+    expect(html).not.toContain('display: none');
+    expect(html).not.toContain('} body {');
+    // The safe fallback paper colour shows up instead.
+    expect(html).toContain('#faf6ee');
+  });
+
+  it('rejects a font-name with a single quote and falls back to Georgia', () => {
+    const evilConfig = ProjectConfigSchema.parse({
+      volume: 1,
+      title: 'T',
+      authorName: 'A',
+      typography: { bodyFont: "Don't Care" },
+    });
+    const html = buildPreviewPageHtml({ page: makePage(), config: evilConfig });
+    expect(html).not.toContain("Don't Care");
+    expect(html).toContain("'Georgia',");
+  });
+});
