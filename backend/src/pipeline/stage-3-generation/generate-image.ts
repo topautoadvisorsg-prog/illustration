@@ -155,11 +155,16 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
   const layoutAwarePrompt = appendImageShapeInstruction(page.imagePrompt!, imageShape);
   const { prompt: finalPrompt, sha256: promptSha256 } = finalizePrompt(layoutAwarePrompt, opts.promptAddendum);
 
-  logger.info({ pageId: page.id, pageKey: page.pageKey, version, imageSize: imageShape.size, imageShape: imageShape.shape, useBlueprint: Boolean(opts.useBlueprint) }, 'Stage 3: generating image');
+  // Blueprint is the source of truth — default ON in production. The lean prompt
+  // references "the attached blueprint image", so generation attaches it. When a
+  // custom image generator is injected (tests), default OFF so the injected generator
+  // is used directly; an explicit useBlueprint always wins.
+  const useBlueprint = opts.useBlueprint ?? !opts.generator;
+  logger.info({ pageId: page.id, pageKey: page.pageKey, version, imageSize: imageShape.size, imageShape: imageShape.shape, useBlueprint }, 'Stage 3: generating image');
 
   let image: GeneratedImage;
   let blueprintPath: string | undefined;
-  if (opts.useBlueprint) {
+  if (useBlueprint) {
     // Build the layout blueprint from the page's deterministic zones and pass it to
     // the image agent as a composition map. Zone geometry depends only on the layout
     // (slot + coverage), so an empty body is fine here.
@@ -179,8 +184,9 @@ export async function generatePageImage(opts: GeneratePageImageOptions): Promise
       blueprintPng,
     );
     blueprintPath = bpStored.relativePath;
-    const blueprintPrompt = `${finalPrompt}\n\n${BLUEPRINT_COMPOSITION_INSTRUCTION}`;
-    image = await generateImageFromBlueprint({ prompt: blueprintPrompt, blueprintPng, size: imageShape.size });
+    // The lean prompt already carries the COMPOSITION + LAYOUT RULES sections, so we
+    // send it as-is (no duplicate legend append).
+    image = await generateImageFromBlueprint({ prompt: finalPrompt, blueprintPng, size: imageShape.size });
   } else {
     image = await generator({ prompt: finalPrompt, size: imageShape.size });
   }

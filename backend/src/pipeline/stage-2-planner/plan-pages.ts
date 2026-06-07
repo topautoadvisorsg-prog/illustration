@@ -625,6 +625,92 @@ function artBriefText(
   ].join('\n');
 }
 
+// ─── Lean prompt architecture (blueprint is the source of truth) ───────────────
+// The image prompt is now assembled in code: Master Style DNA + a SUBJECT PACKAGE +
+// a short composition pointer to the blueprint image + a short rule set. The verbose
+// per-layout templates, manuscript-prose dump, and repeated zone/no-text language are
+// gone — the blueprint image carries the layout, so the prompt stops describing it.
+
+export interface SubjectPackage {
+  primary: string;
+  supporting: string[];
+  environment: string;
+  mood: string;
+}
+
+// Deterministic supporting-element vocabulary (small studies for the ORANGE zones),
+// keyed to subject/title keywords. New-England wilderness motifs only.
+const SUPPORTING_VOCAB: Array<{ test: RegExp; items: string[] }> = [
+  { test: /moose|deer|bear|lynx|fox|otter|beaver|animal|wildlife|track|scat/i, items: ['Animal tracks', 'Pine branch', 'Wetland grasses'] },
+  { test: /river|stream|brook|water|crossing|falls/i, items: ['River stones', 'Fern cluster', 'Moss-covered log'] },
+  { test: /pine|spruce|fir|hemlock|tree|forest|understory|woodland|hardwood|maple|birch/i, items: ['Fern cluster', 'Pinecone', 'Moss-covered log'] },
+  { test: /mountain|alpine|ridge|summit|treeline|rocky|boulder|granite|geology|terrain|valley/i, items: ['Lichen-covered rock', 'Hardy alpine shrub', 'Weathered granite'] },
+  { test: /mushroom|fungi|fungus/i, items: ['Fallen leaves', 'Forest duff', 'Moss patch'] },
+  { test: /tick|lyme|hazard|safety|weather|hypothermia|storm/i, items: ['Pine branch', 'Lichen-covered rock', 'Fern cluster'] },
+  { test: /flower|trillium|botanical|plant|fern|fiddlehead|wildflower/i, items: ['Leaf detail', 'Seed pod', 'Moss patch'] },
+];
+const DEFAULT_SUPPORTING = ['Fern cluster', 'Pinecone', 'Moss-covered log'];
+
+const ENVIRONMENT_VOCAB: Array<{ test: RegExp; env: string }> = [
+  { test: /boreal|black spruce|balsam|bog|tamarack|north(ern)?\b/i, env: 'Northern boreal forest and wetland' },
+  { test: /alpine|treeline|presidential|summit|tundra|above treeline/i, env: 'Alpine zone above treeline' },
+  { test: /hardwood|sugar maple|birch|beech|deciduous/i, env: 'Temperate New England hardwood forest' },
+  { test: /river|stream|brook|wetland|marsh|water|crossing/i, env: 'New England river corridor and woodland' },
+  { test: /mountain|ridge|granite|rocky|geology|valley|bones of the land/i, env: 'New England mountain terrain' },
+];
+const DEFAULT_ENVIRONMENT = 'Temperate New England woodland';
+
+/** Derive the SUBJECT PACKAGE deterministically from the page (no manuscript prose). */
+export function deriveSubjectPackage(page: PageManifest): SubjectPackage {
+  const hay = `${page.entryTitle} ${page.imageSubject}`;
+  const supporting = (SUPPORTING_VOCAB.find((v) => v.test.test(hay))?.items ?? DEFAULT_SUPPORTING).slice(0, 3);
+  const environment = ENVIRONMENT_VOCAB.find((v) => v.test.test(hay))?.env ?? DEFAULT_ENVIRONMENT;
+  const harsh = isDangerPage(page) || /hazard|winter|hypothermia|storm|cold|exposed|spruce trap|disorientation/i.test(hay);
+  const mood = harsh
+    ? 'Cold, stark, exposed wilderness; flat overcast light'
+    : 'Quiet morning atmosphere; soft natural light';
+  return { primary: page.imageSubject, supporting, environment, mood };
+}
+
+const LEAN_LAYOUT_RULES = [
+  'LAYOUT RULES',
+  '- Follow the blueprint image.',
+  '- Generate imagery only.',
+  '- Generate no readable text.',
+  '- Respect RED, BLUE, and ORANGE zones.',
+  '- Do not place important subjects in RED zones.',
+  '- Do not generate labels, captions, annotations, or typography.',
+].join('\n');
+
+/** Assemble the lean image prompt: Style DNA + SUBJECT PACKAGE + blueprint pointer + rules. */
+export function assembleLeanPrompt(masterStyleDna: string, pkg: SubjectPackage): string {
+  return [
+    masterStyleDna.trim(),
+    '',
+    'SUBJECT PACKAGE',
+    '',
+    'PRIMARY SUBJECT',
+    `- ${pkg.primary}`,
+    '',
+    'SUPPORTING SUBJECTS',
+    ...pkg.supporting.map((s) => `- ${s}`),
+    '',
+    'ENVIRONMENT',
+    `- ${pkg.environment}`,
+    '',
+    'MOOD',
+    `- ${pkg.mood}`,
+    '',
+    'COMPOSITION — follow the attached blueprint image.',
+    'RED zones: text-safe zones — keep calm and open; place no important subjects here.',
+    'BLUE zones: primary illustration zones — the primary subject and environmental scene.',
+    'ORANGE zones: supporting illustration zones — small supporting specimen studies.',
+    'Follow the blueprint composition exactly.',
+    '',
+    LEAN_LAYOUT_RULES,
+  ].join('\n');
+}
+
 export function planPage(page: PageManifest, config: ProjectConfig, options: PlanPageOptions = {}): PagePlanningDecision {
   const agent = getAgentContract('PAGE_PLANNER');
   const wordCount = countPageWords(page.bodyMarkdown);
@@ -684,43 +770,13 @@ export function planPage(page: PageManifest, config: ProjectConfig, options: Pla
   if (underMinWords) warnings.push(`word_count_under_layout_min:${wordCount}<${capacity.minWords}`);
   if (overMaxWords) warnings.push(`word_count_over_layout_max:${wordCount}>${capacity.maxWords}`);
 
-  const promptTemplate = asset?.promptTemplate ?? (
-    `{MASTER_STYLE_DNA}\n\nCreate the final illustration for {SUBJECT}. Scientific details: {SCIENTIFIC_DETAILS}. ` +
-    `Use composition notes: {COMPOSITION_NOTES}. Do not render page text, labels, titles, or typography.`
-  );
-
-  if (asset) {
-    for (const placeholder of REQUIRED_PROMPT_PLACEHOLDERS) {
-      if (!asset.placeholders.includes(placeholder) || !promptTemplate.includes(placeholder)) {
-        blockers.push(`missing_required_placeholder:${placeholder}`);
-      }
-    }
-  }
-
-  const assembledPrompt = replaceTemplatePlaceholders(appendPromptSafetyRules(promptTemplate), {
-    '{MASTER_STYLE_DNA}': config.imageGeneration.masterStyleBlockText,
-    '{SUBJECT}': page.imageSubject,
-    '{SCIENTIFIC_DETAILS}': scientificDetails(page),
-    '{COMPOSITION_NOTES}': [
-      asset?.imageZoneDescription ?? asset?.imageSlotDescription ?? `Image-priority zone follows ${selected.template}.`,
-      // Pull the operator-editable layout description into the prompt context so
-      // edits in project config actually influence the image. Previously surfaced
-      // to the UI but never reached the model.
-      asset?.layoutDescription && !asset.layoutDescription.startsWith('Written description')
-        ? `LAYOUT CONTEXT: ${asset.layoutDescription}`
-        : '',
-      artBriefText(page, allocation, asset),
-      labelTextRules(page),
-    ].join('\n'),
-  });
-  // Defensive: strip any box-model assertions that survive in a stored per-project
-  // promptTemplate so the image model only ever receives the zone model. The
-  // backend owns the publishing model; stale stored templates cannot override it.
-  const prompt = stripLegacyBoxModelLanguage(assembledPrompt);
-  const unresolved = prompt.match(/\{[A-Z0-9_]+\}/g) ?? [];
-  for (const placeholder of unresolved) {
-    blockers.push(`unresolved_prompt_placeholder:${placeholder}`);
-  }
+  // Lean prompt: assembled in code from Master Style DNA + SUBJECT PACKAGE + a short
+  // blueprint pointer + a short rule set. The verbose per-layout templates, the
+  // manuscript-prose dump, and the repeated zone/no-text language are no longer
+  // emitted — the blueprint image is the source of truth for layout. (The old template
+  // helpers remain defined in this file but are no longer used; cleanup pending.)
+  const subjectPackage = deriveSubjectPackage(page);
+  const prompt = assembleLeanPrompt(config.imageGeneration.masterStyleBlockText, subjectPackage);
 
   const capacityReasons = [
     `word_count_${wordCount}`,

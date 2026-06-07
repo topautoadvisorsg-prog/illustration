@@ -13,27 +13,28 @@
 import sharp from 'sharp';
 import type { LayoutAllocation, PlanningZone } from '../stage-6-layout/layout-director.js';
 
+// Standardized blueprint palette (RED / BLUE / ORANGE). TITLE folds into RED (it is
+// also a text zone). These colors exist ONLY in the blueprint — never in the page.
 const COLORS = {
   bg: '#ECE4CF', // parchment field
-  image: '#2E6FB0', // IMAGE_PRIORITY_ZONE — blue
-  support: '#7B57A6', // OPTIONAL_SUPPORTING_IMAGE_ZONE — purple
-  text: '#5FA85B', // TEXT_SAFE_ZONE — green
-  title: '#E0A92E', // TITLE_ZONE — yellow
+  image: '#2E6FB0', // BLUE — PRIMARY_IMAGE_ZONE
+  support: '#E08A2E', // ORANGE — SUPPORTING_IMAGE_ZONE
+  text: '#C0392B', // RED — TEXT_SAFE_ZONE (title folds in)
 } as const;
 
 function rectSvg(z: PlanningZone, fill: string, opacity = 0.85): string {
   return `<rect x="${z.xPct}%" y="${z.yPct}%" width="${z.widthPct}%" height="${z.heightPct}%" fill="${fill}" fill-opacity="${opacity}" rx="8" />`;
 }
 
-/** Build the blueprint SVG: parchment field with color-coded zone rectangles. */
+/** Build the blueprint SVG: parchment field with RED / BLUE / ORANGE zone rectangles. */
 export function buildBlueprintSvg(alloc: LayoutAllocation, widthPx: number, heightPx: number): string {
   const parts: string[] = [`<rect width="100%" height="100%" fill="${COLORS.bg}"/>`];
-  // Draw illustration zones first, then text-safe, then title on top.
+  // BLUE = primary image, ORANGE = supporting image, RED = text-safe + title.
   for (const z of alloc.imagePriorityZones) {
     parts.push(rectSvg(z, z.role === 'supporting-art' ? COLORS.support : COLORS.image));
   }
   for (const z of alloc.textSafeZones) parts.push(rectSvg(z, COLORS.text));
-  for (const z of alloc.typographyZones) parts.push(rectSvg(z, COLORS.title));
+  for (const z of alloc.typographyZones) parts.push(rectSvg(z, COLORS.text)); // title folds into RED
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">${parts.join('')}</svg>`;
 }
 
@@ -49,16 +50,15 @@ export async function renderBlueprintPng(
 }
 
 /**
- * Instruction appended to the locked prompt when a blueprint is attached. Tells the
- * image agent to treat the blueprint as a composition map (not content to copy) and
- * to keep the text/title zones calm — the operator-approved wording.
+ * The blueprint legend (RED / BLUE / ORANGE). The lean prompt already carries the
+ * COMPOSITION + LAYOUT RULES sections, so this is no longer appended at generation —
+ * it is surfaced in the Inspector so the operator can read the blueprint's meaning.
  */
 export const BLUEPRINT_COMPOSITION_INSTRUCTION = [
-  'COMPOSITION MAP — a layout blueprint image is attached.',
-  'Use the attached layout blueprint as the composition map.',
-  'Create the illustration only inside the IMAGE_PRIORITY_ZONE (blue regions) and the optional supporting image zones (purple regions).',
-  'Keep the TEXT_SAFE_ZONE (green region) visually calm, low-contrast, parchment-like, and free of important subject matter.',
-  'Keep the TITLE_ZONE (yellow region) calm enough for typography.',
+  'A layout blueprint image is attached as the composition map.',
+  'BLUE regions = PRIMARY_IMAGE_ZONE — the primary subject and environmental scene.',
+  'ORANGE regions = SUPPORTING_IMAGE_ZONE — small supporting specimen studies.',
+  'RED regions = TEXT_SAFE_ZONE (and title) — keep calm, low-contrast, and free of important subject matter.',
   'The blueprint defines composition ONLY — do NOT reproduce its flat colors, boxes, rectangles, or rounded corners; render the natural illustration within those regions so the page reads as one continuous artwork.',
   'Do not generate words, letters, labels, captions, page numbers, or readable text.',
 ].join(' ');

@@ -14,21 +14,22 @@ function allocationFor(layoutTemplate: Parameters<typeof directLayout>[0]['layou
 }
 
 describe('layout blueprint', () => {
-  it('renders color-coded zone rectangles (image / text-safe / title)', () => {
+  it('renders RED / BLUE zone rectangles (text-safe / primary image)', () => {
     const svg = buildBlueprintSvg(allocationFor('LAYOUT_13_FEATURE_BANNER'), 1024, 1536);
     expect(svg).toContain('<svg');
-    expect(svg).toContain('#2E6FB0'); // IMAGE_PRIORITY_ZONE — blue
-    expect(svg).toContain('#5FA85B'); // TEXT_SAFE_ZONE — green
-    expect(svg).toContain('#E0A92E'); // TITLE_ZONE — yellow
+    expect(svg).toContain('#2E6FB0'); // BLUE — PRIMARY_IMAGE_ZONE
+    expect(svg).toContain('#C0392B'); // RED — TEXT_SAFE_ZONE (title folds in)
+    expect(svg).not.toContain('#5FA85B'); // no green
+    expect(svg).not.toContain('#E0A92E'); // no yellow
     expect(svg).toContain('width="1024"');
     expect(svg).toContain('height="1536"');
     // Percent-based rects so the map scales with any output size.
     expect(svg).toMatch(/<rect[^>]*x="[\d.]+%"[^>]*y="[\d.]+%"/);
   });
 
-  it('marks supporting-art study zones distinctly on scattered layouts', () => {
+  it('marks supporting-art study zones ORANGE on scattered layouts', () => {
     const svg = buildBlueprintSvg(allocationFor('LAYOUT_7_SCATTERED_VIGNETTES'), 1024, 1536);
-    expect(svg).toContain('#7B57A6'); // supporting-art — purple
+    expect(svg).toContain('#E08A2E'); // ORANGE — SUPPORTING_IMAGE_ZONE
   });
 
   it('rasterizes the blueprint SVG to a PNG buffer', async () => {
@@ -41,7 +42,7 @@ describe('layout blueprint', () => {
 
   it('composition instruction tells the model to use the map and never render text', () => {
     expect(BLUEPRINT_COMPOSITION_INSTRUCTION).toContain('composition map');
-    expect(BLUEPRINT_COMPOSITION_INSTRUCTION).toContain('IMAGE_PRIORITY_ZONE');
+    expect(BLUEPRINT_COMPOSITION_INSTRUCTION).toContain('PRIMARY_IMAGE_ZONE');
     expect(BLUEPRINT_COMPOSITION_INSTRUCTION).toContain('TEXT_SAFE_ZONE');
     expect(BLUEPRINT_COMPOSITION_INSTRUCTION.toLowerCase()).toContain('do not reproduce its flat colors');
     expect(BLUEPRINT_COMPOSITION_INSTRUCTION.toLowerCase()).toContain('do not generate words');

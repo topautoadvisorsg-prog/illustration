@@ -94,21 +94,26 @@ describe('planPage', () => {
     expect(decision.contentType).toBe('COMPARISON');
     expect(decision.architecture).toBe('FLOAT_LEFT'); // LAYOUT_4's image-priority edge
     expect(typeof decision.coverage).toBe('number');
-    expect(decision.prompt).toContain('golden chanterelle mushroom');
-    expect(decision.prompt).toContain('Vintage Naturalist master style DNA.');
-    expect(decision.prompt).toContain('LAYOUT SYSTEM RULES');
-    // New zone-aware composition brief: teaches the full-page-artwork model to the image model.
-    expect(decision.prompt).toContain('PAGE COMPOSITION BRIEF');
-    expect(decision.prompt).toContain('IMAGE-PRIORITY ZONE');
-    expect(decision.prompt).toContain('TEXT-SAFE ZONE');
-    expect(decision.prompt).toContain('TYPOGRAPHY ZONE');
-    expect(decision.prompt).toContain('The image IS the entire page');
-    expect(decision.prompt).toContain('All typography is overlaid later by the layout engine.');
+    // Lean prompt: Master Style DNA + SUBJECT PACKAGE + blueprint pointer + rules.
+    expect(decision.prompt).toContain('golden chanterelle mushroom'); // primary subject
+    expect(decision.prompt).toContain('Vintage Naturalist master style DNA.'); // DNA from config
+    expect(decision.prompt).toContain('SUBJECT PACKAGE');
+    expect(decision.prompt).toContain('PRIMARY SUBJECT');
+    expect(decision.prompt).toContain('SUPPORTING SUBJECTS');
+    expect(decision.prompt).toContain('ENVIRONMENT');
+    expect(decision.prompt).toContain('MOOD');
+    expect(decision.prompt).toContain('COMPOSITION — follow the attached blueprint image.');
+    expect(decision.prompt).toContain('RED zones');
+    expect(decision.prompt).toContain('BLUE zones');
+    expect(decision.prompt).toContain('ORANGE zones');
+    expect(decision.prompt).toContain('LAYOUT RULES');
+    expect(decision.prompt).toContain('Generate no readable text.');
+    // The verbose/legacy language is gone.
+    expect(decision.prompt).not.toContain('PAGE COMPOSITION BRIEF');
+    expect(decision.prompt).not.toContain('{SUBJECT}');
+    expect(decision.prompt.length).toBeLessThan(4000); // lean, not 8k+
     expect(decision.artBrief.artBox.recommendedWidthPx).toBeGreaterThan(0);
     expect(decision.artBrief.artBox.recommendedHeightPx).toBeGreaterThan(0);
-    expect(decision.prompt).toContain('Generate clean artwork only.');
-    expect(decision.prompt).toContain('Render NO text of any kind in the image');
-    expect(decision.prompt).not.toContain('{SUBJECT}');
     expect(decision.typography.bodyPt).toBe(10.5);
     expect(decision.promptReady).toBe(true);
     expect(decision.layoutInstructions.useCases).toContain('look-alike species');
@@ -273,12 +278,14 @@ describe('planPage', () => {
     );
 
     expect(decision.layoutTemplate).toBe('LAYOUT_3_ILLUSTRATION_DOMINANT');
+    // The lean prompt ignores stored per-layout templates entirely, so legacy
+    // box-model language can never reach the model.
     expect(decision.prompt).not.toMatch(/strong separation between image and content/i);
     expect(decision.prompt).not.toMatch(/remains largely clear/i);
     expect(decision.prompt).not.toMatch(/Upper 35-40% contains/i);
-    // The zone model still reaches the model.
-    expect(decision.prompt).toContain('PAGE COMPOSITION BRIEF');
-    expect(decision.prompt).toContain('The image IS the entire page');
+    // The blueprint-driven composition still reaches the model.
+    expect(decision.prompt).toContain('COMPOSITION — follow the attached blueprint image.');
+    expect(decision.prompt).toContain('RED zones');
   });
 
   it('keeps borderline terrain analysis pages on a text-safe banner layout', () => {
