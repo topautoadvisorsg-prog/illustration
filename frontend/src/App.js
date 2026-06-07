@@ -4726,29 +4726,46 @@ function App() {
                     const pkg = parseSubjectPackage(inspectorData.prompt.text);
                     // Style DNA = everything before the SUBJECT PACKAGE block (ground truth: exactly what the backend sent).
                     const styleDna = inspectorData.prompt.text.split("SUBJECT PACKAGE")[0].trim();
+                    const styleLines = styleDna.split("\n").map((s) => s.trim()).filter(Boolean);
+                    const styleName = styleLines[0] || "—";
+                    // Version is read from the DNA text itself (ground truth = exactly what was sent),
+                    // not from local config which can drift from the live master style block.
+                    const styleVersion = (styleDna.match(/\bv\d[\w.]*/i) || [])[0] || styleLines[1] || "—";
                     return (
-                      <div className="inspector-pane">
-                        <div className="kv"><span>Hero subject</span><b>{pkg.primary || inspectorData.manuscript.imageSubject}</b></div>
-                        <p className="inspector-subhead">Supporting subjects (ORANGE zones)</p>
-                        {pkg.supporting.length > 0
-                          ? <ul className="zone-list">{pkg.supporting.map((s, i) => <li key={i}>{s}</li>)}</ul>
-                          : <p className="empty">—</p>}
-                        <div className="kv"><span>Environment</span><b>{pkg.environment || "—"}</b></div>
-                        <div className="kv"><span>Mood</span><b>{pkg.mood || "—"}</b></div>
-                        <details className="inspector-contract">
-                          <summary>Master Style DNA</summary>
-                          <pre className="inspector-pre">{styleDna || "Style DNA not loaded — open the project config."}</pre>
-                        </details>
-                        <p className="inspector-subhead">Blueprint instructions (RED / BLUE / ORANGE)</p>
-                        <pre className="inspector-pre">{inspectorData.blueprint.instruction}</pre>
-                        <div className="inspector-prompt-head">
-                          <span>Exact final prompt · sha {inspectorData.prompt.sha256.slice(0, 12)}… · {inspectorData.prompt.ready ? "ready" : "blocked"}</span>
-                          <button type="button" className="secondary" onClick={copyInspectorPrompt}>
-                            {inspectorPromptCopied ? "Copied!" : "Copy prompt"}
-                          </button>
+                      <div className="inspector-pane gen-flow">
+                        <div className="gen-section">
+                          <div className="gen-head"><span className="gen-num">1</span> Subject Package</div>
+                          <div className="kv"><span>Hero subject</span><b>{pkg.primary || inspectorData.manuscript.imageSubject}</b></div>
+                          <p className="inspector-subhead">Supporting subjects (ORANGE zones)</p>
+                          {pkg.supporting.length > 0
+                            ? <ul className="zone-list">{pkg.supporting.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                            : <p className="empty">—</p>}
+                          <div className="kv"><span>Environment</span><b>{pkg.environment || "—"}</b></div>
+                          <div className="kv"><span>Mood</span><b>{pkg.mood || "—"}</b></div>
                         </div>
-                        {inspectorData.prompt.blockers.length > 0 && <p className="empty">Blockers: {inspectorData.prompt.blockers.join(", ")}</p>}
-                        <pre className="inspector-pre inspector-prompt-text">{inspectorData.prompt.text}</pre>
+                        <div className="gen-section">
+                          <div className="gen-head"><span className="gen-num">2</span> Style DNA</div>
+                          <div className="kv"><span>Active style</span><b>{styleName}</b></div>
+                          <div className="kv"><span>DNA version</span><b>{styleVersion}</b></div>
+                          <div className="kv"><span>Inheritance</span><b>Platform-wide master style block</b></div>
+                          <p className="inspector-subhead">Style instructions</p>
+                          <pre className="inspector-pre">{styleDna || "Style DNA not loaded — open the project config."}</pre>
+                        </div>
+                        <div className="gen-section">
+                          <div className="gen-head"><span className="gen-num">3</span> Blueprint Instructions <span className="gen-legend">(RED / BLUE / ORANGE)</span></div>
+                          <pre className="inspector-pre">{inspectorData.blueprint.instruction}</pre>
+                        </div>
+                        <div className="gen-section">
+                          <div className="gen-head"><span className="gen-num">4</span> Final Prompt</div>
+                          <div className="inspector-prompt-head">
+                            <span>sha {inspectorData.prompt.sha256.slice(0, 12)}… · {inspectorData.prompt.ready ? "ready" : "blocked"}</span>
+                            <button type="button" className="secondary" onClick={copyInspectorPrompt}>
+                              {inspectorPromptCopied ? "Copied!" : "Copy prompt"}
+                            </button>
+                          </div>
+                          {inspectorData.prompt.blockers.length > 0 && <p className="empty">Blockers: {inspectorData.prompt.blockers.join(", ")}</p>}
+                          <pre className="inspector-pre inspector-prompt-text">{inspectorData.prompt.text}</pre>
+                        </div>
                       </div>
                     );
                   })()}

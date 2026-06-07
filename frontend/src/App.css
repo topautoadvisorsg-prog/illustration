@@ -3448,6 +3448,37 @@ button.secondary {
 .shell.nav-export .cc-intel { display: none !important; }
 
 .sidebar-topnav .sidebar-primary { width: 100%; text-align: left; margin: 2px 0; }
+
+/* Image Generation tab — four distinct sections: Subject → Style → Blueprint → Prompt. */
+.gen-flow { gap: 14px; }
+.gen-section {
+  border: 1px solid var(--border, #d9cfb4);
+  border-left: 3px solid #2e6fb0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.gen-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+.gen-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2e6fb0;
+  color: #fff;
+  font-size: 0.72rem;
+  flex: 0 0 auto;
+}
+.gen-legend { font-weight: 400; opacity: 0.6; font-size: 0.78rem; }
 .fit-tag { padding: 1px 8px; border-radius: 999px; font-size: 0.78rem; }
 .fit-fits { background: rgba(95, 168, 91, 0.2); color: #2f6e2c; }
 .fit-tight { background: rgba(224, 169, 46, 0.22); color: #8a6410; }
