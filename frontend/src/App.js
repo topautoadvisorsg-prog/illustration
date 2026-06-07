@@ -4596,6 +4596,36 @@ function App() {
                       <div className="kv"><span>Split</span><b>{inspectorData.layout.artBrief.imagePercent}% image / {inspectorData.layout.artBrief.textPercent}% text</b></div>
                       <div className="kv"><span>Capacity (words)</span><b>{inspectorData.layout.capacity.minWords}–{inspectorData.layout.capacity.maxWords} (target {inspectorData.layout.capacity.targetWords})</b></div>
                       <div className="kv"><span>Why this layout</span><b>{inspectorData.layout.decisionTrace.layoutExplanation}</b></div>
+                      <p className="inspector-subhead">Zone map (schematic)</p>
+                      <div className="zone-map">
+                        {inspectorData.layout.artBrief.imagePriorityZones.map((z) => (
+                          <div
+                            key={z.id}
+                            className={`zone-box ${z.role === "supporting-art" ? "zone-box-support" : "zone-box-image"}`}
+                            style={{ left: `${z.xPct}%`, top: `${z.yPct}%`, width: `${z.widthPct}%`, height: `${z.heightPct}%` }}
+                          >
+                            <span>{z.role === "supporting-art" ? "support" : "image"}</span>
+                          </div>
+                        ))}
+                        {inspectorData.layout.artBrief.textSafeZones.map((z) => (
+                          <div
+                            key={z.id}
+                            className="zone-box zone-box-text"
+                            style={{ left: `${z.xPct}%`, top: `${z.yPct}%`, width: `${z.widthPct}%`, height: `${z.heightPct}%` }}
+                          >
+                            <span>text-safe</span>
+                          </div>
+                        ))}
+                        {inspectorData.layout.artBrief.typographyZones.map((z) => (
+                          <div
+                            key={z.id}
+                            className="zone-box zone-box-title"
+                            style={{ left: `${z.xPct}%`, top: `${z.yPct}%`, width: `${z.widthPct}%`, height: `${z.heightPct}%` }}
+                          >
+                            <span>title</span>
+                          </div>
+                        ))}
+                      </div>
                       <p className="inspector-subhead">Visual blueprint</p>
                       {inspectorData.blueprint.available ? (
                         <img className="inspector-blueprint" alt="Layout blueprint composition map" src={`${apiUrl}${inspectorData.blueprint.url}`} />

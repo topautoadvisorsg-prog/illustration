@@ -3374,6 +3374,35 @@ button.secondary {
   border-radius: 6px;
   display: block;
 }
+.zone-map {
+  position: relative;
+  width: 230px;
+  aspect-ratio: 5 / 7;
+  border: 1px solid var(--border, #d9cfb4);
+  border-radius: 6px;
+  background: #ece4cf;
+  overflow: hidden;
+  margin: 2px 0 8px;
+}
+.zone-box {
+  position: absolute;
+  border: 1.5px solid;
+  box-sizing: border-box;
+}
+.zone-box span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 0.58rem;
+  line-height: 1;
+  padding: 2px 3px;
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom-right-radius: 4px;
+}
+.zone-box-image { background: rgba(46, 111, 176, 0.24); border-color: #2e6fb0; }
+.zone-box-support { background: rgba(123, 87, 166, 0.24); border-color: #7b57a6; }
+.zone-box-text { background: rgba(95, 168, 91, 0.26); border-color: #5fa85b; }
+.zone-box-title { background: rgba(224, 169, 46, 0.3); border-color: #e0a92e; }
 .zone-list { margin: 2px 0; padding-left: 4px; list-style: none; font-size: 0.8rem; line-height: 1.5; }
 .zone-list li { display: flex; align-items: baseline; gap: 6px; }
 .zone-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; flex: 0 0 auto; }
