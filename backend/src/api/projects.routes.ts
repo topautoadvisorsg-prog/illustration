@@ -34,7 +34,10 @@ import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-mani
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
 import { RenderBlockedError, renderBookPdf, renderChapterPdf, renderCoverPdf, renderPagePdf } from '../pipeline/stage-6-layout/render-chapter.js';
-import { countImagesForProject, listImagesForProject } from '../db/repositories/images.repo.js';
+import { countImagesForProject, listImagesForProject, listImagesForPage } from '../db/repositories/images.repo.js';
+import { computePageGeometry } from '../pipeline/stage-6-layout/page-geometry.js';
+import { analyzeTextFit } from '../pipeline/stage-6-layout/text-fit.js';
+import { getEnv } from '../env.js';
 import { CONTENT_TYPE_POLICY, decomposeTemplate } from '../pipeline/stage-2-planner/layered-layout.js';
 import { layoutCoverageMeta } from '../pipeline/stage-6-layout/layout-profiles.js';
 import { estimateCost } from '../services/cost/estimate.js';
@@ -559,6 +562,111 @@ const TextFitPreviewResponseSchema = z.object({
       }),
     }),
   ),
+});
+
+// Page Generation Inspector (read-only). One deterministic call returns the full
+// construction chain for a single page — manuscript, layout/zones, typography/fit,
+// image plan, exact prompt, image versions, blueprint + render references. NO
+// mutation: planPage + analyzeTextFit are pure; nothing is written or re-planned.
+const PageInspectorResponseSchema = z.object({
+  page: z.object({
+    pageId: z.string(),
+    pageKey: z.string(),
+    entryTitle: z.string(),
+    scientificName: z.string().nullable(),
+    chapterNumber: z.number(),
+    status: z.string(),
+  }),
+  manuscript: z.object({
+    bodyMarkdown: z.string(),
+    imageSubject: z.string(),
+    wordCount: z.number(),
+  }),
+  layout: z.object({
+    template: z.string(),
+    label: z.string(),
+    contentType: z.string(),
+    coverage: z.number(),
+    architecture: z.string(),
+    layoutInstructions: z.object({
+      description: z.string(),
+      useCases: z.array(z.string()),
+      avoidWhen: z.array(z.string()),
+      textZone: z.string(),
+      imageZone: z.string(),
+      textFitRule: z.string(),
+    }),
+    decisionTrace: z.object({
+      contentTypeSource: z.string(),
+      contentTypeReason: z.string(),
+      layoutRule: z.string(),
+      layoutExplanation: z.string(),
+      wordCountBand: z.string(),
+      operatorForced: z.boolean(),
+      alternativesConsidered: z.array(z.object({ template: z.string(), skippedBecause: z.string() })),
+    }),
+    capacity: z.object({
+      minWords: z.number(),
+      targetWords: z.number(),
+      maxWords: z.number(),
+      status: z.string(),
+      overMaxWords: z.boolean(),
+      underMinWords: z.boolean(),
+    }),
+    artBrief: z.object({
+      imagePercent: z.number(),
+      textPercent: z.number(),
+      placement: z.string(),
+      textPlacement: z.string(),
+      architecture: z.string(),
+      textSafeZones: z.array(PlanningZoneSchema),
+      typographyZones: z.array(PlanningZoneSchema),
+      imagePriorityZones: z.array(PlanningZoneSchema),
+      imagePriorityZone: ImagePriorityZoneSchema,
+    }),
+  }),
+  typography: z.object({
+    bodyFont: z.string(),
+    bodyPt: z.number(),
+    lineHeight: z.number(),
+    wordsPerOpeningPage: z.number(),
+    wordsPerContinuationPage: z.number(),
+    estimatedRenderedPages: z.number(),
+    fit: z.object({
+      status: z.string(),
+      fits: z.boolean(),
+      charCount: z.number(),
+      capacityChars: z.number(),
+      fillRatio: z.number(),
+      estimatedLines: z.number(),
+      usableLines: z.number(),
+      estimatedRenderedPages: z.number(),
+      notes: z.array(z.string()),
+    }),
+  }),
+  prompt: z.object({
+    text: z.string(),
+    sha256: z.string(),
+    ready: z.boolean(),
+    blockers: z.array(z.string()),
+    warnings: z.array(z.string()),
+  }),
+  images: z.array(
+    z.object({
+      version: z.number(),
+      status: z.string(),
+      active: z.boolean(),
+      prompt: z.string(),
+      promptSha256: z.string(),
+      widthPx: z.number().nullable(),
+      heightPx: z.number().nullable(),
+      generatedPath: z.string().nullable(),
+      upscaledPath: z.string().nullable(),
+    }),
+  ),
+  model: z.string(),
+  blueprint: z.object({ available: z.boolean(), url: z.string() }),
+  renderEndpoint: z.string(),
 });
 
 const FormatCalibrationResponseSchema = z.object({
@@ -1247,6 +1355,136 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         layoutTemplate: decision.layoutTemplate,
         promptSha256: decision.promptSha256,
         warnings: decision.warnings,
+      };
+    },
+  );
+
+  // Page Generation Inspector — read-only construction chain for ONE page.
+  // Deterministic (planPage + analyzeTextFit are pure); never mutates or re-plans.
+  // Reflects the page's persisted layout override so it matches what will render.
+  app.get(
+    '/api/projects/:id/pages/:pageKey/inspector',
+    {
+      schema: {
+        params: ProjectPageParamsSchema,
+        response: { 200: PageInspectorResponseSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id, pageKey } = ProjectPageParamsSchema.parse(request.params);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      const config = parseProjectConfig(project);
+
+      const manifest = (await listManifests(id, 'PAGE'))
+        .map((row) => PageManifestSchema.parse(row.content))
+        .find((page) => page.pageId === pageKey);
+      if (!manifest) return reply.code(404).send({ error: 'Not Found', message: `Page manifest ${pageKey} not found.`, statusCode: 404 });
+
+      const pageRow = (await listPages(id)).find((p) => p.pageKey === pageKey);
+      const forced = LayoutTemplateIdSchema.safeParse(pageRow?.layoutTemplate);
+      const decision = planPage(
+        manifest,
+        config,
+        forced.success ? { forcedLayoutTemplate: forced.data, reasonCode: 'persisted_page_layout_override' } : {},
+      );
+
+      const geometry = computePageGeometry(config.trimSize);
+      const fit = analyzeTextFit({
+        bodyMarkdown: manifest.bodyMarkdown,
+        layoutTemplate: decision.layoutTemplate,
+        geometry,
+        bodyPt: decision.typography.bodyPt,
+        lineHeight: decision.typography.lineHeight,
+      });
+
+      const imageRows = pageRow ? await listImagesForPage(pageRow.id) : [];
+
+      // Blueprint existence: a small PNG; cheap to probe. Absent until a blueprint
+      // generation has run for this page.
+      let blueprintAvailable = false;
+      try {
+        await getProjectStorage().readProjectFile(`${id}/blueprints/${pageKey}.png`);
+        blueprintAvailable = true;
+      } catch {
+        blueprintAvailable = false;
+      }
+
+      return {
+        page: {
+          pageId: pageRow?.id ?? '',
+          pageKey,
+          entryTitle: decision.entryTitle,
+          scientificName: manifest.scientificName ?? null,
+          chapterNumber: pageRow?.chapterNumber ?? manifest.chapterNumber,
+          status: pageRow?.status ?? 'PLANNED',
+        },
+        manuscript: {
+          bodyMarkdown: manifest.bodyMarkdown,
+          imageSubject: manifest.imageSubject,
+          wordCount: decision.wordCount,
+        },
+        layout: {
+          template: decision.layoutTemplate,
+          label: decision.layoutReferenceLabel,
+          contentType: decision.contentType,
+          coverage: decision.coverage,
+          architecture: decision.artBrief.architecture,
+          layoutInstructions: decision.layoutInstructions,
+          decisionTrace: decision.decisionTrace,
+          capacity: decision.capacity,
+          artBrief: {
+            imagePercent: decision.artBrief.imagePercent,
+            textPercent: decision.artBrief.textPercent,
+            placement: decision.artBrief.placement,
+            textPlacement: decision.artBrief.textPlacement,
+            architecture: decision.artBrief.architecture,
+            textSafeZones: decision.artBrief.textSafeZones,
+            typographyZones: decision.artBrief.typographyZones,
+            imagePriorityZones: decision.artBrief.imagePriorityZones,
+            imagePriorityZone: decision.artBrief.imagePriorityZone,
+          },
+        },
+        typography: {
+          bodyFont: decision.typography.bodyFont,
+          bodyPt: decision.typography.bodyPt,
+          lineHeight: decision.typography.lineHeight,
+          wordsPerOpeningPage: fit.allocation.wordsPerOpeningPage,
+          wordsPerContinuationPage: fit.allocation.wordsPerContinuationPage,
+          estimatedRenderedPages: fit.estimatedRenderedPages,
+          fit: {
+            status: fit.status,
+            fits: fit.fits,
+            charCount: fit.charCount,
+            capacityChars: fit.capacityChars,
+            fillRatio: fit.fillRatio,
+            estimatedLines: fit.estimatedLines,
+            usableLines: fit.usableLines,
+            estimatedRenderedPages: fit.estimatedRenderedPages,
+            notes: fit.notes,
+          },
+        },
+        prompt: {
+          text: decision.prompt,
+          sha256: decision.promptSha256,
+          ready: decision.promptReady,
+          blockers: decision.blockers,
+          warnings: decision.warnings,
+        },
+        images: imageRows.map((img) => ({
+          version: img.version,
+          status: img.status,
+          active: img.active,
+          prompt: img.prompt,
+          promptSha256: img.promptSha256,
+          widthPx: img.widthPx ?? null,
+          heightPx: img.heightPx ?? null,
+          generatedPath: img.generatedPath ?? null,
+          upscaledPath: img.upscaledPath ?? null,
+        })),
+        model: getEnv().OPENAI_IMAGE_MODEL,
+        blueprint: { available: blueprintAvailable, url: pageRow ? `/api/pages/${pageRow.id}/blueprint` : '' },
+        renderEndpoint: `/api/projects/${id}/pages/${pageKey}/render`,
       };
     },
   );
