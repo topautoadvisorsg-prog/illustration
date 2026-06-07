@@ -3912,7 +3912,7 @@ function App() {
         </form>
       </section>
 
-      <section className="panel review-board cc-intel">
+      <section className="panel review-board">
         <div className="section-head">
           <div>
             <p className="eyebrow">Current Workflow Step</p>
@@ -5202,7 +5202,7 @@ function App() {
         </div>
       </section>
 
-      {advancedMode && (
+      {(advancedMode || topNav === "intelligence") && (
       <section className="panel intelligence-panel cc-intel">
         <div className="section-head">
           <div>
@@ -6199,7 +6199,7 @@ function App() {
             {selectedProject && <p className="meta">Selected: {selectedProject.id}</p>}
           </section>
 
-          {advancedMode && (
+          {(advancedMode || topNav === "library") && (
           <section className="panel template-panel cc-library">
             <h2>16 Layout Templates</h2>
             {LAYOUT_TEMPLATES.map(([id, name, description]) => (
