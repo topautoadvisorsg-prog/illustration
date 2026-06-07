@@ -141,121 +141,204 @@ yes to spending money on this page" audit trail.
 
 ---
 
-## 5. Entry-to-page mapping algorithm
+## 5. Reading Block flow algorithm
+
+**Model:** the book is a stream of text poured through a sequence of Reading
+Blocks. Each printed page owns one Reading Block (the actual character
+capacity of its layout's Reading Field at the project's typography). Text
+flows into Block 1 until full → overflow continues into Block 2 → repeat
+until the manuscript ends. Whatever remains in the last block determines
+whether the book is balanced or has a half-empty tail.
+
+Entries are **anchors** in the stream, not page boundaries. An entry's
+content type controls how it enters the flow (preferred opener layout, hard
+or soft break) but never owns its own page count — page count is whatever the
+flow produces.
 
 Single entry point: `paginateProject({ projectId, config })` in
 `backend/src/pipeline/stage-1.75-pagination/paginate.ts`. Pseudocode:
 
 ```
-loadedEntries = list PAGE manifests for project, in order
-capacityTable = build per-layout capacity from layout library + DEFAULT_LAYOUT_CAPACITY
-geometry      = computePageGeometry(config.trimSize)
-result        = []
-
-for each entry in loadedEntries:
-    candidateLayout = preChooseLayout(entry, capacityTable)
-    perPageTarget   = capacityTable[candidateLayout].targetWords
-
-    parts = splitter(entry.bodyMarkdown, perPageTarget, capacityTable[candidateLayout].maxWords)
-    parts = orphanGuard(parts, perPageTarget)
-
-    for (part, i) of parts:
-        push {
-            entry_key: entry.pageKey,
-            part_n: i + 1,
-            total_parts: parts.length,
-            page_role: i === 0 ? 'opener' : 'continuation',
-            layout: i === 0 ? candidateLayout : continuationLayoutFor(candidateLayout),
-            carries_subject: i === 0,
-            reading_field_text: part,
-        }
-
-result = compactor(result, capacityTable)   # multi-entry compaction pass
-result = assignPageNumbers(result)          # planned_page_number = 1..N
+entries  = list PAGE manifests for project, ordered (chapter, plannedPageNumber)
+geometry = computePageGeometry(config.trimSize)
+stream   = entriesToStream(entries)           // see §5.4
+sequence = buildLayoutSequence(entries, config)  // see §5.6 — provisional sequence
+result   = flowEngine(stream, sequence, config, geometry)  // §5.1
+result   = tailRebalance(result, config)      // §5.3
+result   = assignPageNumbers(result)
 persist(result)
 ```
 
-### 5.1 Splitter
+### 5.1 Flow engine
 
-- Splits on **paragraph boundaries first** (`\n\n` in markdown). Never splits
-  inside a paragraph in v1.
-- Target words per part = the chosen layout's `targetWords`.
-- A part is allowed to exceed `targetWords` by up to 10% if it avoids creating
-  a tiny tail (orphan guard handles this).
-- A part may NOT exceed `maxWords` of the layout. If a single paragraph alone
-  exceeds `maxWords`, v1 keeps it whole and flags `fit_status = OVERFLOW` on
-  that part. v2 may sub-split on sentence boundaries; explicitly out of scope.
-- Code fences (` ``` `), images, and `<!-- … -->` blocks are atomic units; the
-  splitter treats them as single paragraphs and never breaks them.
+Input: a token stream + a provisional layout sequence + config + geometry.
 
-### 5.2 Continuation rules
+The engine walks the layout sequence one Reading Block at a time:
 
-- Continuation page layout = `LAYOUT_2_TEXT_HEAVY` in v1 (clean reading layout
-  with small corner art slot). A future `LAYOUT_17_CONTINUATION` can replace
-  this; not blocking v1.
-- Continuation pages have `carries_subject = false`. **The image agent is not
-  invoked on continuation pages in v1.** The renderer fills the image area
-  with a soft parchment wash (or the opener's image, downscaled, behind the
-  text) — operator-tunable, not blocking.
-- Each continuation page gets a small `"(continued)"` line under the title
-  band, rendered by the typography engine.
+1. **Open the next Reading Block.** Compute its capacity in chars by running
+   `computePaginationCapacity({ readingFieldText: '', layoutTemplate,
+   trimSize, bodyPt, lineHeight })` (same math used by Stage 6 text-fit).
+2. **Pour stream tokens** into the block until the next token would exceed
+   capacity (or hit a hard-break anchor — see §5.5).
+3. **Record the block:** `reading_field_text`, `reading_field_chars`,
+   `reading_field_words`, `fit_status` (computed against the actual capacity
+   per §5.7).
+4. **If a new entry started inside this block**, set
+   `carries_subject = true` and `entry_key = startedEntry.pageKey` for this
+   page. If two entries started in the same block (allowed only when soft
+   breaks permitted, §5.5), record both in `compacted_entry_keys` and use
+   the first as `entry_key`.
+5. **If this block contains overflow from a previous block**, set
+   `entry_key = openerPageKey`, `page_role = 'continuation'`, increment
+   `part_n` over the opener's running counter, `carries_subject = false`.
+6. **Advance** to the next layout in the sequence. If the sequence runs out
+   before the stream does, append more `LAYOUT_2_TEXT_HEAVY` pages until
+   the stream empties.
 
-### 5.3 Orphan guard
+The engine produces a sequence of `PaginatedPage` records, in order, with
+all fields populated. It does not write to the database itself — persistence
+is the caller's job.
 
-Prevents two failure modes:
+### 5.2 No splitter, no compactor (deliberate)
 
-1. **Tail orphan:** the last continuation has < 30% of `targetWords`. Fix:
-   pull paragraphs back one part at a time until the tail clears 30% OR the
-   previous part exceeds `maxWords`. If neither is achievable, accept the
-   orphan and emit warning `orphan_tail_accepted`.
-2. **Single-paragraph orphan:** the last part is one paragraph and that
-   paragraph alone is < 60 words. Same fix as above.
+Both behaviors emerge from the flow model for free:
 
-The orphan guard runs after the splitter and BEFORE the compactor. It only
-modifies parts within one entry.
+- **Splitting** a long entry happens because Reading Block N runs out of
+  capacity before the entry's text does; the entry continues into Block
+  N+1, automatically a continuation page.
+- **Compacting** two short adjacent entries happens because entry N+1's
+  first tokens fit inside the trailing room of Block N (when the break
+  policy in §5.5 allows it).
 
-### 5.4 Short-entry compaction
+No special-case code. The flow engine is the entire mechanism.
 
-Two short adjacent entries can share one printed page when:
+### 5.3 Tail rebalance (orphan prevention)
 
-- Both are `< 0.5 × targetWords` of the candidate layout.
-- They share a parent chapter.
-- Both are content types where compaction reads naturally:
-  `REFERENCE_PAGE`, `FIELD_NOTES_PAGE`, `BACK_MATTER`. Compaction is
-  explicitly NOT allowed for `WARNING_PAGE`, `CHAPTER_OPENER`, or any
-  content type with a danger override.
-- The combined char count fits the layout's capacity.
+After the flow engine runs, the last printed page may be underfilled. The
+tail rebalance step looks at the last 1–2 pages:
 
-Compacted page page_role = `'compacted'`. `entry_key` = first entry's key.
-`compacted_entry_keys` = ordered array of all entries on the page. Only ONE
-image (the first entry's) is used; the rest render their text under it.
+1. **Last page < 30% full:** find the most recent low-priority layout in
+   the sequence (e.g. an inserted `LAYOUT_3_ILLUSTRATION_DOMINANT` whose
+   Reading Block is small), drop it from the sequence, and re-run the flow
+   engine from that point forward. Repeat at most twice.
+2. **Last page is a continuation carrying < 60 words:** try pulling one
+   paragraph back from the previous page. If the previous page would
+   exceed its capacity, accept the orphan and emit warning
+   `orphan_tail_accepted`.
 
-Compaction is conservative in v1 — at most TWO entries per compacted page —
-and is operator-tunable via `config.layoutPolicy.compactionEnabled` (default
-`true`).
+The tail rebalance never touches the manuscript stream itself — it only
+edits the layout sequence and re-flows.
 
-### 5.5 Reading-Field allocation
+### 5.4 Manuscript-to-stream conversion
 
-For each printed page, given the chosen layout + page geometry:
+The stream is a list of typed tokens preserving entry boundaries and
+typographic structure:
 
-1. Run `directLayout({ bodyMarkdown: part.reading_field_text, layoutTemplate,
-   geometry, bodyPt, lineHeight })` — the existing Stage 6 layout director.
-   Returns `textSafeZones[]` (the Reading Field rectangles in page-percent
-   coordinates), `typographyZones[]` (title band), `imagePriorityZones[]`.
-2. Compute char capacity per Reading Field:
-   `charsPerLine = floor(readingFieldWidthIn × charsPerInch(bodyFont, bodyPt))`
-   `usableLines  = floor(readingFieldHeightIn / (bodyPt × lineHeight / 72))`
-   `capacityChars = sum across all reading_field zones`
-3. Compare to `reading_field_chars` (post-strip char count of the assigned
-   text). Set `fit_status`:
-   - `FITS`     — `chars ≤ 0.85 × capacity`
-   - `TIGHT`    — `0.85 × capacity < chars ≤ capacity`
-   - `OVERFLOW` — `chars > capacity`
-   - `UNDERFILL` — `chars < 0.30 × capacity` (visual whitespace problem)
+```ts
+type StreamToken =
+  | { kind: 'entry-start'; entryKey: string; entryTitle: string;
+      contentType: ContentType; imageSubject: string;
+      breakBehavior: 'hard' | 'soft' }
+  | { kind: 'paragraph'; markdown: string; chars: number; words: number }
+  | { kind: 'section-heading'; markdown: string; chars: number }
+  | { kind: 'code-block'; markdown: string; chars: number }   // atomic, never split
+  | { kind: 'image-embed'; markdown: string; chars: number }; // atomic, never split
+```
 
-The fit_status is what Stage 1.8 surfaces to the operator. `OVERFLOW` and
-`UNDERFILL` block preview approval until the operator either accepts the
-warning explicitly or re-paginates.
+`entriesToStream(entries)` walks the PAGE manifests in chapter / planned
+page order, emits one `entry-start` token per entry followed by tokens for
+the entry's body (parsed from `bodyMarkdown` on paragraph boundaries). The
+flow engine consumes tokens left-to-right; it never reorders them.
+
+Code blocks and image embeds are atomic (single tokens) and never split
+across Reading Blocks. If an atomic token alone exceeds a block's capacity,
+v1 places it whole in that block and flags `fit_status = OVERFLOW`; v2 may
+re-route to a higher-capacity layout. Out of scope here.
+
+### 5.5 Entry break policy (hybrid, configurable)
+
+When the flow engine encounters an `entry-start` token while there is room
+remaining in the current Reading Block, it consults the break policy.
+
+**Default policy (`config.layoutPolicy.entryBreakPolicy`):**
+
+```ts
+{
+  kind: 'hybrid',
+  softBreakMinLinesRemaining: 8,
+  alwaysHardBreak: ['WARNING_PAGE', 'CHAPTER_OPENER',
+                    'BOTANICAL_PLATE', 'DIAGNOSTIC_DIAGRAM'],
+}
+```
+
+Decision per entry-start:
+
+1. If `entry.contentType ∈ alwaysHardBreak`: HARD break. Close the current
+   block, advance to the entry's preferred opener layout in the sequence,
+   start the entry there.
+2. Else if `linesRemainingInCurrentBlock < softBreakMinLinesRemaining`:
+   HARD break (not enough room for a clean soft break).
+3. Else: SOFT break. Continue the entry in the current block. The page
+   then carries both the previous entry and this one — `entry_key` stays
+   the first, `compacted_entry_keys` records both in order, and only the
+   first entry's `imageSubject` drives the page's illustration.
+
+The `breakBehavior` field on the `entry-start` token is precomputed by
+`entriesToStream` so the flow engine doesn't need to know the policy
+details — it just reads `token.breakBehavior`.
+
+### 5.6 Layout sequence builder
+
+`buildLayoutSequence(entries, config)` produces an array of `LayoutTemplateId`
+representing a provisional page-by-page layout assignment for the whole
+book, BEFORE flow. Algorithm:
+
+```
+sequence = []
+for each entry in entries:
+    opener = preferredOpenerLayout(entry.contentType)
+    // If the previous entry has soft-broken into this one, no opener page is
+    // added — that's resolved at flow time. Worst case: extra layouts go
+    // unused (the flow engine just advances past them).
+    sequence.push(opener)
+    estimatedContinuationCount = roughEstimateContinuationPages(entry, config)
+    for i in [1..estimatedContinuationCount]:
+        sequence.push('LAYOUT_2_TEXT_HEAVY')
+return sequence
+```
+
+`preferredOpenerLayout(contentType)`: returns the layout this content type
+would prefer to open on. Reuses the existing `chooseLayout` logic from
+`plan-pages.ts:217-369` minus the operator-forced and overflow paths, since
+overflow no longer triggers a layout swap (the next Reading Block absorbs
+it).
+
+`roughEstimateContinuationPages(entry, config)`: very coarse —
+`ceil(entry.wordCount / DEFAULT_LAYOUT_CAPACITY.LAYOUT_2_TEXT_HEAVY.targetWords) − 1`.
+The estimate exists only to make the provisional sequence long enough that
+the flow engine rarely has to append `LAYOUT_2_TEXT_HEAVY` pages at the
+end. The actual page count is whatever the flow produces, not what was
+estimated.
+
+`LAYOUT_2_TEXT_HEAVY` is the v1 default continuation/reading layout. SPEC
+§5.2's earlier note about a future `LAYOUT_17_CONTINUATION` still applies.
+
+### 5.7 Reading Block fit_status
+
+For each Reading Block, after the flow engine fills it:
+
+- `FITS`     — `chars ≤ 0.85 × capacity`
+- `TIGHT`    — `0.85 × capacity < chars ≤ capacity`
+- `OVERFLOW` — `chars > capacity` (only possible from an atomic token, per
+                §5.4; otherwise the engine would have stopped pouring)
+- `UNDERFILL` — `chars < 0.30 × capacity`
+
+Computation is unchanged from the prior SPEC — the existing `capacity.ts`
+helper that wraps `analyzeTextFit` is the authority.
+
+`OVERFLOW` and `UNDERFILL` block preview approval until the operator
+either accepts the warning with a logged reason (SPEC §10 approved
+answer 5) or re-paginates.
 
 ---
 
@@ -388,16 +471,17 @@ already enforced fit).
 ```
 backend/src/pipeline/stage-1.75-pagination/
   README.md
-  paginate.ts                 // orchestrator
-  splitter.ts                 // paragraph-aware split
-  orphan-guard.ts             // tail + single-paragraph rebalance
-  compactor.ts                // multi-entry compaction
-  capacity.ts                 // char-level capacity math
-  reading-field-allocate.ts   // wraps stage-6 directLayout + fit_status
+  paginate.ts                 // orchestrator (entries -> stream -> sequence -> flow -> rebalance -> persist)
+  stream.ts                   // entriesToStream + StreamToken types + break-behavior derivation
+  layout-sequence.ts          // buildLayoutSequence + preferredOpenerLayout + roughEstimate
+  flow-engine.ts              // walks the sequence, pours stream into Reading Blocks
+  tail-rebalance.ts           // last-page-underfill recovery (replaces orphan-guard)
+  capacity.ts                 // wraps stage-6 analyzeTextFit, returns fit_status
   __tests__/
-    splitter.test.ts
-    orphan-guard.test.ts
-    compactor.test.ts
+    stream.test.ts
+    layout-sequence.test.ts
+    flow-engine.test.ts
+    tail-rebalance.test.ts
     paginate.integration.test.ts
 
 backend/src/pipeline/stage-1.8-preview/
@@ -423,11 +507,12 @@ Stage 2 `plan-pages.ts` is amended (not rewritten): remove
 
 ### 9.1 Database
 
-`backend/src/db/migrations/0003_pagination.sql`:
+`backend/src/db/migrations/0002_pagination_v1.sql` (shipped in commit 241a89c):
 
-- Adds the 11 new columns to `pages` (all nullable or with safe defaults).
-- Creates `page_approvals`.
-- Backfills the new columns on existing rows in the same transaction.
+- Adds 13 new columns to `pages` (all nullable or with safe NOT NULL DEFAULTs).
+- Creates 3 new enums (`page_role`, `fit_status`, `page_approval_decision`).
+- Creates `page_approvals` audit table.
+- Backfills `entry_key = page_key` on existing rows in the same migration.
 
 The migration is **forward-compatible**: an old backend reading new rows will
 ignore the new columns and behave as it did before. A new backend reading old
@@ -465,27 +550,41 @@ No existing tab is removed. No existing screen is destroyed.
 
 ### 10.1 Unit tests
 
-`splitter.test.ts`:
-- 200-word entry → 1 part.
-- 1,500-word entry, target 340 → 4-5 parts, none > maxWords, all on
-  paragraph boundaries.
-- Entry with one 2,000-word paragraph → 1 part, `fit_status = OVERFLOW`,
-  warning logged.
-- Entry containing a code fence → fence stays intact.
-- Empty body → throws `EMPTY_ENTRY_BODY`.
+`stream.test.ts`:
+- Three entries with bodies → produces ordered `entry-start` + paragraph
+  tokens; entry titles preserved; word/char counts present on every token.
+- Entry with a code fence → fence becomes a single atomic `code-block` token.
+- Entry with section headings → tokens emitted in source order.
+- `entry-start.breakBehavior` resolves to `'hard'` for WARNING_PAGE,
+  CHAPTER_OPENER, BOTANICAL_PLATE, DIAGNOSTIC_DIAGRAM; `'soft'` otherwise.
 
-`orphan-guard.test.ts`:
-- 4 parts, last part < 30% of target → pulls back, returns 4 parts with
-  evened distribution OR 3 parts with last close to maxWords.
-- 2 parts, last part 1 paragraph 40 words → merges into 1 part if total fits,
-  else accepts orphan and warns.
+`layout-sequence.test.ts`:
+- 3 entries (CHAPTER_OPENER, SPECIES_PROFILE, WARNING_PAGE) →
+  sequence starts with LAYOUT_5, then LAYOUT_1, then LAYOUT_4, each
+  followed by a rough number of LAYOUT_2_TEXT_HEAVY continuations.
+- Entry with 0 body words → no continuation pages added after the opener.
+- preferredOpenerLayout reuses the planner's content-type table without
+  triggering overflow autoroute.
 
-`compactor.test.ts`:
-- Two adjacent FIELD_NOTES_PAGE entries, both ~100 words, same chapter →
-  merged into one compacted page, `page_role = 'compacted'`,
-  `compacted_entry_keys` has both keys.
-- One WARNING_PAGE entry + one short field-notes entry → not compacted.
-- Compaction disabled in config → no merges.
+`flow-engine.test.ts`:
+- One short entry (50 words), one opener block of cap 600 → all text fits
+  block 1, no continuations created, sequence's extra blocks dropped.
+- One long entry (1,500 words), opener cap 200 + continuation cap 720 →
+  text spans opener + 2 continuations; `entry_key` consistent across all
+  three; `part_n` = 1/2/3; `carries_subject` only on page 1.
+- Two short adjacent entries within soft-break threshold → both end up on
+  the same page with `compacted_entry_keys = [a, b]`.
+- WARNING_PAGE entry following a half-full block → hard break enforced;
+  warning starts on a new page even with room remaining.
+- Code-block token alone exceeds block capacity → token placed in the
+  block whole, `fit_status = OVERFLOW`, warning emitted.
+
+`tail-rebalance.test.ts`:
+- Last page < 30% full and sequence contains a discretionary
+  LAYOUT_3_ILLUSTRATION_DOMINANT before it → that layout is dropped, flow
+  re-runs, last page becomes well-filled.
+- No discretionary layouts available → orphan accepted, warning
+  `orphan_tail_accepted` emitted.
 
 `capacity.test.ts`:
 - Known geometry (7×10 trim, 0.75" margins, EB Garamond 11pt, 1.35 lh) →

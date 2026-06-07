@@ -51,6 +51,12 @@ const EnvSchema = z.object({
   SENTRY_DSN_BACKEND: z.string().default(''),
 
   STORAGE_ROOT: z.string().default(path.join(REPO_ROOT, 'backend/storage')),
+
+  // Pagination v1 feature flag. When false (default), Stage 1.75 modules can be
+  // imported and unit-tested but no API endpoint exposes them and the existing
+  // Page Plan flow is unchanged. Flip to true ONLY after the full Stage 1.75 +
+  // Stage 1.8 stack is shipped and end-to-end tested by the operator.
+  PAGINATION_V1_ENABLED: z.coerce.boolean().default(false),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
