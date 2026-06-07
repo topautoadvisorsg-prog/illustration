@@ -153,19 +153,20 @@ describe('buildPageHtml', () => {
     expect(html).not.toContain('<p class="section-body">***</p>');
   });
 
-  it('drops the body panel further down for image-heavier layouts (text-safe zone tracks coverage)', () => {
-    // FULL_PAGE plate reserves more of the page for image → body panel pushed down more
-    // than a feature banner. The spacer height encodes the image-priority zone.
-    const plate = buildPageHtml(page({ layoutTemplate: 'LAYOUT_10_FULL_PAGE_PLATE' }), config, {
+  it('drops the body panel further down when focal art occupies the top of the page', () => {
+    // A top-band layout puts focal art across the top, so the reading field (and its
+    // spacer) starts well below a side-by-side layout whose reading field begins at the
+    // top title-band line. The spacer height encodes where the reading field starts.
+    const topBand = buildPageHtml(page({ layoutTemplate: 'LAYOUT_13_FEATURE_BANNER' }), config, {
       geometry,
       imageDataUri: 'data:image/png;base64,AAAA',
     });
-    const banner = buildPageHtml(page({ layoutTemplate: 'LAYOUT_13_FEATURE_BANNER' }), config, {
+    const sideBySide = buildPageHtml(page({ layoutTemplate: 'LAYOUT_2_TEXT_HEAVY' }), config, {
       geometry,
       imageDataUri: 'data:image/png;base64,AAAA',
     });
     const spacerOf = (html: string): number => Number(/art-spacer" style="height:([\d.]+)in/.exec(html)?.[1] ?? '0');
-    expect(spacerOf(plate)).toBeGreaterThan(spacerOf(banner));
+    expect(spacerOf(topBand)).toBeGreaterThan(spacerOf(sideBySide));
   });
 });
 

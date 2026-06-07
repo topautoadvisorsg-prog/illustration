@@ -40,9 +40,42 @@ export interface ImagePriorityZone {
 export type PlanningZoneRole = 'body' | 'caption' | 'title' | 'section-title' | 'primary-art' | 'supporting-art';
 export type PlanningZoneShape = 'rect' | 'organic' | 'path';
 
+/**
+ * The four kinds of page region the Layout Director distinguishes. The whole point
+ * of this vocabulary: long-form reading text and short overlay text are NOT the same
+ * and must not be treated as one generic "text-safe" area.
+ *
+ * - image-priority      Strong focal artwork. The primary subject lives here.
+ * - reading-field       Long-form body text. Lives on a calm parchment field that the
+ *                       artwork OPENS INTO (organic transition, never a pasted block).
+ *                       Coordinates with image-priority but never competes/overlaps it.
+ * - overlay-typography  Short text (title, label, caption, callout, specimen note).
+ *                       MAY sit over artwork because it is short.
+ * - supporting-study    Small natural-history specimen studies. Rendered directly on
+ *                       the page like a museum plate — never as cards/tiles/colored blocks.
+ */
+export type RegionType = 'image-priority' | 'reading-field' | 'overlay-typography' | 'supporting-study';
+
+function regionTypeForRole(role: PlanningZoneRole): RegionType {
+  switch (role) {
+    case 'primary-art':
+      return 'image-priority';
+    case 'supporting-art':
+      return 'supporting-study';
+    case 'body':
+      return 'reading-field';
+    case 'title':
+    case 'section-title':
+    case 'caption':
+      return 'overlay-typography';
+  }
+}
+
 export interface PlanningZone {
   id: string;
   role: PlanningZoneRole;
+  /** Coarse classification used to keep reading text and overlay text from being conflated. */
+  regionType: RegionType;
   shape: PlanningZoneShape;
   xPct: number;
   yPct: number;
@@ -62,6 +95,8 @@ export interface LayoutAllocation {
   typographyZones: PlanningZone[];
   /** Where focal visual detail should live inside the full-page artwork. */
   imagePriorityZones: PlanningZone[];
+  /** All page regions, each tagged with its RegionType. Canonical classified output. */
+  regions: PlanningZone[];
   imagePlacement: string;
   textPlacement: string;
   openingPageImagePercent: number;
@@ -200,87 +235,132 @@ function imagePriorityZoneFor(slot: ArtSlot, coverage: number, geometry: PageGeo
 
 function zone(id: string, role: PlanningZoneRole, xPct: number, yPct: number, widthPct: number, heightPct: number, instruction: string, shape: PlanningZoneShape = 'rect'): PlanningZone {
   const round = (n: number) => Math.round(n * 10) / 10;
-  return { id, role, shape, xPct: round(xPct), yPct: round(yPct), widthPct: round(widthPct), heightPct: round(heightPct), instruction };
+  return { id, role, regionType: regionTypeForRole(role), shape, xPct: round(xPct), yPct: round(yPct), widthPct: round(widthPct), heightPct: round(heightPct), instruction };
+}
+
+// Page-composition constants (percent of the text frame).
+// A calm TITLE BAND is reserved across the top; the title overlays it as Type-B
+// overlay typography. ALL focal image detail and reading fields start BELOW it
+// (FOCAL_TOP), so the title never sits over the concentrated-detail image zone.
+const TITLE_BAND_Y = 4;
+const TITLE_BAND_H = 11;
+const FOCAL_TOP = 18; // image-priority + reading-field start here, under the title band
+const BOTTOM = 94; // leave a calm bottom margin
+const GUTTER = 5; // hard separation between image-priority and reading-field — never share a strip
+const clampN = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+
+function titleBand(): PlanningZone {
+  return zone(
+    'title-main',
+    'title',
+    6,
+    TITLE_BAND_Y,
+    88,
+    TITLE_BAND_H,
+    'Title/heading overlays a CALM top band. Keep this band low-detail and open (save parchment) so the title reads; do not concentrate focal artwork here.',
+  );
 }
 
 function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation, 'textSafeZones' | 'typographyZones' | 'imagePriorityZones'> {
-  const textPct = Math.max(0, 100 - imagePercent);
-  const title = zone(
-    'title-main',
-    'title',
-    9,
-    6,
-    82,
-    14,
-    'Overlay title/heading sits directly on the artwork; composition should provide calm value contrast and negative space.',
-  );
-
-  // Clean gutter between the BLUE image zone and the RED text-safe zone — no shared
-  // collision strip. Every layout reserves GUTTER% of empty space between them.
-  const GUTTER = 4;
-  const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+  const title = titleBand();
   switch (slot) {
     case 'TOP_BAND': {
-      const imgH = clamp(imagePercent, 30, 55);
-      const textY = imgH + GUTTER;
+      const imgH = clampN(imagePercent, 26, 48);
+      const imgY = FOCAL_TOP;
+      const textY = imgY + imgH + GUTTER;
       return {
         typographyZones: [title],
-        imagePriorityZones: [zone('image-priority-top', 'primary-art', 0, 0, 100, imgH, 'Concentrate focal visual detail in the upper artwork zone; below it stays calm for text.')],
-        textSafeZones: [zone('text-safe-lower', 'body', 8, textY, 84, Math.max(24, 96 - textY), 'Reserve calm, low-detail artwork for readable body text. Do not draw a panel, box, card, or empty cutout.', 'organic')],
+        imagePriorityZones: [zone('image-priority-top', 'primary-art', 0, imgY, 100, imgH, 'Concentrate focal visual detail in the upper artwork band; below it the artwork opens into a calm reading field.')],
+        textSafeZones: [zone('reading-field-lower', 'body', 8, textY, 84, Math.max(20, BOTTOM - textY), 'Readable long-form reading field: the artwork opens/dissolves into a calm parchment field here. Organic transition, never a panel, box, card, or pasted block.', 'organic')],
       };
     }
     case 'BOTTOM_BAND': {
-      const imgH = clamp(imagePercent, 30, 55);
+      const imgH = clampN(imagePercent, 26, 48);
       const imgY = 100 - imgH;
       return {
         typographyZones: [title],
-        imagePriorityZones: [zone('image-priority-bottom', 'primary-art', 0, imgY, 100, imgH, 'Concentrate focal visual detail in the lower artwork zone; keep upper body area calm.')],
-        textSafeZones: [zone('text-safe-upper', 'body', 8, 4, 84, Math.max(24, imgY - GUTTER - 4), 'Reserve calm upper artwork for readable body text. No boxes or paper panels.', 'organic')],
+        imagePriorityZones: [zone('image-priority-bottom', 'primary-art', 0, imgY, 100, imgH, 'Concentrate focal visual detail in the lower artwork band; above it the artwork opens into a calm reading field.')],
+        textSafeZones: [zone('reading-field-upper', 'body', 8, FOCAL_TOP, 84, Math.max(20, imgY - GUTTER - FOCAL_TOP), 'Readable long-form reading field on a calm parchment field the artwork dissolves into. No box, card, or pasted block.', 'organic')],
       };
     }
     case 'FLOAT_LEFT': {
-      const imgW = clamp(imagePercent, 40, 60);
+      const imgW = clampN(imagePercent, 40, 58);
       const textX = imgW + GUTTER;
       return {
         typographyZones: [title],
-        imagePriorityZones: [zone('image-priority-left', 'primary-art', 0, 8, imgW, 84, 'Focal visual detail lives along the left side while the full page remains one illustration.')],
-        textSafeZones: [zone('text-safe-right', 'body', textX, 22, Math.max(34, 94 - textX), 70, 'Keep the right column calm for body text; artwork remains visible under text.', 'organic')],
+        imagePriorityZones: [zone('image-priority-left', 'primary-art', 0, FOCAL_TOP, imgW, BOTTOM - FOCAL_TOP, 'Focal subject lives along the left while the full page stays one illustration; it opens into the reading field to its right.')],
+        textSafeZones: [zone('reading-field-right', 'body', textX, FOCAL_TOP, Math.max(32, 94 - textX), BOTTOM - FOCAL_TOP, 'Readable long-form reading field: a calm parchment column the artwork dissolves into at the seam. No hard edge, panel, or card.', 'organic')],
       };
     }
     case 'FLOAT_RIGHT':
     case 'SIDEBAR_RIGHT': {
-      const imgW = clamp(imagePercent, 40, 60);
+      const imgW = clampN(imagePercent, 40, 58);
       const imgX = 100 - imgW;
       return {
         typographyZones: [title],
-        imagePriorityZones: [zone('image-priority-right', 'primary-art', imgX, 8, imgW, 84, 'Focal visual detail lives along the right side while the full page remains one illustration.')],
-        textSafeZones: [zone('text-safe-left', 'body', 6, 22, Math.max(34, imgX - GUTTER - 6), 70, 'Keep the left column calm for body text; no box, card, or hard separation.', 'organic')],
+        imagePriorityZones: [zone('image-priority-right', 'primary-art', imgX, FOCAL_TOP, imgW, BOTTOM - FOCAL_TOP, 'Focal subject lives along the right while the full page stays one illustration; it opens into the reading field to its left.')],
+        textSafeZones: [zone('reading-field-left', 'body', 6, FOCAL_TOP, Math.max(32, imgX - GUTTER - 6), BOTTOM - FOCAL_TOP, 'Readable long-form reading field: a calm parchment column the artwork dissolves into at the seam. No hard edge, panel, or card.', 'organic')],
       };
     }
     case 'SCATTERED':
+      // Supporting studies snap to the page corners/edges (no dead gaps); the reading
+      // field is a calm parchment column that does not overlap any study.
       return {
         typographyZones: [title],
         imagePriorityZones: [
-          zone('image-priority-study-a', 'primary-art', 6, 18, 30, 24, 'First study/focal visual detail zone.'),
-          zone('image-priority-study-b', 'supporting-art', 58, 28, 30, 24, 'Second study/focal visual detail zone.'),
-          zone('image-priority-study-c', 'supporting-art', 12, 62, 26, 22, 'Third study/focal visual detail zone.'),
+          zone('image-priority-study-a', 'primary-art', 4, FOCAL_TOP, 34, 26, 'Primary specimen study, top-left corner — rendered like a museum plate directly on the page, not a card.'),
+          zone('image-priority-study-b', 'supporting-art', 62, FOCAL_TOP, 34, 22, 'Supporting specimen study, top-right corner — a natural-history study on the page, no card/tile/colored block.'),
+          zone('image-priority-study-c', 'supporting-art', 4, 70, 30, 24, 'Supporting specimen study, bottom-left corner — a natural-history study on the page, no card/tile/colored block.'),
         ],
-        textSafeZones: [zone('text-safe-path', 'body', 34, 48, 52, 36, 'Maintain a calm flowing reading path between studies; no filled panel.', 'path')],
+        textSafeZones: [zone('reading-field-path', 'body', 38, 48, 58, 40, 'Readable long-form reading field: a calm parchment field flowing between the studies. No filled panel or card.', 'path')],
       };
     case 'CENTER_WRAP':
       return {
         typographyZones: [title],
-        imagePriorityZones: [zone('image-priority-center', 'primary-art', 24, 24, 52, 38, 'Central focal visual detail with calm surrounding artwork.')],
-        textSafeZones: [zone('text-safe-lower', 'body', 12, 64, 76, 26, 'Reserve calm lower artwork for readable body text.', 'organic')],
+        imagePriorityZones: [zone('image-priority-center', 'primary-art', 22, FOCAL_TOP + 2, 56, 40, 'Central focal subject with calm surrounding artwork that opens into the reading field below.')],
+        textSafeZones: [zone('reading-field-lower', 'body', 10, 64, 80, BOTTOM - 64, 'Readable long-form reading field on a calm parchment field the artwork dissolves into. No box, card, or panel.', 'organic')],
       };
     case 'FULL_PAGE':
     default:
       return {
-        typographyZones: [title],
-        imagePriorityZones: [zone('image-priority-full', 'primary-art', 0, 0, 100, 100, 'The whole page is artwork; focal detail can occupy the full composition while respecting small overlay zones.')],
-        textSafeZones: [zone('text-safe-caption', 'caption', 12, 78, 76, 12, 'Small calm caption/notes zone only; no large body text panel.', 'organic')],
+        typographyZones: [
+          title,
+          zone('caption-lower', 'caption', 12, 82, 76, 10, 'Small calm caption/notes overlay only (Type-B overlay text); no large reading field on this plate.', 'organic'),
+        ],
+        imagePriorityZones: [zone('image-priority-full', 'primary-art', 0, FOCAL_TOP, 100, 100 - FOCAL_TOP, 'Full-page plate: focal detail fills the composition below the calm title band; respect the small overlay zones.')],
+        textSafeZones: [],
       };
   }
+}
+
+/** Axis-aligned overlap test for two planning zones (percent rects). */
+function zonesOverlap(a: PlanningZone, b: PlanningZone): boolean {
+  return (
+    a.xPct < b.xPct + b.widthPct &&
+    b.xPct < a.xPct + a.widthPct &&
+    a.yPct < b.yPct + b.heightPct &&
+    b.yPct < a.yPct + a.heightPct
+  );
+}
+
+/**
+ * Hard invariant: a Reading Field must never overlap an Image-Priority zone. The two
+ * coordinate (sit side by side, the art opens into the field) but never compete. Title/
+ * caption are Type-B OVERLAY typography and are allowed to sit over artwork, so they are
+ * exempt. Returns the list of violating pairs (empty when the layout is clean).
+ */
+export function readingFieldImageConflicts(plan: Pick<LayoutAllocation, 'textSafeZones' | 'imagePriorityZones'>): string[] {
+  const conflicts: string[] = [];
+  const readingFields = plan.textSafeZones.filter((z) => z.regionType === 'reading-field');
+  const imageZones = plan.imagePriorityZones.filter((z) => z.regionType === 'image-priority');
+  for (const rf of readingFields) {
+    for (const img of imageZones) {
+      if (zonesOverlap(rf, img)) {
+        conflicts.push(`${rf.id} overlaps ${img.id}`);
+      }
+    }
+  }
+  return conflicts;
 }
 
 export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
@@ -318,6 +398,16 @@ export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
     notes.push('Long-form entry: small supporting image, body text owns the continuation flow.');
   }
 
+  // Invariant guard: reading field must never overlap image priority. Geometry is
+  // deterministic so this should always be clean; surface a note if it ever regresses.
+  const conflicts = readingFieldImageConflicts(zonePlan);
+  if (conflicts.length > 0) {
+    notes.push(`Layout conflict — reading field overlaps image priority: ${conflicts.join('; ')}`);
+  }
+
+  // Canonical classified region list (the four RegionTypes), ordered back-to-front.
+  const regions: PlanningZone[] = [...zonePlan.imagePriorityZones, ...zonePlan.textSafeZones, ...zonePlan.typographyZones];
+
   return {
     // New zone vocabulary (primary).
     priorityEdge: profile.artSlot,
@@ -325,6 +415,7 @@ export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
     textSafeZones: zonePlan.textSafeZones,
     typographyZones: zonePlan.typographyZones,
     imagePriorityZones: zonePlan.imagePriorityZones,
+    regions,
     imagePlacement: placement.imagePlacement,
     textPlacement: placement.textPlacement,
     // Back-compat aliases (deprecated; consumers should migrate to the names above).
