@@ -37,6 +37,8 @@ import { RenderBlockedError, renderBookPdf, renderChapterPdf, renderCoverPdf, re
 import { countImagesForProject, listImagesForProject, listImagesForPage } from '../db/repositories/images.repo.js';
 import { computePageGeometry } from '../pipeline/stage-6-layout/page-geometry.js';
 import { analyzeTextFit } from '../pipeline/stage-6-layout/text-fit.js';
+import { BLUEPRINT_COMPOSITION_INSTRUCTION } from '../pipeline/stage-3-generation/blueprint.js';
+import { getAgentContract } from '../agents/agent-contracts.js';
 import { getEnv } from '../env.js';
 import { CONTENT_TYPE_POLICY, decomposeTemplate } from '../pipeline/stage-2-planner/layered-layout.js';
 import { layoutCoverageMeta } from '../pipeline/stage-6-layout/layout-profiles.js';
@@ -582,6 +584,19 @@ const PageInspectorResponseSchema = z.object({
     imageSubject: z.string(),
     wordCount: z.number(),
   }),
+  // Gap 1 — the governing instructions for how the manifest is created. The manifest
+  // stage is deterministic today (realityNote), so this is its contract/spec, not an
+  // LLM prompt; surfaced so the operator can see what shaped the manifest.
+  manifestStage: z.object({
+    agentId: z.string(),
+    name: z.string(),
+    mission: z.string(),
+    expertFrame: z.string(),
+    hardRules: z.array(z.string()),
+    requiredOutputs: z.array(z.string()),
+    runtime: z.string(),
+    realityNote: z.string(),
+  }),
   layout: z.object({
     template: z.string(),
     label: z.string(),
@@ -665,7 +680,8 @@ const PageInspectorResponseSchema = z.object({
     }),
   ),
   model: z.string(),
-  blueprint: z.object({ available: z.boolean(), url: z.string() }),
+  // Gap 2 — blueprint composition instruction surfaced directly (no digging in the prompt).
+  blueprint: z.object({ available: z.boolean(), url: z.string(), instruction: z.string() }),
   renderEndpoint: z.string(),
 });
 
@@ -1424,6 +1440,19 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           imageSubject: manifest.imageSubject,
           wordCount: decision.wordCount,
         },
+        manifestStage: (() => {
+          const c = getAgentContract('MANUSCRIPT_ANALYST');
+          return {
+            agentId: c.id,
+            name: c.name,
+            mission: c.mission,
+            expertFrame: c.expertFrame,
+            hardRules: c.hardRules,
+            requiredOutputs: c.requiredOutputs,
+            runtime: c.runtime,
+            realityNote: c.realityNote,
+          };
+        })(),
         layout: {
           template: decision.layoutTemplate,
           label: decision.layoutReferenceLabel,
@@ -1483,7 +1512,11 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           upscaledPath: img.upscaledPath ?? null,
         })),
         model: getEnv().OPENAI_IMAGE_MODEL,
-        blueprint: { available: blueprintAvailable, url: pageRow ? `/api/pages/${pageRow.id}/blueprint` : '' },
+        blueprint: {
+          available: blueprintAvailable,
+          url: pageRow ? `/api/pages/${pageRow.id}/blueprint` : '',
+          instruction: BLUEPRINT_COMPOSITION_INSTRUCTION,
+        },
         renderEndpoint: `/api/projects/${id}/pages/${pageKey}/render`,
       };
     },

@@ -4551,10 +4551,23 @@ function App() {
                         ? `${inspectorData.page.pageKey} · ${inspectorData.layout.label} · ${inspectorData.page.status}`
                         : inspectorError || "no data"}
                   </span>
+                  <span className={`approval-chip ${selectedChapterApproval ? "approved" : "pending"}`}>
+                    {selectedChapterApproval
+                      ? `Chapter ${selectedChapterNumber || selectedPage.chapterNumber || "?"} approved`
+                      : `Chapter ${selectedChapterNumber || selectedPage.chapterNumber || "?"} pending · images locked`}
+                  </span>
                   <button type="button" className="secondary" disabled={inspectorLoading} onClick={() => loadInspector(selectedPage.pageKey)}>
                     Refresh
                   </button>
                 </div>
+                {selectedPageLedgerEntry && (
+                  <div className="inspector-agent-notes">
+                    <strong>Agent Notes (advisory)</strong>
+                    {selectedPageLedgerEntry.selectedLayoutWhy && <p><b>Why this layout:</b> {selectedPageLedgerEntry.selectedLayoutWhy}</p>}
+                    {selectedPageLedgerEntry.recommendedFix && <p><b>Recommended fix:</b> {selectedPageLedgerEntry.recommendedFix}</p>}
+                    <span className="inspector-agent-hint">Advisory only — never blocks generation. Run "Audit with Agent" for a fresh reviewer pass.</span>
+                  </div>
+                )}
                 <div className="inspector-tabs" role="tablist">
                   {[
                     ["manuscript", "Manuscript"],
@@ -4583,6 +4596,18 @@ function App() {
                     <div className="inspector-pane">
                       <div className="kv"><span>Subject</span><b>{inspectorData.manuscript.imageSubject}</b></div>
                       <div className="kv"><span>Words</span><b>{inspectorData.manuscript.wordCount}</b></div>
+                      {inspectorData.manifestStage && (
+                        <details className="inspector-contract">
+                          <summary>Manifest stage instructions — {inspectorData.manifestStage.name} ({inspectorData.manifestStage.runtime})</summary>
+                          <div className="kv"><span>Mission</span><b>{inspectorData.manifestStage.mission}</b></div>
+                          <div className="kv"><span>Frame</span><b>{inspectorData.manifestStage.expertFrame}</b></div>
+                          <p className="inspector-subhead">Rules</p>
+                          <ul className="zone-list">{inspectorData.manifestStage.hardRules.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                          <p className="inspector-subhead">Required outputs</p>
+                          <ul className="zone-list">{inspectorData.manifestStage.requiredOutputs.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                          <p className="empty">{inspectorData.manifestStage.realityNote}</p>
+                        </details>
+                      )}
                       <p className="inspector-subhead">Source text</p>
                       <pre className="inspector-pre">{inspectorData.manuscript.bodyMarkdown}</pre>
                     </div>
@@ -4679,6 +4704,8 @@ function App() {
                       <p>{inspectorData.layout.layoutInstructions.description}</p>
                       <div className="kv"><span>Image zone</span><b>{inspectorData.layout.layoutInstructions.imageZone}</b></div>
                       <div className="kv"><span>Text zone</span><b>{inspectorData.layout.layoutInstructions.textZone}</b></div>
+                      <p className="inspector-subhead">Blueprint composition instruction</p>
+                      <pre className="inspector-pre">{inspectorData.blueprint.instruction}</pre>
                     </div>
                   )}
 
