@@ -69,6 +69,12 @@ export interface EntryBreakPolicy {
   kind: 'hybrid';
   /** Soft-break only if at least this many lines remain in the current block. */
   softBreakMinLinesRemaining: number;
+  /** Maximum number of entries that may share a single compacted page. The
+   *  flow engine refuses a soft break that would push the block past this
+   *  cap, hard-breaking to a new page instead. Keeps compacted pages visually
+   *  legible — one image + N small entries with injected `## headings`.
+   *  v1 default: 2 (one host entry + one compacted entry). */
+  maxEntriesPerCompactedPage: number;
   /** Content types that ALWAYS hard-break to a fresh page. */
   alwaysHardBreak: readonly ContentType[];
 }
@@ -76,6 +82,7 @@ export interface EntryBreakPolicy {
 export const DEFAULT_ENTRY_BREAK_POLICY: EntryBreakPolicy = Object.freeze({
   kind: 'hybrid',
   softBreakMinLinesRemaining: 8,
+  maxEntriesPerCompactedPage: 2,
   alwaysHardBreak: Object.freeze<ContentType[]>([
     'WARNING_PAGE',
     'CHAPTER_OPENER',

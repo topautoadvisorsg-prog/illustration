@@ -58,9 +58,29 @@ export const PaginatedPageSchema = z.object({
   fitStatus: PaginationFitStatusSchema,
   /** Layout director output for this page — text-safe zones, image priority
    *  zones, etc. Carried through so the Stage 1.8 preview renderer doesn't
-   *  need to re-run directLayout. */
-  zones: z.custom<LayoutAllocation>(),
+   *  need to re-run directLayout. Validated minimally (must be an object
+   *  carrying the textSafeZones array); the layout director itself is the
+   *  authority on the full shape. */
+  zones: z.custom<LayoutAllocation>(
+    (val) => {
+      if (val === null || typeof val !== 'object') return false;
+      const z = val as { textSafeZones?: unknown; imagePriorityZones?: unknown };
+      return Array.isArray(z.textSafeZones) && Array.isArray(z.imagePriorityZones);
+    },
+    { message: 'zones must be a LayoutAllocation with textSafeZones[] and imagePriorityZones[]' },
+  ),
   warnings: z.array(z.string()),
-});
+})
+  /** Fix #2: enforce the structural invariant
+   *  `pageRole === 'compacted'` ⟺ `compactedEntryKeys !== null`.
+   *  The schema rejects rows where role and compaction list disagree. */
+  .refine(
+    (page) => (page.pageRole === 'compacted') === (page.compactedEntryKeys !== null),
+    {
+      message:
+        'pageRole=compacted iff compactedEntryKeys is non-null (and vice versa)',
+      path: ['compactedEntryKeys'],
+    },
+  );
 
 export type PaginatedPage = z.infer<typeof PaginatedPageSchema>;

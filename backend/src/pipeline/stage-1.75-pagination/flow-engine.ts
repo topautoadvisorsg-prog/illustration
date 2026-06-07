@@ -329,10 +329,16 @@ export function flowEngine(input: FlowEngineInput, entryMeta: EntryMetaMap): Flo
       // the new entry as carriesSubject=false, losing its image slot). When
       // the current block is a continuation, every entry-start is a hard break.
       const softAllowed = open !== null && open.isOpener;
+      // Compaction cap: once a block already carries `maxEntriesPerCompactedPage`
+      // entries, the next entry-start hard-breaks regardless of how much room
+      // remains. Keeps pages visually legible — one image + bounded titles.
+      const compactionCapReached =
+        open !== null && open.entryKeysOnPage.length >= policy.maxEntriesPerCompactedPage;
       const needHard =
         open === null
         || token.breakBehavior === 'hard'
         || !softAllowed
+        || compactionCapReached
         || linesRemaining(open) < policy.softBreakMinLinesRemaining;
 
       if (needHard) {

@@ -168,6 +168,43 @@ describe('flowEngine — soft break compacts two short SPECIES_PROFILE entries',
     expect(compactedPage!.pageKey).toBe('CH01_P001_m');
   });
 
+  it('refuses a third soft-break — the compaction cap (default 2) holds even when room remains', () => {
+    // Three ultra-short SPECIES_PROFILE entries. Without the cap they would
+    // all pile onto one compacted page; with the cap (default 2) the third
+    // hard-breaks to its own opener.
+    const a = makeEntry({
+      pageId: 'CH01_P001',
+      bodyMarkdown: 'A.',
+      contentType: 'SPECIES_PROFILE',
+      entryTitle: 'A',
+      imageSubject: 'a',
+    });
+    const b = makeEntry({
+      pageId: 'CH01_P002',
+      bodyMarkdown: 'B.',
+      contentType: 'SPECIES_PROFILE',
+      entryTitle: 'B',
+      imageSubject: 'b',
+    });
+    const c = makeEntry({
+      pageId: 'CH01_P003',
+      bodyMarkdown: 'C.',
+      contentType: 'SPECIES_PROFILE',
+      entryTitle: 'C',
+      imageSubject: 'c',
+    });
+    const { pages } = runFlow([a, b, c]);
+
+    const compactedPage = pages.find((p) => p.pageRole === 'compacted');
+    expect(compactedPage).toBeDefined();
+    // Compacted page has EXACTLY 2 entries (A and B). C is NOT on it.
+    expect(compactedPage!.compactedEntryKeys).toEqual(['CH01_P001', 'CH01_P002']);
+    // C lands on its own opener.
+    const cOpener = pages.find((p) => p.entryKey === 'CH01_P003' && p.pageRole === 'opener');
+    expect(cOpener).toBeDefined();
+    expect(cOpener!.compactedEntryKeys).toBeNull();
+  });
+
   it('renders Beta\'s entry title as a visible heading inside the shared Reading Field', () => {
     // Without an injected heading, the operator would see Alpha's body run
     // straight into Beta's body with no visible break. The flow engine must
