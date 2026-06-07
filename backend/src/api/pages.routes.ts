@@ -15,7 +15,8 @@ import {
 import { UpscaleBlockedError, upscalePageImage } from '../pipeline/stage-5-upscale/upscale-image.js';
 import { isChromiumAvailable, renderSampleChapterPdf, renderSamplePagePdf } from '../pipeline/stage-6-layout/render-check.js';
 import { getContentTypeGuide } from '../pipeline/stage-2-planner/layered-layout.js';
-import { getActiveImage, getImageById, getImageVersion } from '../db/repositories/images.repo.js';
+import { createHash } from 'node:crypto';
+import { getActiveImage, getImageById, getImageVersion, deleteImageById, insertImage, listImagesForPage } from '../db/repositories/images.repo.js';
 import { getPageById } from '../db/repositories/manifests.repo.js';
 import { getProjectStorage } from '../services/storage/project-storage.js';
 
@@ -328,6 +329,70 @@ export async function registerPageRoutes(app: FastifyInstance): Promise<void> {
         }
         throw error;
       }
+    },
+  );
+
+  // Delete a single image from the library (operator cleanup).
+  app.delete(
+    '/api/images/:imageId',
+    { schema: { params: ImageParamsSchema, response: { 200: z.object({ deleted: z.boolean() }), 404: ApiErrorSchema } } },
+    async (request, reply) => {
+      const { imageId } = ImageParamsSchema.parse(request.params);
+      const row = await deleteImageById(imageId);
+      if (!row) return reply.code(404).send({ error: 'Not Found', message: 'Image not found.', statusCode: 404 });
+      return { deleted: true };
+    },
+  );
+
+  // Upload a manually-generated image and assign it to a page.
+  const UploadImageBodySchema = z.object({
+    base64: z.string().min(1),
+    filename: z.string().optional(),
+    source: z.enum(['uploaded', 'manual-chatgpt', 'manual-midjourney', 'manual-other']).optional(),
+  });
+  const UploadImageResponseSchema = z.object({
+    imageId: z.string(),
+    version: z.number(),
+    generatedPath: z.string(),
+    widthPx: z.number().nullable(),
+    heightPx: z.number().nullable(),
+  });
+  app.post(
+    '/api/pages/:pageId/images/upload',
+    { schema: { params: PageParamsSchema, body: UploadImageBodySchema, response: { 200: UploadImageResponseSchema, 404: ApiErrorSchema } } },
+    async (request, reply) => {
+      const { pageId } = PageParamsSchema.parse(request.params);
+      const { base64, source } = UploadImageBodySchema.parse(request.body);
+      const page = await getPageById(pageId);
+      if (!page) return reply.code(404).send({ error: 'Not Found', message: 'Page not found.', statusCode: 404 });
+      const buffer = Buffer.from(base64, 'base64');
+      const sha256 = createHash('sha256').update(buffer).digest('hex');
+      const existing = await listImagesForPage(pageId);
+      const version = existing.reduce((max, img) => Math.max(max, img.version), 0) + 1;
+      const stored = await getProjectStorage().writeProjectFile(
+        page.projectId,
+        ['images', page.pageKey, `v${version}-${source || 'uploaded'}.png`],
+        buffer,
+      );
+      const prompt = `[Manual upload: ${source || 'uploaded'}]`;
+      const image = await insertImage({
+        pageId,
+        version,
+        prompt,
+        promptSha256: sha256,
+        generatedPath: stored.relativePath,
+        widthPx: 0,
+        heightPx: 0,
+        status: 'REVIEW',
+        active: existing.length === 0,
+      });
+      return {
+        imageId: image.id,
+        version: image.version,
+        generatedPath: stored.relativePath,
+        widthPx: image.widthPx,
+        heightPx: image.heightPx,
+      };
     },
   );
 

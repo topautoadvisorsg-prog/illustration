@@ -3523,3 +3523,38 @@ button.secondary {
   font-size: 0.82rem;
 }
 .inspector-contract summary { cursor: pointer; font-weight: 600; opacity: 0.8; }
+
+/* Manual workflow & library enhancements */
+.manual-workflow {
+  border-top: 2px dashed #d4c8b8;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.manual-workflow .hint {
+  margin: 4px 0 10px;
+  font-size: 0.82rem;
+  color: #7a6e5f;
+}
+a.button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+button.danger, .button.danger {
+  color: #b4541f;
+  border-color: #d9a78a;
+}
+button.danger:hover:not(:disabled) {
+  background: #fdf2e9;
+}
+.asset-source-badge {
+  display: inline-block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #eae3d8;
+  color: #6d6258;
+}

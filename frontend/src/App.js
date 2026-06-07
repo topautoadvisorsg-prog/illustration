@@ -1712,7 +1712,7 @@ function App() {
         status: "Waiting on review",
         nextAction: "If the text/layout proof is acceptable, generate, reuse, approve, or reject image assets page by page.",
         afterAction: "After all images are approved and print-ready, run final proof/export checks.",
-        buttonLabel: "Load Project Image Library",
+        buttonLabel: "View Image Library",
         actionKey: "images",
         helpPrompt: "Which images are missing or need approval, and what should I do next?",
       };
@@ -2923,6 +2923,47 @@ function App() {
     appendLog("success", `Loaded project image library: ${data.total || 0} assets.`);
   }
 
+  async function deleteLibraryImage(imageId) {
+    if (!imageId) return;
+    if (!window.confirm("Delete this image from the library? This cannot be undone.")) return;
+    await call(`/api/images/${imageId}`, { method: "DELETE" });
+    setMessage("Image deleted.");
+    appendLog("success", "Deleted image from library.");
+    await loadImageLibrary(activeProjectId);
+  }
+
+  async function uploadManualImage(pageId) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png,image/jpeg,image/webp";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(",")[1];
+        const source = window.prompt("Image source? (uploaded / manual-chatgpt / manual-midjourney / manual-other)", "manual-chatgpt") || "uploaded";
+        try {
+          setBusy(true);
+          const data = await call(`/api/pages/${pageId}/images/upload`, {
+            method: "POST",
+            body: JSON.stringify({ base64, source }),
+          });
+          setMessage(`Uploaded image for page, version ${data.version}.`);
+          appendLog("success", `Uploaded manual image, version ${data.version}.`);
+          await loadPageImages(pageId);
+          await loadImageLibrary(activeProjectId);
+        } catch (err) {
+          setError(err.message || "Upload failed.");
+        } finally {
+          setBusy(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+
   async function loadChapterIntelligence(chapterNumber = reviewChapterNumber, projectId = activeProjectId) {
     if (!projectId) throw new Error("Create or select a project first.");
     if (!chapterNumber) throw new Error("Select a chapter first.");
@@ -3276,6 +3317,7 @@ function App() {
       const errorMessage = err instanceof Error ? err.message : String(err);
       appendLog("error", `Could not restore project output: ${errorMessage}`);
     });
+    loadImageLibrary(activeProjectId).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiUrl, activeProjectId, projects]);
 
@@ -3479,7 +3521,7 @@ function App() {
         artifactLabel: "Image library",
         artifactSelector: ".asset-library-panel",
         primaryLabel: "Open Image Review",
-        secondaryLabel: "Load Project Image Library",
+        secondaryLabel: "Refresh Image Library",
         metrics: [
           { label: "pages with art", value: `${imagePageCount}/${pages.length}` },
           { label: "approved art", value: approvedImagePageCount },
@@ -4785,6 +4827,39 @@ function App() {
                           {inspectorData.prompt.blockers.length > 0 && <p className="empty">Blockers: {inspectorData.prompt.blockers.join(", ")}</p>}
                           <pre className="inspector-pre inspector-prompt-text">{inspectorData.prompt.text}</pre>
                         </div>
+                        <div className="gen-section manual-workflow">
+                          <div className="gen-head"><span className="gen-num">⚙</span> Manual Generation Workflow</div>
+                          <p className="hint">Copy the prompt and blueprint, generate externally (ChatGPT, Midjourney, etc.), then upload the result.</p>
+                          <div className="button-row">
+                            <button type="button" className="secondary" onClick={copyInspectorPrompt}>
+                              {inspectorPromptCopied ? "Copied!" : "Copy Prompt"}
+                            </button>
+                            {inspectorData.blueprint.available && (
+                              <a
+                                className="button secondary"
+                                href={`${apiUrl}${inspectorData.blueprint.url}`}
+                                download={`blueprint-${selectedPage?.pageKey || "page"}.png`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Download Blueprint
+                              </a>
+                            )}
+                            {inspectorData.blueprint.available && (
+                              <a
+                                className="button secondary"
+                                href={`${apiUrl}${inspectorData.blueprint.url}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View Blueprint
+                              </a>
+                            )}
+                            <button type="button" disabled={busy || !selectedPage} onClick={() => uploadManualImage(selectedPage.id)}>
+                              Upload Manual Image
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     );
                   })()}
@@ -4801,6 +4876,9 @@ function App() {
                         </button>
                         <button disabled={busy || !selectedPage || selectedPage?.status !== "APPROVED"} onClick={() => run("Upscaling approved image...", upscaleSelectedPageImage)}>
                           Upscale Approved
+                        </button>
+                        <button type="button" className="secondary" disabled={busy || !selectedPage} onClick={() => uploadManualImage(selectedPage.id)}>
+                          Upload Manual Image
                         </button>
                       </div>
                       <div className="image-version-list">
@@ -4896,9 +4974,16 @@ function App() {
                     <option key={chapter.chapterNumber} value={String(chapter.chapterNumber)} label={`Chapter ${chapter.chapterNumber}`} />
                   ))}
                 </select>
-                <button disabled={busy || !activeProjectId} onClick={() => run("Loading project image library...", () => loadImageLibrary(), () => scrollToWorkspaceSection(".asset-library-panel"))}>
-                  Load Project Image Library
+                <button disabled={busy || !activeProjectId} onClick={() => run("Refreshing image library...", () => loadImageLibrary(), () => scrollToWorkspaceSection(".asset-library-panel"))}>
+                  Refresh
                 </button>
+                {selectedPage && (
+                  <button type="button" className="secondary" onClick={() => {
+                    setImageLibraryFilter((current) => ({ ...current, q: current.q === selectedPage.pageKey ? "" : selectedPage.pageKey }));
+                  }}>
+                    {imageLibraryFilter.q === selectedPage?.pageKey ? "Show All" : `Filter: ${selectedPage.pageKey}`}
+                  </button>
+                )}
               </div>
               <div className="asset-library-summary">
                 <strong>{imageLibrary.total || 0} asset(s)</strong>
@@ -4917,6 +5002,7 @@ function App() {
                       <span>{asset.source.entryTitle}</span>
                       <small>{normalizeStatus(asset.status)} / {asset.widthPx || "?"} x {asset.heightPx || "?"} px</small>
                       <small>{layoutName(asset.source.layoutTemplate)}</small>
+                      <small className="asset-source-badge">{asset.prompt?.startsWith("[Manual upload") ? "uploaded" : "generated"}</small>
                       {asset.coverage && (
                         <small className="asset-coverage">
                           {asset.coverage.summary}
@@ -4929,13 +5015,16 @@ function App() {
                     </div>
                     <div className="button-row">
                       <button disabled={busy || !selectedPage || asset.source.pageId === selectedPage.id} onClick={() => run("Reusing image asset...", () => reuseImageAsset(asset.imageId), () => scrollToWorkspaceSection(".image-version-list"))}>
-                        Reuse Image on Selected Page
+                        Reuse on Selected Page
                       </button>
                       {asset.coverage?.repeatable && (
                         <button className="secondary" disabled={busy || !activeProjectId} onClick={() => run("Applying shared image to all matching pages...", () => applySharedImage(asset), () => scrollToWorkspaceSection(".asset-library-panel"))}>
                           Reuse on ALL {layoutName(asset.source.layoutTemplate)} pages
                         </button>
                       )}
+                      <button className="secondary danger" disabled={busy} onClick={() => run("Deleting image...", () => deleteLibraryImage(asset.imageId))}>
+                        Delete
+                      </button>
                     </div>
                     {advancedMode && (
                       <details className="advanced-details">

@@ -223,6 +223,13 @@ export async function reuseImageForPage(targetPageId: string, sourceImageId: str
   });
 }
 
+/** Delete a single image row by ID. Returns the deleted row or undefined. */
+export async function deleteImageById(imageId: string): Promise<ImageRow | undefined> {
+  const db = getDb();
+  const [row] = await db.delete(images).where(eq(images.id, imageId)).returning();
+  return row;
+}
+
 /** Make a specific version the active one for a page (Stage 4 use). */
 export async function setActiveImageVersion(pageId: string, version: number): Promise<ImageRow | undefined> {
   const db = getDb();
