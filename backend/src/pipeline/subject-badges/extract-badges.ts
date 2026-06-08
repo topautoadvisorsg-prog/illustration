@@ -127,9 +127,10 @@ export function detectHazards(title: string, body: string): HazardBadge[] {
   // Resolve contradictions: drop the gentler of any conflicting pair.
   for (const [a, b] of HAZARD_CONTRADICTIONS) {
     if (found.has(a) && found.has(b)) {
-      const severerFirst =
+      // Lower index = more severe. Keep the severer one, drop the gentler.
+      const lessSevere =
         HAZARD_DISPLAY_ORDER.indexOf(a) < HAZARD_DISPLAY_ORDER.indexOf(b) ? b : a;
-      found.delete(severerFirst);
+      found.delete(lessSevere);
     }
   }
 
@@ -185,8 +186,12 @@ export function extractBadgeMetadata(
   const body = manifest.bodyMarkdown ?? '';
   const binomial = extractBinomial(body);
   const region = inferRegion(title, body);
-  // Fallback habitat for concept pages with no organism: a calm regional descriptor.
-  const habitatFallback = `New England ${region.toLowerCase()} landscape`;
+  // Fallback habitat for concept pages with no organism: a calm regional
+  // descriptor. GENERAL reads better as "wilderness" than "general landscape".
+  const habitatFallback =
+    region === 'GENERAL'
+      ? 'New England wilderness landscape'
+      : `New England ${region.toLowerCase()} landscape`;
   const cleanSubject = buildCleanSubject(title, binomial, habitatFallback);
   const hazard = detectHazards(title, body);
   const sourceConfidence = inferSource(title, body);

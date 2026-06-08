@@ -130,22 +130,26 @@ The only ornament family for v1.0. All decorative rules, swags, and medallions c
 
 ---
 
-## 5. Badge System — LOCKED for v1.0
+## 5. Badge System — LOCKED for v1.1
 
-Two badges proven. Additional badges are NOT in v1.0 until visually approved against the standard.
+Badges are **deterministic stamped overlays** — the image model never draws them.
+The model keeps both bottom corners (≈0.9in square) visually quiet; print-prep
+stamps the badges identically on every page (consistent, searchable, reusable).
+Three families. Exact values, colors, order, and contradictions live in
+`standard.ts`. Page subjects stay clean; these values come from page metadata.
 
-| Badge | Icon | Ring | Hex | Use |
-|---|---|---|---|---|
-| **FOREST** | Evergreen tree | Forest Green | `#3F5A43` | Pages set in forest zones |
-| **MOUNTAIN** | Mountain peaks | Mountain Ochre | `#A47A3C` | Pages set in mountain / geology zones |
+**Region (8)** — bottom-left: `FOREST · MOUNTAIN · RIVER · WETLAND · COASTAL ·
+ALPINE · FIELD · GENERAL`
 
-Each badge:
-- Circular, ring-bordered
-- Icon centered, same warm ink as typography
-- Small-caps label below the badge, ink color
-- Always placed in the bottom-corners region of chapter openers
+**Hazard / Usage (9)** — bottom-right, most-severe-first, multiple allowed when
+non-contradictory: `DEADLY · TOXIC · VENOMOUS · AGGRESSIVE · CAUTION ·
+EXPERT_REVIEW · EDIBLE · MEDICINAL · NONE`
 
-**Pending v1.1 evaluation**: River, Wetland, Coastal, Alpine, Tundra. Locked when each one ships a proven render.
+**Source / Confidence (5)** — small sepia seal: `SCIENTIFIC_LITERATURE ·
+FIELD_GUIDE · TRADITIONAL_USE · HISTORICAL_SOURCE · GENERAL_REFERENCE`
+
+Colors are within the warm-sepia world (no screen-bright reds); the v1.1 palette
+is proposed and locked in `standard.ts` pending physical-proof tuning.
 
 ---
 
