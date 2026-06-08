@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { getEnv } from '../env.js';
 import { createAndRunRender } from '../pipeline/experimental/whole-page-render/render-whole-page.js';
 import { printPrepRender } from '../pipeline/print-prep/print-prep.js';
+import { assembleBook } from '../pipeline/book-assembly/assemble-book.js';
 import {
   approveRender,
   getProjectRenderSummary,
@@ -228,5 +229,22 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
       bookReady: summary.bookReady,
       renders: summary.rows.map(serializeRender),
     };
+  });
+
+  // ── Book Assembly: merge book-ready pages into one KDP interior PDF ──
+  // Hard-blocks if any required page is missing / un-print-prepped / failed
+  // preflight / wrong size. Cover wrap is a separate artifact (not here).
+  app.post('/api/experimental/whole-page-render/project/:projectId/assemble', async (request, reply) => {
+    if (flagOff()) return reply.code(503).send(flagDisabledResponse());
+    const { projectId } = ProjectParamsSchema.parse(request.params);
+    try {
+      const report = await assembleBook(projectId);
+      // 200 with the report whether or not it produced a PDF; `blocked` says which.
+      return report;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      request.log.error({ err }, 'book assembly failed');
+      return reply.code(500).send({ error: 'Internal Server Error', message, statusCode: 500 });
+    }
   });
 }
