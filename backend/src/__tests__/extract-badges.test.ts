@@ -14,6 +14,7 @@ import {
   inferRegion,
   composeBadgeSet,
   extractBadgeMetadata,
+  stripReadingFieldMetadata,
 } from '../pipeline/subject-badges/extract-badges.js';
 
 describe('cleanTitle — strips numbering, emoji, editorial tags', () => {
@@ -97,6 +98,39 @@ describe('composeBadgeSet — ordered region, hazard, source', () => {
     expect(set.map((b) => b.family)).toEqual(['region', 'hazard', 'source']);
     const none = composeBadgeSet('FOREST', ['NONE'], 'GENERAL_REFERENCE');
     expect(none.map((b) => b.family)).toEqual(['region', 'source']);
+  });
+});
+
+describe('stripReadingFieldMetadata — header never renders as prose', () => {
+  it('strips a binomial header line (the turkey bleed)', () => {
+    const body = '*Meleagris gallopavo* | ⚠️\n\nThe wild turkey was extirpated from New England by 1851.';
+    const out = stripReadingFieldMetadata(body);
+    expect(out.startsWith('The wild turkey')).toBe(true);
+    expect(out).not.toContain('Meleagris');
+    expect(out).not.toContain('|');
+  });
+
+  it('strips the two-line fungi header (binomial + edibility tag)', () => {
+    const body = '*Morchella* spp. | ⚠️\n**EDIBLE** *(spring only — false morel look-alike critical)* `[EXPERT REVIEW REQUIRED]`\n\nMay in the Connecticut River Valley, the apple trees still in bloom.';
+    const out = stripReadingFieldMetadata(body);
+    expect(out.startsWith('May in the Connecticut')).toBe(true);
+    expect(out).not.toContain('Morchella');
+    expect(out).not.toContain('EXPERT REVIEW');
+  });
+
+  it('leaves a page with no metadata header unchanged', () => {
+    const body = 'Every skill in this chapter is a tool. But the mindset that makes those tools useful is something that develops through practice.';
+    expect(stripReadingFieldMetadata(body)).toBe(body);
+  });
+
+  it('never blanks a page even if it looks all-metadata', () => {
+    const body = '*Crotalus horridus* |';
+    expect(stripReadingFieldMetadata(body).length).toBeGreaterThan(0);
+  });
+
+  it('does not strip legitimate mixed-case bold prose', () => {
+    const body = 'The **White Mountains** are the highest range in the Northeast.';
+    expect(stripReadingFieldMetadata(body)).toBe(body);
   });
 });
 
