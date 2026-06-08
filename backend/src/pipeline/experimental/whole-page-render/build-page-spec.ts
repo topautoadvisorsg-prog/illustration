@@ -14,7 +14,7 @@ import type { PageRow } from '../../../db/repositories/pagination.repo.js';
 import type { LayoutAllocation, PlanningZone } from '../../stage-6-layout/layout-director.js';
 import type { PageGeometry } from '../../stage-6-layout/page-geometry.js';
 import { deriveSubjectPackage } from '../../stage-2-planner/plan-pages.js';
-import { toRoman, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
+import { assembleIllustrationDna, toRoman, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
 import {
   EXPERIMENT_READING_FIELD_WIDENING_PCT,
   EXPERIMENT_TYPOGRAPHY_DNA,
@@ -97,7 +97,9 @@ function buildDecorativeElements(pageType: WholePageSpec['pageType']): Decorativ
 }
 
 export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
-  const { pageRow, config, geometry, allocation, entryTitle, imageSubject } = input;
+  // `config` stays on the input for callers/back-compat but is no longer read
+  // here: Illustration DNA now comes from the Standard, not project config.
+  const { pageRow, geometry, allocation, entryTitle, imageSubject } = input;
   const layout = pageRow.layoutTemplate as LayoutTemplateId;
   const pageType = inferPageType(layout, pageRow);
 
@@ -158,7 +160,11 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
           : [],
     },
     illustrationDNA: {
-      masterStyleBlock: config.imageGeneration.masterStyleBlockText,
+      // Standard v1.2: Illustration DNA comes from the single authority (the
+      // Standard), assembled with PALETTE-token colours — NOT the legacy
+      // free-text masterStyleBlockText config blob (which carried contradictory
+      // paper/text/composition rules from the dead clean-art pipeline).
+      masterStyleBlock: assembleIllustrationDna(),
       subject: subjectPackage,
     },
     pageText: {

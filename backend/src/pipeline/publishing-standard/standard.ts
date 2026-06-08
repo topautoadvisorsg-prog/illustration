@@ -27,10 +27,25 @@
  * Values change ONLY through an explicit version bump (v1.1, v2.0)
  * signed off by the operator.
  *
+ * ─── OWNERSHIP RULE ZERO (v1.2) ───────────────────────────────────
+ *   No module may define a value owned by another module. Modules
+ *   reference owned values through tokens — never raw literals.
+ *
+ *     WRONG:  Illustration DNA  paper = '#E0C8A0'
+ *     RIGHT:  Illustration DNA  paper = PALETTE.parchment
+ *     WRONG:  Typography        ink   = '#543C24'
+ *     RIGHT:  Typography        ink   = PALETTE.ink
+ *
+ *   Color is owned by PALETTE. Text is owned by TYPOGRAPHY. Badges by
+ *   BADGES. Composition by the Layout System. Physical output by
+ *   Print-Prep. Illustration DNA owns artwork BEHAVIOR only. A value
+ *   defined in two places is a bug.
+ *
  * Human-readable companion: ./STANDARD.md
+ * Reconciliation audit trail: ./STANDARD_V1_2_RECONCILIATION.md
  */
 
-export const STANDARD_VERSION = '1.1' as const;
+export const STANDARD_VERSION = '1.2' as const;
 
 // ─── 1. PALETTE ────────────────────────────────────────────────────────────
 export const PALETTE = {
@@ -128,6 +143,52 @@ export const ORNAMENTS = {
     'newly invented ornament families',
   ],
 } as const;
+
+// ─── 4b. ILLUSTRATION DNA (v1.2) ──────────────────────────────────────────
+// Owns ARTWORK BEHAVIOR ONLY — medium, brushwork, naturalist language, mood,
+// texture, lighting, feathered edges. Per Rule Zero it owns NO color values:
+// it references PALETTE tokens. It owns NO text (Typography), NO composition
+// (Layout), NO badges (Badge System), NO physical output (Print-Prep).
+// This is the reconciled Master Style Block (see STANDARD_V1_2_RECONCILIATION.md).
+export const ILLUSTRATION_DNA = {
+  medium:
+    "19th-century naturalist's expedition-journal illustration — pen-and-ink linework with a warm watercolor wash.",
+  referenceArtists: 'John James Audubon, Ernest Thompson Seton, Royal Geographical Society expedition artists.',
+  lineWork:
+    'Confident, expressive, organic pen-and-ink linework — sometimes precise and diagnostic, sometimes loose and gestural. Hand-drawn, never mechanical, never traced, never vector.',
+  colorDiscipline:
+    'Muted, atmospheric watercolor wash applied sparingly. Restrained vintage saturation — never neon, never digital, never over-processed.',
+  mood: 'Contemplative, reverent, grounded in the natural world; collected, hand-bound, kept in a leather satchel.',
+  naturalistPrecision:
+    'Anatomically accurate to field-guide standard — habitat, gill structure, bark texture, leaf venation, track patterns, and proportional scale rendered correctly. Naturalist precision is the foundation; the painterly handling is the surface.',
+  lighting: 'Warm, soft, and directional — as if from a high window in an autumn study.',
+  paperTexture: 'Aged fibrous parchment with subtle fiber and gentle patina (paper colour owned by PALETTE.parchment).',
+  edgeTreatment: 'The wash has soft, feathered edges — no hard rectangular border on the artwork itself.',
+  antiStyle: [
+    'no photography, photorealism, or photographic lighting',
+    'no flat vector, isometric, low-poly, anime, manga, cartoon, or comic-book linework',
+    'no anthropomorphized animals, cartoon expressions, or whimsical fantasy elements',
+  ],
+} as const;
+
+/**
+ * Assemble the Illustration-DNA prompt fragment. The ONLY place colour values
+ * enter is via PALETTE tokens (Rule Zero) — this function interpolates the
+ * token hex; it never hardcodes one.
+ */
+export function assembleIllustrationDna(): string {
+  return [
+    ILLUSTRATION_DNA.medium,
+    `Aesthetic: ${ILLUSTRATION_DNA.mood} Reference points: ${ILLUSTRATION_DNA.referenceArtists}`,
+    `LINE WORK: ${ILLUSTRATION_DNA.lineWork} Line colour is the Standard ink (${PALETTE.ink.hex}).`,
+    `COLOUR: ${ILLUSTRATION_DNA.colorDiscipline} Whites are the parchment paper itself (${PALETTE.parchment.hex}), never bright paper-white. Accents are drawn from the Standard palette.`,
+    `DETAIL: ${ILLUSTRATION_DNA.naturalistPrecision}`,
+    `LIGHT: ${ILLUSTRATION_DNA.lighting}`,
+    `PAPER: ${ILLUSTRATION_DNA.paperTexture}`,
+    `EDGES: ${ILLUSTRATION_DNA.edgeTreatment}`,
+    `Avoid: ${ILLUSTRATION_DNA.antiStyle.join('; ')}.`,
+  ].join('\n');
+}
 
 // ─── 5. BADGE SYSTEM (v1.1) ───────────────────────────────────────────────
 // Three families. Badges are DETERMINISTIC OVERLAYS stamped by print-prep —
@@ -245,6 +306,7 @@ export const WILDLANDS_STANDARD = {
   version: STANDARD_VERSION,
   palette: PALETTE,
   typography: TYPOGRAPHY,
+  illustrationDna: ILLUSTRATION_DNA,
   chapterSystem: CHAPTER_SYSTEM,
   ornaments: ORNAMENTS,
   badges: {

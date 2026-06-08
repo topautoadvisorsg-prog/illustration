@@ -1,4 +1,14 @@
-# Wild Lands Publishing Standard — v1.1
+# Wild Lands Publishing Standard — v1.2
+
+**v1.2 (single authority + Ownership Rule Zero):** the Master Style Block was
+demoted to the **Illustration DNA** module (artwork behaviour only) and the
+duplicate copies were eliminated — the Standard is now the single style
+authority. **Ownership Rule Zero:** no module may define a value owned by
+another; modules reference owned values through tokens (e.g. Illustration DNA
+uses `PALETTE.ink`, never `#543C24`). Owners: Palette → colour · Typography →
+text · Badge System → badges · Layout → composition · Print-Prep → physical
+output · Illustration DNA → artwork behaviour. Full move-by-move audit trail:
+`STANDARD_V1_2_RECONCILIATION.md`.
 
 **v1.1 (badge taxonomy):** three badge families locked — Region (8), Hazard/Usage
 (9), Source/Confidence (5). Badges are deterministic **stamped overlays**, never
