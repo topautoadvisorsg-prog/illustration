@@ -87,13 +87,22 @@ export function computeBadgeLayout(badges: StampableBadge[], canvas: CanvasPx): 
   const hazards = badges.filter((b) => b.family === 'hazard').sort((a, b) => a.order - b.order);
   const source = badges.find((b) => b.family === 'source');
 
-  // Hazard row across the top of the right square.
+  // Hazard row across the top of the right square; source seal beneath it.
   if (hazards.length > 0) {
     const n = hazards.length; // 1 or 2 (contract caps at 2)
-    const gap = n > 1 ? Math.round(0.05 * canvas.dpi) : 0; // 15px
-    const hazW = Math.round((rightSq.width - gap * (n - 1)) / n);
-    const hazH = Math.round(hazW * FAMILY_ASPECT.hazard);
-    const rowLeft = rightSq.left;
+    const gap = n > 1 ? Math.round(0.05 * canvas.dpi) : 0; // 15px between two hazards
+    const srcH = source ? Math.round(0.3 * canvas.dpi) : 0; // 90px
+    const srcGap = source ? Math.round(0.04 * canvas.dpi) : 0; // 12px
+    // Hazard height is capped so the row + source seal both fit the square.
+    const availTopH = rightSq.height - srcH - srcGap;
+    let hazW = Math.round((rightSq.width - gap * (n - 1)) / n);
+    let hazH = Math.round(hazW * FAMILY_ASPECT.hazard);
+    if (hazH > availTopH) {
+      hazH = availTopH;
+      hazW = Math.round(hazH / FAMILY_ASPECT.hazard);
+    }
+    const rowW = hazW * n + gap * (n - 1);
+    const rowLeft = Math.round(rightSq.left + (rightSq.width - rowW) / 2); // centre the row
     hazards.forEach((b, i) => {
       placed.push({
         badge: b,
@@ -101,9 +110,7 @@ export function computeBadgeLayout(badges: StampableBadge[], canvas: CanvasPx): 
       });
     });
     if (source) {
-      const srcH = Math.round(0.3 * canvas.dpi); // 90px
-      const srcW = srcH;
-      placed.push({ badge: source, rect: centeredIn(rightSq, srcW, srcH, rightSq.height - srcH) });
+      placed.push({ badge: source, rect: centeredIn(rightSq, srcH, srcH, rightSq.height - srcH) });
     }
   } else if (source) {
     // No hazards → source centred in the right square.

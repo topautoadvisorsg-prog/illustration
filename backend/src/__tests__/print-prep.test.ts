@@ -16,7 +16,13 @@ import {
 } from '../pipeline/print-prep/badge-geometry.js';
 import { runPreflight } from '../pipeline/print-prep/preflight.js';
 import { composePrintPage } from '../pipeline/print-prep/print-prep.js';
-import { badgesForPage } from '../pipeline/publishing-standard/index.js';
+import {
+  badgesForPage,
+  renderBadgeSvg,
+  REGION_BADGES,
+  HAZARD_BADGES,
+  SOURCE_BADGES,
+} from '../pipeline/publishing-standard/index.js';
 import type { Badge } from '@wildlands/shared';
 
 const sampleBadgeSet: Badge[] = [
@@ -47,6 +53,24 @@ describe('badge geometry — standard canvas + placement', () => {
     expect(allWithinCanvas(placed, canvas)).toBe(true);
   });
 
+  it('a SINGLE hazard fits the safe square and never overlaps the source', () => {
+    const placed = computeBadgeLayout(
+      badgesForPage([
+        { family: 'region', value: 'FOREST' },
+        { family: 'hazard', value: 'DEADLY' },
+        { family: 'source', value: 'FIELD_GUIDE' },
+      ]),
+      canvas,
+    );
+    const haz = placed.find((p) => p.badge.family === 'hazard')!;
+    const src = placed.find((p) => p.badge.family === 'source')!;
+    // hazard must not run past the bottom of the source-reserved area
+    expect(haz.rect.top + haz.rect.height).toBeLessThanOrEqual(src.rect.top + 1);
+    // and the whole thing stays inside the 0.9in safe square (≤ canvas, checked too)
+    expect(allWithinCanvas(placed, canvas)).toBe(true);
+    expect(haz.rect.height).toBeLessThanOrEqual(Math.round(0.9 * canvas.dpi));
+  });
+
   it('folio rect is bottom-centre, above the trim edge', () => {
     const r = computeFolioRect(canvas);
     expect(Math.abs(r.left + r.width / 2 - canvas.width / 2)).toBeLessThan(2); // centred
@@ -72,6 +96,24 @@ describe('preflight gate', () => {
     expect(runPreflight({ ...base, dpi: 150 }).passed).toBe(false);
     expect(runPreflight({ ...base, colorMode: 'cmyk' }).passed).toBe(false);
   });
+});
+
+describe('every badge SVG rasterizes through sharp (no malformed icon paths)', () => {
+  const all: Array<['region' | 'hazard' | 'source', string]> = [
+    ...Object.keys(REGION_BADGES).map((v): ['region', string] => ['region', v]),
+    ...Object.keys(HAZARD_BADGES).filter((v) => v !== 'NONE').map((v): ['hazard', string] => ['hazard', v]),
+    ...Object.keys(SOURCE_BADGES).map((v): ['source', string] => ['source', v]),
+  ];
+  for (const [family, value] of all) {
+    it(`${family}:${value} rasterizes to PNG`, async () => {
+      const png = await sharp(Buffer.from(renderBadgeSvg(family, value)), { density: 600 })
+        .resize({ width: 120 })
+        .png()
+        .toBuffer();
+      expect(png.length).toBeGreaterThan(0);
+      expect(png.subarray(1, 4).toString()).toBe('PNG');
+    });
+  }
 });
 
 describe('composePrintPage — integration on a fixture (no DB, no spend)', () => {
