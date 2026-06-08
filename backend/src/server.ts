@@ -15,6 +15,7 @@ import { registerPageRoutes } from './api/pages.routes.js';
 import { registerIntelligenceRoutes } from './api/intelligence.routes.js';
 import { registerAgentRoutes } from './api/agents.routes.js';
 import { registerPaginationRoutes } from './api/pagination.routes.js';
+import { registerExperimentalRoutes } from './api/experimental.routes.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -55,6 +56,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Pagination v1 — routes are registered always; each one self-gates on
   // PAGINATION_V1_ENABLED and returns 503 when the flag is off.
   await registerPaginationRoutes(app);
+  // Whole-page render experiment — self-gates on WHOLE_PAGE_EXPERIMENT_ENABLED.
+  await registerExperimentalRoutes(app);
 
   app.get('/', async () => ({
     service: 'wildlands-backend',

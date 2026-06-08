@@ -64,6 +64,13 @@ const EnvSchema = z.object({
   // emits paired text + illustration pages. The 16 legacy templates remain in
   // code as latent infrastructure either way.
   LAYOUT_SIMPLIFIED_V1: z.coerce.boolean().default(false),
+
+  // Whole-page render experiment. When false (default), the experimental route
+  // returns 503. When true, the operator can POST to
+  // /api/experimental/whole-page-render/:pageId to test a JSON-page-spec-driven
+  // single-shot render. Production renderer / Stage 3 / Pagination v1 are
+  // never touched by this flag.
+  WHOLE_PAGE_EXPERIMENT_ENABLED: z.coerce.boolean().default(false),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
