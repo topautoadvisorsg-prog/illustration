@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { ApiErrorSchema } from '@wildlands/shared';
 import { getEnv } from '../env.js';
 import { renderWholePage } from '../pipeline/experimental/whole-page-render/render-whole-page.js';
+import { getProjectStorage } from '../services/storage/project-storage.js';
 
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
 
@@ -41,7 +42,52 @@ function flagDisabledResponse() {
   };
 }
 
+/** Pull an experimental artifact (image, spec JSON, or prompt text) by its
+ *  stored relative path. Locked down to paths under `experimental/whole-page/`
+ *  to prevent any read outside the experiment sandbox. Flag-gated like the
+ *  generator. */
+const FileQuerySchema = z.object({ path: z.string().min(1) });
+
 export async function registerExperimentalRoutes(app: FastifyInstance): Promise<void> {
+  app.get('/api/experimental/whole-page-render/file', async (request, reply) => {
+    if (!getEnv().WHOLE_PAGE_EXPERIMENT_ENABLED) {
+      return reply.code(503).send(flagDisabledResponse());
+    }
+    const parsed = FileQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: 'Bad Request',
+        message: 'Missing or invalid `path` query parameter.',
+        statusCode: 400,
+      });
+    }
+    const relPath = parsed.data.path;
+    if (relPath.includes('..') || !relPath.includes('/experimental/whole-page/')) {
+      return reply.code(400).send({
+        error: 'Bad Request',
+        message: 'Path must be under experimental/whole-page/.',
+        statusCode: 400,
+      });
+    }
+    try {
+      const buf = await getProjectStorage().readProjectFile(relPath);
+      const ext = relPath.split('.').pop() ?? '';
+      const ct =
+        ext === 'png' ? 'image/png'
+        : ext === 'json' ? 'application/json'
+        : 'text/plain; charset=utf-8';
+      reply.header('content-type', ct);
+      reply.header('cache-control', 'no-store');
+      return reply.send(buf);
+    } catch {
+      return reply.code(404).send({
+        error: 'Not Found',
+        message: 'Artifact not found.',
+        statusCode: 404,
+      });
+    }
+  });
+
   app.post(
     '/api/experimental/whole-page-render/:pageId',
     {
