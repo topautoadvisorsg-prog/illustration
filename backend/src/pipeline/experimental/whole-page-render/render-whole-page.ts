@@ -135,6 +135,16 @@ export async function createAndRunRender(
   opts: RenderWholePageOptions = {},
 ): Promise<CreateAndRunResult> {
   const prepared = await prepareRender(pageId);
+
+  // Empty-body guard (Tier-0): refuse to spend an image on a content page with
+  // no body text. This catches the silent-blank-page failure where a page was
+  // never paginated (readingFieldText null). Throws BEFORE creating a render row
+  // or calling the model. NOTE: when front matter is built, COVER/TITLE pages
+  // legitimately have no body — exempt those page types here at that time.
+  if (!(prepared.spec.pageText.body ?? '').trim()) {
+    throw new Error(`empty_body_text:${pageId}`);
+  }
+
   const created = await createRenderRow({
     pageId,
     projectId: prepared.projectId,

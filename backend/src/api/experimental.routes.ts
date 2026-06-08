@@ -135,6 +135,15 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
       if (message.startsWith('page_not_found') || message.startsWith('project_not_found')) {
         return reply.code(404).send({ error: 'Not Found', message, statusCode: 404 });
       }
+      if (message.startsWith('empty_body_text')) {
+        // Tier-0 guard: no image spent. The page has no body text — run
+        // Pagination v1 (or this is a non-content page that shouldn't render).
+        return reply.code(422).send({
+          error: 'Unprocessable Entity',
+          message: `Page has no body text to render; run Pagination v1 first. (${message})`,
+          statusCode: 422,
+        });
+      }
       request.log.error({ err }, 'whole-page render failed (infrastructure)');
       return reply.code(500).send({ error: 'Internal Server Error', message, statusCode: 500 });
     }
