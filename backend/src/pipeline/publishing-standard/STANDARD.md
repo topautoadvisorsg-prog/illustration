@@ -3,6 +3,27 @@
 **Status:** LOCKED. Treat every value in this document as a constant.
 **Source of truth:** `backend/src/pipeline/publishing-standard/standard.ts` is the machine version. This document is the human version. If they disagree, the code wins.
 
+## Direction of authority — non-negotiable
+
+```
+Standard  →  Render
+```
+
+Never:
+```
+Render → Standard → Render → Standard → ...
+```
+
+The Standard is upstream of every render. Renders conform to the Standard. The Standard does not conform to renders.
+
+- Do **not** re-sample paper or ink colors from a generated image to "recalibrate" v1.0.
+- Do **not** widen a value because a render came in slightly different.
+- Do **not** treat the model's interpretation as feedback that updates the spec.
+
+If a render disagrees with the Standard, the render is wrong — re-prompt, don't re-spec.
+
+Values change ONLY through an explicit version bump (v1.1, v2.0) signed off by the operator. Empirical sampling from renders is forbidden once a version is locked.
+
 ---
 
 ## Why this exists

@@ -11,6 +11,22 @@
  * hardcoded somewhere downstream, that's a violation — route it
  * through this module.
  *
+ * ─── DIRECTION OF AUTHORITY ───────────────────────────────────────
+ *   Standard → Render.    NEVER  Render → Standard.
+ *
+ * Once a version is locked, values are frozen. Do NOT empirically
+ * sample colors / sizes / placements from a generated PNG to
+ * "recalibrate" the spec — that creates an infinite drift loop:
+ *
+ *     Render → Standard → Render → Standard → ...
+ *
+ * Renders conform to the Standard. The Standard does not conform
+ * to renders. A render that disagrees is a re-prompt problem, not
+ * a re-spec problem.
+ *
+ * Values change ONLY through an explicit version bump (v1.1, v2.0)
+ * signed off by the operator.
+ *
  * Human-readable companion: ./STANDARD.md
  */
 
