@@ -58,6 +58,17 @@ export const pageRoleEnum = pgEnum('page_role', ['opener', 'continuation', 'comp
 export const fitStatusEnum = pgEnum('fit_status', ['PENDING', 'FITS', 'TIGHT', 'OVERFLOW', 'UNDERFILL']);
 // Pagination v1 — audit log of operator decisions on the Text-In-Reading-Field preview.
 export const pageApprovalDecisionEnum = pgEnum('page_approval_decision', ['APPROVED', 'REJECTED', 'RESET']);
+// Whole-page render (AI-first pipeline) — its own lifecycle, never shared with
+// the legacy illustration-only `image_status`. Many versions may be APPROVED;
+// exactly one per page may be approved_for_book + active.
+export const wholePageRenderStatusEnum = pgEnum('whole_page_render_status', [
+  'QUEUED',
+  'RENDERING',
+  'RENDERED',
+  'APPROVED',
+  'REJECTED',
+  'FAILED',
+]);
 export const jobTypeEnum = pgEnum('job_type', ['image-generation', 'upscale', 'layout', 'pdf-compile', 'epub-export']);
 export const jobStatusEnum = pgEnum('job_status', ['queued', 'active', 'completed', 'failed', 'dead-lettered']);
 export const exportKindEnum = pgEnum('export_kind', ['PREMIUM_PDF', 'KINDLE_EPUB']);
@@ -261,6 +272,53 @@ export const images = pgTable(
   (table) => ({
     pageVersionIdx: uniqueIndex('images_page_version_idx').on(table.pageId, table.version),
     pageActiveIdx: index('images_page_active_idx').on(table.pageId, table.active),
+  }),
+);
+
+// Whole-page render (AI-first pipeline). Mirrors the `images` versioning model
+// but is a separate product (typography baked into the generated image). Lives
+// alongside `images`; never mutates legacy state. Book assembly reads only rows
+// where active=true AND approved_for_book=true. See SPEC_PRODUCTIONIZE.md.
+export const wholePageRenders = pgTable(
+  'whole_page_renders',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    status: wholePageRenderStatusEnum('status').default('QUEUED').notNull(),
+    // Inputs that produced this render — full audit trail.
+    specJson: jsonb('spec_json').notNull(),
+    assembledPrompt: text('assembled_prompt').notNull(),
+    promptSha256: text('prompt_sha256').notNull(),
+    standardVersion: text('standard_version').notNull(),
+    // Output.
+    imagePath: text('image_path'),
+    specPath: text('spec_path'),
+    promptPath: text('prompt_path'),
+    widthPx: integer('width_px'),
+    heightPx: integer('height_px'),
+    model: text('model'),
+    // Selection.
+    active: boolean('active').default(false).notNull(),
+    approvedForBook: boolean('approved_for_book').default(false).notNull(),
+    // Decision trail.
+    decidedBy: text('decided_by'),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    rejectionReason: text('rejection_reason'),
+    // Error handling.
+    attempts: integer('attempts').default(0).notNull(),
+    errorMessage: text('error_message'),
+    ...timestamps,
+  },
+  (table) => ({
+    pageVersionIdx: uniqueIndex('wpr_page_version_idx').on(table.pageId, table.version),
+    pageActiveIdx: index('wpr_page_active_idx').on(table.pageId, table.active),
+    projectStatusIdx: index('wpr_project_status_idx').on(table.projectId, table.status),
   }),
 );
 
