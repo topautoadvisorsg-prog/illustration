@@ -3,13 +3,21 @@
 # gives full control and guarantees Chromium + its system libraries are present.
 FROM node:20-bookworm-slim
 
-# Chromium + base fonts + libs so Puppeteer/Paged.js can render print PDFs.
+# Chromium + serif fonts + libs. The fonts serve TWO renderers:
+#  - Puppeteer/Paged.js (legacy PDF), and
+#  - sharp/librsvg (STD-3 print-prep), which rasterizes SVG <text> for badge
+#    labels, source lettermarks, and folios. Without an installed serif those
+#    would render blank. fonts-liberation → "Liberation Serif", fonts-dejavu-core
+#    → "DejaVu Serif" are the fonts named first in TYPOGRAPHY.renderFontFamily.
+# fontconfig is pulled in transitively by the font packages.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       chromium \
       fonts-liberation \
       fonts-dejavu-core \
       fonts-freefont-ttf \
+      fontconfig \
       ca-certificates \
+    && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
 # render-pdf.ts resolves Chromium via CHROMIUM_PATH first.

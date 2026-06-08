@@ -15,6 +15,7 @@ import type { Badge } from '@wildlands/shared';
 import {
   PALETTE,
   SPACING,
+  TYPOGRAPHY,
   badgesForPage,
 } from '../publishing-standard/index.js';
 import {
@@ -40,7 +41,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
   };
 }
 
-const SERIF = "Georgia, 'EB Garamond', 'Times New Roman', serif";
+const SERIF = TYPOGRAPHY.renderFontFamily; // Typography-owned, Docker-installed fonts first
 
 export interface ComposeResult {
   pngBuffer: Buffer;

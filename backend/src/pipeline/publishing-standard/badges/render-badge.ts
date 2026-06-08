@@ -21,6 +21,7 @@ import {
   HAZARD_DISPLAY_ORDER,
   PALETTE,
   REGION_BADGES,
+  TYPOGRAPHY,
 } from '../standard.js';
 
 const INK = PALETTE.ink.hex;
@@ -66,7 +67,8 @@ const SOURCE_LETTER: Record<SourceBadge, string> = {
   GENERAL_REFERENCE: 'G',
 };
 
-const SERIF = "Georgia, 'EB Garamond', 'Times New Roman', serif";
+// Typography owns the stamped-text font; leads with Docker-installed fonts.
+const SERIF = TYPOGRAPHY.renderFontFamily;
 
 function svg(width: number, height: number, body: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 ${(height / width) * 100}" width="${width}" height="${height}">${body}</svg>`;

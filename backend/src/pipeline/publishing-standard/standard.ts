@@ -63,6 +63,16 @@ export type PaletteRole = keyof typeof PALETTE;
 
 // ─── 2. TYPOGRAPHY ────────────────────────────────────────────────────────
 export const TYPOGRAPHY = {
+  /**
+   * Concrete CSS font stack for renderer-STAMPED text (badge labels, source
+   * lettermarks, folios) — NOT the image-model prose above. Leads with fonts
+   * installed in the production Docker image (Dockerfile.backend:
+   * fonts-liberation → Liberation Serif, fonts-dejavu-core → DejaVu Serif) so
+   * sharp/librsvg renders deterministically and never falls back to blank.
+   * Georgia/Times follow for local dev. Owning module: Typography.
+   */
+  renderFontFamily:
+    "'Liberation Serif', 'DejaVu Serif', Georgia, 'Times New Roman', serif",
   body: {
     family: 'Caslon-class old-style serif (Adobe Caslon, Goudy Old Style, or Adobe Garamond) — generous x-height, bracketed serifs',
     pt: 13,
