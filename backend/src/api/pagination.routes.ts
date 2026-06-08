@@ -203,6 +203,63 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
     },
   );
 
+  // GET /api/projects/:id/paginated-pages — full Stage 1.75 row shape for the
+  // frontend's Chapter Production grid + Page Production tab. The legacy
+  // /pages route returns a 7-field subset (status / id / pageKey / chapterNumber
+  // / plannedPageNumber / layoutTemplate / imagePrompt / imagePromptSha256),
+  // which doesn't include the pagination columns the new UI needs. Rather
+  // than expand /pages and risk breaking existing callers, ship a dedicated
+  // endpoint that returns exactly the columns the Page Production UI reads.
+  app.get(
+    '/api/projects/:id/paginated-pages',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        response: { 404: ApiErrorSchema, 503: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      if (!getEnv().PAGINATION_V1_ENABLED) {
+        return reply.code(503).send(flagDisabledResponse());
+      }
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const project = await getProject(id);
+      if (!project) {
+        return reply.code(404).send({ error: 'Not Found', message: 'Project not found.', statusCode: 404 });
+      }
+      const rows = await listPaginatedPagesForProject(id);
+      // Resolve real entry titles + image subjects in one batch so the
+      // operator sees actual names, not the bare pageKey.
+      const entryKeys = collectEntryKeys(rows);
+      const entryMeta = await getEntryMetaByKeys(id, entryKeys);
+      const pages = rows.map((row) => {
+        const primary = entryMeta.get(row.entryKey ?? row.pageKey);
+        return {
+          id: row.id,
+          pageKey: row.pageKey,
+          entryKey: row.entryKey,
+          entryTitle: primary?.entryTitle ?? row.pageKey,
+          chapterNumber: row.chapterNumber,
+          plannedPageNumber: row.plannedPageNumber,
+          layoutTemplate: row.layoutTemplate,
+          partN: row.partN,
+          totalParts: row.totalParts,
+          pageRole: row.pageRole,
+          carriesSubject: row.carriesSubject,
+          compactedEntryKeys: row.compactedEntryKeys ?? null,
+          imageSubject: row.carriesSubject ? (primary?.imageSubject ?? null) : null,
+          fitStatus: row.fitStatus,
+          previewApproved: row.previewApproved,
+          previewApprovedAt: row.previewApprovedAt,
+          previewApprovedBy: row.previewApprovedBy,
+          readingFieldChars: row.readingFieldChars,
+          readingFieldWords: row.readingFieldWords,
+        };
+      });
+      return { pages };
+    },
+  );
+
   // GET /api/projects/:id/pagination-report — read-only aggregate.
   app.get(
     '/api/projects/:id/pagination-report',

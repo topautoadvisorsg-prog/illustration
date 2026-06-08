@@ -52,6 +52,21 @@ describe('Pagination routes — flag off (default)', () => {
     }
   });
 
+  it('GET /api/projects/:id/paginated-pages returns 503 when the flag is off', async () => {
+    const app = await makeApp();
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/projects/00000000-0000-0000-0000-000000000000/paginated-pages',
+      });
+      expect(res.statusCode).toBe(503);
+      const body = res.json();
+      expect(body.error).toBe('Service Unavailable');
+    } finally {
+      await app.close();
+    }
+  });
+
   it('GET /api/projects/:id/pagination-report returns 503 when the flag is off', async () => {
     const app = await makeApp();
     try {

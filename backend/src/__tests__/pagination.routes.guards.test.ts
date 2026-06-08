@@ -43,6 +43,28 @@ vi.mock('../db/repositories/manifests.repo.js', () => ({
   listManifests: vi.fn(async () => []),
 }));
 
+const mockPaginatedRows = [
+  {
+    id: '11111111-1111-1111-1111-111111111111',
+    pageKey: 'CH01_P001',
+    entryKey: 'CH01_P001',
+    chapterNumber: 1,
+    plannedPageNumber: 1,
+    layoutTemplate: 'LAYOUT_B_IMAGE_RIGHT',
+    partN: 1,
+    totalParts: 1,
+    pageRole: 'opener',
+    carriesSubject: true,
+    compactedEntryKeys: null,
+    fitStatus: 'FITS',
+    previewApproved: false,
+    previewApprovedAt: null,
+    previewApprovedBy: null,
+    readingFieldChars: 100,
+    readingFieldWords: 20,
+  },
+];
+
 vi.mock('../db/repositories/pagination.repo.js', () => ({
   countApprovedPages: vi.fn(async () => mockState.approvedCount),
   persistPaginatedPages: vi.fn(async () => ({ pagesWritten: 0 })),
@@ -52,9 +74,11 @@ vi.mock('../db/repositories/pagination.repo.js', () => ({
     fitDistribution: { PENDING: 0, FITS: 0, TIGHT: 0, OVERFLOW: 0, UNDERFILL: 0 },
     approvedPages: 0, pendingApproval: 0, perChapter: [],
   })),
-  listPaginatedPagesForProject: vi.fn(async () => []),
+  listPaginatedPagesForProject: vi.fn(async () => mockPaginatedRows),
   recordPageApproval: vi.fn(async () => { throw new Error('not used in guard tests'); }),
-  getEntryMetaByKeys: vi.fn(async () => new Map()),
+  getEntryMetaByKeys: vi.fn(async () => new Map([
+    ['CH01_P001', { entryTitle: 'Black Bear', imageSubject: 'a black bear at the forest edge' }],
+  ])),
 }));
 
 async function makeApp() {
@@ -124,6 +148,36 @@ describe('POST /paginate — approval protection guard (flag on)', () => {
         payload: {},
       });
       expect(res.statusCode).toBe(400); // empty-manifest branch
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('GET /paginated-pages returns the full pagination row shape with resolved entry titles + image subjects', async () => {
+    const app = await makeApp();
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/projects/00000000-0000-0000-0000-000000000001/paginated-pages',
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(Array.isArray(body.pages)).toBe(true);
+      expect(body.pages).toHaveLength(1);
+      const page = body.pages[0];
+      // Pagination columns the frontend needs.
+      expect(page.id).toBe('11111111-1111-1111-1111-111111111111');
+      expect(page.pageKey).toBe('CH01_P001');
+      expect(page.partN).toBe(1);
+      expect(page.totalParts).toBe(1);
+      expect(page.pageRole).toBe('opener');
+      expect(page.carriesSubject).toBe(true);
+      expect(page.fitStatus).toBe('FITS');
+      expect(page.previewApproved).toBe(false);
+      expect(page.layoutTemplate).toBe('LAYOUT_B_IMAGE_RIGHT');
+      // Real entry title + image subject resolved from the PAGE manifest meta.
+      expect(page.entryTitle).toBe('Black Bear');
+      expect(page.imageSubject).toBe('a black bear at the forest edge');
     } finally {
       await app.close();
     }

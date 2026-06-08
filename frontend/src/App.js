@@ -2108,18 +2108,23 @@ function App() {
   }
 
   async function loadPaginatedPages(projectId = activeProjectId) {
-    if (!projectId || !paginationEnabled) return;
+    // Bail only on missing project id. Do NOT gate on `paginationEnabled`
+    // here: this function is sometimes called immediately after the flag-
+    // detection report set the state to true, before the closure has
+    // updated. The backend route returns 503 when the flag is off, so the
+    // catch below handles that case authoritatively.
+    if (!projectId) return;
     try {
-      const data = await call(`/api/projects/${projectId}/pages`);
-      // listPages returns the raw page rows; ignore the legacy-only response
-      // by filtering for rows that carry the new pagination columns.
-      const rows = Array.isArray(data?.pages) ? data.pages : data;
-      const withPagination = (Array.isArray(rows) ? rows : []).filter(
-        (p) => p && (p.partN !== undefined || p.fitStatus !== undefined || p.pageRole !== undefined),
-      );
-      setPaginatedPages(withPagination);
+      const data = await call(`/api/projects/${projectId}/paginated-pages`);
+      setPaginatedPages(Array.isArray(data?.pages) ? data.pages : []);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      // 503 = backend flag off; silently clear the list and let the rest
+      // of the UI degrade to its flag-off state.
+      if (msg.includes("503") || msg.toLowerCase().includes("dormant")) {
+        setPaginatedPages([]);
+        return;
+      }
       appendLog("issue", `Paginated pages load failed: ${msg}`);
     }
   }
@@ -5302,6 +5307,12 @@ function App() {
                       {!selectedChapterApproval && (
                         <p className="empty">Chapter layout not approved — generation is locked until the chapter layout is approved.</p>
                       )}
+                      {paginationEnabled && !selectedPagePagination && (
+                        <p className="notice gate-notice">
+                          <strong>This page has not been paginated. Run Re-paginate Project before generating art.</strong>
+                          <span> The Reading Field text + layout zones live on the paginated row; until pagination creates that row, image generation is blocked.</span>
+                        </p>
+                      )}
                       {paginationEnabled && selectedPagePagination && !selectedPagePagination.previewApproved && selectedPagePagination.carriesSubject !== false && (
                         <p className="notice gate-notice">
                           <strong>Approve the Reading Field preview before generating art.</strong>
@@ -5315,7 +5326,7 @@ function App() {
                         </p>
                       )}
                       <div className="button-row">
-                        <button disabled={busy || !selectedPage || !selectedChapterApproval || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady) || (paginationEnabled && selectedPagePagination && (!selectedPagePagination.previewApproved || selectedPagePagination.carriesSubject === false))} onClick={() => run("Generating selected page image...", generateSelectedPageImage)}>
+                        <button disabled={busy || !selectedPage || !selectedChapterApproval || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady) || (paginationEnabled && (!selectedPagePagination || !selectedPagePagination.previewApproved || selectedPagePagination.carriesSubject === false))} onClick={() => run("Generating selected page image...", generateSelectedPageImage)}>
                           Generate Image
                         </button>
                         <button disabled={busy || !selectedPage || selectedPage?.status !== "APPROVED"} onClick={() => run("Upscaling approved image...", upscaleSelectedPageImage)}>
