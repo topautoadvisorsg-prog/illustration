@@ -138,6 +138,30 @@ describe('paginateProject — end-to-end orchestrator', () => {
     }
   });
 
+  it('sorts entries into book order even when fed scrambled (cross-chapter compaction bug)', () => {
+    // The manifest query has no ORDER BY, so entries can arrive Postgres-
+    // arbitrary. Feed them scrambled (Ch8, Ch2, Ch1) and assert pagination
+    // restores book order — otherwise compaction merges cross-chapter
+    // neighbours (the real bug: a Ch2 loon onto a Ch8 bushcraft page).
+    const scrambled: PageManifest[] = [
+      makeEntry({ pageId: 'CH08_P001', chapterNumber: 8, pageNumber: 1, entryTitle: 'Bushcraft', bodyMarkdown: bodyOf(2, 20) }),
+      makeEntry({ pageId: 'CH02_P001', chapterNumber: 2, pageNumber: 1, entryTitle: 'Loon', bodyMarkdown: bodyOf(2, 20) }),
+      makeEntry({ pageId: 'CH01_P001', chapterNumber: 1, pageNumber: 1, entryTitle: 'Geology', bodyMarkdown: bodyOf(2, 20) }),
+    ];
+    const result = paginateProject({ entries: scrambled, config: makeConfig() });
+    const chapters = result.pages.map((p) => p.chapterNumber);
+    for (let i = 1; i < chapters.length; i++) {
+      expect(chapters[i]!).toBeGreaterThanOrEqual(chapters[i - 1]!); // non-decreasing
+    }
+    // no compacted page may mix two different chapters.
+    for (const p of result.pages) {
+      if (p.compactedEntryKeys && p.compactedEntryKeys.length > 1) {
+        const chs = new Set(p.compactedEntryKeys.map((k) => k.slice(0, 4)));
+        expect(chs.size).toBe(1);
+      }
+    }
+  });
+
   it('keeps existing-project behavior untouched: pure function with no DB side effects', () => {
     // Smoke test: calling paginateProject does not throw and does not require
     // any environment / network access. Existing projects pass the feature

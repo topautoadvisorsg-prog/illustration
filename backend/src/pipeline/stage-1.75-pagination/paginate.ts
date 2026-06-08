@@ -98,9 +98,17 @@ function summarize(pages: PaginatedPage[], entryCount: number): PaginateProjectR
  */
 export function paginateProject(input: PaginateProjectInput): PaginateProjectResult {
   const trimSize = input.trimSize ?? input.config.trimSize;
-  const entryMeta = buildEntryMeta(input.entries);
-  const stream = entriesToStream(input.entries, { policy: input.policy });
-  const sequence = buildLayoutSequence(input.entries, input.config);
+  // CRITICAL: entries MUST be in book order (chapter, then page) before the
+  // stream is built. The manifest query has no ORDER BY, so callers pass them
+  // in Postgres-arbitrary order — which made compaction merge cross-chapter
+  // neighbours (e.g. a Ch2 loon onto a Ch8 bushcraft page) and could scramble
+  // the whole book. Sort here defensively so order never depends on the DB.
+  const entries = [...input.entries].sort(
+    (a, b) => a.chapterNumber - b.chapterNumber || a.pageNumber - b.pageNumber,
+  );
+  const entryMeta = buildEntryMeta(entries);
+  const stream = entriesToStream(entries, { policy: input.policy });
+  const sequence = buildLayoutSequence(entries, input.config);
 
   const flowResult = flowEngine(
     { stream, sequence, config: input.config, trimSize, policy: input.policy },

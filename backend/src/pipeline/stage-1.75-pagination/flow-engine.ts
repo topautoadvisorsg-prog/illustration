@@ -334,11 +334,18 @@ export function flowEngine(input: FlowEngineInput, entryMeta: EntryMetaMap): Flo
       // remains. Keeps pages visually legible — one image + bounded titles.
       const compactionCapReached =
         open !== null && open.entryKeysOnPage.length >= policy.maxEntriesPerCompactedPage;
+      // Chapter boundary: never compact an entry onto a page that belongs to a
+      // different chapter. A new chapter always starts a fresh page — otherwise
+      // two chapters share a page (the real defect: a Ch2 loon on a Ch8 page).
+      const crossesChapter =
+        open !== null
+        && entryMeta.get(token.entryKey)?.chapterNumber !== open.primaryChapterNumber;
       const needHard =
         open === null
         || token.breakBehavior === 'hard'
         || !softAllowed
         || compactionCapReached
+        || crossesChapter
         || linesRemaining(open) < policy.softBreakMinLinesRemaining;
 
       if (needHard) {
