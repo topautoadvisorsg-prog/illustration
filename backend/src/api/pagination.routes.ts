@@ -13,11 +13,13 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
   ApiErrorSchema,
+  LayoutApprovalSchema,
   LayoutTemplateIdSchema,
   PageManifestSchema,
   ProjectConfigSchema,
   type ProjectConfig,
 } from '@wildlands/shared';
+import { updateProjectConfig } from '../db/repositories/projects.repo.js';
 import { getEnv } from '../env.js';
 import { getProject } from '../db/repositories/projects.repo.js';
 import { listManifests } from '../db/repositories/manifests.repo.js';
@@ -200,6 +202,115 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
         summary: result.summary,
         warnings: result.warnings,
         pagesWritten,
+      };
+    },
+  );
+
+  // POST /api/projects/:id/chapters/:chapterNumber/approve-pagination-v1
+  // — Pagination v1's parallel approval path. The legacy
+  // /chapters/:n/layout-approval route iterates manifests and runs
+  // previewProjectTextFit, which assumes one manifest = one page row.
+  // Pagination v1 breaks that 1:1 assumption (continuations + compacted +
+  // illustration). Rather than modify the legacy gate (operator constraint:
+  // no legacy edits during v1 rollout), this route reads the paginated
+  // rows directly, verifies the Pagination v1 contract (every opener +
+  // compacted has previewApproved=true; every row has a sha256), and writes
+  // the same LayoutApproval shape into config.layoutApprovals so the existing
+  // Stage 3 image-spend gate (assertLayoutApprovedForImageSpend) accepts it.
+  const ChapterApprovalParamsSchema = z.object({
+    id: z.string().uuid(),
+    chapterNumber: z.coerce.number().int().positive(),
+  });
+  app.post(
+    '/api/projects/:id/chapters/:chapterNumber/approve-pagination-v1',
+    {
+      schema: {
+        params: ChapterApprovalParamsSchema,
+        response: { 404: ApiErrorSchema, 409: ApiErrorSchema, 503: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      if (!getEnv().PAGINATION_V1_ENABLED) {
+        return reply.code(503).send(flagDisabledResponse());
+      }
+      const { id, chapterNumber } = ChapterApprovalParamsSchema.parse(request.params);
+      const project = await getProject(id);
+      if (!project) {
+        return reply.code(404).send({ error: 'Not Found', message: 'Project not found.', statusCode: 404 });
+      }
+      const allRows = await listPaginatedPagesForProject(id);
+      const chapterRows = allRows.filter((p) => p.chapterNumber === chapterNumber);
+      if (chapterRows.length === 0) {
+        return reply.code(404).send({
+          error: 'Not Found',
+          message: `Chapter ${chapterNumber} has no paginated pages. Run Re-paginate Project first.`,
+          statusCode: 404,
+        });
+      }
+
+      // Contract check 1: every page must have a non-null imagePromptSha256.
+      // Real prompts on openers + Layout A illustration pages; the backfill
+      // route fills continuations with a safe placeholder.
+      const missingSha = chapterRows.filter((p) => !p.imagePromptSha256);
+      if (missingSha.length > 0) {
+        const sample = missingSha.slice(0, 3).map((p) => p.pageKey).join(', ');
+        return reply.code(409).send({
+          error: 'Conflict',
+          message: `Chapter ${chapterNumber}: ${missingSha.length} page(s) have no imagePromptSha256 (${sample}…). Run Page Plan + backfill-continuation-prompts first.`,
+          statusCode: 409,
+        });
+      }
+
+      // Contract check 2: every opener + compacted page must have an
+      // approved Reading-Field preview. Continuations inherit the opener's
+      // approval (the preview shows the opener's text flow).
+      const requiringApproval = chapterRows.filter((p) => p.pageRole === 'opener' || p.pageRole === 'compacted');
+      const unapproved = requiringApproval.filter((p) => !p.previewApproved);
+      if (unapproved.length > 0) {
+        const sample = unapproved.slice(0, 3).map((p) => p.pageKey).join(', ');
+        return reply.code(409).send({
+          error: 'Conflict',
+          message: `Chapter ${chapterNumber}: ${unapproved.length} opener/compacted page(s) await preview approval (${sample}…). Open each in Page Production and approve before chapter approval.`,
+          statusCode: 409,
+        });
+      }
+
+      // Synthesize textFitSummary from the persisted fitStatus. Pagination v1
+      // uses UNDERFILL; the legacy summary expects underfilled. Map both.
+      const textFitSummary = chapterRows.reduce(
+        (totals, p) => {
+          totals.pages += 1;
+          if (p.fitStatus === 'FITS') totals.fits += 1;
+          else if (p.fitStatus === 'TIGHT') totals.tight += 1;
+          else if (p.fitStatus === 'OVERFLOW') totals.overflow += 1;
+          else totals.underfilled += 1;
+          return totals;
+        },
+        { pages: 0, fits: 0, tight: 0, overflow: 0, underfilled: 0 },
+      );
+
+      const config = ProjectConfigSchema.parse(project.config);
+      const approval = LayoutApprovalSchema.parse({
+        status: 'APPROVED',
+        chapterNumber,
+        approvedAt: new Date().toISOString(),
+        approvedBy: 'operator',
+        pageKeys: chapterRows.map((p) => p.pageKey),
+        promptSha256ByPage: Object.fromEntries(chapterRows.map((p) => [p.pageKey, p.imagePromptSha256!])),
+        textFitSummary,
+      });
+      const layoutApprovals = {
+        ...(config.layoutApprovals ?? {}),
+        [String(chapterNumber)]: approval,
+      };
+      await updateProjectConfig(id, { ...config, layoutApprovals });
+
+      return {
+        chapterNumber,
+        pageCount: chapterRows.length,
+        approvedPreviewCount: requiringApproval.length,
+        skippedContinuationCount: chapterRows.length - requiringApproval.length,
+        approved: true,
       };
     },
   );
