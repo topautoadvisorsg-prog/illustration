@@ -140,6 +140,23 @@ const DEFAULT_LAYOUT_CAPACITY: Record<LayoutTemplateId, { minWords: number; targ
   LAYOUT_14_SIDEBAR_FEATURE: { minWords: 300, targetWords: 460, maxWords: 640 },
   LAYOUT_15_PROGRESSION_STUDY: { minWords: 220, targetWords: 340, maxWords: 500 },
   LAYOUT_16_CUTAWAY_FEATURE: { minWords: 180, targetWords: 300, maxWords: 440 },
+  // ─── Simplified families ──────────────────────────────────────────────
+  // Layout A — text page pulls full reading-area capacity (~text-heavy
+  // equivalent); the illustration page has no body text.
+  LAYOUT_A_TEXT: { minWords: 380, targetWords: 540, maxWords: 720 },
+  LAYOUT_A_ILLUSTRATION: { minWords: 0, targetWords: 0, maxWords: 30 },
+  // Layout B — 50/50 split gives roughly half a text-heavy page's capacity.
+  LAYOUT_B_IMAGE_TOP: { minWords: 200, targetWords: 280, maxWords: 380 },
+  LAYOUT_B_IMAGE_BOTTOM: { minWords: 200, targetWords: 280, maxWords: 380 },
+  LAYOUT_B_IMAGE_LEFT: { minWords: 200, targetWords: 280, maxWords: 380 },
+  LAYOUT_B_IMAGE_RIGHT: { minWords: 200, targetWords: 280, maxWords: 380 },
+  // Layout C — 75% of the page is text; capacity sits between standard and text-heavy.
+  LAYOUT_C_CORNER_TOP_LEFT: { minWords: 320, targetWords: 440, maxWords: 600 },
+  LAYOUT_C_CORNER_TOP_RIGHT: { minWords: 320, targetWords: 440, maxWords: 600 },
+  LAYOUT_C_CORNER_BOTTOM_LEFT: { minWords: 320, targetWords: 440, maxWords: 600 },
+  LAYOUT_C_CORNER_BOTTOM_RIGHT: { minWords: 320, targetWords: 440, maxWords: 600 },
+  // Layout D — pure text, full page available. Highest body capacity.
+  LAYOUT_D_PURE_TEXT: { minWords: 500, targetWords: 700, maxWords: 920 },
 };
 
 const REQUIRED_LAYOUT_TEMPLATES = Object.keys(DEFAULT_LAYOUT_CAPACITY) as LayoutTemplateId[];

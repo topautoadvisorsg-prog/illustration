@@ -29,7 +29,11 @@ export type ArtSlot =
   | 'FULL_PAGE'
   | 'SIDEBAR_RIGHT'
   | 'SCATTERED'
-  | 'CENTER_WRAP';
+  | 'CENTER_WRAP'
+  | 'CORNER_TOP_LEFT'
+  | 'CORNER_TOP_RIGHT'
+  | 'CORNER_BOTTOM_LEFT'
+  | 'CORNER_BOTTOM_RIGHT';
 
 export interface LayoutProfile {
   /** Fraction of the page available to body copy in the text-safe zone (0-1). */
@@ -59,6 +63,23 @@ export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
   LAYOUT_14_SIDEBAR_FEATURE: { textAreaFactor: 0.7, artSlot: 'SIDEBAR_RIGHT', artAreaFraction: 0.3, textLight: false },
   LAYOUT_15_PROGRESSION_STUDY: { textAreaFactor: 0.62, artSlot: 'TOP_BAND', artAreaFraction: 0.42, textLight: false },
   LAYOUT_16_CUTAWAY_FEATURE: { textAreaFactor: 0.6, artSlot: 'TOP_BAND', artAreaFraction: 0.44, textLight: false },
+  // ─── Simplified families (v1 production surface) ───────────────────────
+  // Layout A. Text page is essentially text-heavy with no image; the
+  // illustration page is full-bleed art with caption-only text.
+  LAYOUT_A_TEXT: { textAreaFactor: 0.95, artSlot: 'FLOAT_LEFT', artAreaFraction: 0.05, textLight: false },
+  LAYOUT_A_ILLUSTRATION: { textAreaFactor: 0.08, artSlot: 'FULL_PAGE', artAreaFraction: 0.96, textLight: true },
+  // Layout B — 50/50. Image and text each consume roughly half the page.
+  LAYOUT_B_IMAGE_TOP: { textAreaFactor: 0.5, artSlot: 'TOP_BAND', artAreaFraction: 0.5, textLight: false },
+  LAYOUT_B_IMAGE_BOTTOM: { textAreaFactor: 0.5, artSlot: 'BOTTOM_BAND', artAreaFraction: 0.5, textLight: false },
+  LAYOUT_B_IMAGE_LEFT: { textAreaFactor: 0.5, artSlot: 'FLOAT_LEFT', artAreaFraction: 0.5, textLight: false },
+  LAYOUT_B_IMAGE_RIGHT: { textAreaFactor: 0.5, artSlot: 'FLOAT_RIGHT', artAreaFraction: 0.5, textLight: false },
+  // Layout C — 25% corner support image. Text fills the remaining ~75%.
+  LAYOUT_C_CORNER_TOP_LEFT: { textAreaFactor: 0.75, artSlot: 'CORNER_TOP_LEFT', artAreaFraction: 0.25, textLight: false },
+  LAYOUT_C_CORNER_TOP_RIGHT: { textAreaFactor: 0.75, artSlot: 'CORNER_TOP_RIGHT', artAreaFraction: 0.25, textLight: false },
+  LAYOUT_C_CORNER_BOTTOM_LEFT: { textAreaFactor: 0.75, artSlot: 'CORNER_BOTTOM_LEFT', artAreaFraction: 0.25, textLight: false },
+  LAYOUT_C_CORNER_BOTTOM_RIGHT: { textAreaFactor: 0.75, artSlot: 'CORNER_BOTTOM_RIGHT', artAreaFraction: 0.25, textLight: false },
+  // Layout D — pure text / back matter (no illustration).
+  LAYOUT_D_PURE_TEXT: { textAreaFactor: 1.0, artSlot: 'FULL_PAGE', artAreaFraction: 0, textLight: false },
 };
 
 export function getLayoutProfile(template: LayoutTemplateId): LayoutProfile {
@@ -92,6 +113,10 @@ const ART_SLOT_LABELS: Record<ArtSlot, string> = {
   SIDEBAR_RIGHT: 'right sidebar',
   SCATTERED: 'scattered studies',
   CENTER_WRAP: 'center wrap',
+  CORNER_TOP_LEFT: 'top-left corner',
+  CORNER_TOP_RIGHT: 'top-right corner',
+  CORNER_BOTTOM_LEFT: 'bottom-left corner',
+  CORNER_BOTTOM_RIGHT: 'bottom-right corner',
 };
 
 /**

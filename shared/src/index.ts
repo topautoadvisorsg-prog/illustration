@@ -82,6 +82,9 @@ export const PrintFindingSeveritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'BLOC
 export const PrintFindingCategorySchema = z.enum(['MARGIN', 'TYPOGRAPHY', 'IMAGE_QUALITY', 'PAPER', 'COVER', 'KDP', 'COLOR', 'BINDING', 'OTHER']);
 export const CostOperationSchema = z.enum(['LLM', 'IMAGE_GENERATION', 'UPSCALE', 'PDF_RENDER', 'EPUB_EXPORT', 'STORAGE', 'OTHER']);
 export const LayoutTemplateIdSchema = z.enum([
+  // Legacy named templates — kept as latent infrastructure for advanced /
+  // operator-override flows. The simplified families below are the active
+  // production surface when LAYOUT_SIMPLIFIED_V1 is on.
   'LAYOUT_1_STANDARD',
   'LAYOUT_2_TEXT_HEAVY',
   'LAYOUT_3_ILLUSTRATION_DOMINANT',
@@ -98,6 +101,23 @@ export const LayoutTemplateIdSchema = z.enum([
   'LAYOUT_14_SIDEBAR_FEATURE',
   'LAYOUT_15_PROGRESSION_STUDY',
   'LAYOUT_16_CUTAWAY_FEATURE',
+  // ─── Simplified families (v1 production surface) ───────────────────────
+  // Layout A — Full Text + Full Illustration pair. Text page leads, the
+  // facing illustration page acts as the visual reward.
+  'LAYOUT_A_TEXT',
+  'LAYOUT_A_ILLUSTRATION',
+  // Layout B — 50/50 split. Four variants by image placement.
+  'LAYOUT_B_IMAGE_TOP',
+  'LAYOUT_B_IMAGE_BOTTOM',
+  'LAYOUT_B_IMAGE_LEFT',
+  'LAYOUT_B_IMAGE_RIGHT',
+  // Layout C — 25% support image in a page corner. Four corner variants.
+  'LAYOUT_C_CORNER_TOP_LEFT',
+  'LAYOUT_C_CORNER_TOP_RIGHT',
+  'LAYOUT_C_CORNER_BOTTOM_LEFT',
+  'LAYOUT_C_CORNER_BOTTOM_RIGHT',
+  // Layout D — pure text / back matter. No illustration.
+  'LAYOUT_D_PURE_TEXT',
 ]);
 
 // â”€â”€ Layered layout model (Phase 1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -129,6 +149,8 @@ export const ContentTypeSchema = z.enum([
 
 /** How MUCH of the page the imagery occupies (percent buckets). */
 export const CoverageSchema = z.union([
+  z.literal(0), // Layout D — pure text, no illustration
+  z.literal(5), // Layout A text page — minimal decoration only
   z.literal(15),
   z.literal(25),
   z.literal(40),
@@ -148,6 +170,11 @@ export const ArchitectureSchema = z.enum([
   'SIDEBAR_RIGHT',
   'SCATTERED',
   'CENTER_WRAP',
+  // Corner architectures for Layout C (25% support-image variants).
+  'CORNER_TOP_LEFT',
+  'CORNER_TOP_RIGHT',
+  'CORNER_BOTTOM_LEFT',
+  'CORNER_BOTTOM_RIGHT',
 ]);
 
 export type ContentType = z.infer<typeof ContentTypeSchema>;

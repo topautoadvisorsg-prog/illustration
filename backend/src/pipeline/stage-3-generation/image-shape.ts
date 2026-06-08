@@ -43,6 +43,11 @@ const SHAPE_BY_SLOT: Record<ArtSlot, ImageShape> = {
   SIDEBAR_RIGHT: 'portrait',
   SCATTERED: 'square',
   CENTER_WRAP: 'square',
+  // Layout C 25% corner variants are small square vignettes.
+  CORNER_TOP_LEFT: 'square',
+  CORNER_TOP_RIGHT: 'square',
+  CORNER_BOTTOM_LEFT: 'square',
+  CORNER_BOTTOM_RIGHT: 'square',
 };
 
 export const LAYOUT_IMAGE_SHAPES: Record<LayoutTemplateId, ImageShape> = {
@@ -62,6 +67,18 @@ export const LAYOUT_IMAGE_SHAPES: Record<LayoutTemplateId, ImageShape> = {
   LAYOUT_14_SIDEBAR_FEATURE: 'portrait',
   LAYOUT_15_PROGRESSION_STUDY: 'landscape',
   LAYOUT_16_CUTAWAY_FEATURE: 'landscape',
+  // ─── Simplified families ──────────────────────────────────────────────
+  LAYOUT_A_TEXT: 'square', // tiny decoration if any — shape mostly irrelevant
+  LAYOUT_A_ILLUSTRATION: 'portrait',
+  LAYOUT_B_IMAGE_TOP: 'landscape',
+  LAYOUT_B_IMAGE_BOTTOM: 'landscape',
+  LAYOUT_B_IMAGE_LEFT: 'portrait',
+  LAYOUT_B_IMAGE_RIGHT: 'portrait',
+  LAYOUT_C_CORNER_TOP_LEFT: 'square',
+  LAYOUT_C_CORNER_TOP_RIGHT: 'square',
+  LAYOUT_C_CORNER_BOTTOM_LEFT: 'square',
+  LAYOUT_C_CORNER_BOTTOM_RIGHT: 'square',
+  LAYOUT_D_PURE_TEXT: 'square', // no image — placeholder for the Record completeness
 };
 
 export function imageShapeForLayout(template: LayoutTemplateId): LayoutImageShape {

@@ -57,6 +57,13 @@ const EnvSchema = z.object({
   // Page Plan flow is unchanged. Flip to true ONLY after the full Stage 1.75 +
   // Stage 1.8 stack is shipped and end-to-end tested by the operator.
   PAGINATION_V1_ENABLED: z.coerce.boolean().default(false),
+
+  // Simplified layout families (Layouts A, B, C, D). When false (default), the
+  // planner picks from the 16 named templates as before. When true, the planner
+  // routes to the four simplified families instead, and the Layout A flow rule
+  // emits paired text + illustration pages. The 16 legacy templates remain in
+  // code as latent infrastructure either way.
+  LAYOUT_SIMPLIFIED_V1: z.coerce.boolean().default(false),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

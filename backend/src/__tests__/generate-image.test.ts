@@ -154,7 +154,7 @@ describe('assertLayoutApprovedForImageSpend', () => {
 });
 
 describe('layout-aware image shape mapping', () => {
-  it('defines a shape for every canonical layout template', () => {
+  it('defines a shape for every canonical layout template (legacy + simplified families)', () => {
     expect(Object.keys(LAYOUT_IMAGE_SHAPES).sort()).toEqual([
       'LAYOUT_10_FULL_PAGE_PLATE',
       'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD',
@@ -172,6 +172,17 @@ describe('layout-aware image shape mapping', () => {
       'LAYOUT_7_SCATTERED_VIGNETTES',
       'LAYOUT_8_MARGIN_ILLUSTRATION',
       'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
+      'LAYOUT_A_ILLUSTRATION',
+      'LAYOUT_A_TEXT',
+      'LAYOUT_B_IMAGE_BOTTOM',
+      'LAYOUT_B_IMAGE_LEFT',
+      'LAYOUT_B_IMAGE_RIGHT',
+      'LAYOUT_B_IMAGE_TOP',
+      'LAYOUT_C_CORNER_BOTTOM_LEFT',
+      'LAYOUT_C_CORNER_BOTTOM_RIGHT',
+      'LAYOUT_C_CORNER_TOP_LEFT',
+      'LAYOUT_C_CORNER_TOP_RIGHT',
+      'LAYOUT_D_PURE_TEXT',
     ]);
   });
 

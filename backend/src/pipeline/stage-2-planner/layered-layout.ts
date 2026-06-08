@@ -185,6 +185,20 @@ export const LAYOUT_TEMPLATE_COMPOSITION: Record<LayoutTemplateId, LayoutComposi
   LAYOUT_14_SIDEBAR_FEATURE: { contentType: 'SIDEBAR_FEATURE', coverage: 25, architecture: 'SIDEBAR_RIGHT' },
   LAYOUT_15_PROGRESSION_STUDY: { contentType: 'PROGRESSION_STUDY', coverage: 40, architecture: 'TOP_BAND' },
   LAYOUT_16_CUTAWAY_FEATURE: { contentType: 'CUTAWAY_ILLUSTRATION', coverage: 40, architecture: 'TOP_BAND' },
+  // ─── Simplified families (v1 production surface). Coverage / architecture
+  // are the canonical axes; the family-aware planner reads these to route to
+  // the right rendering pipeline. ───────────────────────────────────────
+  LAYOUT_A_TEXT: { contentType: 'ENCYCLOPEDIA_ENTRY', coverage: 5, architecture: 'FLOAT_LEFT' },
+  LAYOUT_A_ILLUSTRATION: { contentType: 'BOTANICAL_PLATE', coverage: 100, architecture: 'FULL_PAGE' },
+  LAYOUT_B_IMAGE_TOP: { contentType: 'HABITAT_OVERVIEW', coverage: 50, architecture: 'TOP_BAND' },
+  LAYOUT_B_IMAGE_BOTTOM: { contentType: 'HABITAT_OVERVIEW', coverage: 50, architecture: 'BOTTOM_BAND' },
+  LAYOUT_B_IMAGE_LEFT: { contentType: 'SPECIES_PROFILE', coverage: 50, architecture: 'FLOAT_LEFT' },
+  LAYOUT_B_IMAGE_RIGHT: { contentType: 'SPECIES_PROFILE', coverage: 50, architecture: 'FLOAT_RIGHT' },
+  LAYOUT_C_CORNER_TOP_LEFT: { contentType: 'SPECIES_PROFILE', coverage: 25, architecture: 'CORNER_TOP_LEFT' },
+  LAYOUT_C_CORNER_TOP_RIGHT: { contentType: 'SPECIES_PROFILE', coverage: 25, architecture: 'CORNER_TOP_RIGHT' },
+  LAYOUT_C_CORNER_BOTTOM_LEFT: { contentType: 'SPECIES_PROFILE', coverage: 25, architecture: 'CORNER_BOTTOM_LEFT' },
+  LAYOUT_C_CORNER_BOTTOM_RIGHT: { contentType: 'SPECIES_PROFILE', coverage: 25, architecture: 'CORNER_BOTTOM_RIGHT' },
+  LAYOUT_D_PURE_TEXT: { contentType: 'REFERENCE_PAGE', coverage: 0, architecture: 'FULL_PAGE' },
 };
 
 export function decomposeTemplate(template: LayoutTemplateId): LayoutComposition {

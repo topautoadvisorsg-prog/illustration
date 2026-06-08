@@ -16,6 +16,8 @@
 
 import type { ContentType, LayoutTemplateId, PageManifest, ProjectConfig } from '@wildlands/shared';
 import { isDangerPage } from '../stage-2-planner/content-signals.js';
+import { chooseSimplifiedLayout } from '../stage-2-planner/layout-families.js';
+import { getEnv } from '../../env.js';
 import { countWords } from '../shared/markdown-text.js';
 
 /** v1 continuation/reading layout. SPEC §5.6 notes a future LAYOUT_17_CONTINUATION. */
@@ -35,6 +37,13 @@ export function preferredOpenerLayout(
   entry: PageManifest,
   config: ProjectConfig,
 ): LayoutTemplateId {
+  // Simplified families take precedence when the flag is on. Falls back to
+  // the 16-template content-type table below otherwise. The danger override
+  // lives inside chooseSimplifiedLayout itself for the simplified path.
+  if (getEnv().LAYOUT_SIMPLIFIED_V1) {
+    return chooseSimplifiedLayout(entry, config).template;
+  }
+
   // Danger override — highest priority, same as the planner.
   if (isDangerPage(entry)) return 'LAYOUT_4_DANGER_WARNING';
 
