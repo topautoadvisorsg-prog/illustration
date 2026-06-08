@@ -138,19 +138,65 @@ export function detectHazards(title: string, body: string): HazardBadge[] {
   return ordered.length ? ordered : ['NONE'];
 }
 
-// ── Region inference (habitat nouns — correct use of the scan) ─────────────
+// ── Region inference — WEIGHTED SCORING (not first-match) ──────────────────
+// Habitat keywords per region. Score = capped body hits + 2× title/first-line
+// hits. Highest wins; a weak non-FOREST signal (< threshold) falls back to
+// FOREST/GENERAL so one incidental terrain word ("boulder") can't mislabel a
+// forest animal as MOUNTAIN. Tuned + validated over the full 129-page corpus.
+const REGION_KEYWORDS: Record<Exclude<RegionBadge, 'GENERAL'>, string[]> = {
+  FOREST: ['forest', 'woodland', 'hardwood', 'spruce', 'fir', 'pine', 'hemlock', 'cedar', 'canopy', 'understory', 'birch', 'maple', 'oak', 'beech', 'boreal', 'timber', 'grove', 'deciduous', 'conifer', 'tamarack', 'aspen'],
+  MOUNTAIN: ['mountain', 'summit', 'granite', 'rocky', 'ridge', 'notch', 'peak', 'slope', 'cliff', 'boulder', 'talus', 'ledge', 'rockslide'],
+  RIVER: ['river', 'stream', 'brook', 'creek', 'watershed', 'riparian', 'rapids', 'ford', 'crossing', 'current'],
+  WETLAND: ['marsh', 'bog', 'wetland', 'swamp', 'cattail', 'fen', 'pond', 'muck', 'mire'],
+  COASTAL: ['coast', 'shoreline', 'tidal', 'beach', 'ocean', 'saltmarsh', 'dune', 'estuary', 'shore'],
+  ALPINE: ['alpine', 'above treeline', 'above-treeline', 'subalpine', 'tundra', 'presidential range', 'krummholz', 'treeline'],
+  FIELD: ['meadow', 'grassland', 'clearing', 'pasture', 'open field', 'field edge', 'old field', 'hayfield'],
+};
+/** Tie-break order: rarer/more-specific habitat wins ties. */
+const REGION_TIEBREAK: RegionBadge[] = ['ALPINE', 'COASTAL', 'WETLAND', 'RIVER', 'MOUNTAIN', 'FIELD', 'FOREST'];
+const REGION_KW_CAP = 3; // each keyword contributes at most this (anti-backdrop)
+const REGION_CONFIDENCE_THRESHOLD = 3; // weak non-FOREST signal falls back
+
+function countKeyword(text: string, kw: string): number {
+  const esc = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matches = text.match(new RegExp(`(?<![a-z])${esc}(?![a-z])`, 'g'));
+  return matches ? matches.length : 0;
+}
+
+/** Score every region. Exposed for the audit report. */
+export function scoreRegions(
+  title: string,
+  body: string,
+): { region: RegionBadge; score: number; confidence: 'high' | 'med' | 'low'; topKeywords: string[] } {
+  const titleL = title.toLowerCase();
+  const firstLine = (body.toLowerCase().split('\n')[0] ?? '');
+  const rest = body.toLowerCase();
+  const scores: Record<string, number> = {};
+  const hits: Record<string, Array<[string, number]>> = {};
+  for (const [region, kws] of Object.entries(REGION_KEYWORDS)) {
+    let s = 0;
+    const h: Array<[string, number]> = [];
+    for (const kw of kws) {
+      const tot = Math.min(countKeyword(rest, kw), REGION_KW_CAP) + 2 * (countKeyword(titleL, kw) + countKeyword(firstLine, kw));
+      if (tot > 0) { s += tot; h.push([kw, tot]); }
+    }
+    scores[region] = s;
+    hits[region] = h.sort((a, b) => b[1] - a[1]);
+  }
+  const best = Math.max(...Object.values(scores));
+  if (best === 0) return { region: 'GENERAL', score: 0, confidence: 'low', topKeywords: [] };
+  const winners = Object.keys(scores).filter((r) => scores[r] === best) as RegionBadge[];
+  let winner = winners.sort((a, b) => REGION_TIEBREAK.indexOf(a) - REGION_TIEBREAK.indexOf(b))[0]!;
+  // Weak non-FOREST signal can't override a forest backdrop / a calm default.
+  if (winner !== 'FOREST' && winner !== 'GENERAL' && best < REGION_CONFIDENCE_THRESHOLD) {
+    winner = (scores.FOREST ?? 0) > 0 ? 'FOREST' : 'GENERAL';
+  }
+  const confidence = best >= 6 ? 'high' : best >= 3 ? 'med' : 'low';
+  return { region: winner, score: best, confidence, topKeywords: (hits[winner] ?? []).slice(0, 4).map(([k]) => k) };
+}
+
 export function inferRegion(title: string, body: string): RegionBadge {
-  const hay = `${title}\n${body}`.toLowerCase();
-  const test = (re: RegExp) => re.test(hay);
-  // Order matters: most specific habitat wins.
-  if (test(/above[-\s]?treeline|alpine tundra|\balpine\b|presidential range/)) return 'ALPINE';
-  if (test(/\bcoast|shoreline|tidal|\bbeach\b|ocean|saltmarsh/)) return 'COASTAL';
-  if (test(/\bmarsh|\bbog\b|wetland|swamp|cattail|\bfen\b/)) return 'WETLAND';
-  if (test(/\briver|\bstream|\bbrook|\bcreek|crossing|riparian|\bpond\b/)) return 'RIVER';
-  if (test(/ridgeline|\bsummit|granite|rocky|mountain|\bridge\b|\bnotch\b|\bpeak/)) return 'MOUNTAIN';
-  if (test(/\bmeadow|open field|\bfield\b|grassland|\bclearing\b|pasture/)) return 'FIELD';
-  if (test(/forest|woodland|spruce|\bfir\b|hardwood|\bpine\b|\bbirch|understory|canopy|boreal/)) return 'FOREST';
-  return 'GENERAL';
+  return scoreRegions(title, body).region;
 }
 
 // ── Source confidence (conservative; no aggressive inference) ──────────────

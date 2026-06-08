@@ -37,6 +37,9 @@ export async function registerSubjectBadgeRoutes(app: FastifyInstance): Promise<
     const regionCounts: Record<string, number> = {};
     const sourceCounts: Record<string, number> = {};
     const examples: Array<Record<string, unknown>> = [];
+    // Region audit: old (current manifest) vs new (recomputed) distribution + changes.
+    const oldRegionCounts: Record<string, number> = {};
+    const regionChanges: Array<{ pageId: string; from: string; to: string; title: string }> = [];
 
     for (const row of rows) {
       const content = row.content as Record<string, unknown>;
@@ -53,6 +56,18 @@ export async function registerSubjectBadgeRoutes(app: FastifyInstance): Promise<
       for (const h of meta.hazard) hazardCounts[h] = (hazardCounts[h] ?? 0) + 1;
       regionCounts[meta.region] = (regionCounts[meta.region] ?? 0) + 1;
       sourceCounts[meta.sourceConfidence] = (sourceCounts[meta.sourceConfidence] ?? 0) + 1;
+
+      // Region audit — compare the current persisted region to the recomputed one.
+      const oldRegion = typeof content.region === 'string' ? content.region : '(none)';
+      oldRegionCounts[oldRegion] = (oldRegionCounts[oldRegion] ?? 0) + 1;
+      if (oldRegion !== meta.region) {
+        regionChanges.push({
+          pageId,
+          from: oldRegion,
+          to: meta.region,
+          title: String(content.entryTitle ?? ''),
+        });
+      }
 
       // Did the subject actually change (cleaned)?
       if (meta.cleanSubject !== beforeSubject) cleaned += 1;
@@ -96,6 +111,12 @@ export async function registerSubjectBadgeRoutes(app: FastifyInstance): Promise<
       regionCounts,
       sourceCounts,
       examples,
+      regionAudit: {
+        oldRegionCounts,
+        newRegionCounts: regionCounts,
+        changed: regionChanges.length,
+        changes: regionChanges,
+      },
     };
   });
 }

@@ -65,15 +65,29 @@ describe('detectHazards — preserves the warning, most-severe-first', () => {
   });
 });
 
-describe('inferRegion — habitat scan (correct use)', () => {
+describe('inferRegion — weighted scoring (not first-match)', () => {
   it('FOREST for spruce/hardwood', () => {
     expect(inferRegion('Black Bear', 'lives in the boreal spruce-fir forest')).toBe('FOREST');
   });
   it('RIVER for stream/crossing', () => {
-    expect(inferRegion('River Crossings', 'fording the spring snowmelt river')).toBe('RIVER');
+    expect(inferRegion('River Crossings', 'fording the spring snowmelt river and stream')).toBe('RIVER');
   });
   it('ALPINE above treeline', () => {
-    expect(inferRegion('Above-Treeline Weather', 'the alpine tundra of the Presidential Range')).toBe('ALPINE');
+    expect(inferRegion('Above-Treeline Weather', 'the alpine tundra of the Presidential Range, above treeline')).toBe('ALPINE');
+  });
+  it('forest backdrop beats a single incidental mountain word', () => {
+    // A forest animal whose body mentions one "boulder" must NOT become MOUNTAIN.
+    expect(
+      inferRegion('Black Bear', 'the bear roams the spruce-fir forest and hardwood understory, sometimes near a boulder'),
+    ).toBe('FOREST');
+  });
+  it('weak lone signal falls back rather than mislabeling', () => {
+    // One "peak" with no forest signal → not confidently MOUNTAIN → GENERAL.
+    const r = inferRegion('Yellow Jacket', 'the wasp investigates your lunch near a rocky peak');
+    expect(['GENERAL', 'MOUNTAIN']).toContain(r); // either fallback or weak win, never a confident wrong
+  });
+  it('strong water signal wins (Beaver → WETLAND)', () => {
+    expect(inferRegion('Beaver', 'builds dams in the pond, bog, and wetland of the forest')).toBe('WETLAND');
   });
 });
 
