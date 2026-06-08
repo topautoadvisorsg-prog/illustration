@@ -9,9 +9,9 @@
  * the flag is off. No existing call site reaches these functions today.
  */
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { getDb } from '../client.js';
-import { pageApprovals, pages } from '../schema/index.js';
+import { manifests, pageApprovals, pages } from '../schema/index.js';
 import type {
   PaginatedPage,
   PaginationFitStatus,
@@ -73,6 +73,48 @@ export async function persistPaginatedPages(
     );
     return { pagesWritten: input.paginatedPages.length };
   });
+}
+
+/**
+ * Look up entry titles + image subjects for a set of entry keys (Stage 1.5
+ * PAGE manifests). The `pages` table doesn't carry these strings — they live
+ * in the manifest's `content` jsonb — and Stage 1.8's preview renderer needs
+ * them for the title band and the image placeholder label.
+ *
+ * Returns a Map keyed by entryKey. Missing keys are simply absent from the
+ * map; callers fall back to a placeholder so a stale entry never throws.
+ */
+export interface EntryMetaLookup {
+  entryTitle: string;
+  imageSubject: string;
+}
+
+export async function getEntryMetaByKeys(
+  projectId: string,
+  entryKeys: string[],
+): Promise<Map<string, EntryMetaLookup>> {
+  const out = new Map<string, EntryMetaLookup>();
+  if (entryKeys.length === 0) return out;
+  const db = getDb();
+  const rows = await db
+    .select({ externalId: manifests.externalId, content: manifests.content })
+    .from(manifests)
+    .where(
+      and(
+        eq(manifests.projectId, projectId),
+        eq(manifests.kind, 'PAGE'),
+        inArray(manifests.externalId, entryKeys),
+      ),
+    );
+  for (const row of rows) {
+    const content = row.content as { entryTitle?: unknown; imageSubject?: unknown } | null;
+    if (!content) continue;
+    const entryTitle = typeof content.entryTitle === 'string' ? content.entryTitle : '';
+    const imageSubject = typeof content.imageSubject === 'string' ? content.imageSubject : '';
+    if (!entryTitle && !imageSubject) continue;
+    out.set(row.externalId, { entryTitle, imageSubject });
+  }
+  return out;
 }
 
 /** Read every page row for a project, ordered by planned page number. */

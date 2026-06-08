@@ -11,17 +11,25 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { ApiErrorSchema, PageManifestSchema } from '@wildlands/shared';
+import {
+  ApiErrorSchema,
+  LayoutTemplateIdSchema,
+  PageManifestSchema,
+  ProjectConfigSchema,
+  type ProjectConfig,
+} from '@wildlands/shared';
 import { getEnv } from '../env.js';
 import { getProject } from '../db/repositories/projects.repo.js';
 import { listManifests } from '../db/repositories/manifests.repo.js';
 import {
   countApprovedPages,
+  getEntryMetaByKeys,
   getPaginatedPageById,
   getPaginationReport,
   listPaginatedPagesForProject,
   persistPaginatedPages,
   recordPageApproval,
+  type EntryMetaLookup,
   type PageRow,
 } from '../db/repositories/pagination.repo.js';
 import { paginateProject } from '../pipeline/stage-1.75-pagination/paginate.js';
@@ -39,8 +47,6 @@ import {
   writePreviewToCache,
 } from '../pipeline/stage-1.8-preview/preview-cache.js';
 import { isChromiumAvailable } from '../pipeline/stage-6-layout/render-pdf.js';
-import type { ProjectRow } from '../db/repositories/projects.repo.js';
-import type { LayoutTemplateId } from '@wildlands/shared';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
@@ -58,27 +64,37 @@ function flagDisabledResponse() {
   };
 }
 
-function reconstructPaginatedPage(row: PageRow, projectConfig: ProjectRow): PaginatedPage {
-  // The `zones` field isn't persisted (it's a derived view of the layout
-  // director). Recompute from the persisted text + layout so renders match.
-  const config = projectConfig.config as Record<string, unknown>;
-  const geometry = computePageGeometry((config.trimSize as never));
-  const typography = config.typography as { bodyPt: number; lineHeight: number };
+/**
+ * Reconstruct a `PaginatedPage` from a `pages` row + the project's config +
+ * a pre-fetched entry-meta lookup. Pure — no I/O — so the caller batches
+ * meta fetches.
+ *
+ * The `zones` field isn't persisted (it's a derived view of the layout
+ * director). We recompute from the persisted text + layout so the preview
+ * always matches the live geometry.
+ */
+function reconstructPaginatedPage(
+  row: PageRow,
+  config: ProjectConfig,
+  entryMeta: Map<string, EntryMetaLookup>,
+): PaginatedPage {
+  const geometry = computePageGeometry(config.trimSize);
+  const layoutTemplate = LayoutTemplateIdSchema.catch('LAYOUT_1_STANDARD').parse(row.layoutTemplate);
   const zones = directLayout({
     bodyMarkdown: row.readingFieldText ?? '',
-    layoutTemplate: (row.layoutTemplate ?? 'LAYOUT_1_STANDARD') as LayoutTemplateId,
+    layoutTemplate,
     geometry,
-    bodyPt: typography.bodyPt,
-    lineHeight: typography.lineHeight,
+    bodyPt: config.typography.bodyPt,
+    lineHeight: config.typography.lineHeight,
   });
+  const primaryEntryKey = row.entryKey ?? row.pageKey;
+  const primary = entryMeta.get(primaryEntryKey);
+  // Compacted pages: surface the primary entry's image subject only — the
+  // first entry on a compacted page drives the illustration, per SPEC §5.5.
   return {
     plannedPageNumber: row.plannedPageNumber,
-    entryKey: row.entryKey ?? row.pageKey,
-    // The pages table doesn't store entryTitle directly; we recover it from
-    // the PAGE manifest if needed at the call site. For the preview we don't
-    // strictly need it — pass a placeholder; the HTML builder will use it for
-    // the title band. Callers who need the real title can look it up.
-    entryTitle: 'page',
+    entryKey: primaryEntryKey,
+    entryTitle: primary?.entryTitle || row.pageKey,
     pageKey: row.pageKey,
     chapterNumber: row.chapterNumber,
     partN: row.partN,
@@ -86,8 +102,8 @@ function reconstructPaginatedPage(row: PageRow, projectConfig: ProjectRow): Pagi
     pageRole: row.pageRole as PageRole,
     carriesSubject: row.carriesSubject,
     compactedEntryKeys: (row.compactedEntryKeys as string[] | null) ?? null,
-    imageSubject: null,
-    layoutTemplate: (row.layoutTemplate ?? 'LAYOUT_1_STANDARD') as LayoutTemplateId,
+    imageSubject: row.carriesSubject ? (primary?.imageSubject ?? null) : null,
+    layoutTemplate,
     readingFieldText: row.readingFieldText ?? '',
     readingFieldChars: row.readingFieldChars ?? 0,
     readingFieldWords: row.readingFieldWords ?? 0,
@@ -95,6 +111,18 @@ function reconstructPaginatedPage(row: PageRow, projectConfig: ProjectRow): Pagi
     zones,
     warnings: [],
   };
+}
+
+/** Collect every entry-key we need meta for, including secondary entries on
+ *  compacted pages so the preview renderer can label them properly. */
+function collectEntryKeys(rows: PageRow[]): string[] {
+  const set = new Set<string>();
+  for (const row of rows) {
+    if (row.entryKey) set.add(row.entryKey);
+    const compacted = row.compactedEntryKeys as string[] | null;
+    if (compacted) for (const key of compacted) set.add(key);
+  }
+  return Array.from(set);
 }
 
 export async function registerPaginationRoutes(app: FastifyInstance): Promise<void> {
@@ -161,7 +189,7 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
         });
       }
       const entries = manifestRows.map((row) => PageManifestSchema.parse(row.content));
-      const config = (project.config as Record<string, unknown>) as never;
+      const config = ProjectConfigSchema.parse(project.config);
       const result = paginateProject({ entries, config });
       const { pagesWritten } = await persistPaginatedPages({
         projectId: id,
@@ -194,7 +222,13 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
 
   // GET /api/pages/:pageId/preview — return a single-page PDF for the Reading
   // Field preview. Reads from cache or renders fresh and writes to cache.
-  app.get('/api/pages/:pageId/preview', async (request, reply) => {
+  // No response schema: the payload is a PDF buffer, which the frontend
+  // fetches via callPdf (treating the response body as a blob). Error bodies
+  // fall through to the global error handler.
+  app.get(
+    '/api/pages/:pageId/preview',
+    { schema: { params: PageParamsSchema, response: { 404: ApiErrorSchema, 503: ApiErrorSchema } } },
+    async (request, reply) => {
     if (!getEnv().PAGINATION_V1_ENABLED) {
       return reply.code(503).send(flagDisabledResponse());
     }
@@ -207,8 +241,10 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
     if (!project) {
       return reply.code(404).send({ error: 'Not Found', message: 'Project not found.', statusCode: 404 });
     }
-    const paginated = reconstructPaginatedPage(row, project);
-    const config = project.config as never;
+    const config = ProjectConfigSchema.parse(project.config);
+    const entryKeys = collectEntryKeys([row]);
+    const entryMeta = await getEntryMetaByKeys(row.projectId, entryKeys);
+    const paginated = reconstructPaginatedPage(row, config, entryMeta);
     const key = previewCacheKey({ page: paginated, config });
     const cached = await readPreviewFromCache(key);
     if (cached) {
