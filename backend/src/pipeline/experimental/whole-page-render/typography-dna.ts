@@ -15,21 +15,27 @@
 import type { TypographyDNA } from './types.js';
 
 export const EXPERIMENT_TYPOGRAPHY_DNA: TypographyDNA = {
-  identity: 'vintage_naturalist_collector_edition',
-  bodyFamily: 'Caslon-class serif (Adobe Caslon, Goudy Old Style, or close equivalent)',
-  bodyPt: 12,
-  bodyLineHeight: 1.45,
-  bodyMeasureChars: 65,
-  titleFamily: 'Matching serif, full small-caps capitals, refined letter-spacing',
+  identity:
+    'museum-grade collector edition, vintage natural-history monograph — letterpress feel, deep printed ink texture, fine paper grain visible under the type',
+  bodyFamily:
+    'Old-style serif in the Caslon / Goudy Old Style / Adobe Garamond family — generous x-height, bracketed serifs, dark printed ink (warm near-black, never pure black), subtle letterpress impression',
+  bodyPt: 13,
+  bodyLineHeight: 1.5,
+  bodyMeasureChars: 70,
+  titleFamily:
+    'Engraved roman caps with refined letter-spacing — confident hierarchy: small refined "CHAPTER" kicker (tracked small-caps, hairline rule on either side), oversized Roman numeral as the dominant glyph, and a full-width title in stately serif caps. Title color is the same warm printed ink as the body, never a brand color.',
   titleHierarchy: ['CHAPTER', 'I', 'THE WILD LAND'],
   ornaments: [
-    'botanical_rule_top_with_pinecone_motif',
-    'botanical_rule_bottom_with_pinecone_motif',
+    'engraved botanical swag at the top: pine branches with cones, oak leaves with acorns, ferns — symmetrical, centered medallion with a single pinecone, fine line-engraving in warm sepia ink',
+    'matching engraved botanical swag at the bottom: mirrors the top, slightly slimmer, centered pinecone medallion',
+    'hairline decorative rules flanking the CHAPTER kicker and the title name — thin, elegant, period-correct',
+    'subtle paper-grain and gentle vignette around the page edges — collector-edition finish, never a digital drop-shadow',
   ],
-  decorativeInitial: 'illuminated_drop_cap',
+  decorativeInitial:
+    'illuminated drop-cap on the first letter of the body — engraved botanical surround (leaves, vines, a small pinecone), warm sepia ink, ~3 lines tall, refined and restrained, never cartoonish',
   noModernUi: true,
   noInfographic: true,
 };
 
 /** Percentage the experimental reading measure is wider than production. */
-export const EXPERIMENT_READING_FIELD_WIDENING_PCT = 15;
+export const EXPERIMENT_READING_FIELD_WIDENING_PCT = 20;
