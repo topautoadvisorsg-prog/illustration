@@ -16,12 +16,14 @@
  *   8. Hard constraints
  */
 
+import { PALETTE, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
 import type { WholePageSpec } from './types.js';
 
 const HEADER = [
-  'You are rendering a complete, FINISHED, publishable collector-edition book page.',
+  `You are rendering a complete, FINISHED, publishable collector-edition book page under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version}.`,
   'The target quality is a museum-grade, vintage natural-history monograph — the kind of page that ships in a hardcover boxed edition.',
   'This is NOT an illustration with text dropped on top. This is a single, integrated, designed page where the typography, ornamentation, and illustration belong to the same composition.',
+  `The page paper is parchment ${PALETTE.parchment.hex}. All typography ink is warm sepia ${PALETTE.ink.hex} — never pure black, never colored. Forest badges use ${PALETTE.forestGreen.hex}. Mountain badges use ${PALETTE.mountainOchre.hex}. These are not suggestions — they are house standards locked across every page in the series.`,
   'The specification below is authoritative. Render the page exactly as specified. Do not invent text. Do not rearrange the layout. Do not substitute words. The body text is provided verbatim and must appear on the page exactly as supplied.',
 ].join(' ');
 

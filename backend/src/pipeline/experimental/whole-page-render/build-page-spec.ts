@@ -14,6 +14,7 @@ import type { PageRow } from '../../../db/repositories/pagination.repo.js';
 import type { LayoutAllocation, PlanningZone } from '../../stage-6-layout/layout-director.js';
 import type { PageGeometry } from '../../stage-6-layout/page-geometry.js';
 import { deriveSubjectPackage } from '../../stage-2-planner/plan-pages.js';
+import { BADGES, toRoman, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
 import {
   EXPERIMENT_READING_FIELD_WIDENING_PCT,
   EXPERIMENT_TYPOGRAPHY_DNA,
@@ -72,40 +73,27 @@ function inferPageType(layout: LayoutTemplateId, pageRow: PageRow): WholePageSpe
  * botanical pinecone rules + Forest/Mountain badges; we hand the same to the
  * image model. Other pages get bottom rule only.
  */
+/**
+ * Decorative elements per the Wild Lands Publishing Standard. Family is
+ * always Botanical Pinecone (`WILDLANDS_STANDARD.ornaments.family`). Badges
+ * are pulled from the locked badge catalog — no inline strings.
+ */
 function buildDecorativeElements(pageType: WholePageSpec['pageType']): DecorativeElementsDTO {
   if (pageType === 'CHAPTER_OPENER') {
     return {
-      topRule: { kind: 'botanical_pinecone_swag', position: 'above_illustration' },
-      bottomRule: { kind: 'botanical_pinecone_swag', position: 'below_body' },
+      topRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':top_swag', position: 'above_illustration' },
+      bottomRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':bottom_swag', position: 'below_body' },
       badges: [
-        { label: 'FOREST', icon: 'evergreen_tree', ring: 'forest_green' },
-        { label: 'MOUNTAIN', icon: 'mountain_peaks', ring: 'ochre' },
+        { label: BADGES.FOREST.label,   icon: BADGES.FOREST.icon,   ring: BADGES.FOREST.ringColorHex },
+        { label: BADGES.MOUNTAIN.label, icon: BADGES.MOUNTAIN.icon, ring: BADGES.MOUNTAIN.ringColorHex },
       ],
     };
   }
   return {
     topRule: null,
-    bottomRule: { kind: 'botanical_pinecone_swag', position: 'below_body' },
+    bottomRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':bottom_swag', position: 'below_body' },
     badges: [],
   };
-}
-
-function extractChapterRoman(chapterNumber: number): string {
-  // Lightweight Roman numeral converter — chapter numbers stay <= 100 for any
-  // realistic book; this is intentionally simple.
-  const map: Array<[number, string]> = [
-    [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
-    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
-  ];
-  let n = chapterNumber;
-  let out = '';
-  for (const [val, sym] of map) {
-    while (n >= val) {
-      out += sym;
-      n -= val;
-    }
-  }
-  return out || String(chapterNumber);
 }
 
 export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
@@ -166,7 +154,7 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
       // For non-chapter-openers we don't enforce a fixed title hierarchy.
       titleHierarchy:
         pageType === 'CHAPTER_OPENER'
-          ? ['CHAPTER', extractChapterRoman(pageRow.chapterNumber), entryTitle.toUpperCase()]
+          ? ['CHAPTER', toRoman(pageRow.chapterNumber), entryTitle.toUpperCase()]
           : [],
     },
     illustrationDNA: {
@@ -178,7 +166,7 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
         pageType === 'CHAPTER_OPENER'
           ? {
               kicker: 'CHAPTER',
-              number: extractChapterRoman(pageRow.chapterNumber),
+              number: toRoman(pageRow.chapterNumber),
               name: entryTitle.toUpperCase(),
             }
           : { kicker: '', number: '', name: '' },
