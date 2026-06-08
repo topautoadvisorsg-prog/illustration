@@ -16,6 +16,7 @@ import type { PageGeometry } from '../../stage-6-layout/page-geometry.js';
 import { deriveSubjectPackage } from '../../stage-2-planner/plan-pages.js';
 import { assembleIllustrationDna, toRoman, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
 import { stripReadingFieldMetadata } from '../../subject-badges/extract-badges.js';
+import { markdownToBlocks, blocksToPlainText } from './markdown-blocks.js';
 import {
   EXPERIMENT_READING_FIELD_WIDENING_PCT,
   EXPERIMENT_TYPOGRAPHY_DNA,
@@ -133,9 +134,12 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
   };
   const subjectPackage = deriveSubjectPackage(fauxManifest);
 
+  // Strip the metadata header, then parse markdown → typed plain-text blocks.
+  const bodyBlocks = markdownToBlocks(stripReadingFieldMetadata(pageRow.readingFieldText ?? ''));
+
   const dropCap =
-    pageType === 'CHAPTER_OPENER' && pageRow.readingFieldText
-      ? pageRow.readingFieldText.trim().charAt(0).toUpperCase() || null
+    pageType === 'CHAPTER_OPENER' && bodyBlocks.length > 0
+      ? (bodyBlocks.find((b) => b.type === 'paragraph')?.text.charAt(0).toUpperCase() ?? null) || null
       : null;
 
   return {
@@ -177,9 +181,11 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
               name: entryTitle.toUpperCase(),
             }
           : { kicker: '', number: '', name: '' },
-      // Strip the manuscript metadata header (binomial + hazard markers) — it
-      // lives in cleanSubject + badges, never in the rendered prose.
-      body: stripReadingFieldMetadata(pageRow.readingFieldText ?? ''),
+      // Strip the manuscript metadata header (binomial + hazard markers), then
+      // parse markdown into typed plain-text blocks — the model never sees a
+      // markdown character (no `###`/`**` can bleed onto the page).
+      body: blocksToPlainText(bodyBlocks),
+      bodyBlocks,
       dropCap,
     },
     decorativeElements: buildDecorativeElements(pageType),
