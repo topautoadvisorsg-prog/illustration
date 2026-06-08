@@ -32,6 +32,7 @@ export interface BuildPageSpecInput {
   allocation: LayoutAllocation;
   entryTitle: string;
   imageSubject: string;
+  badgeContext?: { hazard: string[]; region: string; source: string };
 }
 
 /** Pick the largest text-safe zone — the actual reading field for this layout. */
@@ -82,8 +83,8 @@ function buildDecorativeElements(pageType: WholePageSpec['pageType']): Decorativ
       topRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':top_swag', position: 'above_illustration' },
       bottomRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':bottom_swag', position: 'below_body' },
       badges: [
-        { label: BADGES.FOREST.label,   icon: BADGES.FOREST.icon,   ring: BADGES.FOREST.ringColorHex },
-        { label: BADGES.MOUNTAIN.label, icon: BADGES.MOUNTAIN.icon, ring: BADGES.MOUNTAIN.ringColorHex },
+        { label: BADGES.FOREST.label,   icon: BADGES.FOREST.icon,   ring: BADGES.FOREST.colorHex },
+        { label: BADGES.MOUNTAIN.label, icon: BADGES.MOUNTAIN.icon, ring: BADGES.MOUNTAIN.colorHex },
       ],
     };
   }
@@ -172,5 +173,6 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
       dropCap,
     },
     decorativeElements: buildDecorativeElements(pageType),
+    badgeContext: input.badgeContext ?? { hazard: ['NONE'], region: 'GENERAL', source: 'GENERAL_REFERENCE' },
   };
 }

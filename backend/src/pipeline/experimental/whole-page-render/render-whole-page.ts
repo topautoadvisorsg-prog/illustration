@@ -86,7 +86,13 @@ async function prepareRender(pageId: string): Promise<PreparedRender> {
   const entryMeta = await getEntryMetaByKeys(pageRow.projectId, [entryKey]);
   const meta = entryMeta.get(entryKey);
   const entryTitle = meta?.entryTitle || pageRow.pageKey;
-  const imageSubject = meta?.imageSubject || entryTitle;
+  // Standard v1.1: prefer the clean subject. Warnings live in badges, never here.
+  const imageSubject = meta?.cleanSubject || meta?.imageSubject || entryTitle;
+  const badgeContext = {
+    hazard: meta?.hazard ?? [],
+    region: meta?.region ?? 'GENERAL',
+    source: meta?.sourceConfidence ?? 'GENERAL_REFERENCE',
+  };
 
   const geometry = computePageGeometry(config.trimSize);
   const allocation = directLayout({
@@ -97,7 +103,7 @@ async function prepareRender(pageId: string): Promise<PreparedRender> {
     lineHeight: config.typography.lineHeight,
   });
 
-  const spec = buildPageSpec({ pageRow, config, geometry, allocation, entryTitle, imageSubject });
+  const spec = buildPageSpec({ pageRow, config, geometry, allocation, entryTitle, imageSubject, badgeContext });
   const assembledPrompt = assembleExperimentPrompt(spec);
   const size = pickSize(geometry.trimWidthIn, geometry.trimHeightIn);
   return {

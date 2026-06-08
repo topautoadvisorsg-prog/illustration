@@ -150,6 +150,22 @@ export async function listPages(projectId: string): Promise<PageRow[]> {
   return db.select().from(pages).where(eq(pages.projectId, projectId)).orderBy(pages.plannedPageNumber);
 }
 
+/**
+ * Overwrite a single manifest's `content` jsonb. Used by the deterministic
+ * subject+badge cleanup pass (Standard v1.1) to persist the extracted fields.
+ * Does not touch any other column or any page row.
+ */
+export async function updateManifestContent(
+  manifestId: string,
+  content: unknown,
+): Promise<void> {
+  const db = getDb();
+  await db
+    .update(manifests)
+    .set({ content: content as object, updatedAt: new Date() })
+    .where(eq(manifests.id, manifestId));
+}
+
 export async function getPageById(id: string): Promise<PageRow | undefined> {
   const db = getDb();
   const [row] = await db.select().from(pages).where(eq(pages.id, id)).limit(1);

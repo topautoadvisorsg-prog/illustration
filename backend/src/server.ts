@@ -16,6 +16,7 @@ import { registerIntelligenceRoutes } from './api/intelligence.routes.js';
 import { registerAgentRoutes } from './api/agents.routes.js';
 import { registerPaginationRoutes } from './api/pagination.routes.js';
 import { registerExperimentalRoutes } from './api/experimental.routes.js';
+import { registerSubjectBadgeRoutes } from './api/subject-badges.routes.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -58,6 +59,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   await registerPaginationRoutes(app);
   // Whole-page render experiment — self-gates on WHOLE_PAGE_EXPERIMENT_ENABLED.
   await registerExperimentalRoutes(app);
+  // Subject + Badge metadata cleanup (Standard v1.1) — deterministic, no AI.
+  await registerSubjectBadgeRoutes(app);
 
   app.get('/', async () => ({
     service: 'wildlands-backend',

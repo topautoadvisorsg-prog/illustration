@@ -80,6 +80,14 @@ export interface DecorativeElementsDTO {
   badges: DecorativeBadge[];
 }
 
+/** Standard v1.1 — badge metadata passed to the model as CONTEXT ONLY. The
+ *  model never draws badges; print-prep stamps them. */
+export interface BadgeContextDTO {
+  hazard: string[];
+  region: string;
+  source: string;
+}
+
 export interface WholePageSpec {
   pageType: 'CHAPTER_OPENER' | 'INTERIOR' | 'COMPACTED' | 'CONTINUATION';
   layoutFamily: LayoutTemplateId;
@@ -89,6 +97,8 @@ export interface WholePageSpec {
   illustrationDNA: IllustrationDNADTO;
   pageText: PageTextDTO;
   decorativeElements: DecorativeElementsDTO;
+  /** Badge metadata (context only; never drawn by the model). */
+  badgeContext: BadgeContextDTO;
 }
 
 // Persisted render shape now lives in the DB row (WholePageRenderRow in

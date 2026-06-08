@@ -1,4 +1,10 @@
-# Wild Lands Publishing Standard — v1.0
+# Wild Lands Publishing Standard — v1.1
+
+**v1.1 (badge taxonomy):** three badge families locked — Region (8), Hazard/Usage
+(9), Source/Confidence (5). Badges are deterministic **stamped overlays**, never
+model-drawn; the image model keeps the bottom corners clean. Subjects stay clean;
+hazards/region/source live in badge metadata. See `standard.ts` for exact values,
+colors, order, and placement.
 
 **Status:** LOCKED. Treat every value in this document as a constant.
 **Source of truth:** `backend/src/pipeline/publishing-standard/standard.ts` is the machine version. This document is the human version. If they disagree, the code wins.

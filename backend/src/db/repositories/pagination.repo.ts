@@ -88,6 +88,11 @@ export async function persistPaginatedPages(
 export interface EntryMetaLookup {
   entryTitle: string;
   imageSubject: string;
+  /** Standard v1.1 subject + badge metadata (absent until the cleanup pass runs). */
+  cleanSubject?: string;
+  hazard?: string[];
+  region?: string;
+  sourceConfidence?: string;
 }
 
 export async function getEntryMetaByKeys(
@@ -108,12 +113,20 @@ export async function getEntryMetaByKeys(
       ),
     );
   for (const row of rows) {
-    const content = row.content as { entryTitle?: unknown; imageSubject?: unknown } | null;
+    const content = row.content as Record<string, unknown> | null;
     if (!content) continue;
     const entryTitle = typeof content.entryTitle === 'string' ? content.entryTitle : '';
     const imageSubject = typeof content.imageSubject === 'string' ? content.imageSubject : '';
     if (!entryTitle && !imageSubject) continue;
-    out.set(row.externalId, { entryTitle, imageSubject });
+    out.set(row.externalId, {
+      entryTitle,
+      imageSubject,
+      cleanSubject: typeof content.cleanSubject === 'string' ? content.cleanSubject : undefined,
+      hazard: Array.isArray(content.hazard) ? (content.hazard as string[]) : undefined,
+      region: typeof content.region === 'string' ? content.region : undefined,
+      sourceConfidence:
+        typeof content.sourceConfidence === 'string' ? content.sourceConfidence : undefined,
+    });
   }
   return out;
 }

@@ -30,7 +30,7 @@
  * Human-readable companion: ./STANDARD.md
  */
 
-export const STANDARD_VERSION = '1.0' as const;
+export const STANDARD_VERSION = '1.1' as const;
 
 // ─── 1. PALETTE ────────────────────────────────────────────────────────────
 export const PALETTE = {
@@ -129,26 +129,76 @@ export const ORNAMENTS = {
   ],
 } as const;
 
-// ─── 5. BADGE SYSTEM ──────────────────────────────────────────────────────
-export const BADGES = {
-  FOREST: {
-    label: 'FOREST',
-    icon: 'evergreen tree',
-    ringColorHex: PALETTE.forestGreen.hex,
-    appliesTo: ['forest-zone pages'],
-  },
-  MOUNTAIN: {
-    label: 'MOUNTAIN',
-    icon: 'mountain peaks',
-    ringColorHex: PALETTE.mountainOchre.hex,
-    appliesTo: ['mountain-zone pages', 'geology pages'],
-  },
+// ─── 5. BADGE SYSTEM (v1.1) ───────────────────────────────────────────────
+// Three families. Badges are DETERMINISTIC OVERLAYS stamped by print-prep —
+// the image model never draws them. Colors are within the warm-sepia world
+// (no screen-bright reds). Physical proof decides final tuning.
+
+/** Region family (8). Where the subject lives. Bottom-LEFT corner. */
+export const REGION_BADGES = {
+  FOREST:   { label: 'FOREST',   icon: 'evergreen tree',  colorHex: '#3F5A43' },
+  MOUNTAIN: { label: 'MOUNTAIN', icon: 'mountain peaks',  colorHex: '#A47A3C' },
+  RIVER:    { label: 'RIVER',    icon: 'flowing river',   colorHex: '#3E5C6E' },
+  WETLAND:  { label: 'WETLAND',  icon: 'cattail reeds',   colorHex: '#5C6B43' },
+  COASTAL:  { label: 'COASTAL',  icon: 'wave and shore',  colorHex: '#6E7A78' },
+  ALPINE:   { label: 'ALPINE',   icon: 'bare summit',     colorHex: '#8A8472' },
+  FIELD:    { label: 'FIELD',    icon: 'open meadow',     colorHex: '#9A7B3C' },
+  GENERAL:  { label: 'GENERAL',  icon: 'compass rose',    colorHex: '#6B5A40' },
+} as const;
+export type RegionBadge = keyof typeof REGION_BADGES;
+
+/** Hazard / usage family (9). Bottom-RIGHT corner. Multiple allowed when
+ *  non-contradictory; rendered in HAZARD_DISPLAY_ORDER (most severe first). */
+export const HAZARD_BADGES = {
+  DEADLY:        { label: 'DEADLY',        icon: 'skull',          colorHex: '#3A2018' },
+  TOXIC:         { label: 'TOXIC',         icon: 'warning amber',  colorHex: '#8A5A1E' },
+  VENOMOUS:      { label: 'VENOMOUS',      icon: 'fang',           colorHex: '#5A2A1E' },
+  AGGRESSIVE:    { label: 'AGGRESSIVE',    icon: 'charging horns', colorHex: '#7A3E1E' },
+  CAUTION:       { label: 'CAUTION',       icon: 'exclamation',    colorHex: '#A47A3C' },
+  EXPERT_REVIEW: { label: 'EXPERT REVIEW', icon: 'magnifier',      colorHex: '#4A4A40' },
+  EDIBLE:        { label: 'EDIBLE',        icon: 'check leaf',     colorHex: '#3F5A43' },
+  MEDICINAL:     { label: 'MEDICINAL',     icon: 'mortar pestle',  colorHex: '#5C6B43' },
+  NONE:          { label: '',              icon: '',               colorHex: '' },
+} as const;
+export type HazardBadge = keyof typeof HAZARD_BADGES;
+
+/** Severity order — most severe stamped first. NONE means "no badge". */
+export const HAZARD_DISPLAY_ORDER: HazardBadge[] = [
+  'DEADLY', 'TOXIC', 'VENOMOUS', 'AGGRESSIVE', 'CAUTION',
+  'EXPERT_REVIEW', 'EDIBLE', 'MEDICINAL', 'NONE',
+];
+
+/** Pairs that must never co-occur on a page. */
+export const HAZARD_CONTRADICTIONS: Array<[HazardBadge, HazardBadge]> = [
+  ['DEADLY', 'EDIBLE'],
+  ['DEADLY', 'MEDICINAL'],
+  ['TOXIC', 'EDIBLE'],
+];
+
+/** Source / confidence family (5). Small sepia seal, near the hazard badge. */
+export const SOURCE_BADGES = {
+  SCIENTIFIC_LITERATURE: { label: 'SCIENTIFIC LITERATURE', colorHex: PALETTE.ink.hex },
+  FIELD_GUIDE:           { label: 'FIELD GUIDE',           colorHex: PALETTE.ink.hex },
+  TRADITIONAL_USE:       { label: 'TRADITIONAL USE',       colorHex: PALETTE.ink.hex },
+  HISTORICAL_SOURCE:     { label: 'HISTORICAL SOURCE',     colorHex: PALETTE.ink.hex },
+  GENERAL_REFERENCE:     { label: 'GENERAL REFERENCE',     colorHex: PALETTE.ink.hex },
+} as const;
+export type SourceBadge = keyof typeof SOURCE_BADGES;
+
+/** Locked placement. Badges are stamped, never model-drawn. The image model
+ *  must keep these corners visually quiet. */
+export const BADGE_PLACEMENT = {
+  region: 'bottom-left',
+  hazard: 'bottom-right',
+  source: 'bottom-right-inner',
+  /** Reserved clean square in each bottom corner (inside trim safe area). */
+  safeZoneIn: 0.9,
 } as const;
 
-export type BadgeId = keyof typeof BADGES;
-
-/** Pending v1.1 evaluation — only added when a render proves out. */
-export const PENDING_BADGES = ['RIVER', 'WETLAND', 'COASTAL', 'ALPINE', 'TUNDRA'] as const;
+/** Back-compat: v1.0 referenced BADGES.{FOREST,MOUNTAIN}. Keep the alias so
+ *  nothing that imported BADGES breaks; it now points at the region family. */
+export const BADGES = REGION_BADGES;
+export type BadgeId = RegionBadge;
 
 // ─── 6. LAYOUT FAMILIES ─────────────────────────────────────────────────
 /** Reference only — the canonical definitions live in
@@ -197,8 +247,14 @@ export const WILDLANDS_STANDARD = {
   typography: TYPOGRAPHY,
   chapterSystem: CHAPTER_SYSTEM,
   ornaments: ORNAMENTS,
-  badges: BADGES,
-  pendingBadges: PENDING_BADGES,
+  badges: {
+    region: REGION_BADGES,
+    hazard: HAZARD_BADGES,
+    source: SOURCE_BADGES,
+    hazardDisplayOrder: HAZARD_DISPLAY_ORDER,
+    hazardContradictions: HAZARD_CONTRADICTIONS,
+    placement: BADGE_PLACEMENT,
+  },
   layoutFamilies: LAYOUT_FAMILIES,
   pageHierarchy: {
     chapterOpener: CHAPTER_OPENER_HIERARCHY,

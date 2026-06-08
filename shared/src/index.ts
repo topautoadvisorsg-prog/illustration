@@ -489,6 +489,32 @@ export const ProjectSchema = z.object({
   updatedAt: z.string(),
 });
 
+// ── Subject + Badge Metadata (Standard v1.1) ──────────────────────────────
+// The image subject stays clean; hazards/region/source live in badge fields.
+export const RegionBadgeSchema = z.enum([
+  'FOREST', 'MOUNTAIN', 'RIVER', 'WETLAND', 'COASTAL', 'ALPINE', 'FIELD', 'GENERAL',
+]);
+export type RegionBadge = z.infer<typeof RegionBadgeSchema>;
+
+export const HazardBadgeSchema = z.enum([
+  'DEADLY', 'TOXIC', 'VENOMOUS', 'AGGRESSIVE', 'CAUTION',
+  'EXPERT_REVIEW', 'EDIBLE', 'MEDICINAL', 'NONE',
+]);
+export type HazardBadge = z.infer<typeof HazardBadgeSchema>;
+
+export const SourceBadgeSchema = z.enum([
+  'SCIENTIFIC_LITERATURE', 'FIELD_GUIDE', 'TRADITIONAL_USE',
+  'HISTORICAL_SOURCE', 'GENERAL_REFERENCE',
+]);
+export type SourceBadge = z.infer<typeof SourceBadgeSchema>;
+
+/** A single resolved badge to stamp, tagged with its family. */
+export const BadgeSchema = z.object({
+  family: z.enum(['region', 'hazard', 'source']),
+  value: z.string(),
+});
+export type Badge = z.infer<typeof BadgeSchema>;
+
 export const PageManifestSchema = z.object({
   pageId: z.string().min(1),
   projectId: z.string().uuid().optional(),
@@ -506,6 +532,18 @@ export const PageManifestSchema = z.object({
   imagePrompt: z.string().optional(),
   bodyMarkdown: z.string().min(1),
   warnings: z.array(z.string()).default([]),
+  // ── Standard v1.1 subject + badge metadata (optional; filled by the
+  //    deterministic extractor, never by the image model). ──
+  /** Illustration subject ONLY — no warnings, tags, or editorial markup. */
+  cleanSubject: z.string().optional(),
+  /** Usage/hazard badges, most-severe-first; [] or ['NONE'] when none apply. */
+  hazard: z.array(HazardBadgeSchema).optional(),
+  /** Where the subject lives. Defaults to GENERAL on concept pages. */
+  region: RegionBadgeSchema.optional(),
+  /** Source confidence. Defaults to GENERAL_REFERENCE. */
+  sourceConfidence: SourceBadgeSchema.optional(),
+  /** Resolved ordered badge set the renderer stamps (region, hazard…, source). */
+  badgeSet: z.array(BadgeSchema).optional(),
 });
 
 // â”€â”€ Manifest generation (Stage 1.5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

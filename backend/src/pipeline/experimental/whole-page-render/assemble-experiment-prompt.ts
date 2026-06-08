@@ -51,6 +51,8 @@ function hardConstraints(spec: WholePageSpec): string {
     '- The whole page must read as ONE integrated composition. The illustration, the typography, and the ornamentation share the same paper, the same ink palette, the same period. The page should look like it was printed from a single plate, not assembled in software.',
     '- Vintage natural-history monograph aesthetic. No modern UI. No infographic styling. No flat icons. No drop-shadows that look digital. No gradients. No sans-serif anywhere on the page.',
     '- Do not add page numbers, captions, watermarks, signatures, copyright text, folios, or running heads unless explicitly listed in `decorativeElements`.',
+    // Standard v1.1 — badges are deterministic stamped overlays, NOT model-drawn.
+    '- Do NOT draw any badges, hazard symbols, warning icons, region/category icons, labels, or page numbers. Keep BOTH bottom corners (about 0.9 inch square each) visually quiet and uncluttered — that space is reserved for badges the renderer stamps later. The hazard/region/source values are CONTEXT to set the mood only; never render them as marks on the page.',
     '- Output a finished, publishable page. If the result would not pass as a real spread in a collector-edition hardcover, it is wrong.',
   );
   return lines.join('\n');
@@ -79,6 +81,8 @@ export function assembleExperimentPrompt(spec: WholePageSpec): string {
     '"""',
     '',
     block('DECORATIVE ELEMENTS', spec.decorativeElements),
+    '',
+    block('BADGE CONTEXT (mood only — do NOT draw these; the renderer stamps them)', spec.badgeContext),
     '',
     hardConstraints(spec),
   ].join('\n');
