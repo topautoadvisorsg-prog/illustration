@@ -52,11 +52,16 @@ export function defaultMarginsForTrim(trim: TrimSize): PageMargins {
 }
 
 export function computePageGeometry(trim: TrimSize, margins: PageMargins = defaultMarginsForTrim(trim)): PageGeometry {
+  // The print page box (bound interior page: bleed on the outer + top/bottom
+  // edges, not the gutter). Consumed by the legacy HTML/PDF page size only.
   const pageWidthIn = round3(trim.widthIn + trim.bleedIn);
   const pageHeightIn = round3(trim.heightIn + trim.bleedIn * 2);
 
-  const textWidthIn = round3(pageWidthIn - margins.gutterIn - margins.rightIn);
-  const textHeightIn = round3(pageHeightIn - margins.topIn - margins.bottomIn);
+  // Box model (SPEC_GEOMETRY_RECONCILIATION): the safe CONTENT frame is the
+  // TRIM box inset by margins — content must NEVER depend on bleed. Deriving it
+  // from the bleed page inflated the frame by the bleed (the model violation).
+  const textWidthIn = round3(trim.widthIn - margins.gutterIn - margins.rightIn);
+  const textHeightIn = round3(trim.heightIn - margins.topIn - margins.bottomIn);
 
   if (textWidthIn <= 0 || textHeightIn <= 0) {
     throw new Error(

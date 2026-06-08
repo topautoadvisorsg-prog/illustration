@@ -17,7 +17,10 @@ import {
   SPACING,
   TYPOGRAPHY,
   badgesForPage,
+  resolveGeometry,
 } from '../publishing-standard/index.js';
+import { ProjectConfigSchema } from '@wildlands/shared';
+import { getProject } from '../../db/repositories/projects.repo.js';
 import {
   allWithinCanvas,
   computeBadgeLayout,
@@ -55,13 +58,16 @@ export interface ComposeResult {
   stampedFolio: boolean;
 }
 
-/** The deterministic image+pdf composition. Testable on a fixture buffer. */
+/** The deterministic image+pdf composition. Testable on a fixture buffer.
+ *  `canvasIn` is the project's resolved canvas (trim + 2×bleed); defaults to the
+ *  Standard default so the render and the print file always share one trim. */
 export async function composePrintPage(
   renderPng: Buffer,
   badgeSet: Badge[] | null,
   folioLabel: string | null,
+  canvasIn: { w: number; h: number } = SPACING.canvasIn,
 ): Promise<ComposeResult> {
-  const canvas = standardCanvas();
+  const canvas = standardCanvas(canvasIn);
   const parchment = hexToRgb(PALETTE.parchment.hex);
 
   // 1. Lanczos upscale, height-fit (preserves the full composition; no crop).
@@ -117,7 +123,7 @@ export async function composePrintPage(
 
   // 6. Single-page PDF at exact trim+bleed (pdf-lib, points = in × 72).
   const pdf = await PDFDocument.create();
-  const page = pdf.addPage([SPACING.canvasIn.w * 72, SPACING.canvasIn.h * 72]);
+  const page = pdf.addPage([canvasIn.w * 72, canvasIn.h * 72]);
   const img = await pdf.embedPng(pngBuffer);
   page.drawImage(img, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() });
   const pdfBuffer = Buffer.from(await pdf.save());
@@ -151,6 +157,12 @@ export async function printPrepRender(renderId: string): Promise<PrintPrepResult
   if (!row) throw new Error(`render_not_found:${renderId}`);
   if (!row.imagePath) throw new Error(`render_has_no_image:${renderId}`);
 
+  // Resolve the project's canvas (single source of truth) so the print file is
+  // composed AND preflighted at the same trim the render used.
+  const project = await getProject(row.projectId);
+  const config = ProjectConfigSchema.parse(project?.config ?? {});
+  const canvasIn = resolveGeometry(config).canvasIn;
+
   const storage = getProjectStorage();
   const renderPng = await storage.readProjectFile(row.imagePath);
 
@@ -170,7 +182,7 @@ export async function printPrepRender(renderId: string): Promise<PrintPrepResult
   const page = await getPaginatedPageById(row.pageId);
   const folioLabel = page ? String(page.plannedPageNumber) : null;
 
-  const composed = await composePrintPage(renderPng, badgeSet, folioLabel);
+  const composed = await composePrintPage(renderPng, badgeSet, folioLabel, canvasIn);
 
   const pageKey = page?.pageKey ?? row.pageId;
   const base = `${pageKey}-${renderId}`;
@@ -185,6 +197,7 @@ export async function printPrepRender(renderId: string): Promise<PrintPrepResult
     pngBytes: composed.pngBuffer.length,
     pdfBytes: composed.pdfBuffer.length,
     badgesWithinCanvas: composed.badgesWithinCanvas,
+    canvasIn,
   });
 
   await persistPrintPrep(renderId, {

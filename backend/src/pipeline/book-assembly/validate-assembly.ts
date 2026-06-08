@@ -29,6 +29,9 @@ export interface AssemblyValidationInput {
   renderByPageId: Map<string, BookReadyRenderRef>;
   /** Loaded print-PDF page dims, keyed by pageId (only for pages that have a print PDF). */
   dimsByPageId: Map<string, PageDimsPt>;
+  /** Project's resolved canvas (trim + 2×bleed). The expected page size derives
+   *  from it — never a hardcoded constant. Defaults to the Standard default. */
+  canvasIn?: { w: number; h: number };
 }
 
 export interface ValidationCheck {
@@ -50,12 +53,13 @@ export interface AssemblyValidation {
   dimensionFailures: string[];
 }
 
-const EXPECTED_W_PT = SPACING.canvasIn.w * 72; // 630
-const EXPECTED_H_PT = SPACING.canvasIn.h * 72; // 810
 const PT_TOL = 1; // 1pt tolerance
 
 export function validateAssembly(input: AssemblyValidationInput): AssemblyValidation {
   const { spine, renderByPageId, dimsByPageId } = input;
+  const canvasIn = input.canvasIn ?? SPACING.canvasIn;
+  const EXPECTED_W_PT = canvasIn.w * 72;
+  const EXPECTED_H_PT = canvasIn.h * 72;
 
   const missing: string[] = [];
   const preflightFailures: string[] = [];
@@ -89,7 +93,7 @@ export function validateAssembly(input: AssemblyValidationInput): AssemblyValida
     { name: 'every_page_book_ready', ok: missing.length === 0, detail: `${spine.length - missing.length}/${spine.length} pages have a book-ready render` },
     { name: 'every_page_has_print_output', ok: noPrintOutput.length === 0, detail: noPrintOutput.length ? `${noPrintOutput.length} missing print PDF` : 'all pages print-prepped' },
     { name: 'every_page_preflight_passed', ok: preflightFailures.length === 0, detail: preflightFailures.length ? `${preflightFailures.length} failed preflight` : 'all pages passed preflight' },
-    { name: 'page_dimensions', ok: dimensionFailures.length === 0, detail: dimensionFailures.length ? `${dimensionFailures.length} wrong size` : `all ${SPACING.canvasIn.w}×${SPACING.canvasIn.h}in` },
+    { name: 'page_dimensions', ok: dimensionFailures.length === 0, detail: dimensionFailures.length ? `${dimensionFailures.length} wrong size` : `all ${canvasIn.w}×${canvasIn.h}in` },
     { name: 'trim_bleed_consistency', ok: distinctDims.size <= 1, detail: distinctDims.size <= 1 ? 'uniform' : `${distinctDims.size} distinct page sizes` },
     { name: 'page_count', ok: missing.length === 0 && assembledCount === spine.length, detail: `${assembledCount}/${spine.length}` },
   ];

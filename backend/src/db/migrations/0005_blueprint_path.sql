@@ -1,0 +1,1 @@
+ALTER TABLE "whole_page_renders" ADD COLUMN "blueprint_path" text;

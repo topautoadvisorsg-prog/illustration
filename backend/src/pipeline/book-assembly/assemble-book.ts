@@ -10,7 +10,9 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto';
-import { SPACING } from '../publishing-standard/index.js';
+import { ProjectConfigSchema } from '@wildlands/shared';
+import { resolveGeometry } from '../publishing-standard/index.js';
+import { getProject } from '../../db/repositories/projects.repo.js';
 import { listPaginatedPagesForProject } from '../../db/repositories/pagination.repo.js';
 import { listBookReadyRenders } from '../../db/repositories/whole-page-render.repo.js';
 import { recordExport } from '../../db/repositories/exports.repo.js';
@@ -52,6 +54,12 @@ export interface AssemblyReport {
 }
 
 export async function assembleBook(projectId: string): Promise<AssemblyReport> {
+  // 0. Resolve the project geometry — the single source for the expected page
+  //    size and the reported final trim (SPEC_GEOMETRY_RECONCILIATION §1).
+  const project = await getProject(projectId);
+  const config = ProjectConfigSchema.parse(project?.config ?? {});
+  const geometry = resolveGeometry(config);
+
   // 1. Expected pages, in spine order.
   const pageRows = await listPaginatedPagesForProject(projectId);
   const spine: SpinePage[] = resolveSpine(
@@ -93,7 +101,7 @@ export async function assembleBook(projectId: string): Promise<AssemblyReport> {
   }
 
   // 4. Validate. Block on any failure.
-  const validation = validateAssembly({ spine, renderByPageId, dimsByPageId });
+  const validation = validateAssembly({ spine, renderByPageId, dimsByPageId, canvasIn: geometry.canvasIn });
   const runId = randomUUID();
   const buildSpine = (): AssemblySpineEntry[] =>
     spine.map((page, i) => {
@@ -117,7 +125,7 @@ export async function assembleBook(projectId: string): Promise<AssemblyReport> {
     interiorPdfPath,
     finalPageCount: finalCount,
     pageCountAdvisory: pageCountAdvisory(finalCount),
-    finalTrim: { trimIn: { w: SPACING.trimIn.w, h: SPACING.trimIn.h }, bleedIn: SPACING.bleedIn },
+    finalTrim: { trimIn: { w: geometry.trimSize.widthIn, h: geometry.trimSize.heightIn }, bleedIn: geometry.trimSize.bleedIn },
   });
 
   if (validation.blocked) {

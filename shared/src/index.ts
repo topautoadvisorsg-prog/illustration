@@ -454,7 +454,10 @@ export const ProjectConfigSchema = z.object({
   subtitle: z.string().optional(),
   authorName: z.string().min(1),
   publishingStandard: PublishingStandardSchema.default({}),
-  trimSize: TrimSizeSchema.default({ widthIn: 7, heightIn: 10, bleedIn: 0.125 }),
+  // Default is the Publishing Standard trim (8.5×11). The old silent 7×10
+  // default caused render (7×10) vs print-prep (8.75×11.25) divergence —
+  // see SPEC_GEOMETRY_RECONCILIATION. Geometry is resolved via resolveGeometry.
+  trimSize: TrimSizeSchema.default({ widthIn: 8.5, heightIn: 11, bleedIn: 0.125 }),
   typography: TypographyConfigSchema.default({}),
   colorPalette: ColorPaletteSchema.default({}),
   imageGeneration: ImageGenerationConfigSchema.default({}),

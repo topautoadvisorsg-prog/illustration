@@ -70,7 +70,14 @@ describe('paginateProject — end-to-end orchestrator', () => {
       }),
     ];
 
-    const result = paginateProject({ entries, config: makeConfig() });
+    // Pin the trim so this mechanics test (hard-breaks, linkage, part
+    // accounting) is deterministic and decoupled from the Standard default trim
+    // — capacity, and therefore the exact compaction distribution, depends on it.
+    const result = paginateProject({
+      entries,
+      config: makeConfig(),
+      trimSize: { widthIn: 7, heightIn: 10, bleedIn: 0.125 },
+    });
 
     expect(result.summary.totalEntries).toBe(4);
     expect(result.summary.totalPages).toBeGreaterThanOrEqual(4);

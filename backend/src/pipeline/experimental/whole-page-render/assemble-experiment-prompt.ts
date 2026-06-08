@@ -59,10 +59,22 @@ function hardConstraints(spec: WholePageSpec): string {
 }
 
 export function assembleExperimentPrompt(spec: WholePageSpec): string {
+  // Drop-cap governance (SPEC_GEOMETRY_RECONCILIATION §3): when there is no
+  // drop-cap, the surround description must not reach the model at all — drop
+  // `decorativeInitial` from the typography block entirely rather than emit a
+  // stray "null" that still nudges the model toward an illuminated initial.
+  const typographyDNA =
+    spec.typographyDNA.decorativeInitial == null
+      ? (() => {
+          const { decorativeInitial: _omit, ...rest } = spec.typographyDNA;
+          return rest;
+        })()
+      : spec.typographyDNA;
+
   return [
     HEADER,
     '',
-    block('TYPOGRAPHY DNA', spec.typographyDNA),
+    block('TYPOGRAPHY DNA', typographyDNA),
     '',
     block('ILLUSTRATION DNA — subject', spec.illustrationDNA.subject),
     '',
