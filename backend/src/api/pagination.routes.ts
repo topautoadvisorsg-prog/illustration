@@ -261,23 +261,31 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
         });
       }
 
-      // Contract check 2: every opener + compacted page must have an
-      // approved Reading-Field preview. Continuations inherit the opener's
-      // approval (the preview shows the opener's text flow).
-      const requiringApproval = chapterRows.filter((p) => p.pageRole === 'opener' || p.pageRole === 'compacted');
-      const unapproved = requiringApproval.filter((p) => !p.previewApproved);
-      if (unapproved.length > 0) {
-        const sample = unapproved.slice(0, 3).map((p) => p.pageKey).join(', ');
+      // Contract check 2: at least one opener/compacted page in the chapter
+      // must have an approved Reading-Field preview. The approval is PARTIAL —
+      // it covers only the entries whose openers have been approved. Stage 3's
+      // `assertLayoutApprovedForImageSpend` does per-page coverage checks, so
+      // image generation will pass for approved pages and fail for unapproved
+      // ones with "not covered by the approved chapter layout." This is the
+      // Pagination v1 design: per-entry approval, incremental rollout.
+      const openerLike = chapterRows.filter((p) => p.pageRole === 'opener' || p.pageRole === 'compacted');
+      const approvedOpeners = openerLike.filter((p) => p.previewApproved);
+      if (approvedOpeners.length === 0) {
         return reply.code(409).send({
           error: 'Conflict',
-          message: `Chapter ${chapterNumber}: ${unapproved.length} opener/compacted page(s) await preview approval (${sample}…). Open each in Page Production and approve before chapter approval.`,
+          message: `Chapter ${chapterNumber}: no opener/compacted page has an approved Reading-Field preview yet. Approve at least one preview in Page Production before chapter approval.`,
           statusCode: 409,
         });
       }
+      // Build the covered set: every approved opener + every continuation of
+      // that opener's entry. Unapproved openers' chains are excluded.
+      const approvedEntryKeys = new Set(approvedOpeners.map((p) => p.entryKey));
+      const coveredPages = chapterRows.filter((p) => approvedEntryKeys.has(p.entryKey));
 
-      // Synthesize textFitSummary from the persisted fitStatus. Pagination v1
-      // uses UNDERFILL; the legacy summary expects underfilled. Map both.
-      const textFitSummary = chapterRows.reduce(
+      // Synthesize textFitSummary from the persisted fitStatus on the COVERED
+      // pages only. Pagination v1's UNDERFILL maps to the legacy "underfilled"
+      // bucket.
+      const textFitSummary = coveredPages.reduce(
         (totals, p) => {
           totals.pages += 1;
           if (p.fitStatus === 'FITS') totals.fits += 1;
@@ -295,8 +303,8 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
         chapterNumber,
         approvedAt: new Date().toISOString(),
         approvedBy: 'operator',
-        pageKeys: chapterRows.map((p) => p.pageKey),
-        promptSha256ByPage: Object.fromEntries(chapterRows.map((p) => [p.pageKey, p.imagePromptSha256!])),
+        pageKeys: coveredPages.map((p) => p.pageKey),
+        promptSha256ByPage: Object.fromEntries(coveredPages.map((p) => [p.pageKey, p.imagePromptSha256!])),
         textFitSummary,
       });
       const layoutApprovals = {
@@ -308,8 +316,10 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
       return {
         chapterNumber,
         pageCount: chapterRows.length,
-        approvedPreviewCount: requiringApproval.length,
-        skippedContinuationCount: chapterRows.length - requiringApproval.length,
+        approvedPreviewCount: approvedOpeners.length,
+        coveredPageCount: coveredPages.length,
+        skippedContinuationCount: coveredPages.length - approvedOpeners.length,
+        unapprovedOpenerCount: openerLike.length - approvedOpeners.length,
         approved: true,
       };
     },
