@@ -255,6 +255,29 @@ function publishingStandardFor(config) {
   };
 }
 
+// Simplified layout family labels (commit #4 / LAYOUT_SIMPLIFIED_V1).
+// Used by the Page Production tab and the Chapter Production panel so the
+// operator sees "Layout B — 50/50 (image right)" instead of the raw
+// template id. Legacy templates (LAYOUT_1..16) fall through to the legacy
+// label table below.
+const SIMPLIFIED_FAMILY_LABELS = {
+  LAYOUT_A_TEXT: "Layout A — Full Text + Full Illustration (text page)",
+  LAYOUT_A_ILLUSTRATION: "Layout A — Full Text + Full Illustration (illustration page)",
+  LAYOUT_B_IMAGE_TOP: "Layout B — 50/50 (image top)",
+  LAYOUT_B_IMAGE_BOTTOM: "Layout B — 50/50 (image bottom)",
+  LAYOUT_B_IMAGE_LEFT: "Layout B — 50/50 (image left)",
+  LAYOUT_B_IMAGE_RIGHT: "Layout B — 50/50 (image right)",
+  LAYOUT_C_CORNER_TOP_LEFT: "Layout C — 25% Support (top-left corner)",
+  LAYOUT_C_CORNER_TOP_RIGHT: "Layout C — 25% Support (top-right corner)",
+  LAYOUT_C_CORNER_BOTTOM_LEFT: "Layout C — 25% Support (bottom-left corner)",
+  LAYOUT_C_CORNER_BOTTOM_RIGHT: "Layout C — 25% Support (bottom-right corner)",
+  LAYOUT_D_PURE_TEXT: "Layout D — Pure Text / Back Matter",
+};
+
+function simplifiedFamilyLabel(template) {
+  return SIMPLIFIED_FAMILY_LABELS[template] || null;
+}
+
 const WORKFLOW_STAGES = [
   { key: "project", label: "Project Setup", action: "Create or select the book project." },
   { key: "standards", label: "Publishing Format", action: "Choose format before planning." },
@@ -1418,6 +1441,17 @@ function App() {
   const [inspectorPreviewUrl, setInspectorPreviewUrl] = useState("");
   const [inspectorPreviewLoading, setInspectorPreviewLoading] = useState(false);
   const [inspectorPromptCopied, setInspectorPromptCopied] = useState(false);
+  // Pagination v1 (commit #4) — operator UI state. All gated on
+  // `paginationEnabled`, which is detected from the backend's 503 response.
+  // Existing flow keeps working untouched when the flag is off.
+  const [paginationEnabled, setPaginationEnabled] = useState(false);
+  const [paginationReport, setPaginationReport] = useState(null);
+  const [paginatedPages, setPaginatedPages] = useState([]);
+  const [pageProductionPreviewUrl, setPageProductionPreviewUrl] = useState("");
+  const [pageProductionPreviewLoading, setPageProductionPreviewLoading] = useState(false);
+  const [pageProductionPreviewError, setPageProductionPreviewError] = useState("");
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   const [imageInstruction, setImageInstruction] = useState("");
   const [pdfPreview, setPdfPreview] = useState({ title: "", url: "", meta: "", kind: "", chapterNumber: null, pageKey: "" });
   const [proofThumbnails, setProofThumbnails] = useState([]);
@@ -1495,6 +1529,14 @@ function App() {
   const pageByKey = useMemo(() => new Map(pages.map((page) => [page.pageKey, page])), [pages]);
   const pagePlanByKey = useMemo(() => new Map(plannedPages.map((page) => [page.pageKey, page])), [plannedPages]);
   const selectedPage = pages.find((page) => page.id === selectedPageId) || pages[0] || null;
+  // Pagination v1 — the paginated-page row for the currently selected page
+  // (matched by id first, then pageKey as fallback for legacy data). null
+  // when pagination is disabled or this page hasn't been paginated yet.
+  const selectedPagePagination = paginationEnabled && selectedPage
+    ? (paginatedPages || []).find((p) => p?.id === selectedPage.id)
+        || (paginatedPages || []).find((p) => p?.pageKey === selectedPage.pageKey)
+        || null
+    : null;
   const selectedPageManifest = selectedPage ? pageManifests.find((page) => page.pageId === selectedPage.pageKey) : null;
   const selectedPagePlan = selectedPage ? pagePlanByKey.get(selectedPage.pageKey) : null;
   const selectedChapterNumber =
@@ -2041,6 +2083,125 @@ function App() {
   }
 
   // Tab 7 — render the final single page to PDF and embed it (exact export fidelity).
+  // ─── Pagination v1 (commit #4) — API helpers ─────────────────────────────
+  //
+  // Feature-flag detection: `/api/projects/:id/pagination-report` returns 503
+  // when PAGINATION_V1_ENABLED=false on the backend, and a real report when
+  // the flag is on. We call it once per project load and store the result.
+  async function loadPaginationReport(projectId = activeProjectId) {
+    if (!projectId) return;
+    try {
+      const data = await call(`/api/projects/${projectId}/pagination-report`);
+      setPaginationEnabled(true);
+      setPaginationReport(data);
+    } catch (err) {
+      // 503 is the expected response when the flag is off — silently keep
+      // the new UI hidden and leave the existing flow intact.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("503") || msg.toLowerCase().includes("dormant")) {
+        setPaginationEnabled(false);
+        setPaginationReport(null);
+      } else {
+        appendLog("issue", `Pagination report load failed: ${msg}`);
+      }
+    }
+  }
+
+  async function loadPaginatedPages(projectId = activeProjectId) {
+    if (!projectId || !paginationEnabled) return;
+    try {
+      const data = await call(`/api/projects/${projectId}/pages`);
+      // listPages returns the raw page rows; ignore the legacy-only response
+      // by filtering for rows that carry the new pagination columns.
+      const rows = Array.isArray(data?.pages) ? data.pages : data;
+      const withPagination = (Array.isArray(rows) ? rows : []).filter(
+        (p) => p && (p.partN !== undefined || p.fitStatus !== undefined || p.pageRole !== undefined),
+      );
+      setPaginatedPages(withPagination);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      appendLog("issue", `Paginated pages load failed: ${msg}`);
+    }
+  }
+
+  async function runPagination(mode) {
+    if (!activeProjectId) throw new Error("Select a project first.");
+    if (mode === "replace" && !window.confirm(
+      "Re-paginate will REPLACE every existing page in this project. " +
+      "Approved pages will be reset. Continue?",
+    )) {
+      return false;
+    }
+    const body = mode ? JSON.stringify({ mode }) : "{}";
+    try {
+      const data = await call(`/api/projects/${activeProjectId}/paginate`, { method: "POST", body });
+      setMessage(`Paginated: ${data.summary.totalPages} pages (${data.pagesWritten} written).`);
+      appendLog("success", `Paginated: ${data.summary.totalPages} pages.`);
+      await loadPaginationReport(activeProjectId);
+      await loadPaginatedPages(activeProjectId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // 409 = approved pages exist; offer the replace path.
+      if (msg.includes("409") || msg.toLowerCase().includes("approved page")) {
+        if (window.confirm(`${msg}\n\nProceed with replace mode?`)) {
+          return runPagination("replace");
+        }
+        return false;
+      }
+      throw err;
+    }
+  }
+
+  async function loadPageProductionPreview(pageId) {
+    if (!pageId) return;
+    setPageProductionPreviewLoading(true);
+    setPageProductionPreviewError("");
+    try {
+      const { blob } = await callPdf(`/api/pages/${pageId}/preview`);
+      const url = URL.createObjectURL(blob);
+      setPageProductionPreviewUrl((old) => {
+        if (old) URL.revokeObjectURL(old);
+        return url;
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPageProductionPreviewError(msg);
+    } finally {
+      setPageProductionPreviewLoading(false);
+    }
+  }
+
+  async function approveSelectedPagePreview() {
+    if (!selectedPage?.id) return;
+    await call(`/api/pages/${selectedPage.id}/preview/approve`, {
+      method: "POST",
+      body: JSON.stringify({ decidedBy: "operator" }),
+    });
+    setMessage(`Approved Reading-Field preview for ${selectedPage.pageKey}.`);
+    appendLog("success", `Preview approved: ${selectedPage.pageKey}.`);
+    await loadPaginatedPages(activeProjectId);
+    await loadPaginationReport(activeProjectId);
+  }
+
+  async function rejectSelectedPagePreview() {
+    if (!selectedPage?.id) return;
+    const reason = (rejectReason || "").trim();
+    if (!reason) {
+      setError("Reject requires a reason — type one before submitting.");
+      return;
+    }
+    await call(`/api/pages/${selectedPage.id}/preview/reject`, {
+      method: "POST",
+      body: JSON.stringify({ decidedBy: "operator", reason }),
+    });
+    setMessage(`Rejected preview for ${selectedPage.pageKey}.`);
+    appendLog("issue", `Preview rejected: ${selectedPage.pageKey} — ${reason}`);
+    setRejectModalOpen(false);
+    setRejectReason("");
+    await loadPaginatedPages(activeProjectId);
+    await loadPaginationReport(activeProjectId);
+  }
+
   async function loadInspectorPreview(pageKey) {
     if (!activeProjectId || !pageKey) return;
     setInspectorPreviewLoading(true);
@@ -3351,8 +3512,19 @@ function App() {
       appendLog("error", `Could not restore project output: ${errorMessage}`);
     });
     loadImageLibrary(activeProjectId).catch(() => {});
+    // Pagination v1 detection — 503 means flag is off, leaves UI hidden.
+    loadPaginationReport(activeProjectId).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiUrl, activeProjectId, projects]);
+
+  // When pagination is enabled (post-detection), pull the actual page rows
+  // so the Chapter Production panel can render tiles. Runs once per
+  // `paginationEnabled` flip; loadPaginatedPages no-ops when flag is off.
+  useEffect(() => {
+    if (!paginationEnabled || !activeProjectId) return;
+    loadPaginatedPages(activeProjectId).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginationEnabled, activeProjectId]);
 
   const storedManuscriptName = fileNameFromPath(selectedProject?.manuscriptPath);
   const manuscriptStatusText = manuscript.trim()
@@ -3884,6 +4056,7 @@ function App() {
             </div>
           )}
           {projects.length > 0 && (
+          <>
           <div className="phase-row project-row">
             <label htmlFor="project-select">Project</label>
             <div className="project-picker" id="project-select" role="listbox" aria-label="Projects">
@@ -3950,6 +4123,7 @@ function App() {
               event.target.value = "";
             }}
           />
+          </>
           )}
           <div className="operator-log" aria-live="polite">
             {operatorLog.map((entry, index) => (
@@ -4651,6 +4825,89 @@ function App() {
             </div>
           </section>
 
+          {paginationEnabled && (
+            <section className="review-card chapter-production-panel cc-control cc-export">
+              <div className="section-head">
+                <div>
+                  <h3>📑 Chapter Production — Reading-Field Approval</h3>
+                  <p className="hint">
+                    Each printed page must have an approved Reading-Field preview before image generation can run.
+                    Click a tile to open it in the Page Production tab.
+                  </p>
+                </div>
+                <div className="button-row">
+                  <button
+                    type="button"
+                    disabled={busy || !activeProjectId}
+                    onClick={() => run("Paginating project...", () => runPagination())}
+                  >
+                    Re-paginate Project
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busy || !activeProjectId}
+                    onClick={() => loadPaginationReport(activeProjectId).then(() => loadPaginatedPages(activeProjectId))}
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+              {paginationReport && (
+                <div className="metric-row">
+                  <span><b>{paginationReport.totalPages}</b> printed pages</span>
+                  <span><b>{paginationReport.approvedPages}</b> approved</span>
+                  <span><b>{paginationReport.pendingApproval}</b> pending</span>
+                  <span><b>{paginationReport.openers}</b> openers · <b>{paginationReport.continuations}</b> continuations · <b>{paginationReport.compacted}</b> compacted</span>
+                </div>
+              )}
+              {(() => {
+                const chapterFilter = reviewChapterNumber;
+                const pagesForChapter = (paginatedPages || []).filter(
+                  (p) => !chapterFilter || Number(p.chapterNumber) === Number(chapterFilter),
+                );
+                if (pagesForChapter.length === 0) {
+                  return (
+                    <p className="empty">
+                      {paginatedPages.length === 0
+                        ? "No paginated pages yet. Click Re-paginate Project to produce them."
+                        : `No pages in ${reviewChapterLabel}.`}
+                    </p>
+                  );
+                }
+                return (
+                  <div className="chapter-production-grid">
+                    {pagesForChapter.map((pp) => {
+                      const familyLabel = simplifiedFamilyLabel(pp.layoutTemplate);
+                      const fitLower = String(pp.fitStatus || "PENDING").toLowerCase();
+                      const isActive = selectedPage && selectedPage.id === pp.id;
+                      return (
+                        <button
+                          type="button"
+                          key={pp.id || pp.pageKey}
+                          className={`chapter-production-tile ${isActive ? "active" : ""}`}
+                          onClick={() => {
+                            setSelectedPageId(pp.id);
+                            setInspectorTab("pageproduction");
+                          }}
+                        >
+                          <span className="cpt-pagenum">page {pp.plannedPageNumber}</span>
+                          <strong>{pp.pageKey}</strong>
+                          <span className="cpt-role">{pp.pageRole}{pp.partN ? ` · ${pp.partN}/${pp.totalParts}` : ""}</span>
+                          <span className={`fit-tag fit-${fitLower}`}>{pp.fitStatus || "PENDING"}</span>
+                          <span className={pp.previewApproved ? "approval-badge approved" : "approval-badge pending"}>
+                            {pp.previewApproved ? "APPROVED" : "PENDING"}
+                          </span>
+                          {familyLabel && <small className="cpt-family">{familyLabel}</small>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </section>
+          )}
+
           <section className="review-card image-review-card cc-control">
             <div className="section-head">
               <div>
@@ -4712,6 +4969,11 @@ function App() {
                   {[
                     ["manuscript", "Manuscript"],
                     ["layout", "Layout"],
+                    // Pagination v1: insert Page Production between Layout and
+                    // Image Generation so the operator approves the Reading
+                    // Field preview before any image spend. Hidden when the
+                    // backend flag is off.
+                    ...(paginationEnabled ? [["pageproduction", "Page Production"]] : []),
                     ["imagegen", "Image Generation"],
                     ["image", "Image Result"],
                     ["finalpage", "Final Page"],
@@ -4837,6 +5099,122 @@ function App() {
                     </div>
                   )}
 
+                  {paginationEnabled && inspectorTab === "pageproduction" && (() => {
+                    // Pagination v1 — Page Production tab. Uses the
+                    // top-level `selectedPagePagination` value (the page row
+                    // that matches the operator's current selection) so the
+                    // metadata + approve/reject controls + the Image
+                    // Generation gate all read the same source of truth.
+                    const pp = selectedPagePagination;
+                    if (!pp) {
+                      return (
+                        <div className="inspector-pane">
+                          <p className="empty">
+                            This page has not been paginated yet. Run <b>Re-paginate Project</b>
+                            in the Chapter Production panel to produce its Reading-Field preview.
+                          </p>
+                        </div>
+                      );
+                    }
+                    const familyLabel = simplifiedFamilyLabel(pp.layoutTemplate);
+                    const fitLower = String(pp.fitStatus || "PENDING").toLowerCase();
+                    return (
+                      <div className="inspector-pane page-production-pane">
+                        <div className="kv"><span>Page</span><b>{pp.plannedPageNumber} of {paginatedPages.length} · {pp.pageKey}</b></div>
+                        <div className="kv"><span>Role</span><b>{pp.pageRole}{pp.partN ? ` · part ${pp.partN} of ${pp.totalParts}` : ""}</b></div>
+                        <div className="kv"><span>Layout</span><b>{familyLabel || pp.layoutTemplate}</b></div>
+                        <div className="kv">
+                          <span>Fit</span>
+                          <b className={`fit-tag fit-${fitLower}`}>{pp.fitStatus || "PENDING"}</b>
+                        </div>
+                        <div className="kv">
+                          <span>Approval</span>
+                          <b className={pp.previewApproved ? "approval-badge approved" : "approval-badge pending"}>
+                            {pp.previewApproved
+                              ? `APPROVED${pp.previewApprovedBy ? ` by ${pp.previewApprovedBy}` : ""}${pp.previewApprovedAt ? ` · ${new Date(pp.previewApprovedAt).toLocaleString()}` : ""}`
+                              : "PENDING"}
+                          </b>
+                        </div>
+                        {pp.compactedEntryKeys && pp.compactedEntryKeys.length > 1 && (
+                          <div className="kv">
+                            <span>Compacted entries</span>
+                            <b>{pp.compactedEntryKeys.join(" + ")}</b>
+                          </div>
+                        )}
+                        <p className="inspector-subhead">Reading-Field preview</p>
+                        <div className="button-row">
+                          <button
+                            type="button"
+                            disabled={pageProductionPreviewLoading}
+                            onClick={() => loadPageProductionPreview(pp.id)}
+                          >
+                            {pageProductionPreviewLoading
+                              ? "Rendering…"
+                              : pageProductionPreviewUrl
+                                ? "Re-render preview"
+                                : "Load Reading-Field preview"}
+                          </button>
+                          <button
+                            type="button"
+                            className="primary"
+                            disabled={busy || pp.previewApproved}
+                            onClick={() => run("Approving preview...", approveSelectedPagePreview)}
+                          >
+                            {pp.previewApproved ? "Already approved" : "Approve preview"}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary danger"
+                            disabled={busy}
+                            onClick={() => { setRejectReason(""); setRejectModalOpen(true); }}
+                          >
+                            Reject…
+                          </button>
+                        </div>
+                        {pageProductionPreviewError && (
+                          <p className="notice error">{pageProductionPreviewError}</p>
+                        )}
+                        {pageProductionPreviewUrl ? (
+                          <iframe
+                            title="Reading-Field preview"
+                            className="page-production-preview"
+                            src={pageProductionPreviewUrl}
+                          />
+                        ) : (
+                          <p className="empty">
+                            {pageProductionPreviewLoading
+                              ? "Rendering the Reading-Field preview…"
+                              : "Click Load Reading-Field preview to see the exact text inside the Reading Field before any image is generated."}
+                          </p>
+                        )}
+                        {rejectModalOpen && (
+                          <div className="reject-modal">
+                            <strong>Reject this Reading-Field preview</strong>
+                            <p className="hint">Give a short reason so the operator audit log captures why this preview was rejected.</p>
+                            <textarea
+                              value={rejectReason}
+                              onChange={(e) => setRejectReason(e.target.value)}
+                              placeholder="e.g. overflow at the last paragraph; needs re-pagination"
+                            />
+                            <div className="button-row">
+                              <button
+                                type="button"
+                                className="secondary danger"
+                                disabled={busy || !rejectReason.trim()}
+                                onClick={() => run("Rejecting preview...", rejectSelectedPagePreview)}
+                              >
+                                Submit rejection
+                              </button>
+                              <button type="button" className="secondary" onClick={() => setRejectModalOpen(false)}>
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {inspectorData && inspectorTab === "imagegen" && (() => {
                     const pkg = parseSubjectPackage(inspectorData.prompt.text);
                     // Style DNA = everything before the SUBJECT PACKAGE block (ground truth: exactly what the backend sent).
@@ -4924,8 +5302,20 @@ function App() {
                       {!selectedChapterApproval && (
                         <p className="empty">Chapter layout not approved — generation is locked until the chapter layout is approved.</p>
                       )}
+                      {paginationEnabled && selectedPagePagination && !selectedPagePagination.previewApproved && selectedPagePagination.carriesSubject !== false && (
+                        <p className="notice gate-notice">
+                          <strong>Approve the Reading Field preview before generating art.</strong>
+                          <span> Open the <b>Page Production</b> tab, review the live preview, and click Approve preview to unlock image generation.</span>
+                        </p>
+                      )}
+                      {paginationEnabled && selectedPagePagination && selectedPagePagination.carriesSubject === false && (
+                        <p className="notice gate-notice">
+                          <strong>Continuation page — no image required.</strong>
+                          <span> This page carries text only; the entry's image lives on the facing illustration page.</span>
+                        </p>
+                      )}
                       <div className="button-row">
-                        <button disabled={busy || !selectedPage || !selectedChapterApproval || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady)} onClick={() => run("Generating selected page image...", generateSelectedPageImage)}>
+                        <button disabled={busy || !selectedPage || !selectedChapterApproval || !(selectedPage?.imagePrompt || selectedPagePlan?.promptReady) || (paginationEnabled && selectedPagePagination && (!selectedPagePagination.previewApproved || selectedPagePagination.carriesSubject === false))} onClick={() => run("Generating selected page image...", generateSelectedPageImage)}>
                           Generate Image
                         </button>
                         <button disabled={busy || !selectedPage || selectedPage?.status !== "APPROVED"} onClick={() => run("Upscaling approved image...", upscaleSelectedPageImage)}>
