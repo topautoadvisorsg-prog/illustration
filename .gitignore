@@ -65,3 +65,15 @@ CHAPTER1_5PAGE_PROOF.pdf
 ch1_proof_v2*.pdf
 ch1_validation.pdf
 prompt_audit/
+# Render-test scratch (UI screenshots, blueprint PNGs, proof PDFs)
+live_shots/
+nav_shots/
+rz_test/
+step3/
+verify/
+vis_shots/
+experimental_*.png
+experimental_*.pdf
+experimental_*.py
+std_*.png
+wpr_*.png

@@ -14,7 +14,7 @@ import type { PageRow } from '../../../db/repositories/pagination.repo.js';
 import type { LayoutAllocation, PlanningZone } from '../../stage-6-layout/layout-director.js';
 import type { PageGeometry } from '../../stage-6-layout/page-geometry.js';
 import { deriveSubjectPackage } from '../../stage-2-planner/plan-pages.js';
-import { BADGES, toRoman, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
+import { toRoman, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
 import {
   EXPERIMENT_READING_FIELD_WIDENING_PCT,
   EXPERIMENT_TYPOGRAPHY_DNA,
@@ -73,19 +73,20 @@ function inferPageType(layout: LayoutTemplateId, pageRow: PageRow): WholePageSpe
 
 /**
  * Decorative elements per the Wild Lands Publishing Standard. Family is always
- * Botanical Pinecone (`WILDLANDS_STANDARD.ornaments.family`). Badges come from
- * the locked badge catalog — no inline strings. Chapter openers get top+bottom
- * swags + badges; other page types get a bottom swag only.
+ * Botanical Pinecone (`WILDLANDS_STANDARD.ornaments.family`). Chapter openers
+ * get top+bottom swags; other page types get a bottom swag only.
+ *
+ * Standard v1.1: `badges` is ALWAYS empty here — badges are deterministic
+ * stamped overlays (print-prep), never model-drawn. The badge VALUES travel in
+ * `spec.badgeContext` as mood-only context. Emitting badges here would
+ * contradict the prompt's "do not draw badges" hard constraint.
  */
 function buildDecorativeElements(pageType: WholePageSpec['pageType']): DecorativeElementsDTO {
   if (pageType === 'CHAPTER_OPENER') {
     return {
       topRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':top_swag', position: 'above_illustration' },
       bottomRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':bottom_swag', position: 'below_body' },
-      badges: [
-        { label: BADGES.FOREST.label,   icon: BADGES.FOREST.icon,   ring: BADGES.FOREST.colorHex },
-        { label: BADGES.MOUNTAIN.label, icon: BADGES.MOUNTAIN.icon, ring: BADGES.MOUNTAIN.colorHex },
-      ],
+      badges: [],
     };
   }
   return {
