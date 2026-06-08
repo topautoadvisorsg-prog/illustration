@@ -38,9 +38,15 @@ export interface CreateRenderRowResult {
 }
 
 /**
- * Insert a new QUEUED render at version = max(version)+1 for the page. The
- * unique (page_id, version) index plus computing the next version inside a
- * transaction means concurrent submits can't collide on a version number.
+ * Insert a new QUEUED render at version = max(version)+1 for the page.
+ *
+ * Concurrency: under Postgres READ COMMITTED two simultaneous submits for the
+ * same page can both read the same max version and try to insert the same N+1.
+ * The unique (page_id, version) index makes the loser FAIL CLEANLY with a
+ * constraint error rather than corrupt the sequence — never two rows at the
+ * same version. For v1 (synchronous, single operator) a true serialization
+ * lock (SELECT ... FOR UPDATE) is unnecessary; the unique index is the safety
+ * net. Revisit if/when the async queue lands and parallel auto-retries appear.
  */
 export async function createRenderRow(
   input: CreateRenderRowInput,
@@ -51,12 +57,12 @@ export async function createRenderRow(
     const [agg] = await tx
       .select({
         maxVersion: sql<number>`COALESCE(MAX(${wholePageRenders.version}), 0)`,
-        priorAttempts: sql<number>`COUNT(*)`,
       })
       .from(wholePageRenders)
       .where(eq(wholePageRenders.pageId, input.pageId));
     const version = Number(agg?.maxVersion ?? 0) + 1;
-    const attempts = version; // each row is one attempt; attempts == version count
+    // One row == one attempt for this page, so attempts == version.
+    const attempts = version;
     const [row] = await tx
       .insert(wholePageRenders)
       .values({

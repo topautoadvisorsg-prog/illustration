@@ -27,7 +27,7 @@ import {
   type WholePageRenderRow,
 } from '../../../db/repositories/whole-page-render.repo.js';
 import { WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
-import { directLayout } from '../../stage-6-layout/layout-director.js';
+import { directLayout, type LayoutAllocation } from '../../stage-6-layout/layout-director.js';
 import { computePageGeometry } from '../../stage-6-layout/page-geometry.js';
 import { renderBlueprintPng } from '../../stage-3-generation/blueprint.js';
 import {
@@ -64,11 +64,16 @@ interface PreparedRender {
   pageKey: string;
   spec: WholePageSpec;
   assembledPrompt: string;
+  /** Blueprint inputs, computed here so executeRender never re-loads. */
+  allocation: LayoutAllocation;
+  size: ImageSize;
 }
 
 /**
- * Pure prep: load page + config, build spec + prompt. No image spend, no DB
- * writes. Shared by both the row-creation step and the execution step.
+ * Pure prep: load page + config, build spec + prompt + the blueprint inputs.
+ * No image spend, no DB writes. The single load path for a page — both the
+ * row-creation step and the execution step call this, so the page, project,
+ * config, geometry, and allocation are each fetched/derived exactly once.
  */
 async function prepareRender(pageId: string): Promise<PreparedRender> {
   const pageRow = await getPaginatedPageById(pageId);
@@ -94,7 +99,15 @@ async function prepareRender(pageId: string): Promise<PreparedRender> {
 
   const spec = buildPageSpec({ pageRow, config, geometry, allocation, entryTitle, imageSubject });
   const assembledPrompt = assembleExperimentPrompt(spec);
-  return { projectId: pageRow.projectId, pageKey: pageRow.pageKey, spec, assembledPrompt };
+  const size = pickSize(geometry.trimWidthIn, geometry.trimHeightIn);
+  return {
+    projectId: pageRow.projectId,
+    pageKey: pageRow.pageKey,
+    spec,
+    assembledPrompt,
+    allocation,
+    size,
+  };
 }
 
 export interface CreateAndRunResult {
@@ -149,26 +162,15 @@ export async function executeRender(
 
   await markRendering(renderId);
   try {
+    // Single load path — page, project, config, geometry, allocation, spec, and
+    // prompt are all derived here exactly once (no second fetch).
     const prepared = await prepareRender(existing.pageId);
 
     // Same deterministic blueprint production uses for the layout zones.
-    const config = ProjectConfigSchema.parse(
-      (await getProject(prepared.projectId))!.config,
-    );
-    const geometry = computePageGeometry(config.trimSize);
-    const pageRow = (await getPaginatedPageById(existing.pageId))!;
-    const allocation = directLayout({
-      bodyMarkdown: pageRow.readingFieldText ?? '',
-      layoutTemplate: pageRow.layoutTemplate as Parameters<typeof directLayout>[0]['layoutTemplate'],
-      geometry,
-      bodyPt: config.typography.bodyPt,
-      lineHeight: config.typography.lineHeight,
-    });
-    const size = pickSize(geometry.trimWidthIn, geometry.trimHeightIn);
-    const [bw, bh] = size.split('x').map(Number);
-    const { png: blueprintPng } = await renderBlueprintPng(allocation, bw ?? 1024, bh ?? 1536);
+    const [bw, bh] = prepared.size.split('x').map(Number);
+    const { png: blueprintPng } = await renderBlueprintPng(prepared.allocation, bw ?? 1024, bh ?? 1536);
 
-    const image = await generator({ prompt: prepared.assembledPrompt, blueprintPng, size });
+    const image = await generator({ prompt: prepared.assembledPrompt, blueprintPng, size: prepared.size });
 
     const storage = getProjectStorage();
     const base = `${prepared.pageKey}-${renderId}`;

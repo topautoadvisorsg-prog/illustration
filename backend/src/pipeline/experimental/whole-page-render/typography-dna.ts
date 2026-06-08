@@ -35,5 +35,10 @@ export const EXPERIMENT_TYPOGRAPHY_DNA: TypographyDNA = {
   noInfographic: true,
 };
 
-/** No longer used: the standard's measure (70 chars) is the experiment's measure. */
+/**
+ * How much wider the experimental reading field is vs. the legacy production
+ * measure. Feeds `readingFieldGeometry.widerThanProductionPct` in the spec, a
+ * hint to the model that the text column is generous. The absolute measure
+ * itself is locked by the Standard (70 chars).
+ */
 export const EXPERIMENT_READING_FIELD_WIDENING_PCT = 20;

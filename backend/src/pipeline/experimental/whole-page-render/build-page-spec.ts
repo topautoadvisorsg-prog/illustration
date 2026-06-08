@@ -59,9 +59,11 @@ function inferReadingFieldAnchor(zone: PlanningZone | null): ReadingFieldGeometr
 function inferPageType(layout: LayoutTemplateId, pageRow: PageRow): WholePageSpec['pageType'] {
   if (pageRow.pageRole === 'continuation') return 'CONTINUATION';
   if (pageRow.pageRole === 'compacted') return 'COMPACTED';
-  // Chapter openers are the first page of a chapter; we treat layout 13 banner
-  // or any opener at plannedPageNumber == chapter start as opener for this
-  // experiment. The conservative test: pageRole opener + layout has top art.
+  // KNOWN v1.0 LIMITATION: only LAYOUT_13_FEATURE_BANNER openers get the full
+  // CHAPTER hierarchy + badges. An opener on another layout (e.g. P002 on
+  // LAYOUT_4_DANGER_WARNING) currently falls through to INTERIOR — no kicker,
+  // numeral, or badges. Surfaced in the P002 render. Broadening this to "any
+  // pageRole === 'opener'" is a flagged decision, not a silent change.
   if (pageRow.pageRole === 'opener' && layout === 'LAYOUT_13_FEATURE_BANNER') {
     return 'CHAPTER_OPENER';
   }
@@ -69,14 +71,10 @@ function inferPageType(layout: LayoutTemplateId, pageRow: PageRow): WholePageSpe
 }
 
 /**
- * Decorative elements for the v1 experiment. The CH01_P001 baseline carries
- * botanical pinecone rules + Forest/Mountain badges; we hand the same to the
- * image model. Other pages get bottom rule only.
- */
-/**
- * Decorative elements per the Wild Lands Publishing Standard. Family is
- * always Botanical Pinecone (`WILDLANDS_STANDARD.ornaments.family`). Badges
- * are pulled from the locked badge catalog — no inline strings.
+ * Decorative elements per the Wild Lands Publishing Standard. Family is always
+ * Botanical Pinecone (`WILDLANDS_STANDARD.ornaments.family`). Badges come from
+ * the locked badge catalog — no inline strings. Chapter openers get top+bottom
+ * swags + badges; other page types get a bottom swag only.
  */
 function buildDecorativeElements(pageType: WholePageSpec['pageType']): DecorativeElementsDTO {
   if (pageType === 'CHAPTER_OPENER') {

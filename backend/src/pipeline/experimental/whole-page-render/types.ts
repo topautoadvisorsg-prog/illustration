@@ -91,16 +91,6 @@ export interface WholePageSpec {
   decorativeElements: DecorativeElementsDTO;
 }
 
-export interface WholePageRenderResult {
-  runId: string;
-  pageId: string;
-  pageKey: string;
-  spec: WholePageSpec;
-  assembledPrompt: string;
-  imageRelativePath: string;
-  specRelativePath: string;
-  promptRelativePath: string;
-  widthPx: number;
-  heightPx: number;
-  model: string;
-}
+// Persisted render shape now lives in the DB row (WholePageRenderRow in
+// whole-page-render.repo.ts). The old disk-only WholePageRenderResult type
+// was removed when the pipeline moved to DB persistence (move #1).

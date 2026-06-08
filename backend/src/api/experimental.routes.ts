@@ -11,9 +11,8 @@
  *   reject          → status REJECTED, clears book selection
  */
 
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { ApiErrorSchema } from '@wildlands/shared';
 import { getEnv } from '../env.js';
 import { createAndRunRender } from '../pipeline/experimental/whole-page-render/render-whole-page.js';
 import {
@@ -106,7 +105,10 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   });
 
   // ── Generate (or regenerate) a whole-page render for a page ──
-  const runHandler = async (request: any, reply: any) => {
+  // Shared by POST :pageId and POST :pageId/regenerate. Base Fastify types are
+  // intentional: params/body are validated explicitly with zod below, so the
+  // handler treats them as untrusted input rather than relying on route generics.
+  const runHandler = async (request: FastifyRequest, reply: FastifyReply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { pageId } = PageParamsSchema.parse(request.params);
     const body = RenderBodySchema.parse(request.body ?? {});
