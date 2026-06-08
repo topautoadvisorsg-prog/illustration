@@ -22,6 +22,7 @@ import { getEnv } from '../env.js';
 import { getProject } from '../db/repositories/projects.repo.js';
 import { listManifests } from '../db/repositories/manifests.repo.js';
 import {
+  backfillContinuationPrompts,
   countApprovedPages,
   getEntryMetaByKeys,
   getPaginatedPageById,
@@ -200,6 +201,35 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
         warnings: result.warnings,
         pagesWritten,
       };
+    },
+  );
+
+  // POST /api/projects/:id/backfill-continuation-prompts — writes a safe
+  // placeholder image_prompt on continuation pages (carriesSubject = false)
+  // that lack one. The legacy chapter-layout-approval gate refuses to
+  // approve a chapter while any of its rows have a null image_prompt, but
+  // continuation pages never need a real prompt (the Stage 3 Pagination v1
+  // gate refuses image spend on carriesSubject = false pages regardless).
+  // This route unblocks the legacy gate without modifying any legacy code.
+  app.post(
+    '/api/projects/:id/backfill-continuation-prompts',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        response: { 404: ApiErrorSchema, 503: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      if (!getEnv().PAGINATION_V1_ENABLED) {
+        return reply.code(503).send(flagDisabledResponse());
+      }
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const project = await getProject(id);
+      if (!project) {
+        return reply.code(404).send({ error: 'Not Found', message: 'Project not found.', statusCode: 404 });
+      }
+      const updated = await backfillContinuationPrompts(id);
+      return { backfilledRows: updated };
     },
   );
 

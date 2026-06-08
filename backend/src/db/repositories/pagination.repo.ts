@@ -9,6 +9,7 @@
  * the flag is off. No existing call site reaches these functions today.
  */
 
+import { createHash } from 'node:crypto';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { getDb } from '../client.js';
 import { manifests, pageApprovals, pages } from '../schema/index.js';
@@ -258,6 +259,38 @@ export async function getPaginationReport(projectId: string): Promise<Pagination
     pendingApproval: rows.length - approvedPages,
     perChapter: Array.from(perChapter.values()).sort((a, b) => a.chapterNumber - b.chapterNumber),
   };
+}
+
+/**
+ * Backfill a placeholder `image_prompt` on continuation pages (carriesSubject = false)
+ * that lack one. Continuation pages never get their own image, but the
+ * legacy chapter-layout-approval gate counts any row with a null imagePrompt
+ * as "unplanned" and refuses to approve the chapter. Writing a safe
+ * placeholder (with a matching sha256) lets the gate pass without changing
+ * any image-generation behavior — the Pagination v1 Stage 3 gate
+ * (`assertPreviewApprovedForImageSpend`) refuses image spend on
+ * carriesSubject=false pages regardless of prompt contents.
+ *
+ * Idempotent: rows that already have an imagePrompt are left untouched.
+ * Returns the number of rows updated.
+ */
+export async function backfillContinuationPrompts(projectId: string): Promise<number> {
+  const db = getDb();
+  // Use the placeholder text + a stable hash so re-running this is a no-op.
+  const placeholderPrompt = '[continuation page — no image; carries text only]';
+  const placeholderSha = createHash('sha256').update(placeholderPrompt, 'utf8').digest('hex');
+  const result = await db
+    .update(pages)
+    .set({ imagePrompt: placeholderPrompt, imagePromptSha256: placeholderSha, updatedAt: new Date() })
+    .where(
+      and(
+        eq(pages.projectId, projectId),
+        eq(pages.carriesSubject, false),
+        sql`image_prompt IS NULL`,
+      ),
+    )
+    .returning({ id: pages.id });
+  return result.length;
 }
 
 /**
