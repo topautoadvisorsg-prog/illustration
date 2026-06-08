@@ -306,6 +306,10 @@ export const wholePageRenders = pgTable(
     // Selection.
     active: boolean('active').default(false).notNull(),
     approvedForBook: boolean('approved_for_book').default(false).notNull(),
+    // Print-prep (STD-3). Additive; null until print-prep runs for this render.
+    printPngPath: text('print_png_path'),
+    printPdfPath: text('print_pdf_path'),
+    preflightPassed: boolean('preflight_passed'),
     // Decision trail.
     decidedBy: text('decided_by'),
     decidedAt: timestamp('decided_at', { withTimezone: true }),

@@ -122,6 +122,26 @@ export async function markRendered(renderId: string, out: MarkRenderedInput): Pr
     .where(eq(wholePageRenders.id, renderId));
 }
 
+export interface PersistPrintPrepInput {
+  printPngPath: string;
+  printPdfPath: string;
+  preflightPassed: boolean;
+}
+
+/** Persist the print-prep outputs + preflight result on a render row (STD-3). */
+export async function persistPrintPrep(renderId: string, out: PersistPrintPrepInput): Promise<void> {
+  const db = getDb();
+  await db
+    .update(wholePageRenders)
+    .set({
+      printPngPath: out.printPngPath,
+      printPdfPath: out.printPdfPath,
+      preflightPassed: out.preflightPassed,
+      updatedAt: new Date(),
+    })
+    .where(eq(wholePageRenders.id, renderId));
+}
+
 export async function markFailed(renderId: string, errorMessage: string): Promise<void> {
   const db = getDb();
   await db

@@ -15,6 +15,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { getEnv } from '../env.js';
 import { createAndRunRender } from '../pipeline/experimental/whole-page-render/render-whole-page.js';
+import { printPrepRender } from '../pipeline/print-prep/print-prep.js';
 import {
   approveRender,
   getProjectRenderSummary,
@@ -161,6 +162,27 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
     }
     const row = await approveRender(renderId, body.decidedBy);
     return { render: serializeRender(row) };
+  });
+
+  // ── Print-prep a render (STD-3): KDP-ready PNG + PDF + preflight ──
+  // Allowed on any RENDERED render (deterministic, no spend). Assembly later
+  // consumes only approved_for_book + preflight_passed.
+  app.post('/api/experimental/whole-page-render/:renderId/print-prep', async (request, reply) => {
+    if (flagOff()) return reply.code(503).send(flagDisabledResponse());
+    const { renderId } = RenderParamsSchema.parse(request.params);
+    const existing = await getRenderById(renderId);
+    if (!existing) return reply.code(404).send({ error: 'Not Found', message: `render_not_found:${renderId}`, statusCode: 404 });
+    if (!existing.imagePath || (existing.status !== 'RENDERED' && existing.status !== 'APPROVED')) {
+      return reply.code(409).send({ error: 'Conflict', message: `cannot_print_prep_status:${existing.status}`, statusCode: 409 });
+    }
+    try {
+      const result = await printPrepRender(renderId);
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      request.log.error({ err }, 'print-prep failed');
+      return reply.code(500).send({ error: 'Internal Server Error', message, statusCode: 500 });
+    }
   });
 
   // ── Select THE version for the book (one per page) ──

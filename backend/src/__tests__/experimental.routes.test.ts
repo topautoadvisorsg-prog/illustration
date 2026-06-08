@@ -35,6 +35,7 @@ const ROUTES: Array<{ method: 'GET' | 'POST'; url: string; payload?: unknown }> 
   { method: 'POST', url: `/api/experimental/whole-page-render/${UUID}/regenerate`, payload: { decidedBy: 't' } },
   { method: 'GET', url: `/api/experimental/whole-page-render/page/${UUID}/versions` },
   { method: 'POST', url: `/api/experimental/whole-page-render/${UUID}/approve`, payload: { decidedBy: 't' } },
+  { method: 'POST', url: `/api/experimental/whole-page-render/${UUID}/print-prep`, payload: {} },
   { method: 'POST', url: `/api/experimental/whole-page-render/${UUID}/select-for-book`, payload: { decidedBy: 't' } },
   { method: 'POST', url: `/api/experimental/whole-page-render/${UUID}/reject`, payload: { decidedBy: 't', reason: 'x' } },
   { method: 'GET', url: `/api/experimental/whole-page-render/project/${UUID}` },
