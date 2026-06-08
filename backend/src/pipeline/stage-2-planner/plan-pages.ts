@@ -25,6 +25,7 @@ import { includesAny, isDangerPage, signalText } from './content-signals.js';
 import { CONTENT_TYPE_POLICY, classifyContentType, decomposeTemplate } from './layered-layout.js';
 import { computePageGeometry } from '../stage-6-layout/page-geometry.js';
 import { directLayout, type LayoutAllocation } from '../stage-6-layout/layout-director.js';
+import { layoutCoverageMeta } from '../stage-6-layout/layout-profiles.js';
 
 const REQUIRED_PROMPT_PLACEHOLDERS = ['{MASTER_STYLE_DNA}', '{SUBJECT}', '{SCIENTIFIC_DETAILS}', '{COMPOSITION_NOTES}'] as const;
 
@@ -536,7 +537,19 @@ const LEAN_LAYOUT_RULES = [
 ].join('\n');
 
 /** Assemble the lean image prompt: Style DNA + SUBJECT PACKAGE + blueprint pointer + rules. */
-export function assembleLeanPrompt(masterStyleDna: string, pkg: SubjectPackage): string {
+export function assembleLeanPrompt(
+  masterStyleDna: string,
+  pkg: SubjectPackage,
+  layoutTemplate: LayoutTemplateId,
+): string {
+  const meta = layoutCoverageMeta(layoutTemplate);
+  const imagePct = meta.imagePercent;
+  const readingPct = meta.textPercent;
+  // Supporting studies sit inside the primary image zone; allocate ~10% of the
+  // page to them when the image zone has room, otherwise scale down. Floor 5%.
+  const supportingPct = Math.max(5, Math.min(10, Math.round(imagePct * 0.2)));
+  const anchorLabel = meta.placementLabel;
+
   return [
     masterStyleDna.trim(),
     '',
@@ -554,12 +567,16 @@ export function assembleLeanPrompt(masterStyleDna: string, pkg: SubjectPackage):
     'MOOD',
     `- ${pkg.mood}`,
     '',
+    'COMPOSITION ENFORCEMENT (from layout engine — not negotiable)',
+    `- Primary image zone: ~${imagePct}% of the page, anchored ${anchorLabel}. Concentrate the strongest detail, the main subject, and the environmental scene here.`,
+    `- Reading Field: ~${readingPct}% of the page. Keep it calm, open, low-detail — quiet paper, mist, sky, or pale terrain. No important subjects here.`,
+    `- Supporting studies: ~${supportingPct}% of the page, distributed as small naturalist specimen studies inside the primary image zone — no cards, frames, or backgrounds.`,
+    '',
     'COMPOSITION — follow the attached blueprint image. The whole page is ONE continuous illustrated page.',
-    'RED zones = the READING FIELD: a calm, open, low-detail parchment area where typography will be placed later. It is NOT a box — place no important subjects here.',
+    'RED zones = the READING FIELD: the layout engine has already placed typography at fixed coordinates inside this area. Treat it as occupied — your job is not to compose for text, it is to keep this region visually quiet so the typography reads cleanly.',
     'BLUE zones = primary image priority: the main subject and the environmental scene; concentrate the strongest detail here.',
     'ORANGE zones = supporting study areas: small naturalist specimen studies placed directly on the page.',
     'The illustration must OPEN ORGANICALLY into the Reading Field — let the artwork dissolve into it through a natural transition: mist, light sky, pale terrain, calm water, paper tone, or atmospheric fade. No hard edge, no seam, no rectangle.',
-    'Keep the Reading Field calm and open. The renderer/layout system owns final typography and readability — you only keep this area clear.',
     '',
     'Supporting studies feel like museum / naturalist studies placed directly on the page — delicate watercolor or ink specimen studies, hand-placed on the same paper. No cards. No sticky notes. No yellow or colored backgrounds. No boxes. No frames. No rectangles behind them.',
     '',
@@ -632,7 +649,7 @@ export function planPage(page: PageManifest, config: ProjectConfig, options: Pla
   // emitted — the blueprint image is the source of truth for layout. (The old template
   // helpers remain defined in this file but are no longer used; cleanup pending.)
   const subjectPackage = deriveSubjectPackage(page);
-  const prompt = assembleLeanPrompt(config.imageGeneration.masterStyleBlockText, subjectPackage);
+  const prompt = assembleLeanPrompt(config.imageGeneration.masterStyleBlockText, subjectPackage, selected.template);
 
   const capacityReasons = [
     `word_count_${wordCount}`,
