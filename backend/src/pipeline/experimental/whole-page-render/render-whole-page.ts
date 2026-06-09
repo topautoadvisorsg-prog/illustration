@@ -59,7 +59,7 @@ function pickSize(trimWidthIn: number, trimHeightIn: number): ImageSize {
   return '1024x1024';
 }
 
-interface PreparedRender {
+export interface PreparedRender {
   projectId: string;
   pageKey: string;
   spec: WholePageSpec;

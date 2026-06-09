@@ -28,6 +28,10 @@ import {
   type WholePageRenderRow,
 } from '../db/repositories/whole-page-render.repo.js';
 import { getProjectStorage } from '../services/storage/project-storage.js';
+import {
+  buildPreviewPackageForPage,
+  buildProofPackageForRender,
+} from '../services/render-proof/build-package.js';
 
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
 const RenderParamsSchema = z.object({ renderId: z.string().uuid() });
@@ -91,18 +95,81 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
       return reply.code(400).send({ error: 'Bad Request', message: 'Missing or invalid `path`.', statusCode: 400 });
     }
     const relPath = parsed.data.path;
-    if (relPath.includes('..') || !relPath.includes('/experimental/whole-page/')) {
-      return reply.code(400).send({ error: 'Bad Request', message: 'Path must be under experimental/whole-page/.', statusCode: 400 });
+    // Allow render artifacts (experimental/whole-page/...) AND print-prep
+    // outputs (print-ready/...). Both are render-package files the operator
+    // needs to inspect; print-prep used a sibling prefix when it landed and
+    // the proof package needs to link to them.
+    const allowed =
+      relPath.includes('/experimental/whole-page/') || relPath.includes('/print-ready/');
+    if (relPath.includes('..') || !allowed) {
+      return reply
+        .code(400)
+        .send({
+          error: 'Bad Request',
+          message: 'Path must be under experimental/whole-page/ or print-ready/.',
+          statusCode: 400,
+        });
     }
     try {
       const buf = await getProjectStorage().readProjectFile(relPath);
       const ext = relPath.split('.').pop() ?? '';
-      const ct = ext === 'png' ? 'image/png' : ext === 'json' ? 'application/json' : 'text/plain; charset=utf-8';
+      const ct =
+        ext === 'png'
+          ? 'image/png'
+          : ext === 'pdf'
+            ? 'application/pdf'
+            : ext === 'json'
+              ? 'application/json'
+              : 'text/plain; charset=utf-8';
       reply.header('content-type', ct);
       reply.header('cache-control', 'no-store');
       return reply.send(buf);
     } catch {
       return reply.code(404).send({ error: 'Not Found', message: 'Artifact not found.', statusCode: 404 });
+    }
+  });
+
+  // ── Proof package (post-render) ─────────────────────────────────────────
+  // Returns AUTHORITY / INPUT / OUTPUT / PRINT for an existing render row.
+  // Operator can audit every render package from one endpoint, no file hunt.
+  app.get('/api/experimental/whole-page-render/:renderId/proof-package', async (request, reply) => {
+    if (flagOff()) return reply.code(503).send(flagDisabledResponse());
+    const { renderId } = RenderParamsSchema.parse(request.params);
+    try {
+      const pkg = await buildProofPackageForRender(renderId);
+      return pkg;
+    } catch (e) {
+      const message = (e as Error).message;
+      if (message.startsWith('render_not_found:')) {
+        return reply.code(404).send({ error: 'Not Found', message: 'Render not found.', statusCode: 404 });
+      }
+      request.log.error({ err: e }, 'proof-package failed');
+      return reply
+        .code(500)
+        .send({ error: 'Internal Error', message: `Proof package build failed: ${message}`, statusCode: 500 });
+    }
+  });
+
+  // ── Preview package (pre-render, NO SPEND) ──────────────────────────────
+  // Same shape as the proof package but without output/print sections — the
+  // operator can inspect exactly what WOULD be sent to the model before
+  // authorizing image-generation spend. AUTHORITY + INPUT only. Uses
+  // prepareRender + renderBlueprintPng locally (no AI call).
+  app.get('/api/experimental/whole-page-render/page/:pageId/preview-package', async (request, reply) => {
+    if (flagOff()) return reply.code(503).send(flagDisabledResponse());
+    const { pageId } = PageParamsSchema.parse(request.params);
+    try {
+      const pkg = await buildPreviewPackageForPage(pageId);
+      return pkg;
+    } catch (e) {
+      const message = (e as Error).message;
+      if (message.startsWith('page_not_found:') || message.startsWith('project_not_found:')) {
+        return reply.code(404).send({ error: 'Not Found', message: 'Page not found.', statusCode: 404 });
+      }
+      request.log.error({ err: e }, 'preview-package failed');
+      return reply
+        .code(500)
+        .send({ error: 'Internal Error', message: `Preview package build failed: ${message}`, statusCode: 500 });
     }
   });
 
