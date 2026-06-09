@@ -12,9 +12,11 @@ export interface PreflightInput {
   pngBytes: number;
   pdfBytes: number;
   badgesWithinCanvas: boolean;
-  /** Project's resolved canvas (trim + 2×bleed). Defaults to the Standard
-   *  default so preflight expects the same trim the page was composed at. */
-  canvasIn?: { w: number; h: number };
+  /** Project's resolved canvas (trim + 2×bleed). REQUIRED — preflight must
+   *  check the page against the SAME canvas the project resolved to. Callers
+   *  pass `resolveGeometry(config).canvasIn`; no default fallback (that path
+   *  is what produced the original trim-mismatch bug). */
+  canvasIn: { w: number; h: number };
 }
 
 export interface PreflightCheck {
@@ -31,7 +33,7 @@ export interface PreflightReport {
 const KDP_MAX_INTERIOR_PDF_BYTES = 650 * 1024 * 1024; // KDP ~650MB ceiling
 
 export function runPreflight(input: PreflightInput): PreflightReport {
-  const canvasIn = input.canvasIn ?? SPACING.canvasIn;
+  const { canvasIn } = input;
   const expW = Math.round(canvasIn.w * SPACING.printDpi);
   const expH = Math.round(canvasIn.h * SPACING.printDpi);
 

@@ -36,6 +36,11 @@ describe('spine ordering', () => {
   });
 });
 
+/** Standard default canvas (8.5×11 trim + 0.125 bleed → 8.75×11.25 → 630×810 pt).
+ *  Tests assert the default-trim shape; the 7×10 chain is covered by
+ *  multi-trim-7x10.integration. */
+const STANDARD_CANVAS_IN = { w: 8.75, h: 11.25 };
+
 const goodDims: PageDimsPt = { widthPt: 630, heightPt: 810 };
 function refs(map: Record<string, Partial<BookReadyRenderRef>>): Map<string, BookReadyRenderRef> {
   const m = new Map<string, BookReadyRenderRef>();
@@ -53,13 +58,19 @@ describe('validation gate — blocks correctly', () => {
       spine,
       renderByPageId: refs({ a: {}, b: {} }),
       dimsByPageId: new Map([['a', goodDims], ['b', goodDims]]),
+      canvasIn: STANDARD_CANVAS_IN,
     });
     expect(v.blocked).toBe(false);
     expect(v.checks.every((c) => c.ok)).toBe(true);
   });
 
   it('blocks on a missing page', () => {
-    const v = validateAssembly({ spine, renderByPageId: refs({ a: {} }), dimsByPageId: new Map([['a', goodDims]]) });
+    const v = validateAssembly({
+      spine,
+      renderByPageId: refs({ a: {} }),
+      dimsByPageId: new Map([['a', goodDims]]),
+      canvasIn: STANDARD_CANVAS_IN,
+    });
     expect(v.blocked).toBe(true);
     expect(v.missing).toEqual(['b']);
   });
@@ -69,6 +80,7 @@ describe('validation gate — blocks correctly', () => {
       spine,
       renderByPageId: refs({ a: {}, b: { preflightPassed: false } }),
       dimsByPageId: new Map([['a', goodDims], ['b', goodDims]]),
+      canvasIn: STANDARD_CANVAS_IN,
     });
     expect(v.blocked).toBe(true);
     expect(v.preflightFailures).toEqual(['b']);
@@ -79,6 +91,7 @@ describe('validation gate — blocks correctly', () => {
       spine,
       renderByPageId: refs({ a: {}, b: { printPdfPath: null } }),
       dimsByPageId: new Map([['a', goodDims]]),
+      canvasIn: STANDARD_CANVAS_IN,
     });
     expect(v.blocked).toBe(true);
     expect(v.noPrintOutput).toEqual(['b']);
@@ -89,6 +102,7 @@ describe('validation gate — blocks correctly', () => {
       spine,
       renderByPageId: refs({ a: {}, b: {} }),
       dimsByPageId: new Map([['a', goodDims], ['b', { widthPt: 612, heightPt: 792 }]]),
+      canvasIn: STANDARD_CANVAS_IN,
     });
     expect(v.blocked).toBe(true);
     expect(v.dimensionFailures).toEqual(['b']);

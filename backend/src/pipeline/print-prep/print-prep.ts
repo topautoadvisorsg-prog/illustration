@@ -14,7 +14,6 @@ import { PDFDocument } from 'pdf-lib';
 import type { Badge } from '@wildlands/shared';
 import {
   PALETTE,
-  SPACING,
   TYPOGRAPHY,
   badgesForPage,
   resolveGeometry,
@@ -59,13 +58,15 @@ export interface ComposeResult {
 }
 
 /** The deterministic image+pdf composition. Testable on a fixture buffer.
- *  `canvasIn` is the project's resolved canvas (trim + 2×bleed); defaults to the
- *  Standard default so the render and the print file always share one trim. */
+ *  `canvasIn` is the project's resolved canvas (trim + 2×bleed). REQUIRED so
+ *  the render and the print file always share one trim — callers pass
+ *  `resolveGeometry(config).canvasIn`. No default fallback (that path is what
+ *  produced the original trim-mismatch bug). */
 export async function composePrintPage(
   renderPng: Buffer,
   badgeSet: Badge[] | null,
   folioLabel: string | null,
-  canvasIn: { w: number; h: number } = SPACING.canvasIn,
+  canvasIn: { w: number; h: number },
 ): Promise<ComposeResult> {
   const canvas = standardCanvas(canvasIn);
   const parchment = hexToRgb(PALETTE.parchment.hex);

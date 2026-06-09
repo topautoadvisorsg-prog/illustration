@@ -5,7 +5,6 @@
  * interior PDF is produced — the report names exactly which pages block it.
  */
 
-import { SPACING } from '../publishing-standard/index.js';
 import type { SpinePage } from './spine-order.js';
 
 /** The book-ready render fields the gate needs (from whole_page_renders). */
@@ -29,9 +28,11 @@ export interface AssemblyValidationInput {
   renderByPageId: Map<string, BookReadyRenderRef>;
   /** Loaded print-PDF page dims, keyed by pageId (only for pages that have a print PDF). */
   dimsByPageId: Map<string, PageDimsPt>;
-  /** Project's resolved canvas (trim + 2×bleed). The expected page size derives
-   *  from it — never a hardcoded constant. Defaults to the Standard default. */
-  canvasIn?: { w: number; h: number };
+  /** Project's resolved canvas (trim + 2×bleed). REQUIRED — the expected page
+   *  size derives from it, never from a hardcoded constant. Callers pass
+   *  `resolveGeometry(config).canvasIn`; no default fallback (that path is what
+   *  produced the original trim-mismatch bug). */
+  canvasIn: { w: number; h: number };
 }
 
 export interface ValidationCheck {
@@ -56,8 +57,7 @@ export interface AssemblyValidation {
 const PT_TOL = 1; // 1pt tolerance
 
 export function validateAssembly(input: AssemblyValidationInput): AssemblyValidation {
-  const { spine, renderByPageId, dimsByPageId } = input;
-  const canvasIn = input.canvasIn ?? SPACING.canvasIn;
+  const { spine, renderByPageId, dimsByPageId, canvasIn } = input;
   const EXPECTED_W_PT = canvasIn.w * 72;
   const EXPECTED_H_PT = canvasIn.h * 72;
 
