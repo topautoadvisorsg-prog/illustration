@@ -11,7 +11,6 @@ const configuredBackend = process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND_U
 // Pipeline phases you can "talk to" in the operator console.
 const PHASES = ["Manuscript", "Breakdown", "Page Plan", "Text-Fit", "Images", "Review", "Render", "Export"];
 const PAID_ACTION_WARNING = "This calls a paid external API. Continue?";
-const DEV_ISSUES_KEY = "wildlands_dev_issues";
 const ACTIVE_PROJECT_KEY = "wildlands_active_project_id";
 const ACTIVE_PHASE_KEY = "wildlands_active_phase";
 const SELECTED_PAGE_PREFIX = "wildlands_selected_page:";
@@ -38,14 +37,6 @@ const RELATION_TYPES = [
   "AFFECTS",
   "RELATED_TO",
 ];
-
-function loadDevIssues() {
-  try {
-    return JSON.parse(localStorage.getItem(DEV_ISSUES_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
 
 function loadStoredString(key, fallback = "") {
   try {
@@ -1401,6 +1392,19 @@ const STAGE_LABEL = {
   "budget-preflight": "Budget",
   "verification-ready": "Ready for image gen",
 };
+// Each supervisor stage maps to a real UI surface so every blocker can be
+// answered with one click. The selectors target panels that already exist —
+// per the "every blocker has a button" rule.
+const STAGE_TARGET = {
+  ingest: { selector: ".upload-dropzone", label: "Open Upload" },
+  manifests: { selector: ".chapter-tree", label: "Open Breakdown" },
+  pagination: { selector: ".page-plan-list", label: "Open Page Plan" },
+  "text-fit": { selector: ".page-quality-review", label: "Open Page Plan" },
+  "page-quality": { selector: ".page-quality-review", label: "Open Quality Review" },
+  "publishing-director": { selector: ".decision-ledger", label: "Open Page Issues" },
+  "budget-preflight": { selector: ".production-status-tile", label: "Review Budget" },
+  "verification-ready": { selector: ".chapter-production-panel", label: "Open Render Proofs" },
+};
 
 function App() {
   const [backendUrl, setBackendUrl] = useState(trimSlash(configuredBackend));
@@ -1503,7 +1507,6 @@ function App() {
     const stored = loadStoredString(ACTIVE_PHASE_KEY, PHASES[0]);
     return PHASES.includes(stored) ? stored : PHASES[0];
   });
-  const [devIssues, setDevIssues] = useState(loadDevIssues);
   const [intelligenceOverview, setIntelligenceOverview] = useState(null);
   const [intelligenceItems, setIntelligenceItems] = useState([]);
   const [intelligenceFilter, setIntelligenceFilter] = useState({ type: "", q: "" });
@@ -1868,57 +1871,6 @@ function App() {
     ].slice(0, 80));
   }
 
-  function persistDevIssues(next) {
-    try {
-      localStorage.setItem(DEV_ISSUES_KEY, JSON.stringify(next));
-    } catch {
-      /* localStorage unavailable - keep in memory only */
-    }
-  }
-
-  // Capture a plain-English issue tied to the current phase for the developer to fix.
-  function flagForDeveloper() {
-    const text = commandInput.trim();
-    if (!text) return;
-    const issue = {
-      phase,
-      projectId: activeProjectId || "(no project selected)",
-      projectTitle: selectedProject?.title || "",
-      status: selectedProject?.status || "",
-      message: text,
-      time: new Date().toISOString(),
-    };
-    setDevIssues((current) => {
-      const next = [issue, ...current].slice(0, 200);
-      persistDevIssues(next);
-      return next;
-    });
-    appendLog("issue", `[${phase}] flagged for developer: ${text}`);
-    setCommandInput("");
-  }
-
-  // Package all flagged issues into a structured report to hand to the developer.
-  async function copyDeveloperReport() {
-    if (devIssues.length === 0) return;
-    const lines = devIssues.map(
-      (i) => `- [${i.phase}] (project ${i.projectId}${i.status ? `, status ${i.status}` : ""}) ${i.message} - ${i.time}`,
-    );
-    const report = `## Wildlands operator feedback for the developer\nBackend: ${apiUrl || "(unset)"}\nGenerated: ${new Date().toISOString()}\n\n${lines.join("\n")}\n`;
-    try {
-      await navigator.clipboard.writeText(report);
-      setMessage(`Copied ${devIssues.length} issue(s) - paste this to the developer.`);
-    } catch {
-      setMessage("Copy failed; the report is logged below - copy it manually.");
-      appendLog("issue", report);
-    }
-  }
-
-  function clearDevIssues() {
-    setDevIssues([]);
-    persistDevIssues([]);
-    setMessage("Cleared flagged developer issues.");
-  }
-
   function focusAgentChat(prompt = operatorGuidance.helpPrompt) {
     setChatInput(prompt || "What should I do next?");
     chatPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2085,6 +2037,30 @@ function App() {
       blob: await response.blob(),
       headers: response.headers,
     };
+  }
+
+  // Jump to a specific page by pageKey — used by the Production Status tile's
+  // clickable blocker references (e.g. "Review CH06_P006_m"). The rule per the
+  // agent feedback: every blocker has a button. No hunting.
+  function jumpToPageKey(pageKey) {
+    if (!pageKey) return;
+    setTopNav("control");
+    const fromPages = pages.find((p) => p.pageKey === pageKey);
+    const fromPaginated = (paginatedPages || []).find((p) => p?.pageKey === pageKey);
+    const target = fromPages || fromPaginated;
+    if (target?.id) setSelectedPageId(target.id);
+    window.setTimeout(
+      () => scrollToWorkspaceSection(".chapter-production-grid", "center"),
+      80,
+    );
+  }
+
+  // Jump to a stage's UI surface (the panel where the operator can act).
+  function jumpToStage(stageKey) {
+    const target = STAGE_TARGET[stageKey];
+    if (!target) return;
+    setTopNav("control");
+    window.setTimeout(() => scrollToWorkspaceSection(target.selector, "center"), 80);
   }
 
   // Production Status — calls the Supervisor's no-spend pipeline check and
@@ -3974,12 +3950,66 @@ function App() {
               <span className="pst-stage">Stage: <strong>{STAGE_LABEL[pipelineReport.currentStage] || pipelineReport.currentStage}</strong></span>
             </div>
 
-            <p className="pst-next">
-              <strong>Next:</strong> {pipelineReport.nextAction?.label || "—"}
-              {pipelineReport.nextAction?.details && (
-                <span className="pst-next-details">{pipelineReport.nextAction.details}</span>
+            <div className="pst-next">
+              <p>
+                <strong>Next:</strong> {pipelineReport.nextAction?.label || "—"}
+                {pipelineReport.nextAction?.details && (
+                  <span className="pst-next-details">{pipelineReport.nextAction.details}</span>
+                )}
+              </p>
+              {pipelineReport.currentStage && STAGE_TARGET[pipelineReport.currentStage] && (
+                <button
+                  type="button"
+                  className="pst-next-cta"
+                  onClick={() => jumpToStage(pipelineReport.currentStage)}
+                >
+                  {STAGE_TARGET[pipelineReport.currentStage].label} →
+                </button>
               )}
-            </p>
+            </div>
+
+            {pipelineReport.blockingIssues?.length > 0 && (
+              <div className="pst-blockers">
+                <p className="eyebrow">Blockers ({pipelineReport.blockingIssues.length})</p>
+                <ul>
+                  {pipelineReport.blockingIssues.map((issue, i) => (
+                    <li key={`blocker-${i}`}>
+                      <span className="pst-blocker-text">
+                        <span className="pst-blocker-stage">[{STAGE_LABEL[issue.stage] || issue.stage}]</span>
+                        {" "}{issue.message}
+                      </span>
+                      {issue.pageKey ? (
+                        <button type="button" className="pst-jump" onClick={() => jumpToPageKey(issue.pageKey)}>
+                          {issue.pageKey} →
+                        </button>
+                      ) : STAGE_TARGET[issue.stage] ? (
+                        <button type="button" className="pst-jump" onClick={() => jumpToStage(issue.stage)}>
+                          Go →
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {pipelineReport.snapshot?.operatorReviewPages?.length > 0 && (
+              <div className="pst-review-pages">
+                <p className="eyebrow">Review pages ({pipelineReport.snapshot.operatorReviewPages.length})</p>
+                <div className="pst-review-chips">
+                  {pipelineReport.snapshot.operatorReviewPages.map((pk) => (
+                    <button
+                      type="button"
+                      key={pk}
+                      className="pst-jump"
+                      onClick={() => jumpToPageKey(pk)}
+                    >
+                      {pk} →
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {pipelineReport.snapshot && (
               <div className="pst-snapshot">
@@ -3990,11 +4020,6 @@ function App() {
                   {" / "}
                   ${pipelineReport.snapshot.imageBudgetUsd?.toFixed(2)} budget
                 </span>
-                {pipelineReport.snapshot.operatorReviewPages?.length > 0 && (
-                  <span>
-                    Review: <strong>{pipelineReport.snapshot.operatorReviewPages.join(", ")}</strong>
-                  </span>
-                )}
               </div>
             )}
           </>
