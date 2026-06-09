@@ -1,5 +1,5 @@
 /**
- * Stage 1.75 — entry-rebalance (Patch B).
+ * Stage 1.75 — entry-rebalance (Patch B + C).
  *
  * Post-pass that runs after `flowEngine`. The engine pours greedily, filling
  * each page to capacity before breaking. That produces a cliff: every full
@@ -8,10 +8,15 @@
  * stops the cliff.
  *
  * For each STANDALONE multi-part entry (opener + N continuations), re-pour
- * the joined text across the same parts (or one extra) so that every part
- * lands at ~TARGET_FILL_RATIO instead of ~1.0. The entry's text and parts
- * stay together; chapter boundaries and entry boundaries are never crossed;
- * compacted pages are skipped.
+ * the joined text across the same parts (or one extra). Targets are
+ * PROPORTIONAL to each part's capacity (Patch C): opener (smaller capacity
+ * for image-bearing layouts) gets fewer chars; continuations (larger
+ * capacity for LAYOUT_2_TEXT_HEAVY) get more. Every part lands at the same
+ * overall fill ratio = totalChars / totalCapacity.
+ *
+ * Entry boundaries and chapter boundaries are never crossed; compacted
+ * pages are skipped (multi-entry layouts are operator territory, not pure
+ * splits).
  *
  * The pass is pure. It produces a new `PaginatedPage[]` and the list of
  * entryKeys it touched, for warnings and tests.
@@ -134,11 +139,32 @@ export function rebalanceEntries(input: RebalanceEntriesInput): RebalanceEntries
       );
     }
 
-    // 4. Re-pour. Greedy distribution at paragraph + heading boundaries.
-    const newTexts = redistribute(joinedText, targetParts);
+    // 4. Compute per-part char targets PROPORTIONAL to each part's capacity
+    //    (Patch C). Even-splitting by part count is wrong when the opener has
+    //    smaller capacity than the continuations — the opener overflows while
+    //    the continuations have slack. Targets at the entry's overall fill
+    //    ratio (chars/capacity) land every part at the SAME fill ratio.
+    const openerProbe = analyzeTextFit({
+      bodyMarkdown: '',
+      layoutTemplate: sorted[0]!.layoutTemplate,
+      geometry,
+      bodyPt: input.bodyPt,
+      lineHeight: input.lineHeight,
+    });
+    const openerCapacityChars = openerProbe.capacityChars;
+    const capacitiesByPart: number[] = [openerCapacityChars];
+    for (let i = 1; i < targetParts; i++) {
+      capacitiesByPart.push(continuationCapacityChars);
+    }
+    const totalTargetCapacity = capacitiesByPart.reduce((a, b) => a + b, 0);
+    const overallFillRatio = totalTargetCapacity > 0 ? totalChars / totalTargetCapacity : 1;
+    const targetsByPart = capacitiesByPart.map((cap) => cap * overallFillRatio);
+
+    // 5. Re-pour. Greedy distribution at paragraph + heading boundaries.
+    const newTexts = redistribute(joinedText, targetsByPart);
     if (newTexts.length === 0) continue;
 
-    // 5. Build new pages. Opener keeps its layout + subject + warnings;
+    // 6. Build new pages. Opener keeps its layout + subject + warnings;
     //    continuations are LAYOUT_2_TEXT_HEAVY with carriesSubject=false.
     const opener = sorted[0]!;
     const newParts: PaginatedPage[] = newTexts.map((text, i) => {
@@ -183,14 +209,14 @@ export function rebalanceEntries(input: RebalanceEntriesInput): RebalanceEntries
       };
     });
 
-    // 6. Replace: first old part → all new parts, other old parts → empty (drop).
+    // 7. Replace: first old part → all new parts, other old parts → empty (drop).
     replacements.set(sorted[0]!, newParts);
     for (let i = 1; i < sorted.length; i++) replacements.set(sorted[i]!, []);
 
     rebalancedEntryKeys.push(entryKey);
   }
 
-  // 7. Splice replacements into the page list, preserving spine order.
+  // 8. Splice replacements into the page list, preserving spine order.
   const out: PaginatedPage[] = [];
   for (const page of input.pages) {
     const replacement = replacements.get(page);
@@ -210,15 +236,24 @@ export function rebalanceEntries(input: RebalanceEntriesInput): RebalanceEntries
 }
 
 /**
- * Split joined markdown into `targetParts` chunks at paragraph boundaries.
- * Section headings (`##`+) stay attached to the paragraph that follows them —
+ * Split joined markdown into N chunks at paragraph boundaries, where each
+ * chunk targets a part-specific char count (Patch C: PROPORTIONAL to capacity).
+ *
+ * `targetsByPart[i]` is the target char count for part i. Caller computes
+ * these as `capacityChars[i] × overallFillRatio` so every part lands at the
+ * same fill ratio — opener (smaller capacity) gets fewer chars, continuations
+ * (larger capacity) get more.
+ *
+ * Section headings (`##`+) stay attached to the paragraph that follows —
  * we break BEFORE a heading, never after, so each part opens cleanly.
  *
- * Pure greedy. Walks paragraphs in order; closes the current part when adding
- * the next paragraph would overshoot the target, OR when the next paragraph
- * is a heading and the current part is already ≥70% of target.
+ * Pure greedy. Walks paragraphs in order; closes the current part when
+ * adding the next paragraph would overshoot the CURRENT part's target, OR
+ * when the next paragraph is a heading and the current part is already
+ * ≥70% of its target.
  */
-function redistribute(joinedText: string, targetParts: number): string[] {
+function redistribute(joinedText: string, targetsByPart: number[]): string[] {
+  const targetParts = targetsByPart.length;
   if (targetParts < 1) return [];
   if (targetParts === 1) return [joinedText];
 
@@ -226,10 +261,8 @@ function redistribute(joinedText: string, targetParts: number): string[] {
   if (paragraphs.length === 0) return [joinedText];
 
   const charsByPara = paragraphs.map((p) => stripMarkdown(p).length);
-  const totalChars = charsByPara.reduce((a, b) => a + b, 0);
-  if (totalChars === 0) return [joinedText];
+  if (charsByPara.reduce((a, b) => a + b, 0) === 0) return [joinedText];
 
-  const targetCharsPerPart = totalChars / targetParts;
   const isHeading = (p: string): boolean => /^#{2,6}\s+/.test(p.trimStart());
 
   const parts: string[][] = [];
@@ -239,15 +272,17 @@ function redistribute(joinedText: string, targetParts: number): string[] {
   for (let i = 0; i < paragraphs.length; i++) {
     const para = paragraphs[i]!;
     const paraChars = charsByPara[i]!;
+    // Target for the part we're currently filling. Each part has its own.
+    const currentTarget = targetsByPart[parts.length] ?? 0;
     const remainingPartsAfterThis = targetParts - parts.length - 1;
     // Don't close a part if we'd leave fewer paragraphs than parts still
     // needed — that produces empty parts at the tail.
     const enoughLeftToFill = paragraphs.length - i >= remainingPartsAfterThis;
     const canCloseAnother = parts.length < targetParts - 1;
 
-    const wouldOvershoot = currentChars + paraChars > targetCharsPerPart;
+    const wouldOvershoot = currentChars + paraChars > currentTarget;
     const isCleanHeadingBreak =
-      isHeading(para) && currentChars >= targetCharsPerPart * HEADING_BREAK_MIN_FRACTION;
+      isHeading(para) && currentChars >= currentTarget * HEADING_BREAK_MIN_FRACTION;
 
     const shouldClose =
       current.length > 0 && canCloseAnother && enoughLeftToFill && (wouldOvershoot || isCleanHeadingBreak);
