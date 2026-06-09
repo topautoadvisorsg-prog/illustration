@@ -106,7 +106,7 @@ describe('applyDirectorAutoFixes', () => {
     expect(out.applied[0]!.description).toMatch(/intentional outlier/i);
   });
 
-  it('switch_layout NOT auto-applied in v1 even when allowed (reserved as no-op)', () => {
+  it('switch_layout NOT auto-applied in v1 even when allowed (reserved — surfaces in skippedNotAllowed)', () => {
     const out = applyDirectorAutoFixes({
       ledger: ledger([
         entry({
@@ -119,9 +119,12 @@ describe('applyDirectorAutoFixes', () => {
       allowedActions: ['switch_layout'],
       enabled: true,
     });
-    // v1 reserved — no fix applied, no skipped-not-allowed (allow list matched).
+    // v1 reserved — no fix applied. The skipped-not-allowed row explains why
+    // so the operator (and any future report consumer) never sees a silent skip.
     expect(out.applied).toHaveLength(0);
-    expect(out.skippedNotAllowed).toHaveLength(0);
+    expect(out.skippedNotAllowed).toHaveLength(1);
+    expect(out.skippedNotAllowed[0]!.kind).toBe('switch_layout');
+    expect(out.skippedNotAllowed[0]!.rationale).toMatch(/reserved by v1/i);
   });
 
   it('MANUAL entries needing decision surface as manualRequired', () => {

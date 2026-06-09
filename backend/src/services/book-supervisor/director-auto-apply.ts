@@ -85,7 +85,18 @@ export function applyDirectorAutoFixes(input: AutoApplyInput): AutoApplyResult {
       }
 
       const fix = executeAction(entry, action);
-      if (fix) applied.push(fix);
+      if (fix) {
+        applied.push(fix);
+      } else {
+        // Action kind is allowed and AUTOMATIC-eligible, but v1 reserves the
+        // actual mutation. Surface it explicitly so the operator (or the
+        // report consumer) sees the gap instead of a silent skip.
+        skippedNotAllowed.push({
+          pageKey: entry.pageKey,
+          kind: action.kind,
+          rationale: `action kind "${action.kind}" is allowed but reserved by v1 supervisor (mutation seam not yet wired)`,
+        });
+      }
     }
   }
 

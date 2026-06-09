@@ -79,3 +79,18 @@ std_*.png
 wpr_*.png
 badge_preview.html
 printprep_*.png
+
+# Session-byproduct PNGs / forensic dumps from rendering & pagination diagnostics
+batch2*.png
+batch2v2*.png
+render_*.png
+forensic_prompt.txt
+forensic_spec.json
+
+# Geometry / utilization diagnostic outputs (regenerable via the scripts)
+backend/geometry-audit.png
+backend/geometry-audit.svg
+backend/utilization-report.png
+
+# Graphify (knowledge-graph) outputs — large, regenerable
+graphify-out/

@@ -36,7 +36,7 @@ import { reviewProjectPageQuality } from '../page-quality/page-quality-review.js
 import { buildPublishingDirectorDecisionLedger } from '../publishing-director/decision-ledger.js';
 import { estimateCost } from '../cost/estimate.js';
 import { applyDirectorAutoFixes } from './director-auto-apply.js';
-import { resolvePolicy, type SupervisorPolicy } from './policy.js';
+import { resolvePolicy, type SupervisorPolicy, type SupervisorPolicyOverride } from './policy.js';
 import type {
   PipelineReport,
   PipelineSnapshot,
@@ -52,7 +52,7 @@ export interface RunPipelineInput {
   projectId: string;
   mode: SupervisorMode;
   /** Per-run policy override. Merged into DEFAULT_SUPERVISOR_POLICY. */
-  policyOverride?: Partial<SupervisorPolicy>;
+  policyOverride?: SupervisorPolicyOverride;
 }
 
 /** Single entry point. Returns the report; throws only on missing project. */
@@ -288,12 +288,23 @@ function runPaginationStage(
     });
   }
 
-  // Cross-chapter compaction guard (hard zero by default).
-  // perChapter aggregates per chapter, but cross-chapter compaction is detected
-  // elsewhere; here we just confirm the basic invariant by checking that compacted
-  // counts sum cleanly across chapters.
-  const compactedTotal = report.perChapter.reduce((sum, ch) => sum + (ch.fitDistribution.FITS ?? 0) * 0 + 0, 0);
-  void compactedTotal; // structural — current pagination engine guarantees this
+  // Sanity invariant: the per-chapter fit counts must sum to the project totals.
+  // This is the supervisor's belt-and-braces check that the report it just read
+  // is internally consistent. A mismatch would mean the aggregation drifted —
+  // a real bug, surface as a BLOCKER so the operator never builds on bad data.
+  const perChapterFitSum = report.perChapter.reduce(
+    (sum, ch) => sum + Object.values(ch.fitDistribution).reduce((a, b) => a + b, 0),
+    0,
+  );
+  if (perChapterFitSum !== report.totalPages) {
+    findings.push({
+      severity: 'BLOCKER',
+      stage: 'pagination',
+      message: `Pagination report inconsistent: per-chapter fit sum ${perChapterFitSum} ≠ totalPages ${report.totalPages}.`,
+      recommendedAction:
+        'Re-run pagination. If the mismatch persists, this is a backend bug — escalate.',
+    });
+  }
 
   const verdict: SupervisorVerdict = findings.some((f) => f.severity === 'BLOCKER')
     ? 'BLOCKED'
@@ -305,12 +316,16 @@ function runPaginationStage(
     stageKey: 'pagination',
     label: 'Pagination (v1)',
     verdict,
+    // Operator-facing summary uses plain language per BOOK_PRODUCTION_UI_AUDIT
+    // §6 terminology fix: TIGHT → "near capacity", OVERFLOW → "over capacity",
+    // UNDERFILL → "under-filled". The raw codes stay in `metrics` for the UI to
+    // map however it wants.
     summary:
       verdict === 'PASS'
-        ? `${report.totalPages} pages, ${fits.FITS} FITS / ${fits.TIGHT} TIGHT / ${fits.OVERFLOW} OVERFLOW / ${fits.UNDERFILL} UNDERFILL.`
+        ? `${report.totalPages} pages — ${fits.FITS} fit comfortably, ${fits.TIGHT} near capacity, ${fits.OVERFLOW} over capacity, ${fits.UNDERFILL} under-filled.`
         : verdict === 'WARNING'
           ? `${report.totalPages} pages — within tolerance but flagged for review.`
-          : `${report.totalPages} pages — pagination math is BLOCKING further stages.`,
+          : `${report.totalPages} pages — pagination math is blocking further stages.`,
     metrics: {
       totalPages: report.totalPages,
       fitDistribution: fits,
@@ -589,7 +604,18 @@ function runVerificationReadyStage(
   _policy: SupervisorPolicy,
 ): SupervisorStageReport {
   const t0 = Date.now();
-  const required = ['ingest', 'manifests', 'pagination', 'text-fit', 'page-quality', 'budget-preflight'];
+  // Stages that MUST be PASS before the verification batch can start. Director
+  // is included because a BLOCKED ledger means the operator owes a decision
+  // somewhere that even safe auto-fixes can't resolve.
+  const required = [
+    'ingest',
+    'manifests',
+    'pagination',
+    'text-fit',
+    'page-quality',
+    'publishing-director',
+    'budget-preflight',
+  ];
   const failed = upstream.filter(
     (s) => required.includes(s.stageKey) && (s.verdict === 'BLOCKED' || s.verdict === 'NOT_RUN'),
   );

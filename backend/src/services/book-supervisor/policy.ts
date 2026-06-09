@@ -125,9 +125,16 @@ export const DEFAULT_SUPERVISOR_POLICY: SupervisorPolicy = {
   },
 };
 
+/** Deep-partial of SupervisorPolicy: each top-level section is optional AND
+ *  each field inside it is optional. Lets callers tweak a single threshold
+ *  without restating the whole section. */
+export type SupervisorPolicyOverride = {
+  [K in keyof SupervisorPolicy]?: Partial<SupervisorPolicy[K]>;
+};
+
 /** Merge a partial override into the defaults. Used by the API when callers
  *  want to tweak a single threshold for one run. */
-export function resolvePolicy(override?: Partial<SupervisorPolicy>): SupervisorPolicy {
+export function resolvePolicy(override?: SupervisorPolicyOverride): SupervisorPolicy {
   if (!override) return DEFAULT_SUPERVISOR_POLICY;
   return {
     pagination: { ...DEFAULT_SUPERVISOR_POLICY.pagination, ...(override.pagination ?? {}) },
