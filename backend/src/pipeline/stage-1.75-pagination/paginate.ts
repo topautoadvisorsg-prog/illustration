@@ -17,6 +17,7 @@ import { resolveGeometry } from '../publishing-standard/index.js';
 import { buildLayoutSequence, type LayoutSequence } from './layout-sequence.js';
 import { entriesToStream, type EntryBreakPolicy, type StreamToken } from './stream.js';
 import { flowEngine, type EntryMeta, type EntryMetaMap } from './flow-engine.js';
+import { rebalanceEntries } from './entry-rebalance.js';
 import { tailRebalance } from './tail-rebalance.js';
 import { expandLayoutAPairs } from './layout-a-pair.js';
 import { PaginatedPageSchema, type PaginatedPage } from './types.js';
@@ -119,11 +120,24 @@ export function paginateProject(input: PaginateProjectInput): PaginateProjectRes
     entryMeta,
   );
 
+  // Entry-rebalance (Patch B): the flow engine pours greedily so every full
+  // page sits AT capacity — a cliff that small markdown↔stripped char drift
+  // can push into OVERFLOW. This pass re-pours each multi-part STANDALONE
+  // entry across its own parts (adding at most one continuation when needed)
+  // so no page lands above ~85% fill while a sibling has slack. Pure;
+  // skips compacted pages and never crosses entry/chapter boundaries.
+  const entryRebalance = rebalanceEntries({
+    pages: flowResult.pages,
+    trimSize,
+    bodyPt: input.config.typography.bodyPt,
+    lineHeight: input.config.typography.lineHeight,
+  });
+
   // Tail-rebalance v1: surface the candidate / orphan warning; reflow is not
   // performed automatically yet (deferred — the orchestrator stays simple, and
   // the operator can manually re-paginate after editing the layout sequence in
   // a future UI). The warning lets the operator know what could be improved.
-  const rebalance = tailRebalance({ pages: flowResult.pages });
+  const rebalance = tailRebalance({ pages: entryRebalance.pages });
 
   // Assign global 1-based printed page numbers across the whole book. This is
   // the orchestrator's job — the flow engine doesn't know the final order
@@ -140,7 +154,7 @@ export function paginateProject(input: PaginateProjectInput): PaginateProjectRes
   // pages table. Throws if any required field is missing or out of range.
   const validated = paired.map((p) => PaginatedPageSchema.parse(p));
 
-  const warnings = [...flowResult.warnings, ...rebalance.warnings];
+  const warnings = [...flowResult.warnings, ...entryRebalance.warnings, ...rebalance.warnings];
 
   return {
     pages: validated,
