@@ -15,17 +15,29 @@ AI publishing agents do the work -> operator reviews, corrects, approves, and ex
 
 ## Main Screens
 
-- Backend connection check.
-- AI Publishing Agent Console.
-- Workflow/stage status board.
-- Manuscript upload/paste area.
-- Manuscript breakdown review.
-- Page plan review.
-- Text-fit preview summary.
-- Image proofing controls.
-- Large PDF preview/export panel.
-- Publishing Intelligence Center.
-- Advanced configuration for raw layout prompt assets and internal metadata.
+The console is one project workspace with five top-nav tabs, plus a sidebar
+that pins the project, the workflow stages, and resource shortcuts.
+
+Tabs (left-to-right):
+
+1. **🛠 Control Center** — Production Status tile (calls the Supervisor,
+   shows verdict / why / next action / run), Dashboard hero, Operator
+   guidance, Chat agent, Page Plan, Render Proofs, Image review, Decision
+   Ledger, Quality Review.
+2. **Setup** — Project create / select, manuscript upload, publishing
+   format (trim / typography), format calibration.
+3. **Library** — Reference catalog of layout templates with thumbnails.
+4. **Intelligence** — Decisions / experiments / standards / SOPs / cost
+   events / print findings (gated to power users behind Advanced mode).
+5. **Export** — Chapter production grid, book parts, render proof
+   preview, download.
+
+Floating elements:
+
+- Notice strip for last action / errors.
+- Advanced Mode toggle (top-right) to unlock power features and raw
+  internals.
+- Chat agent panel that can answer "why" against the live project.
 
 ## Normal vs Advanced
 

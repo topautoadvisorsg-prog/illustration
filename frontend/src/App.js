@@ -1087,11 +1087,39 @@ function trimSlash(value) {
 }
 
 function layoutName(templateId) {
-  return LAYOUT_LABELS[templateId] || templateId || "No layout";
+  // Two layout systems coexist: legacy LAYOUT_TEMPLATES (LAYOUT_1..16, which
+  // seeds LAYOUT_LABELS) AND the simplified families (LAYOUT_A/B/C/D, which
+  // live in SIMPLIFIED_FAMILY_LABELS). The simplified families are the
+  // ACTIVE pipeline; consult them BEFORE falling through to the raw enum.
+  // Per LEGACY_DRIFT_AUDIT D-2.
+  return (
+    LAYOUT_LABELS[templateId] ||
+    simplifiedFamilyLabel(templateId) ||
+    templateId ||
+    "No layout"
+  );
 }
 
 function normalizeStatus(value) {
   return String(value || "pending").replace(/_/g, " ").toLowerCase();
+}
+
+// Operator-language map for the pagination v1 / text-fit enum (PaginationFitStatus
+// in backend/src/pipeline/stage-1.75-pagination/capacity.ts). Per LEGACY_DRIFT_AUDIT
+// D-4 — the raw codes (TIGHT, OVERFLOW, etc.) were leaking into operator chips
+// and forcing a publisher to guess "is tight good or bad?". Same translation used
+// by the Production Status tile.
+const FIT_STATUS_LABEL = {
+  PENDING: "Pending",
+  FITS: "Fits",
+  TIGHT: "Near capacity",
+  OVERFLOW: "Over capacity",
+  UNDERFILL: "Under-filled",
+};
+function fitStatusLabel(raw) {
+  if (!raw) return FIT_STATUS_LABEL.PENDING;
+  const key = String(raw).toUpperCase();
+  return FIT_STATUS_LABEL[key] || normalizeStatus(raw);
 }
 
 function formatPercent(value) {
@@ -1688,15 +1716,19 @@ function App() {
   );
   const operatorGuidance = useMemo(() => {
     if (busy) {
+      // Per LEGACY_DRIFT_AUDIT D-7: this is the busy/loading interstitial, not
+      // a publishing stage. Labels are operator-language ("Processing"), and
+      // stageKey is a neutral flag that does NOT exist in WORKFLOW_STAGES so
+      // the sidebar workflow rail isn't disturbed.
       return {
-        stageKey: "system",
-        stageLabel: "System Working",
-        status: "Waiting on system",
-        nextAction: "Let the current operation finish, then review the result in the log or preview.",
-        afterAction: "After it finishes, the board will move the next incomplete stage to Next.",
+        stageKey: "processing",
+        stageLabel: "Processing",
+        status: "Working on your last action",
+        nextAction: "Wait for the current operation to finish, then review the result in the log or preview.",
+        afterAction: "After it finishes, the board will move the next step to Next.",
         buttonLabel: "Working...",
         actionKey: null,
-        helpPrompt: "What is the system doing right now, and what should I check when it finishes?",
+        helpPrompt: "What is the platform doing right now, and what should I check when it finishes?",
       };
     }
     if (!activeProjectId) {
@@ -1723,10 +1755,13 @@ function App() {
         helpPrompt: "Help me choose the right publishing format for this book.",
       };
     }
+    // Per LEGACY_DRIFT_AUDIT D-8: these were both "Upload Manuscript" but they
+    // are TWO different states. Label each for its actual operator step so the
+    // workflow rail doesn't show "Upload Manuscript" twice in a row.
     if (!selectedProject?.manuscriptPath && !manuscript.trim()) {
       return {
         stageKey: "manuscript",
-        stageLabel: "Upload Manuscript",
+        stageLabel: "Choose Manuscript File",
         status: "Waiting on you",
         nextAction: "Choose the master manuscript file so the system can store it on the project.",
         afterAction: "After the file is loaded, click Upload Manuscript.",
@@ -4613,7 +4648,8 @@ function App() {
             </div>
             {textFitPreview && (
               <div className={`fit-summary ${textFitPreview.readyForImageSpend ? "ok" : "warn"}`}>
-                <strong>{textFitPreview.readyForImageSpend ? "Ready for image spend" : "Text-fit needs review"}</strong>
+                {/* Per LEGACY_DRIFT_AUDIT D-5: operator-language label, no dev jargon. */}
+                <strong>{textFitPreview.readyForImageSpend ? "Ready to generate images" : "Page Plan needs review before image generation"}</strong>
                 <span>{textFitPreview.totals?.fits || 0} fit / {textFitPreview.totals?.tight || 0} tight / {textFitPreview.totals?.overflow || 0} overflow</span>
               </div>
             )}
@@ -4901,7 +4937,7 @@ function App() {
                     <div className="page-plan-meta">
                       <span>{plan?.wordCount ?? "?"} words</span>
                       <span>{normalizeStatus(row?.status)}</span>
-                      <span>{fit?.fit?.status ? normalizeStatus(fit.fit.status) : normalizeStatus(plan?.textFitStatus || "fit pending")}</span>
+                      <span>{fitStatusLabel(fit?.fit?.status || plan?.textFitStatus)}</span>
                       <span>{approval ? "layout approved" : "layout pending"}</span>
                       {allocation && <span>{allocation.estimatedRenderedPages} rendered page(s)</span>}
                       <span>{plan?.blockers?.length || 0} blocker(s)</span>
@@ -5091,9 +5127,9 @@ function App() {
                           <span className="cpt-pagenum">page {pp.plannedPageNumber}</span>
                           <strong>{pp.pageKey}</strong>
                           <span className="cpt-role">{pp.pageRole}{pp.partN ? ` · ${pp.partN}/${pp.totalParts}` : ""}</span>
-                          <span className={`fit-tag fit-${fitLower}`}>{pp.fitStatus || "PENDING"}</span>
+                          <span className={`fit-tag fit-${fitLower}`}>{fitStatusLabel(pp.fitStatus)}</span>
                           <span className={pp.previewApproved ? "approval-badge approved" : "approval-badge pending"}>
-                            {pp.previewApproved ? "APPROVED" : "PENDING"}
+                            {pp.previewApproved ? "Approved" : "Pending"}
                           </span>
                           {familyLabel && <small className="cpt-family">{familyLabel}</small>}
                         </button>
@@ -5322,14 +5358,14 @@ function App() {
                         <div className="kv"><span>Layout</span><b>{familyLabel || pp.layoutTemplate}</b></div>
                         <div className="kv">
                           <span>Fit</span>
-                          <b className={`fit-tag fit-${fitLower}`}>{pp.fitStatus || "PENDING"}</b>
+                          <b className={`fit-tag fit-${fitLower}`}>{fitStatusLabel(pp.fitStatus)}</b>
                         </div>
                         <div className="kv">
                           <span>Approval</span>
                           <b className={pp.previewApproved ? "approval-badge approved" : "approval-badge pending"}>
                             {pp.previewApproved
-                              ? `APPROVED${pp.previewApprovedBy ? ` by ${pp.previewApprovedBy}` : ""}${pp.previewApprovedAt ? ` · ${new Date(pp.previewApprovedAt).toLocaleString()}` : ""}`
-                              : "PENDING"}
+                              ? `Approved${pp.previewApprovedBy ? ` by ${pp.previewApprovedBy}` : ""}${pp.previewApprovedAt ? ` · ${new Date(pp.previewApprovedAt).toLocaleString()}` : ""}`
+                              : "Pending"}
                           </b>
                         </div>
                         {pp.compactedEntryKeys && pp.compactedEntryKeys.length > 1 && (
@@ -5823,7 +5859,7 @@ function App() {
                           <span>{page.entryTitle}</span>
                         </div>
                         <span className={`proof-status ${fit?.fit?.status ? fit.fit.status.toLowerCase() : "pending"}`}>
-                          {fit?.fit?.status ? normalizeStatus(fit.fit.status) : "fit pending"}
+                          {fitStatusLabel(fit?.fit?.status)}
                         </span>
                       </div>
                       <div className="proof-page-meta">
