@@ -1,5 +1,5 @@
 /**
- * Stage 1.75 — entry-rebalance (Patch B + C).
+ * Stage 1.75 — entry-rebalance (Patch B + C + D).
  *
  * Post-pass that runs after `flowEngine`. The engine pours greedily, filling
  * each page to capacity before breaking. That produces a cliff: every full
@@ -161,7 +161,9 @@ export function rebalanceEntries(input: RebalanceEntriesInput): RebalanceEntries
     const targetsByPart = capacitiesByPart.map((cap) => cap * overallFillRatio);
 
     // 5. Re-pour. Greedy distribution at paragraph + heading boundaries.
-    const newTexts = redistribute(joinedText, targetsByPart);
+    //    Patch D: closest-distance close rule needs capacities too, so we can
+    //    hard-stop before exceeding cap while still optimizing distance-to-target.
+    const newTexts = redistribute(joinedText, targetsByPart, capacitiesByPart);
     if (newTexts.length === 0) continue;
 
     // 6. Build new pages. Opener keeps its layout + subject + warnings;
@@ -236,23 +238,34 @@ export function rebalanceEntries(input: RebalanceEntriesInput): RebalanceEntries
 }
 
 /**
- * Split joined markdown into N chunks at paragraph boundaries, where each
- * chunk targets a part-specific char count (Patch C: PROPORTIONAL to capacity).
+ * Split joined markdown into N chunks at paragraph boundaries.
  *
- * `targetsByPart[i]` is the target char count for part i. Caller computes
- * these as `capacityChars[i] × overallFillRatio` so every part lands at the
- * same fill ratio — opener (smaller capacity) gets fewer chars, continuations
- * (larger capacity) get more.
+ * `targetsByPart[i]` is the IDEAL char count for part i; `capacitiesByPart[i]`
+ * is the HARD CEILING. Targets are computed proportional to capacity
+ * (Patch C) so every part lands at the same fill ratio.
+ *
+ * Closing rule (Patch D — closest-distance):
+ *   1. If adding the next paragraph would exceed CAPACITY → close (avoid OVERFLOW).
+ *   2. Else compare |distance to target|:
+ *      - adding gets us CLOSER to target → add (keep filling).
+ *      - not adding is CLOSER → close (current part is good enough).
+ *   3. A heading break still wins when current part is already ≥70% of target.
+ *
+ * Pre-Patch D (overshoot rule) closed at "current + next > target" — that
+ * under-filled earlier parts when a single big paragraph would push the
+ * part over target, so the last part absorbed the cumulative deficit.
+ * Closest-distance accepts a small overshoot when the alternative is a
+ * large undershoot — keeps every part near target and stops the deficit
+ * from cascading to the last continuation.
  *
  * Section headings (`##`+) stay attached to the paragraph that follows —
  * we break BEFORE a heading, never after, so each part opens cleanly.
- *
- * Pure greedy. Walks paragraphs in order; closes the current part when
- * adding the next paragraph would overshoot the CURRENT part's target, OR
- * when the next paragraph is a heading and the current part is already
- * ≥70% of its target.
  */
-function redistribute(joinedText: string, targetsByPart: number[]): string[] {
+function redistribute(
+  joinedText: string,
+  targetsByPart: number[],
+  capacitiesByPart: number[],
+): string[] {
   const targetParts = targetsByPart.length;
   if (targetParts < 1) return [];
   if (targetParts === 1) return [joinedText];
@@ -272,20 +285,26 @@ function redistribute(joinedText: string, targetsByPart: number[]): string[] {
   for (let i = 0; i < paragraphs.length; i++) {
     const para = paragraphs[i]!;
     const paraChars = charsByPara[i]!;
-    // Target for the part we're currently filling. Each part has its own.
     const currentTarget = targetsByPart[parts.length] ?? 0;
+    const currentCapacity = capacitiesByPart[parts.length] ?? Number.POSITIVE_INFINITY;
     const remainingPartsAfterThis = targetParts - parts.length - 1;
-    // Don't close a part if we'd leave fewer paragraphs than parts still
-    // needed — that produces empty parts at the tail.
     const enoughLeftToFill = paragraphs.length - i >= remainingPartsAfterThis;
     const canCloseAnother = parts.length < targetParts - 1;
 
-    const wouldOvershoot = currentChars + paraChars > currentTarget;
+    // Hard-stop: never push a part above its capacity (would OVERFLOW).
+    const wouldExceedCapacity = currentChars + paraChars > currentCapacity;
+    // Closest-distance: which choice puts the part nearer to target?
+    const distanceWithoutAdd = Math.abs(currentChars - currentTarget);
+    const distanceWithAdd = Math.abs(currentChars + paraChars - currentTarget);
+    const closerWithoutAdd = distanceWithoutAdd < distanceWithAdd;
     const isCleanHeadingBreak =
       isHeading(para) && currentChars >= currentTarget * HEADING_BREAK_MIN_FRACTION;
 
     const shouldClose =
-      current.length > 0 && canCloseAnother && enoughLeftToFill && (wouldOvershoot || isCleanHeadingBreak);
+      current.length > 0
+      && canCloseAnother
+      && enoughLeftToFill
+      && (wouldExceedCapacity || closerWithoutAdd || isCleanHeadingBreak);
 
     if (shouldClose) {
       parts.push(current);
