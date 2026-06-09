@@ -25,6 +25,10 @@ import {
 } from '../pipeline/publishing-standard/index.js';
 import type { Badge } from '@wildlands/shared';
 
+/** Standard default canvas (8.5×11 trim + 0.125 bleed). Tests exercise the
+ *  default-trim shape; the 7×10 chain is covered by multi-trim-7x10.integration. */
+const STANDARD_CANVAS_IN = { w: 8.75, h: 11.25 };
+
 const sampleBadgeSet: Badge[] = [
   { family: 'region', value: 'FOREST' },
   { family: 'hazard', value: 'DEADLY' },
@@ -33,7 +37,7 @@ const sampleBadgeSet: Badge[] = [
 ];
 
 describe('badge geometry — standard canvas + placement', () => {
-  const canvas = standardCanvas();
+  const canvas = standardCanvas(STANDARD_CANVAS_IN);
 
   it('canvas is the 300-DPI full-bleed page', () => {
     expect(canvas).toMatchObject({ width: 2625, height: 3375, dpi: 300 });
@@ -83,6 +87,7 @@ describe('preflight gate', () => {
   const base = {
     widthPx: 2625, heightPx: 3375, dpi: 300, colorMode: 'srgb',
     pngBytes: 1000, pdfBytes: 1000, badgesWithinCanvas: true,
+    canvasIn: STANDARD_CANVAS_IN,
   };
   it('passes a correct page', () => {
     expect(runPreflight(base).passed).toBe(true);
@@ -122,7 +127,7 @@ describe('composePrintPage — integration on a fixture (no DB, no spend)', () =
       create: { width: 1024, height: 1536, channels: 3, background: { r: 224, g: 200, b: 160 } },
     }).png().toBuffer();
 
-    const out = await composePrintPage(fixture, sampleBadgeSet, '42');
+    const out = await composePrintPage(fixture, sampleBadgeSet, '42', STANDARD_CANVAS_IN);
 
     expect(out.widthPx).toBe(2625);
     expect(out.heightPx).toBe(3375);
@@ -142,6 +147,7 @@ describe('composePrintPage — integration on a fixture (no DB, no spend)', () =
     const pre = runPreflight({
       widthPx: out.widthPx, heightPx: out.heightPx, dpi: out.dpi, colorMode: out.colorMode,
       pngBytes: out.pngBuffer.length, pdfBytes: out.pdfBuffer.length, badgesWithinCanvas: out.badgesWithinCanvas,
+      canvasIn: STANDARD_CANVAS_IN,
     });
     expect(pre.passed).toBe(true);
   });
@@ -154,6 +160,7 @@ describe('composePrintPage — integration on a fixture (no DB, no spend)', () =
       fixture,
       [{ family: 'region', value: 'RIVER' }, { family: 'hazard', value: 'NONE' }, { family: 'source', value: 'FIELD_GUIDE' }],
       null,
+      STANDARD_CANVAS_IN,
     );
     expect(out.stampedBadges).toBe(2); // region + source, no hazard
     expect(out.stampedFolio).toBe(false); // null folio

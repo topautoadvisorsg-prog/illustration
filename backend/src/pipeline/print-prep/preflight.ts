@@ -12,6 +12,11 @@ export interface PreflightInput {
   pngBytes: number;
   pdfBytes: number;
   badgesWithinCanvas: boolean;
+  /** Project's resolved canvas (trim + 2×bleed). REQUIRED — preflight must
+   *  check the page against the SAME canvas the project resolved to. Callers
+   *  pass `resolveGeometry(config).canvasIn`; no default fallback (that path
+   *  is what produced the original trim-mismatch bug). */
+  canvasIn: { w: number; h: number };
 }
 
 export interface PreflightCheck {
@@ -28,8 +33,9 @@ export interface PreflightReport {
 const KDP_MAX_INTERIOR_PDF_BYTES = 650 * 1024 * 1024; // KDP ~650MB ceiling
 
 export function runPreflight(input: PreflightInput): PreflightReport {
-  const expW = Math.round(SPACING.canvasIn.w * SPACING.printDpi); // 2625
-  const expH = Math.round(SPACING.canvasIn.h * SPACING.printDpi); // 3375
+  const { canvasIn } = input;
+  const expW = Math.round(canvasIn.w * SPACING.printDpi);
+  const expH = Math.round(canvasIn.h * SPACING.printDpi);
 
   const checks: PreflightCheck[] = [
     {
@@ -45,9 +51,9 @@ export function runPreflight(input: PreflightInput): PreflightReport {
     {
       name: 'trim_plus_bleed',
       ok:
-        Math.abs(input.widthPx / input.dpi - SPACING.canvasIn.w) < 0.01 &&
-        Math.abs(input.heightPx / input.dpi - SPACING.canvasIn.h) < 0.01,
-      detail: `${(input.widthPx / input.dpi).toFixed(3)}×${(input.heightPx / input.dpi).toFixed(3)} in (expected ${SPACING.canvasIn.w}×${SPACING.canvasIn.h})`,
+        Math.abs(input.widthPx / input.dpi - canvasIn.w) < 0.01 &&
+        Math.abs(input.heightPx / input.dpi - canvasIn.h) < 0.01,
+      detail: `${(input.widthPx / input.dpi).toFixed(3)}×${(input.heightPx / input.dpi).toFixed(3)} in (expected ${canvasIn.w}×${canvasIn.h})`,
     },
     {
       name: 'color_mode',

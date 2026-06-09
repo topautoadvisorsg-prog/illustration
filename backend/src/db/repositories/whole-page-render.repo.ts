@@ -99,6 +99,7 @@ export interface MarkRenderedInput {
   imagePath: string;
   specPath: string;
   promptPath: string;
+  blueprintPath?: string | null;
   widthPx: number;
   heightPx: number;
   model: string;
@@ -113,6 +114,7 @@ export async function markRendered(renderId: string, out: MarkRenderedInput): Pr
       imagePath: out.imagePath,
       specPath: out.specPath,
       promptPath: out.promptPath,
+      blueprintPath: out.blueprintPath ?? null,
       widthPx: out.widthPx,
       heightPx: out.heightPx,
       model: out.model,

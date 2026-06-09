@@ -153,11 +153,17 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
         outside: geometry.margins.rightIn,
         inside: geometry.margins.gutterIn,
       },
-      bleedIn: 0.125,
+      // Bleed is owned by the resolved geometry (Rule Zero) — never hardcoded.
+      bleedIn: geometry.bleedIn,
     },
     readingFieldGeometry: rfGeometry,
     typographyDNA: {
       ...EXPERIMENT_TYPOGRAPHY_DNA,
+      // Drop-cap governance (SPEC_GEOMETRY_RECONCILIATION §3): the drop-cap
+      // surround is authoritative on `dropCap`. When there is no drop-cap
+      // (every interior/continuation page), emit NOTHING about it — otherwise
+      // the model draws an illuminated initial on pages that should have none.
+      decorativeInitial: dropCap ? EXPERIMENT_TYPOGRAPHY_DNA.decorativeInitial : null,
       // For non-chapter-openers we don't enforce a fixed title hierarchy.
       titleHierarchy:
         pageType === 'CHAPTER_OPENER'

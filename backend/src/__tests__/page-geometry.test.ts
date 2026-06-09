@@ -9,12 +9,13 @@ import {
 describe('computePageGeometry', () => {
   it('computes an 8.5x11 premium page with bleed and default margins', () => {
     const g = computePageGeometry({ widthIn: 8.5, heightIn: 11, bleedIn: 0.125 }, DEFAULT_MARGINS);
-    expect(g.pageWidthIn).toBe(8.625);
+    expect(g.pageWidthIn).toBe(8.625); // print page box (bound page) — unchanged
     expect(g.pageHeightIn).toBe(11.25);
-    expect(g.textWidthIn).toBe(6.375); // 8.625 - 1.25 gutter - 1 right
-    expect(g.textHeightIn).toBe(9.25); // 11.25 - 1 - 1
-    expect(g.textWidthPt).toBe(459); // 6.375 * 72
-    expect(g.textHeightPt).toBe(666); // 9.25 * 72
+    // Content frame derives from the TRIM box (8.5×11), never the bleed page.
+    expect(g.textWidthIn).toBe(6.25); // 8.5 - 1.25 gutter - 1 right
+    expect(g.textHeightIn).toBe(9); // 11 - 1 - 1
+    expect(g.textWidthPt).toBe(450); // 6.25 * 72
+    expect(g.textHeightPt).toBe(648); // 9 * 72
     expect(g.safeZoneIn).toBe(0.25);
   });
 
@@ -22,8 +23,8 @@ describe('computePageGeometry', () => {
     const g = computePageGeometry({ widthIn: 6, heightIn: 9, bleedIn: 0.125 }, COMPACT_MARGINS);
     expect(g.pageWidthIn).toBe(6.125);
     expect(g.pageHeightIn).toBe(9.25);
-    expect(g.textWidthIn).toBe(4.625); // 6.125 - 0.875 - 0.625
-    expect(g.textHeightIn).toBe(7.75); // 9.25 - 0.75 - 0.75
+    expect(g.textWidthIn).toBe(4.5); // trim 6 - 0.875 - 0.625
+    expect(g.textHeightIn).toBe(7.5); // trim 9 - 0.75 - 0.75
   });
 
   it('picks compact margins for small trims and default for large', () => {

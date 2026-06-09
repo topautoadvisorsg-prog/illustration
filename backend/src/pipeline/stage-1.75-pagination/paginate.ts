@@ -13,6 +13,7 @@
  */
 
 import type { PageManifest, ProjectConfig, TrimSize } from '@wildlands/shared';
+import { resolveGeometry } from '../publishing-standard/index.js';
 import { buildLayoutSequence, type LayoutSequence } from './layout-sequence.js';
 import { entriesToStream, type EntryBreakPolicy, type StreamToken } from './stream.js';
 import { flowEngine, type EntryMeta, type EntryMetaMap } from './flow-engine.js';
@@ -97,7 +98,10 @@ function summarize(pages: PaginatedPage[], entryCount: number): PaginateProjectR
  * full ordered list of `PaginatedPage` records ready for persistence.
  */
 export function paginateProject(input: PaginateProjectInput): PaginateProjectResult {
-  const trimSize = input.trimSize ?? input.config.trimSize;
+  // Single source of truth (SPEC_GEOMETRY_RECONCILIATION §1): capacity math
+  // uses the resolved trim — never a raw config default. An explicit override
+  // (input.trimSize) is honored but must still be a supported trim.
+  const trimSize = resolveGeometry({ trimSize: input.trimSize ?? input.config.trimSize }).trimSize;
   // CRITICAL: entries MUST be in book order (chapter, then page) before the
   // stream is built. The manifest query has no ORDER BY, so callers pass them
   // in Postgres-arbitrary order — which made compaction merge cross-chapter

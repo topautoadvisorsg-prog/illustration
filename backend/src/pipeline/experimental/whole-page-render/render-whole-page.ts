@@ -26,7 +26,7 @@ import {
   markRendering,
   type WholePageRenderRow,
 } from '../../../db/repositories/whole-page-render.repo.js';
-import { WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
+import { WILDLANDS_STANDARD, resolveGeometry } from '../../publishing-standard/index.js';
 import { directLayout, type LayoutAllocation } from '../../stage-6-layout/layout-director.js';
 import { computePageGeometry } from '../../stage-6-layout/page-geometry.js';
 import { renderBlueprintPng } from '../../stage-3-generation/blueprint.js';
@@ -75,7 +75,7 @@ interface PreparedRender {
  * row-creation step and the execution step call this, so the page, project,
  * config, geometry, and allocation are each fetched/derived exactly once.
  */
-async function prepareRender(pageId: string): Promise<PreparedRender> {
+export async function prepareRender(pageId: string): Promise<PreparedRender> {
   const pageRow = await getPaginatedPageById(pageId);
   if (!pageRow) throw new Error(`page_not_found:${pageId}`);
   const project = await getProject(pageRow.projectId);
@@ -94,7 +94,10 @@ async function prepareRender(pageId: string): Promise<PreparedRender> {
     source: meta?.sourceConfidence ?? 'GENERAL_REFERENCE',
   };
 
-  const geometry = computePageGeometry(config.trimSize);
+  // Resolved trim is the single source (SPEC_GEOMETRY_RECONCILIATION §1): the
+  // page-spec geometry AND the blueprint pixel size both derive from it, so the
+  // render can never disagree with print-prep on trim.
+  const geometry = computePageGeometry(resolveGeometry(config).trimSize);
   const allocation = directLayout({
     bodyMarkdown: pageRow.readingFieldText ?? '',
     layoutTemplate: pageRow.layoutTemplate as Parameters<typeof directLayout>[0]['layoutTemplate'],
@@ -205,11 +208,20 @@ export async function executeRender(
       ['experimental', 'whole-page', `${base}.prompt.txt`],
       prepared.assembledPrompt,
     );
+    // Blueprint auditability (SPEC_GEOMETRY_RECONCILIATION §4): persist the
+    // layout blueprint so every render package is complete and reproducible —
+    // spec JSON + prompt + blueprint + output image.
+    const blueprintStored = await storage.writeProjectFile(
+      prepared.projectId,
+      ['experimental', 'whole-page', `${base}.blueprint.png`],
+      blueprintPng,
+    );
 
     await markRendered(renderId, {
       imagePath: imageStored.relativePath,
       specPath: specStored.relativePath,
       promptPath: promptStored.relativePath,
+      blueprintPath: blueprintStored.relativePath,
       widthPx: image.widthPx,
       heightPx: image.heightPx,
       model: image.model,

@@ -32,11 +32,18 @@ export interface CanvasPx {
   dpi: number;
 }
 
-/** The standard 300-DPI full-bleed canvas. */
-export function standardCanvas(): CanvasPx {
+/**
+ * The 300-DPI full-bleed canvas for a project.
+ *
+ * Canvas inches are DERIVED from the project's resolved trim
+ * (SPEC_GEOMETRY_RECONCILIATION §1) — callers MUST pass
+ * `resolveGeometry(config).canvasIn`. No default fallback: an omitted canvas
+ * is how the trim-mismatch bug crept in originally.
+ */
+export function standardCanvas(canvasIn: { w: number; h: number }): CanvasPx {
   return {
-    width: Math.round(SPACING.canvasIn.w * SPACING.printDpi), // 2625
-    height: Math.round(SPACING.canvasIn.h * SPACING.printDpi), // 3375
+    width: Math.round(canvasIn.w * SPACING.printDpi),
+    height: Math.round(canvasIn.h * SPACING.printDpi),
     dpi: SPACING.printDpi,
   };
 }

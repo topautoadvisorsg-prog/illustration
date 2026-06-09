@@ -300,6 +300,9 @@ export const wholePageRenders = pgTable(
     imagePath: text('image_path'),
     specPath: text('spec_path'),
     promptPath: text('prompt_path'),
+    // Blueprint auditability (SPEC_GEOMETRY_RECONCILIATION §4): the layout
+    // blueprint handed to the model, kept for a complete render package.
+    blueprintPath: text('blueprint_path'),
     widthPx: integer('width_px'),
     heightPx: integer('height_px'),
     model: text('model'),

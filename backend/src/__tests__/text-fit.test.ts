@@ -12,13 +12,14 @@ function fit(body: string, layoutTemplate: LayoutTemplateId = 'LAYOUT_1_STANDARD
 describe('analyzeTextFit', () => {
   it('derives a deterministic character grid for the standard layout', () => {
     const r = fit('x'.repeat(1500));
-    // 459pt / (0.45 * 11pt) = floor(92.7) = 92 chars/line
-    expect(r.charsPerLine).toBe(92);
-    // floor(666 / (11 * 1.28)) = floor(47.3) = 47 total lines
-    expect(r.totalLines).toBe(47);
-    // (47 - 3 overhead) * 0.8 factor -> floor(35.2) = 35 usable lines
-    expect(r.usableLines).toBe(35);
-    expect(r.capacityChars).toBe(92 * 35);
+    // Content frame now derives from the TRIM box: textWidthPt 450, heightPt 648.
+    // 450pt / (0.45 * 11pt) = floor(90.9) = 90 chars/line
+    expect(r.charsPerLine).toBe(90);
+    // floor(648 / (11 * 1.28)) = floor(46.0) = 46 total lines
+    expect(r.totalLines).toBe(46);
+    // (46 - 3 overhead) * 0.8 factor -> floor(34.4) = 34 usable lines
+    expect(r.usableLines).toBe(34);
+    expect(r.capacityChars).toBe(90 * 34);
   });
 
   it('classifies a comfortably-fitting page as FITS', () => {
