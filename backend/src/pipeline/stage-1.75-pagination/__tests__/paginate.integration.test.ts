@@ -108,10 +108,17 @@ describe('paginateProject — end-to-end orchestrator', () => {
       }
     }
 
-    // Total parts on each chain matches actual chain length.
+    // Total parts on each chain matches actual chain length. An entry "appears"
+    // on a page if it's the primary entryKey OR listed in compactedEntryKeys —
+    // that's the engine's accounting (flow-engine.ts:427-434) and what the
+    // reader sees as "Part N of M" coverage. Counting primary-only would
+    // miscount any entry that soft-broke onto a prior opener AND also got a
+    // standalone continuation.
     const partsByEntry = new Map<string, number>();
     for (const p of result.pages) {
-      partsByEntry.set(p.entryKey, (partsByEntry.get(p.entryKey) ?? 0) + 1);
+      const seen = new Set<string>([p.entryKey]);
+      if (p.compactedEntryKeys) for (const k of p.compactedEntryKeys) seen.add(k);
+      for (const k of seen) partsByEntry.set(k, (partsByEntry.get(k) ?? 0) + 1);
     }
     for (const p of result.pages) {
       expect(p.totalParts).toBe(partsByEntry.get(p.entryKey));

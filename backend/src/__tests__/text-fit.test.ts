@@ -12,14 +12,19 @@ function fit(body: string, layoutTemplate: LayoutTemplateId = 'LAYOUT_1_STANDARD
 describe('analyzeTextFit', () => {
   it('derives a deterministic character grid for the standard layout', () => {
     const r = fit('x'.repeat(1500));
-    // Content frame now derives from the TRIM box: textWidthPt 450, heightPt 648.
-    // 450pt / (0.45 * 11pt) = floor(90.9) = 90 chars/line
-    expect(r.charsPerLine).toBe(90);
-    // floor(648 / (11 * 1.28)) = floor(46.0) = 46 total lines
+    // Content frame derives from the TRIM box: textWidthPt 450, heightPt 648.
+    // LAYOUT_1_STANDARD is FLOAT_LEFT with artAreaFraction=0.32 — ≥ the parallel-
+    // column threshold (0.25), so the text panel is a NARROWER column at FULL
+    // height (not the old full-width × reduced-lines model).
+    //   panelWidthPt  = 450 × (1 − 0.32) = 306
+    //   panelHeightPt = 648
+    //   charsPerLine  = floor(306 / (0.45 × 11)) = floor(61.8) = 61
+    //   totalLines    = floor(648 / (11 × 1.28)) = floor(46.0) = 46
+    //   usableLines   = 46 − 3 overhead          = 43
+    expect(r.charsPerLine).toBe(61);
     expect(r.totalLines).toBe(46);
-    // (46 - 3 overhead) * 0.8 factor -> floor(34.4) = 34 usable lines
-    expect(r.usableLines).toBe(34);
-    expect(r.capacityChars).toBe(90 * 34);
+    expect(r.usableLines).toBe(43);
+    expect(r.capacityChars).toBe(61 * 43);
   });
 
   it('classifies a comfortably-fitting page as FITS', () => {
@@ -45,7 +50,9 @@ describe('analyzeTextFit', () => {
   });
 
   it('flags a nearly-full page as TIGHT', () => {
-    // capacity = 92*35 = 3220; ~95% fill
+    // capacity = 61 × 43 = 2623; 3050 chars → fillRatio ≈ 1.16. LAYOUT_1_STANDARD
+    // is FLOAT_LEFT artAreaFraction=0.32 — not textLight, not (a≥0.5 &&
+    // fillRatio>1.25) — so the analyzer maps to TIGHT (not OVERFLOW).
     const r = fit('x'.repeat(3050));
     expect(r.status).toBe('TIGHT');
     expect(r.fits).toBe(true);

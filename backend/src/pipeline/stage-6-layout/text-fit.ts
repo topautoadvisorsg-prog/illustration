@@ -16,7 +16,7 @@
 import type { LayoutTemplateId } from '@wildlands/shared';
 import { stripMarkdown } from '../stage-2-planner/plan-pages.js';
 import type { PageGeometry } from './page-geometry.js';
-import { getLayoutProfile } from './layout-profiles.js';
+import { getLayoutProfile, type LayoutProfile } from './layout-profiles.js';
 import { directLayout, type LayoutAllocation } from './layout-director.js';
 
 // Calibrated so the geometric estimate agrees with the planner's per-layout word
@@ -28,6 +28,11 @@ export const AVG_CHAR_WIDTH_EM = 0.45;
 export const TITLE_OVERHEAD_LINES = 3;
 /** Extra lines consumed per section header. */
 export const LINES_PER_SECTION_HEADER = 1;
+/** Float art is treated as a "wrap-around" (text reflows beside it as line-loss)
+ *  rather than a "parallel column" (text in a narrower strip) when the image
+ *  occupies less than this fraction of the page area. Below the threshold,
+ *  half-image-half-page-of-text doesn't visually match what the renderer does. */
+const FLOAT_PARALLEL_COLUMN_THRESHOLD = 0.25;
 
 export type TextFitStatus = 'FITS' | 'TIGHT' | 'OVERFLOW' | 'UNDERFILLED';
 
@@ -60,6 +65,54 @@ function countSectionHeaders(markdown: string): number {
   return matches ? matches.length : 0;
 }
 
+/**
+ * Derive the layout's physical TEXT panel rectangle from the resolved geometry +
+ * the layout's `artSlot` + `artAreaFraction`. This replaces the old single
+ * `textAreaFactor` multiplier (which reduced only the line count, regardless of
+ * whether the image actually narrowed the text column).
+ *
+ * Geometry by slot:
+ *   - TOP_BAND / BOTTOM_BAND / SCATTERED / FULL_PAGE:
+ *     Image consumes a horizontal band; text uses FULL width × REDUCED height.
+ *     (For PURE_TEXT, artAreaFraction = 0 → panel = the full text frame.)
+ *   - FLOAT_LEFT / FLOAT_RIGHT / SIDEBAR_LEFT / SIDEBAR_RIGHT:
+ *     Two regimes by image size:
+ *       a < 0.25  → small floating image: text wraps around it → line-loss model
+ *                   (FULL width × (1−a) height).
+ *       a ≥ 0.25  → large image / sidebar: text in a parallel column
+ *                   ((1−a) width × FULL height).
+ *   - CORNER_*: text wraps around two sides → line-loss model.
+ */
+function textPanelDims(
+  geometry: PageGeometry,
+  profile: LayoutProfile,
+): { widthPt: number; heightPt: number } {
+  const W = geometry.textWidthPt;
+  const H = geometry.textHeightPt;
+  const a = profile.artAreaFraction;
+  switch (profile.artSlot) {
+    case 'TOP_BAND':
+    case 'BOTTOM_BAND':
+    case 'SCATTERED':
+    case 'FULL_PAGE':
+    case 'CENTER_WRAP':
+    case 'CORNER_TOP_LEFT':
+    case 'CORNER_TOP_RIGHT':
+    case 'CORNER_BOTTOM_LEFT':
+    case 'CORNER_BOTTOM_RIGHT':
+      // Horizontal band, scattered marks, full-page background, centered or
+      // cornered image — text uses FULL width × REDUCED height.
+      return { widthPt: W, heightPt: H * (1 - a) };
+    case 'FLOAT_LEFT':
+    case 'FLOAT_RIGHT':
+    case 'SIDEBAR_RIGHT':
+      // Two regimes by image size.
+      return a < FLOAT_PARALLEL_COLUMN_THRESHOLD
+        ? { widthPt: W, heightPt: H * (1 - a) }      // small float → text wraps; line-loss
+        : { widthPt: W * (1 - a), heightPt: H };     // large float / sidebar → parallel column
+  }
+}
+
 export function analyzeTextFit(input: TextFitInput): TextFitResult {
   const { geometry, bodyPt, lineHeight, layoutTemplate } = input;
   const profile = getLayoutProfile(layoutTemplate);
@@ -67,13 +120,18 @@ export function analyzeTextFit(input: TextFitInput): TextFitResult {
 
   const charCount = stripMarkdown(input.bodyMarkdown).length;
 
-  const charsPerLine = Math.max(1, Math.floor(geometry.textWidthPt / (AVG_CHAR_WIDTH_EM * bodyPt)));
+  // Capacity is derived from the layout's PHYSICAL text panel rectangle
+  // (artSlot + artAreaFraction), NOT the full text frame reduced by a single
+  // `textAreaFactor` multiplier. See `textPanelDims` for the slot→rectangle
+  // mapping. SPEC_GEOMETRY_RECONCILIATION §calibration follow-up.
+  const panel = textPanelDims(geometry, profile);
+  const charsPerLine = Math.max(1, Math.floor(panel.widthPt / (AVG_CHAR_WIDTH_EM * bodyPt)));
   const lineBoxPt = bodyPt * lineHeight;
-  const totalLines = Math.max(1, Math.floor(geometry.textHeightPt / lineBoxPt));
+  const totalLines = Math.max(1, Math.floor(panel.heightPt / lineBoxPt));
 
   const overheadLines = TITLE_OVERHEAD_LINES + countSectionHeaders(input.bodyMarkdown) * LINES_PER_SECTION_HEADER;
   const linesForText = Math.max(1, totalLines - overheadLines);
-  const usableLines = Math.max(1, Math.floor(linesForText * profile.textAreaFactor));
+  const usableLines = linesForText;
 
   const capacityChars = charsPerLine * usableLines;
   const estimatedLines = Math.ceil(charCount / charsPerLine);
