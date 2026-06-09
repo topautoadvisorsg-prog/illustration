@@ -17,6 +17,7 @@ import { registerAgentRoutes } from './api/agents.routes.js';
 import { registerPaginationRoutes } from './api/pagination.routes.js';
 import { registerExperimentalRoutes } from './api/experimental.routes.js';
 import { registerSubjectBadgeRoutes } from './api/subject-badges.routes.js';
+import { registerSupervisorRoutes } from './api/supervisor.routes.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -61,6 +62,10 @@ export async function buildServer(): Promise<FastifyInstance> {
   await registerExperimentalRoutes(app);
   // Subject + Badge metadata cleanup (Standard v1.1) — deterministic, no AI.
   await registerSubjectBadgeRoutes(app);
+  // Book Production Supervisor — orchestrates the no-spend half of the pipeline
+  // and returns a unified PipelineReport with PASS / WARNING / BLOCKED verdict +
+  // next-action CTA. Image generation stays gated behind operator authorization.
+  await registerSupervisorRoutes(app);
 
   app.get('/', async () => ({
     service: 'wildlands-backend',
