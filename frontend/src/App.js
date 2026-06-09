@@ -170,6 +170,24 @@ const LAYOUT_ZONE_PRESETS = {
   LAYOUT_14_SIDEBAR_FEATURE: { architecture: "SIDEBAR_RIGHT", openingPageImagePercent: 30, openingPageTextPercent: 70 },
   LAYOUT_15_PROGRESSION_STUDY: { architecture: "TOP_BAND", openingPageImagePercent: 42, openingPageTextPercent: 58 },
   LAYOUT_16_CUTAWAY_FEATURE: { architecture: "TOP_BAND", openingPageImagePercent: 44, openingPageTextPercent: 56 },
+
+  // Simplified-family layouts (commit #4 / LAYOUT_SIMPLIFIED_V1) — entries here
+  // mirror backend/src/pipeline/stage-6-layout/layout-profiles.ts (artSlot +
+  // artAreaFraction). Before this entry was added, pages on these layouts
+  // fell through to LAYOUT_1_STANDARD and showed the wrong silhouette in the
+  // Page Plan zone-preview-card. See OPERATOR_SIMPLICITY_REVIEW + the layout
+  // preview drift audit.
+  LAYOUT_A_TEXT:                { architecture: "FLOAT_LEFT",          openingPageImagePercent: 5,  openingPageTextPercent: 95 },
+  LAYOUT_A_ILLUSTRATION:        { architecture: "FULL_PAGE",           openingPageImagePercent: 96, openingPageTextPercent: 4 },
+  LAYOUT_B_IMAGE_TOP:           { architecture: "TOP_BAND",            openingPageImagePercent: 50, openingPageTextPercent: 50 },
+  LAYOUT_B_IMAGE_BOTTOM:        { architecture: "BOTTOM_BAND",         openingPageImagePercent: 50, openingPageTextPercent: 50 },
+  LAYOUT_B_IMAGE_LEFT:          { architecture: "FLOAT_LEFT",          openingPageImagePercent: 50, openingPageTextPercent: 50 },
+  LAYOUT_B_IMAGE_RIGHT:         { architecture: "FLOAT_RIGHT",         openingPageImagePercent: 50, openingPageTextPercent: 50 },
+  LAYOUT_C_CORNER_TOP_LEFT:     { architecture: "CORNER_TOP_LEFT",     openingPageImagePercent: 25, openingPageTextPercent: 75 },
+  LAYOUT_C_CORNER_TOP_RIGHT:    { architecture: "CORNER_TOP_RIGHT",    openingPageImagePercent: 25, openingPageTextPercent: 75 },
+  LAYOUT_C_CORNER_BOTTOM_LEFT:  { architecture: "CORNER_BOTTOM_LEFT",  openingPageImagePercent: 25, openingPageTextPercent: 75 },
+  LAYOUT_C_CORNER_BOTTOM_RIGHT: { architecture: "CORNER_BOTTOM_RIGHT", openingPageImagePercent: 25, openingPageTextPercent: 75 },
+  LAYOUT_D_PURE_TEXT:           { architecture: "FULL_PAGE",           openingPageImagePercent: 0,  openingPageTextPercent: 100 },
 };
 
 const PUBLISHING_STANDARD_PRESETS = {
@@ -1133,10 +1151,40 @@ function zonePreviewLayers(source) {
     ];
   }
   if (architecture === "FULL_PAGE") {
+    // Pure-text path: when the layout reserves zero image area (e.g.
+    // LAYOUT_D_PURE_TEXT), render no image-priority zone — the page is text only.
+    if (imagePercent === 0) {
+      return [
+        baseTitle,
+        { id: "text-safe-full", kind: "text-safe", label: "Text-safe", xPct: 8, yPct: 22, widthPct: 84, heightPct: 70 },
+      ];
+    }
     return [
       { id: "image-priority-full", kind: "image-priority", label: "Image-priority", xPct: 0, yPct: 0, widthPct: 100, heightPct: 100 },
       baseTitle,
       { id: "text-safe-caption", kind: "text-safe", label: "Text-safe", xPct: 12, yPct: 78, widthPct: 76, heightPct: 12 },
+    ];
+  }
+  if (architecture === "BOTTOM_BAND") {
+    const imgH = Math.max(20, imagePercent);
+    return [
+      { id: "image-priority-bottom", kind: "image-priority", label: "Image-priority", xPct: 0, yPct: 100 - imgH, widthPct: 100, heightPct: imgH, instruction: "Concentrate focal visual detail in the lower artwork band; above it the artwork opens into a calm reading field." },
+      baseTitle,
+      { id: "text-safe-upper", kind: "text-safe", label: "Text-safe", xPct: 10, yPct: 24, widthPct: 80, heightPct: Math.max(20, 100 - imgH - 28) },
+    ];
+  }
+  if (architecture.startsWith("CORNER_")) {
+    const corners = {
+      CORNER_TOP_LEFT:     { ix: 4,  iy: 8,  iw: 38, ih: 38, tx: 46, ty: 24, tw: 50, th: 64 },
+      CORNER_TOP_RIGHT:    { ix: 58, iy: 8,  iw: 38, ih: 38, tx: 4,  ty: 24, tw: 50, th: 64 },
+      CORNER_BOTTOM_LEFT:  { ix: 4,  iy: 54, iw: 38, ih: 38, tx: 6,  ty: 6,  tw: 88, th: 44 },
+      CORNER_BOTTOM_RIGHT: { ix: 58, iy: 54, iw: 38, ih: 38, tx: 6,  ty: 6,  tw: 88, th: 44 },
+    };
+    const c = corners[architecture] || corners.CORNER_TOP_LEFT;
+    return [
+      { id: "image-priority-corner", kind: "image-priority", label: "Image-priority", xPct: c.ix, yPct: c.iy, widthPct: c.iw, heightPct: c.ih, instruction: "Small focal study lives in one corner; the rest of the page is a calm reading field." },
+      baseTitle,
+      { id: "text-safe-corner", kind: "text-safe", label: "Text-safe", xPct: c.tx, yPct: c.ty, widthPct: c.tw, heightPct: c.th },
     ];
   }
   return [
@@ -4885,7 +4933,16 @@ function App() {
                           }}
                         >
                           <span className="zone-preview-artwork-label">
-                            Full-page artwork canvas · {projectConfig?.trimSize?.widthIn || 7}×{projectConfig?.trimSize?.heightIn || 10}in
+                            Trim · {projectConfig?.trimSize?.widthIn || 7}×{projectConfig?.trimSize?.heightIn || 10}in
+                            {projectConfig?.trimSize?.bleedIn > 0 && (
+                              <span className="zone-preview-artwork-sublabel">
+                                {" · Bleed canvas "}
+                                {((projectConfig?.trimSize?.widthIn || 7) + 2 * projectConfig.trimSize.bleedIn).toFixed(2)}
+                                ×
+                                {((projectConfig?.trimSize?.heightIn || 10) + 2 * projectConfig.trimSize.bleedIn).toFixed(2)}
+                                in
+                              </span>
+                            )}
                           </span>
                           {zoneLayers.map((zone) => (
                             <span
