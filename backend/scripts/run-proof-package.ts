@@ -78,6 +78,9 @@ async function fetchProofPackage(renderId: string): Promise<any> {
 
 function printPackage(label: string, pkg: any): void {
   head(`${label} — ${pkg.pageKey} (status: ${pkg.status})`);
+  if (pkg.errorMessage) {
+    warn(`error: ${pkg.errorMessage}`);
+  }
   console.log('  AUTHORITY');
   ok(`layout         : ${pkg.authority.layoutTemplate}`);
   ok(`family label   : ${pkg.authority.layoutFamilyLabel}`);

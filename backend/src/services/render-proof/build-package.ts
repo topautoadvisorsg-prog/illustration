@@ -22,6 +22,7 @@ import {
   type PreparedRender,
 } from '../../pipeline/experimental/whole-page-render/render-whole-page.js';
 import { renderBlueprintPng } from '../../pipeline/stage-3-generation/blueprint.js';
+import type { PlanningZone } from '../../pipeline/stage-6-layout/layout-director.js';
 import { resolveGeometry } from '../../pipeline/publishing-standard/index.js';
 import { computePageGeometry } from '../../pipeline/stage-6-layout/page-geometry.js';
 import type { WholePageSpec } from '../../pipeline/experimental/whole-page-render/types.js';
@@ -52,6 +53,9 @@ export interface RenderProofPackage {
   pageKey: string;
   renderId: string | null; // null for the pre-render preview path
   status: 'PREVIEW' | 'QUEUED' | 'RENDERING' | 'RENDERED' | 'APPROVED' | 'REJECTED' | 'FAILED';
+  /** Populated when status === 'FAILED'. Surfaces the row's stored error so the
+   *  operator can audit failed renders without a DB query. Null otherwise. */
+  errorMessage: string | null;
   /** What the page was supposed to be. */
   authority: {
     layoutTemplate: LayoutTemplateId | string;
@@ -62,11 +66,9 @@ export interface RenderProofPackage {
     canvas: { widthIn: number; heightIn: number };
     textFrame: { widthIn: number; heightIn: number };
     zones: {
-      typographyZones: WholePageSpec['layoutGeometry'] extends infer _ ? unknown : never;
-    } & {
-      typographyZones: unknown;
-      imagePriorityZones: unknown;
-      textSafeZones: unknown;
+      typographyZones: PlanningZone[];
+      imagePriorityZones: PlanningZone[];
+      textSafeZones: PlanningZone[];
     };
     sourceText: string;
     sourceTextChars: number;
@@ -137,6 +139,7 @@ export async function buildPreviewPackageForPage(pageId: string): Promise<Render
     },
     output: null,
     print: null,
+    errorMessage: null,
   });
 }
 
@@ -200,6 +203,10 @@ export async function buildProofPackageForRender(renderId: string): Promise<Rend
         },
     output,
     print,
+    // The row's stored error message. Surfaced in the package only when status
+    // is FAILED so the operator can audit failures from the proof endpoint
+    // without a DB query.
+    errorMessage: row.errorMessage ?? null,
   });
 }
 
@@ -220,6 +227,7 @@ interface AssembleInput {
   blueprintImage: RenderProofPackage['input']['blueprintImage'];
   output: RenderProofPackage['output'];
   print: RenderProofPackage['print'];
+  errorMessage: string | null;
 }
 
 async function assemblePackage(input: AssembleInput): Promise<RenderProofPackage> {
@@ -274,5 +282,8 @@ async function assemblePackage(input: AssembleInput): Promise<RenderProofPackage
     },
     output: input.output,
     print: input.print,
+    // Only meaningful when the render failed; null otherwise so the operator
+    // does not see stale error context on RENDERED / APPROVED rows.
+    errorMessage: input.status === 'FAILED' ? input.errorMessage : null,
   };
 }
