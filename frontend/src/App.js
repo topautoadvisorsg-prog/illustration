@@ -1383,6 +1383,25 @@ const defaultLessonDraft = {
   tags: "layout, image-prompt",
 };
 
+// Supervisor verdict / stage labels — operator-facing translation. Kept here
+// (not in a separate file) to match the single-file convention; tiny scope.
+const VERDICT_LABEL = {
+  PASS: "✓ Ready",
+  WARNING: "⚠ Review",
+  BLOCKED: "⛔ Blocked",
+  NOT_RUN: "— Not Run",
+};
+const STAGE_LABEL = {
+  ingest: "Manuscript",
+  manifests: "Breakdown",
+  pagination: "Pagination",
+  "text-fit": "Text-fit check",
+  "page-quality": "Quality review",
+  "publishing-director": "Page issues",
+  "budget-preflight": "Budget",
+  "verification-ready": "Ready for image gen",
+};
+
 function App() {
   const [backendUrl, setBackendUrl] = useState(trimSlash(configuredBackend));
   const [health, setHealth] = useState(null);
@@ -1461,6 +1480,11 @@ function App() {
   const [renderedChapterNumber, setRenderedChapterNumber] = useState(null);
   const [chapterIntelligence, setChapterIntelligence] = useState(null);
   const [productionDashboard, setProductionDashboard] = useState(null);
+  // Supervisor pipeline report (POST /api/projects/:id/run-pipeline). Drives the
+  // Production Status tile — the single "STATUS / WHY / NEXT / RUN" surface.
+  const [pipelineReport, setPipelineReport] = useState(null);
+  const [pipelineLoading, setPipelineLoading] = useState(false);
+  const [pipelineError, setPipelineError] = useState("");
   const [advancedMode, setAdvancedMode] = useState(false);
   const [agents, setAgents] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -2061,6 +2085,34 @@ function App() {
       blob: await response.blob(),
       headers: response.headers,
     };
+  }
+
+  // Production Status — calls the Supervisor's no-spend pipeline check and
+  // populates the dashboard tile. Authoritative source for "WHAT IS HAPPENING /
+  // WHY / NEXT ACTION". Hits POST /api/projects/:id/run-pipeline.
+  async function runPipelineCheck() {
+    if (!activeProjectId) {
+      setPipelineError("Open a project before running a check.");
+      return;
+    }
+    setPipelineLoading(true);
+    setPipelineError("");
+    try {
+      const data = await call(`/api/projects/${activeProjectId}/run-pipeline`, {
+        method: "POST",
+        body: JSON.stringify({ mode: "no-spend" }),
+      });
+      setPipelineReport(data);
+      appendLog(
+        data.overallVerdict === "BLOCKED" ? "error" : data.overallVerdict === "WARNING" ? "warn" : "success",
+        `Pipeline check: ${data.overallVerdict} — ${data.nextAction?.label || ""}`,
+      );
+    } catch (err) {
+      setPipelineError(err.message || "Pipeline check failed.");
+      appendLog("error", `Pipeline check failed: ${err.message}`);
+    } finally {
+      setPipelineLoading(false);
+    }
   }
 
   // Fetch the read-only construction chain for the selected page (Inspector).
@@ -3890,6 +3942,64 @@ function App() {
       )}
 
       {(message || error) && <section className={`notice ${error ? "error" : ""}`}>{error || message}</section>}
+
+      {/* Production Status — the single STATUS / WHY / NEXT / RUN surface.
+          Reads the Supervisor's PipelineReport. cc-control: Production tab only. */}
+      <section className="production-status-tile cc-control" aria-label="Production status">
+        <div className="pst-head">
+          <p className="eyebrow">Production Status</p>
+          <button
+            type="button"
+            className="secondary"
+            onClick={runPipelineCheck}
+            disabled={pipelineLoading || !activeProjectId}
+            title={!activeProjectId ? "Open a project first" : ""}
+          >
+            {pipelineLoading ? "Checking..." : pipelineReport ? "↻ Refresh" : "▶ Run Pipeline Check"}
+          </button>
+        </div>
+
+        {pipelineError && <p className="pst-error">{pipelineError}</p>}
+
+        {!pipelineReport && !pipelineLoading && !pipelineError && (
+          <p className="pst-empty">
+            Run a Pipeline Check to see the project's current status, next action, and budget.
+          </p>
+        )}
+
+        {pipelineReport && (
+          <>
+            <div className={`pst-verdict pst-verdict--${(pipelineReport.overallVerdict || "").toLowerCase()}`}>
+              <span className="pst-verdict-pill">{VERDICT_LABEL[pipelineReport.overallVerdict] || pipelineReport.overallVerdict}</span>
+              <span className="pst-stage">Stage: <strong>{STAGE_LABEL[pipelineReport.currentStage] || pipelineReport.currentStage}</strong></span>
+            </div>
+
+            <p className="pst-next">
+              <strong>Next:</strong> {pipelineReport.nextAction?.label || "—"}
+              {pipelineReport.nextAction?.details && (
+                <span className="pst-next-details">{pipelineReport.nextAction.details}</span>
+              )}
+            </p>
+
+            {pipelineReport.snapshot && (
+              <div className="pst-snapshot">
+                <span><strong>{pipelineReport.snapshot.pageCount}</strong> pages</span>
+                <span><strong>{pipelineReport.snapshot.overflowCount}</strong> over capacity</span>
+                <span>
+                  Spend <strong>${pipelineReport.snapshot.estimatedImageSpendUsd?.toFixed(2)}</strong>
+                  {" / "}
+                  ${pipelineReport.snapshot.imageBudgetUsd?.toFixed(2)} budget
+                </span>
+                {pipelineReport.snapshot.operatorReviewPages?.length > 0 && (
+                  <span>
+                    Review: <strong>{pipelineReport.snapshot.operatorReviewPages.join(", ")}</strong>
+                  </span>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
       <section className="dashboard-hero cc-intel cc-control">
         <div className="project-cover-card" aria-hidden="true">

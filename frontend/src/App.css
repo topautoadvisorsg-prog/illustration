@@ -723,6 +723,114 @@ textarea {
   gap: 10px;
 }
 
+/* ─── Production Status tile ───────────────────────────────────────────────
+   The single STATUS / WHY / NEXT / RUN surface. Pinned above the dashboard
+   hero on the Production tab. Reads the Supervisor's PipelineReport. */
+.production-status-tile {
+  margin-bottom: 18px;
+  padding: 20px 22px;
+  border: 1px solid var(--wl-border);
+  border-radius: var(--wl-r-lg);
+  background: var(--wl-bg-elev);
+  box-shadow: var(--wl-shadow-sm);
+}
+
+.pst-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.pst-head .eyebrow { margin: 0; }
+
+.pst-empty {
+  margin: 0;
+  color: var(--wl-ink-500);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.pst-error {
+  margin: 0 0 12px;
+  color: var(--wl-rust-500);
+  font-size: 0.875rem;
+}
+
+.pst-verdict {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.pst-verdict-pill {
+  padding: 5px 12px;
+  border-radius: var(--wl-r-pill);
+  border: 1px solid var(--wl-border);
+  background: var(--wl-bg-tint);
+  color: var(--wl-ink-700);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.pst-verdict--pass .pst-verdict-pill {
+  background: #f1f7f3;
+  border-color: rgba(47, 122, 87, 0.32);
+  color: var(--wl-forest-600);
+}
+.pst-verdict--warning .pst-verdict-pill {
+  background: var(--wl-amber-50);
+  border-color: rgba(184, 131, 48, 0.35);
+  color: #82591b;
+}
+.pst-verdict--blocked .pst-verdict-pill {
+  background: #fcefec;
+  border-color: rgba(176, 65, 50, 0.32);
+  color: var(--wl-rust-500);
+}
+.pst-stage {
+  color: var(--wl-ink-500);
+  font-size: 0.8125rem;
+  letter-spacing: -0.005em;
+}
+.pst-stage strong {
+  color: var(--wl-ink-700);
+  font-weight: 600;
+}
+
+.pst-next {
+  margin: 0 0 14px;
+  color: var(--wl-ink-700);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+}
+.pst-next strong {
+  color: var(--wl-ink-900);
+  margin-right: 4px;
+}
+.pst-next-details {
+  display: block;
+  margin-top: 6px;
+  color: var(--wl-ink-500);
+  font-size: 0.8125rem;
+}
+
+.pst-snapshot {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--wl-border-soft);
+  color: var(--wl-ink-500);
+  font-size: 0.8125rem;
+  letter-spacing: -0.005em;
+}
+.pst-snapshot strong {
+  color: var(--wl-forest-700);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .dashboard-hero {
   display: grid;
   grid-template-columns: 156px minmax(220px, 1fr) minmax(170px, 0.65fr);
