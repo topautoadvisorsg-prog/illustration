@@ -27,6 +27,8 @@ vi.mock('../env.js', async () => {
 const mockState = {
   approvedCount: 0,
   projectExists: true,
+  /** F-6 — paid whole-page renders that the freeze guard protects. */
+  paidRenders: 0,
 };
 
 vi.mock('../db/repositories/projects.repo.js', () => ({
@@ -81,6 +83,23 @@ vi.mock('../db/repositories/pagination.repo.js', () => ({
   ])),
 }));
 
+vi.mock('../db/repositories/whole-page-render.repo.js', async () => {
+  const actual = await vi.importActual<typeof import('../db/repositories/whole-page-render.repo.js')>(
+    '../db/repositories/whole-page-render.repo.js',
+  );
+  return {
+    ...actual,
+    // F-6 freeze guard reads this; default 0 keeps legacy tests untouched.
+    getProjectRenderSummary: vi.fn(async (projectId: string) => ({
+      projectId,
+      total: mockState.paidRenders,
+      byStatus: mockState.paidRenders > 0 ? { RENDERED: mockState.paidRenders } : {},
+      bookReady: 0,
+      rows: [],
+    })),
+  };
+});
+
 async function makeApp() {
   const { registerPaginationRoutes } = await import('../api/pagination.routes.js');
   const app = Fastify();
@@ -94,6 +113,7 @@ async function makeApp() {
 beforeEach(() => {
   mockState.approvedCount = 0;
   mockState.projectExists = true;
+  mockState.paidRenders = 0;
 });
 
 afterEach(() => vi.clearAllMocks());
@@ -148,6 +168,41 @@ describe('POST /paginate — approval protection guard (flag on)', () => {
         payload: {},
       });
       expect(res.statusCode).toBe(400); // empty-manifest branch
+    } finally {
+      await app.close();
+    }
+  });
+
+  // ── F-6 — pagination freeze guard (protects paid renders) ────────────────
+
+  it('returns 409 when paid renders exist and confirmOrphanRenders is absent', async () => {
+    mockState.paidRenders = 22;
+    const app = await makeApp();
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/projects/00000000-0000-0000-0000-000000000001/paginate',
+        payload: {},
+      });
+      expect(res.statusCode).toBe(409);
+      const body = res.json();
+      expect(body.message).toMatch(/ORPHAN 22 paid/);
+      expect(body.message).toMatch(/confirmOrphanRenders/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('proceeds past the freeze guard with confirmOrphanRenders:true (lands on empty-manifest 400)', async () => {
+    mockState.paidRenders = 22;
+    const app = await makeApp();
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/projects/00000000-0000-0000-0000-000000000001/paginate',
+        payload: { confirmOrphanRenders: true },
+      });
+      expect(res.statusCode).toBe(400); // guard passed; empty-manifest branch
     } finally {
       await app.close();
     }

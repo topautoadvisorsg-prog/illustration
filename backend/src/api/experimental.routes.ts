@@ -40,6 +40,11 @@ const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
 const RenderBodySchema = z.object({
   decidedBy: z.string().min(1).default('operator'),
   notes: z.string().optional(),
+  /** F-7 idempotency — when true and the page already has a RENDERED or
+   *  APPROVED row, return that row instead of paying for a new render.
+   *  Batch runs MUST set this; the Chapter 1 run proved error responses
+   *  don't mean failure, so blind client retries double-spend without it. */
+  skipIfRendered: z.boolean().default(false),
 });
 const DecisionBodySchema = z.object({
   decidedBy: z.string().min(1).default('operator'),
@@ -182,6 +187,24 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
     const { pageId } = PageParamsSchema.parse(request.params);
     const body = RenderBodySchema.parse(request.body ?? {});
     try {
+      // F-7 — idempotent path for batch runs: an existing good render short-
+      // circuits BEFORE any row creation or model call. No spend.
+      if (body.skipIfRendered) {
+        const existing = await listRendersForPage(pageId);
+        const good = existing.find((r) => r.status === 'RENDERED' || r.status === 'APPROVED');
+        if (good) {
+          return {
+            render: serializeRender(good),
+            version: good.version,
+            attempts: good.attempts,
+            status: good.status,
+            warnings: ['skipped_already_rendered'],
+            decidedBy: body.decidedBy,
+            assembledPromptPreview: good.assembledPrompt.slice(0, 2000),
+            specPreview: good.specJson,
+          };
+        }
+      }
       const result = await createAndRunRender(pageId, {});
       const warnings: string[] = [];
       if (result.softCapExceeded) {

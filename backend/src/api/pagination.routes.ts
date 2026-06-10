@@ -36,6 +36,7 @@ import {
   type PageRow,
 } from '../db/repositories/pagination.repo.js';
 import { paginateProject } from '../pipeline/stage-1.75-pagination/paginate.js';
+import { getProjectRenderSummary } from '../db/repositories/whole-page-render.repo.js';
 import { directLayout } from '../pipeline/stage-6-layout/layout-director.js';
 import { computePageGeometry } from '../pipeline/stage-6-layout/page-geometry.js';
 import {
@@ -132,7 +133,14 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
   // POST /api/projects/:id/paginate — run Pagination v1 and persist the result.
   // Body: { mode?: 'replace' | 'safe' } — `safe` (default) refuses to run when
   // approved pages exist; `replace` is the explicit destructive override.
-  const PaginateBodySchema = z.object({ mode: z.enum(['replace', 'safe']).optional() });
+  const PaginateBodySchema = z.object({
+    mode: z.enum(['replace', 'safe']).optional(),
+    /** F-6 — re-pagination deletes and recreates page rows with NEW ids,
+     *  orphaning every whole-page render keyed to the old ids (paid images
+     *  become unreachable from any page). When good renders exist, the
+     *  caller must set this true to proceed. */
+    confirmOrphanRenders: z.boolean().default(false),
+  });
   const PaginateResponseSchema = z.object({
     summary: z.object({
       totalEntries: z.number(),
@@ -165,7 +173,7 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
         return reply.code(503).send(flagDisabledResponse());
       }
       const { id } = ProjectParamsSchema.parse(request.params);
-      const { mode } = PaginateBodySchema.parse(request.body ?? {});
+      const { mode, confirmOrphanRenders } = PaginateBodySchema.parse(request.body ?? {});
       const project = await getProject(id);
       if (!project) {
         return reply.code(404).send({ error: 'Not Found', message: 'Project not found.', statusCode: 404 });
@@ -178,6 +186,24 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
         return reply.code(409).send({
           error: 'Conflict',
           message: `Re-paginating will destroy ${approvedPageCount} approved page(s). Re-run with mode:"replace" to confirm.`,
+          statusCode: 409,
+        });
+      }
+
+      // F-6 — pagination freeze guard. Re-pagination recreates every page row
+      // with a new id, orphaning all whole-page renders (paid images) keyed
+      // to the old ids. The Chapter 1 production run proved this costs real
+      // money (an accidental re-paginate after a full-book render would
+      // orphan ~245 paid renders). Hard-stop unless explicitly confirmed.
+      const renderSummary = await getProjectRenderSummary(id);
+      const paidRenders =
+        (renderSummary.byStatus['RENDERED'] ?? 0) + (renderSummary.byStatus['APPROVED'] ?? 0);
+      if (paidRenders > 0 && !confirmOrphanRenders) {
+        return reply.code(409).send({
+          error: 'Conflict',
+          message:
+            `Re-paginating will ORPHAN ${paidRenders} paid whole-page render(s) — their page ids will no longer exist. ` +
+            `Re-run with confirmOrphanRenders:true only if you intend to re-render those pages.`,
           statusCode: 409,
         });
       }

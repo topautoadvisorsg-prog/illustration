@@ -370,14 +370,26 @@ async function runTextFitStage(
     };
   }
 
-  const readyForImageSpend = preview.readyForImageSpend;
-  if (policy.textFit.readyForImageSpendRequired && !readyForImageSpend) {
+  // F-1 — gate unification. The old binary check (readyForImageSpend ⇔
+  // overflow === 0) could NEVER pass with by-design compacted overflow
+  // pages, while the pagination stage tolerated overflowMax. A gate that
+  // never passes is noise — every production run needed a human bypass.
+  // Both stages now share ONE tolerance: policy.pagination.overflowMax.
+  const overflowCount = preview.totals.overflow;
+  const withinTolerance = overflowCount <= policy.pagination.overflowMax;
+  if (policy.textFit.readyForImageSpendRequired && !withinTolerance) {
     findings.push({
       severity: 'BLOCKER',
       stage: 'text-fit',
-      message: 'Text-fit preview reports not ready for image spend.',
+      message: `Text-fit overflow ${overflowCount} exceeds tolerance ${policy.pagination.overflowMax}.`,
       recommendedAction:
         'Resolve flagged pages on the Page Plan before image generation.',
+    });
+  } else if (overflowCount > 0) {
+    findings.push({
+      severity: 'INFO',
+      stage: 'text-fit',
+      message: `${overflowCount} OVERFLOW page(s) within tolerance (max ${policy.pagination.overflowMax}) — by-design compacted outliers.`,
     });
   }
 
@@ -388,11 +400,13 @@ async function runTextFitStage(
     stageKey: 'text-fit',
     label: 'Text-fit preview (no spend)',
     verdict,
-    summary: readyForImageSpend
-      ? 'Text-fit ready for image spend.'
+    summary: withinTolerance
+      ? `Text-fit ready for image spend (overflow ${overflowCount}/${policy.pagination.overflowMax} tolerated).`
       : 'Text-fit blocked image spend.',
     metrics: {
-      readyForImageSpend,
+      readyForImageSpend: preview.readyForImageSpend,
+      overflowCount,
+      overflowTolerance: policy.pagination.overflowMax,
       pages: preview.pages?.length ?? 0,
     },
     findings,
