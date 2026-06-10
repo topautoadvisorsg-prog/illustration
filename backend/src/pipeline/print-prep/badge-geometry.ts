@@ -174,15 +174,22 @@ export function allWithinCanvas(placed: PlacedBadge[], canvas: CanvasPx): boolea
 // The cartouche SVG uses a Gaussian-blurred ellipse so the edges blend into
 // the underlying artwork rather than reading as a digital widget.
 
-const STACK_INSET_IN = 0.375;
-const STACK_MAX_WIDTH_IN = 0.55;
-const STACK_PADDING_IN = 0.10;
+// L-7.2.1 — tightened corner mark. Operator review: cartouche was floating
+// inside the composition, parchment backing nearly invisible, total footprint
+// felt sidebar-sized rather than corner-mark sized. Constants below tuned to:
+//   - sit ~0.125 in from the TRIM edge (canvas inset 0.25 = trim inset 0.125
+//     for 0.125 bleed; matches KDP minimum content-inside-trim)
+//   - render the cartouche as a clearly-visible parchment patch (less blur)
+//   - take less vertical real estate so the swag stays the dominant ornament
+const STACK_INSET_IN = 0.25;
+const STACK_MAX_WIDTH_IN = 0.50;
+const STACK_PADDING_IN = 0.075;
 const STACK_GAP_IN = 0.05;
 const STACK_ITEM_HEIGHTS_IN = {
-  region: 0.32,
-  hazards: 0.28,
-  source: 0.20,
-  folio: 0.20,
+  region: 0.28,
+  hazards: 0.24,
+  source: 0.18,
+  folio: 0.18,
 } as const;
 
 export interface BadgeStackResult {
@@ -320,8 +327,12 @@ export function buildCartoucheSvg(rect: PxRect, parchmentHex: string): string {
   const rx = (w / 2) * 0.95;
   const ry = (h / 2) * 0.95;
   // Blur radius scales with the cartouche so the softness reads the same at
-  // any DPI / canvas size.
-  const blur = Math.max(4, Math.round(Math.min(w, h) * 0.06));
+  // any DPI / canvas size. L-7.2.1 — dropped from 6 % to 3.5 % of the min
+  // dimension. The earlier 6 % faded the parchment ring to nearly transparent
+  // at the rim, so the badges looked like they were floating. 3.5 % preserves
+  // a clearly visible parchment patch underneath while still feathering the
+  // edge into the artwork.
+  const blur = Math.max(3, Math.round(Math.min(w, h) * 0.035));
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
     `<defs><filter id="soft" x="-20%" y="-20%" width="140%" height="140%">` +
