@@ -10,8 +10,8 @@ import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import {
   standardCanvas,
-  computeBadgeLayout,
-  computeFolioRect,
+  computeBadgeStackLayout,
+  buildCartoucheSvg,
   allWithinCanvas,
 } from '../pipeline/print-prep/badge-geometry.js';
 import { runPreflight } from '../pipeline/print-prep/preflight.js';
@@ -36,50 +36,70 @@ const sampleBadgeSet: Badge[] = [
   { family: 'source', value: 'SCIENTIFIC_LITERATURE' },
 ];
 
-describe('badge geometry — standard canvas + placement', () => {
+describe('badge geometry — L-7.2 bottom-right cartouche stack', () => {
   const canvas = standardCanvas(STANDARD_CANVAS_IN);
 
   it('canvas is the 300-DPI full-bleed page', () => {
     expect(canvas).toMatchObject({ width: 2625, height: 3375, dpi: 300 });
   });
 
-  it('region → bottom-left; hazards + source → bottom-right; all inside canvas', () => {
-    const placed = computeBadgeLayout(badgesForPage(sampleBadgeSet), canvas);
-    const region = placed.find((p) => p.badge.family === 'region')!;
-    const hazards = placed.filter((p) => p.badge.family === 'hazard');
-    const source = placed.find((p) => p.badge.family === 'source')!;
-
-    expect(region.rect.left).toBeLessThan(canvas.width / 2); // left half
-    for (const h of hazards) expect(h.rect.left).toBeGreaterThan(canvas.width / 2); // right half
-    expect(source.rect.left).toBeGreaterThan(canvas.width / 2);
-    // hazards above the source in the right corner
-    expect(source.rect.top).toBeGreaterThan(hazards[0]!.rect.top);
-    expect(allWithinCanvas(placed, canvas)).toBe(true);
+  it('all metadata stacks in the bottom-right corner, inside the canvas', () => {
+    const stack = computeBadgeStackLayout(badgesForPage(sampleBadgeSet), '184', canvas);
+    // Everything lives in the bottom-right quadrant.
+    expect(stack.cartoucheRect.left).toBeGreaterThan(canvas.width / 2);
+    expect(stack.cartoucheRect.top).toBeGreaterThan(canvas.height / 2);
+    for (const p of stack.placedBadges) {
+      expect(p.rect.left).toBeGreaterThan(canvas.width / 2);
+      expect(p.rect.top).toBeGreaterThan(canvas.height / 2);
+    }
+    expect(allWithinCanvas(stack.placedBadges, canvas)).toBe(true);
+    // Vertical order: region → hazards → source → folio.
+    const region = stack.placedBadges.find((p) => p.badge.family === 'region')!;
+    const hazard = stack.placedBadges.find((p) => p.badge.family === 'hazard')!;
+    const source = stack.placedBadges.find((p) => p.badge.family === 'source')!;
+    expect(hazard.rect.top).toBeGreaterThan(region.rect.top);
+    expect(source.rect.top).toBeGreaterThan(hazard.rect.top);
+    expect(stack.folio!.rect.top).toBeGreaterThan(source.rect.top);
+    expect(stack.folio!.label).toBe('184');
   });
 
-  it('a SINGLE hazard fits the safe square and never overlaps the source', () => {
-    const placed = computeBadgeLayout(
-      badgesForPage([
-        { family: 'region', value: 'FOREST' },
-        { family: 'hazard', value: 'DEADLY' },
-        { family: 'source', value: 'FIELD_GUIDE' },
-      ]),
+  it('cartouche fully contains every stamped item', () => {
+    const stack = computeBadgeStackLayout(badgesForPage(sampleBadgeSet), '45', canvas);
+    const c = stack.cartoucheRect;
+    const items = [...stack.placedBadges.map((p) => p.rect), stack.folio!.rect];
+    for (const r of items) {
+      expect(r.left).toBeGreaterThanOrEqual(c.left);
+      expect(r.top).toBeGreaterThanOrEqual(c.top);
+      expect(r.left + r.width).toBeLessThanOrEqual(c.left + c.width + 1);
+      expect(r.top + r.height).toBeLessThanOrEqual(c.top + c.height + 1);
+    }
+  });
+
+  it('stack shrinks when items are absent (no folio, fewer badges)', () => {
+    const full = computeBadgeStackLayout(badgesForPage(sampleBadgeSet), '45', canvas);
+    const noFolio = computeBadgeStackLayout(badgesForPage(sampleBadgeSet), null, canvas);
+    const minimal = computeBadgeStackLayout(
+      badgesForPage([{ family: 'region', value: 'FOREST' }]),
+      null,
       canvas,
     );
-    const haz = placed.find((p) => p.badge.family === 'hazard')!;
-    const src = placed.find((p) => p.badge.family === 'source')!;
-    // hazard must not run past the bottom of the source-reserved area
-    expect(haz.rect.top + haz.rect.height).toBeLessThanOrEqual(src.rect.top + 1);
-    // and the whole thing stays inside the 0.9in safe square (≤ canvas, checked too)
-    expect(allWithinCanvas(placed, canvas)).toBe(true);
-    expect(haz.rect.height).toBeLessThanOrEqual(Math.round(0.9 * canvas.dpi));
+    expect(noFolio.folio).toBeNull();
+    expect(noFolio.cartoucheRect.height).toBeLessThan(full.cartoucheRect.height);
+    expect(minimal.cartoucheRect.height).toBeLessThan(noFolio.cartoucheRect.height);
+    // Cartouche bottom stays anchored to the corner regardless of stack size.
+    expect(minimal.cartoucheRect.top + minimal.cartoucheRect.height).toBe(
+      full.cartoucheRect.top + full.cartoucheRect.height,
+    );
   });
 
-  it('folio rect is bottom-centre, above the trim edge', () => {
-    const r = computeFolioRect(canvas);
-    expect(Math.abs(r.left + r.width / 2 - canvas.width / 2)).toBeLessThan(2); // centred
-    expect(r.top).toBeLessThan(canvas.height); // above the bottom edge
-    expect(r.top).toBeGreaterThan(canvas.height * 0.8); // in the bottom region
+  it('cartouche SVG has a solid core + blurred halo (visible backing)', () => {
+    const stack = computeBadgeStackLayout(badgesForPage(sampleBadgeSet), '45', canvas);
+    const svg = buildCartoucheSvg(stack.cartoucheRect, '#E0C8A0');
+    const ellipses = svg.match(/<ellipse/g) ?? [];
+    expect(ellipses.length).toBe(2); // halo + solid core
+    expect(svg).toContain('feGaussianBlur'); // feathered edge present
+    // Exactly one ellipse carries the blur filter (the core is unfiltered).
+    expect(svg.match(/filter="url\(#soft\)"/g)?.length).toBe(1);
   });
 });
 
