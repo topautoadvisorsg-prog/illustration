@@ -69,9 +69,15 @@ describe('multi-trim guardrail: 7×10 project flows end-to-end without 8.5×11 l
     expect(eightHalf.trimHeightIn).toBe(11);
 
     // Pagination capacity is derived from the text-frame area; the two trims
-    // MUST produce different frames or pagination is silently the same.
-    expect(seven.textWidthIn).not.toBe(eightHalf.textWidthIn);
-    expect(seven.textHeightIn).not.toBe(eightHalf.textHeightIn);
+    // MUST produce different frames or pagination is silently the same. After
+    // L-1 (symmetric 0.5 in COMPACT margins) the 7×10 text-height happens to
+    // match the 8.5×11 text-height (both 9 in) — but the widths differ, so the
+    // text-frame *area* is still distinct. Assert area-difference here, not
+    // axis-by-axis equality, so future symmetric margin tweaks don't false-
+    // trigger this guardrail.
+    const sevenArea = seven.textWidthIn * seven.textHeightIn;
+    const eightHalfArea = eightHalf.textWidthIn * eightHalf.textHeightIn;
+    expect(sevenArea).not.toBe(eightHalfArea);
 
     // Box-model invariant: content frame derived from TRIM, not from bleed page.
     expect(seven.textWidthIn).toBe(seven.trimWidthIn - seven.margins.gutterIn - seven.margins.rightIn);

@@ -41,8 +41,19 @@ export interface PageGeometry {
 /** Default interior margins for an 8.5x11 premium page (matches spike renderer). */
 export const DEFAULT_MARGINS: PageMargins = { topIn: 1, rightIn: 1, bottomIn: 1, gutterIn: 1.25 };
 
-/** Smaller default frame for compact 6x9 editions. */
-export const COMPACT_MARGINS: PageMargins = { topIn: 0.75, rightIn: 0.625, bottomIn: 0.75, gutterIn: 0.875 };
+/**
+ * Compact-edition margins for trims ≤ 7 in wide (6×9 paperback, 7×10 hardcover).
+ *
+ * Symmetric 0.50 in on every side per the L-1 text-frame expansion (operator-
+ * approved 2026-06-09 after the v1 baseline reclaimed too much white margin).
+ * Translates to:
+ *   - 7×10 trim → 6.0 × 9.0 in text frame (77 % utilisation, +12 % capacity)
+ *   - 6×9  trim → 5.0 × 8.0 in text frame
+ *
+ * Stays at the KDP perfect-bound inside-margin floor (0.50 in) for >150-page
+ * books. Do NOT drop below 0.50 in any side without explicit operator sign-off.
+ */
+export const COMPACT_MARGINS: PageMargins = { topIn: 0.5, rightIn: 0.5, bottomIn: 0.5, gutterIn: 0.5 };
 
 export const KDP_SAFE_ZONE_IN = 0.25;
 

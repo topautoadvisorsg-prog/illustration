@@ -19,12 +19,20 @@ describe('computePageGeometry', () => {
     expect(g.safeZoneIn).toBe(0.25);
   });
 
-  it('computes a 6x9 compact page', () => {
+  it('computes a 6x9 compact page (L-1 symmetric 0.5 in margins)', () => {
     const g = computePageGeometry({ widthIn: 6, heightIn: 9, bleedIn: 0.125 }, COMPACT_MARGINS);
     expect(g.pageWidthIn).toBe(6.125);
     expect(g.pageHeightIn).toBe(9.25);
-    expect(g.textWidthIn).toBe(4.5); // trim 6 - 0.875 - 0.625
-    expect(g.textHeightIn).toBe(7.5); // trim 9 - 0.75 - 0.75
+    expect(g.textWidthIn).toBe(5); // trim 6 - 0.5 gutter - 0.5 right
+    expect(g.textHeightIn).toBe(8); // trim 9 - 0.5 - 0.5
+  });
+
+  it('computes a 7x10 compact page (L-1 symmetric 0.5 in margins)', () => {
+    const g = computePageGeometry({ widthIn: 7, heightIn: 10, bleedIn: 0.125 }, COMPACT_MARGINS);
+    expect(g.textWidthIn).toBe(6); // trim 7 - 0.5 gutter - 0.5 right
+    expect(g.textHeightIn).toBe(9); // trim 10 - 0.5 - 0.5
+    expect(g.textWidthPt).toBe(432); // 6 * 72
+    expect(g.textHeightPt).toBe(648); // 9 * 72
   });
 
   it('picks compact margins for small trims and default for large', () => {
