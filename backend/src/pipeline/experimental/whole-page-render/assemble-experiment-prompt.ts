@@ -53,15 +53,15 @@ function hardConstraints(spec: WholePageSpec): string {
     '- Do not add page numbers, captions, watermarks, signatures, copyright text, folios, or running heads unless explicitly listed in `decorativeElements`.',
     // Standard v1.1 — badges are deterministic stamped overlays, NOT model-drawn.
     '- Do NOT draw any badges, hazard symbols, warning icons, region/category icons, labels, or page numbers. The hazard/region/source values in BADGE CONTEXT are mood-setting context only; never render them as marks on the page.',
-    // L-7 — explicit reserved zones with coordinates. The BADGE-SAFE ZONES
-    // block above lists exact rects (inches from canvas top-left). Every
-    // listed rect must remain VISUALLY CLEAN: no text, no titles, no focal
-    // illustration detail, no ornamental border, no swag pinecones, no
-    // hairlines, no signatures, no folio. Paper background only. The
-    // renderer stamps badges and folio into these zones AFTER your render;
-    // anything you place there will be hidden or will collide with the
-    // stamped mark. Treat the listed coordinates as negative space.',
-    '- BADGE-SAFE ZONES (above) are the hardest constraint on this page. Every rect listed must be perfectly clean — paper background only, no marks of any kind, no ornament tendrils crossing in. If the BADGE-SAFE ZONES list is empty, no zone is reserved.',
+    // L-7.1 — strong spatial language. The blueprint paints the reserved
+    // band YELLOW; the model should read "yellow region = empty parchment,
+    // hard stop." Prior wording ("leave VISUALLY CLEAN") was too abstract
+    // and the model kept extending swag ornaments and body text into the
+    // bottom band. This wording is explicit.
+    '- BOTTOM STAMPING BAND — the bottom approximately 1 inch of the page (every YELLOW region in the blueprint) is reserved EXEMPT parchment. The bottom-left corner, the bottom-right corner, and the centered bottom strip are stamped LATER by the renderer with badges and the page number. Within these YELLOW regions render NOTHING: no body text, no titles, no decorative ornament, no swag pinecones, no hairlines, no plant tendrils, no signatures, no artwork. The page background paper must show through cleanly.',
+    '- The decorative bottom swag (pinecone garland) must terminate ABOVE the yellow band — never crossing into it, never letting tendrils or pinecones extend into the bottom band.',
+    '- The body text column must terminate ABOVE the yellow band — the last line of body text sits above the band, never inside it.',
+    '- BADGE-SAFE ZONES (json above) are the exact rect coordinates of these reserved regions, in inches from canvas top-left. They are the hardest constraint on this page.',
     '- Output a finished, publishable page. If the result would not pass as a real spread in a collector-edition hardcover, it is wrong.',
   );
   return lines.join('\n');

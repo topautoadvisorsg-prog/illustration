@@ -26,8 +26,13 @@ import {
   markRendering,
   type WholePageRenderRow,
 } from '../../../db/repositories/whole-page-render.repo.js';
-import { WILDLANDS_STANDARD, resolveGeometry } from '../../publishing-standard/index.js';
+import {
+  WILDLANDS_STANDARD,
+  computeBadgeSafeZones,
+  resolveGeometry,
+} from '../../publishing-standard/index.js';
 import { directLayout, type LayoutAllocation } from '../../stage-6-layout/layout-director.js';
+import { clipAllocationForBadgeBand } from '../../stage-6-layout/badge-clip.js';
 import { computePageGeometry } from '../../stage-6-layout/page-geometry.js';
 import { renderBlueprintPng } from '../../stage-3-generation/blueprint.js';
 import {
@@ -98,13 +103,30 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
   // page-spec geometry AND the blueprint pixel size both derive from it, so the
   // render can never disagree with print-prep on trim.
   const geometry = computePageGeometry(resolveGeometry(config).trimSize);
-  const allocation = directLayout({
+  const rawAllocation = directLayout({
     bodyMarkdown: pageRow.readingFieldText ?? '',
     layoutTemplate: pageRow.layoutTemplate as Parameters<typeof directLayout>[0]['layoutTemplate'],
     geometry,
     bodyPt: config.typography.bodyPt,
     lineHeight: config.typography.lineHeight,
   });
+
+  // L-7.1 — clip text / image zones above the badge band BEFORE we hand the
+  // allocation to buildPageSpec or to the blueprint renderer. Without this
+  // step the blueprint shows text/image zones overlapping the reserved
+  // corners + folio strip, and the model gets contradictory instructions
+  // ("fill RED" + "leave the black square inside RED clean"). Resulting
+  // collisions are exactly what the 2026-06-09 print proof showed.
+  const canvasInForClip = {
+    w: geometry.trimWidthIn + 2 * geometry.bleedIn,
+    h: geometry.trimHeightIn + 2 * geometry.bleedIn,
+  };
+  const badgeSafeZonesForClip = computeBadgeSafeZones({
+    badgeContext: badgeContext ?? { hazard: ['NONE'], region: 'GENERAL', source: 'GENERAL_REFERENCE' },
+    layoutFamily: pageRow.layoutTemplate ?? '',
+    canvasIn: canvasInForClip,
+  });
+  const allocation = clipAllocationForBadgeBand(rawAllocation, badgeSafeZonesForClip, canvasInForClip);
 
   const spec = buildPageSpec({ pageRow, config, geometry, allocation, entryTitle, imageSubject, badgeContext });
   const assembledPrompt = assembleExperimentPrompt(spec);
