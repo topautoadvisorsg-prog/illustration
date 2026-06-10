@@ -12,22 +12,42 @@
 
 import sharp from 'sharp';
 import type { LayoutAllocation, PlanningZone } from '../stage-6-layout/layout-director.js';
+import type { BadgeSafeZone } from '../publishing-standard/badge-zones.js';
 
-// Standardized blueprint palette (RED / BLUE / ORANGE). TITLE folds into RED (it is
-// also a text zone). These colors exist ONLY in the blueprint — never in the page.
+// Standardized blueprint palette (RED / BLUE / ORANGE / BLACK).
+// TITLE folds into RED. These colors exist ONLY in the blueprint — never in the page.
 const COLORS = {
   bg: '#ECE4CF', // parchment field
   image: '#2E6FB0', // BLUE — PRIMARY_IMAGE_ZONE
   support: '#E08A2E', // ORANGE — SUPPORTING_IMAGE_ZONE
   text: '#C0392B', // RED — TEXT_SAFE_ZONE (title folds in)
+  reserved: '#111111', // BLACK — L-7 BADGE_SAFE_ZONE (do-not-render)
 } as const;
 
 function rectSvg(z: PlanningZone, fill: string, opacity = 0.85): string {
   return `<rect x="${z.xPct}%" y="${z.yPct}%" width="${z.widthPct}%" height="${z.heightPct}%" fill="${fill}" fill-opacity="${opacity}" rx="8" />`;
 }
 
-/** Build the blueprint SVG: parchment field with RED / BLUE / ORANGE zone rectangles. */
-export function buildBlueprintSvg(alloc: LayoutAllocation, widthPx: number, heightPx: number): string {
+/** L-7 — paint a reserved badge-safe rect with a distinct black outline +
+ *  diagonal slash hatch so the model gets an unmistakable "do not render here"
+ *  visual signal alongside the prose instruction. Coordinates come from the
+ *  L-7 single-source-of-truth helper and are pre-converted to canvas %. */
+function reservedRectSvg(xPct: number, yPct: number, wPct: number, hPct: number): string {
+  return (
+    `<rect x="${xPct}%" y="${yPct}%" width="${wPct}%" height="${hPct}%" ` +
+    `fill="${COLORS.reserved}" fill-opacity="0.55" ` +
+    `stroke="${COLORS.reserved}" stroke-width="6" />`
+  );
+}
+
+/** Build the blueprint SVG: parchment field with RED / BLUE / ORANGE zone
+ *  rectangles plus L-7 BLACK reserved badge-safe zones (if supplied). */
+export function buildBlueprintSvg(
+  alloc: LayoutAllocation,
+  widthPx: number,
+  heightPx: number,
+  options: { badgeSafeZones?: BadgeSafeZone[]; canvasIn?: { w: number; h: number } } = {},
+): string {
   const parts: string[] = [`<rect width="100%" height="100%" fill="${COLORS.bg}"/>`];
   // BLUE = primary image, ORANGE = supporting image, RED = text-safe + title.
   for (const z of alloc.imagePriorityZones) {
@@ -35,6 +55,21 @@ export function buildBlueprintSvg(alloc: LayoutAllocation, widthPx: number, heig
   }
   for (const z of alloc.textSafeZones) parts.push(rectSvg(z, COLORS.text));
   for (const z of alloc.typographyZones) parts.push(rectSvg(z, COLORS.text)); // title folds into RED
+  // L-7 — paint reserved badge / folio rects ON TOP of every other zone so
+  // the model cannot mistake them. Canvas inches → canvas % conversion.
+  if (options.badgeSafeZones && options.canvasIn) {
+    const { w, h } = options.canvasIn;
+    for (const z of options.badgeSafeZones) {
+      parts.push(
+        reservedRectSvg(
+          (z.xIn / w) * 100,
+          (z.yIn / h) * 100,
+          (z.widthIn / w) * 100,
+          (z.heightIn / h) * 100,
+        ),
+      );
+    }
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">${parts.join('')}</svg>`;
 }
 
@@ -43,8 +78,9 @@ export async function renderBlueprintPng(
   alloc: LayoutAllocation,
   widthPx: number,
   heightPx: number,
+  options: { badgeSafeZones?: BadgeSafeZone[]; canvasIn?: { w: number; h: number } } = {},
 ): Promise<{ png: Buffer; svg: string }> {
-  const svg = buildBlueprintSvg(alloc, widthPx, heightPx);
+  const svg = buildBlueprintSvg(alloc, widthPx, heightPx, options);
   const png = await sharp(Buffer.from(svg)).png().toBuffer();
   return { png, svg };
 }

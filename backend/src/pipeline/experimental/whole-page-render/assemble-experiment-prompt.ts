@@ -52,7 +52,16 @@ function hardConstraints(spec: WholePageSpec): string {
     '- Vintage natural-history monograph aesthetic. No modern UI. No infographic styling. No flat icons. No drop-shadows that look digital. No gradients. No sans-serif anywhere on the page.',
     '- Do not add page numbers, captions, watermarks, signatures, copyright text, folios, or running heads unless explicitly listed in `decorativeElements`.',
     // Standard v1.1 — badges are deterministic stamped overlays, NOT model-drawn.
-    '- Do NOT draw any badges, hazard symbols, warning icons, region/category icons, labels, or page numbers. Keep BOTH bottom corners (about 0.9 inch square each) visually quiet and uncluttered — that space is reserved for badges the renderer stamps later. The hazard/region/source values are CONTEXT to set the mood only; never render them as marks on the page.',
+    '- Do NOT draw any badges, hazard symbols, warning icons, region/category icons, labels, or page numbers. The hazard/region/source values in BADGE CONTEXT are mood-setting context only; never render them as marks on the page.',
+    // L-7 — explicit reserved zones with coordinates. The BADGE-SAFE ZONES
+    // block above lists exact rects (inches from canvas top-left). Every
+    // listed rect must remain VISUALLY CLEAN: no text, no titles, no focal
+    // illustration detail, no ornamental border, no swag pinecones, no
+    // hairlines, no signatures, no folio. Paper background only. The
+    // renderer stamps badges and folio into these zones AFTER your render;
+    // anything you place there will be hidden or will collide with the
+    // stamped mark. Treat the listed coordinates as negative space.',
+    '- BADGE-SAFE ZONES (above) are the hardest constraint on this page. Every rect listed must be perfectly clean — paper background only, no marks of any kind, no ornament tendrils crossing in. If the BADGE-SAFE ZONES list is empty, no zone is reserved.',
     '- Output a finished, publishable page. If the result would not pass as a real spread in a collector-edition hardcover, it is wrong.',
   );
   return lines.join('\n');
@@ -99,6 +108,15 @@ export function assembleExperimentPrompt(spec: WholePageSpec): string {
     block('DECORATIVE ELEMENTS', spec.decorativeElements),
     '',
     block('BADGE CONTEXT (mood only — do NOT draw these; the renderer stamps them)', spec.badgeContext),
+    '',
+    // L-7 — exact reserved rects in inches from canvas top-left. The
+    // renderer stamps badges + folio into these rects; anything the model
+    // places here will collide. Empty array = no zones reserved (operator
+    // O-6 release rule applied).
+    block(
+      'BADGE-SAFE ZONES (reserved rects — leave VISUALLY CLEAN, inches from canvas top-left)',
+      spec.badgeSafeZones,
+    ),
     '',
     hardConstraints(spec),
   ].join('\n');

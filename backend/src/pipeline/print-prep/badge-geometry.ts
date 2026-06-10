@@ -1,18 +1,18 @@
 /**
  * Badge + folio placement geometry (STD-3 Print-Prep).
  *
- * Pure, deterministic pixel math. Reads the Standard's spacing + badge safe-zone
- * (Layout owns the zones; Print-Prep only computes the rects to stamp into).
- * No I/O, no image work — that's print-prep.ts.
+ * Pure, deterministic pixel math. Converts the reserved INCH-space safe zones
+ * from `publishing-standard/badge-zones.ts` into 300-DPI pixel rects and
+ * places each badge family inside its reserved corner.
  *
- * Canvas (8.75×11.25in @ 300 DPI) = 2625×3375. The reserved badge corners are
- * 0.9in squares inset by (bleed + KDP safe) from each bottom corner.
+ * L-7 single source of truth: every dimension comes from BADGE_ZONE_GEOMETRY
+ * in `badge-zones.ts` — no inline literals here. If the AI's safe-zone clue
+ * and the stamper's rect disagree, badges collide with art. This module is
+ * the second half of the contract.
  */
 
-import { BADGE_PLACEMENT, SPACING } from '../publishing-standard/index.js';
+import { BADGE_ZONE_GEOMETRY, SPACING } from '../publishing-standard/index.js';
 import type { StampableBadge } from '../publishing-standard/index.js';
-
-const KDP_SAFE_IN = 0.25; // KDP keep-content-inside margin from the trim edge
 
 export interface PxRect {
   left: number;
@@ -56,8 +56,10 @@ const FAMILY_ASPECT: Record<StampableBadge['family'], number> = {
 };
 
 function safeSquares(canvas: CanvasPx): { left: PxRect; right: PxRect } {
-  const inset = Math.round((SPACING.bleedIn + KDP_SAFE_IN) * canvas.dpi); // 0.375in = 113px
-  const sq = Math.round(BADGE_PLACEMENT.safeZoneIn * canvas.dpi); // 0.9in = 270px
+  // Pixel rects for the reserved corner squares — derived from the L-7
+  // single source of truth so the AI's prompt and the stamper agree.
+  const inset = Math.round(BADGE_ZONE_GEOMETRY.insetIn * canvas.dpi); // 0.375in = 113px
+  const sq = Math.round(BADGE_ZONE_GEOMETRY.safeZoneIn * canvas.dpi); // 0.9in = 270px
   const top = canvas.height - inset - sq;
   return {
     left: { left: inset, top, width: sq, height: sq },
@@ -128,12 +130,13 @@ export function computeBadgeLayout(badges: StampableBadge[], canvas: CanvasPx): 
   return placed;
 }
 
-/** Folio (page number) rect: bottom-centre, 0.5in up from the trim edge. */
+/** Folio (page number) rect: bottom-centre, 0.5in up from the trim edge.
+ *  Pixel math derived from the L-7 single source of truth. */
 export function computeFolioRect(canvas: CanvasPx): PxRect {
-  const trimBottom = canvas.height - Math.round(SPACING.bleedIn * canvas.dpi); // 3337
-  const up = Math.round(SPACING.badgeClearFromTrimIn * canvas.dpi); // 0.5in = 150px
-  const w = Math.round(1.5 * canvas.dpi); // 450px text box
-  const h = Math.round(0.3 * canvas.dpi); // 90px
+  const trimBottom = canvas.height - Math.round(SPACING.bleedIn * canvas.dpi);
+  const up = Math.round(BADGE_ZONE_GEOMETRY.folioClearFromTrimIn * canvas.dpi);
+  const w = Math.round(BADGE_ZONE_GEOMETRY.folioWidthIn * canvas.dpi);
+  const h = Math.round(BADGE_ZONE_GEOMETRY.folioHeightIn * canvas.dpi);
   return {
     left: Math.round((canvas.width - w) / 2),
     top: trimBottom - up - h,

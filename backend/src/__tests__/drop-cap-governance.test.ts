@@ -32,6 +32,10 @@ function makeSpec(over: { dropCap: string | null; decorativeInitial: string | nu
     },
     decorativeElements: { topRule: null, bottomRule: null, badges: [] },
     badgeContext: { hazard: ['NONE'], region: 'GENERAL', source: 'GENERAL_REFERENCE' },
+    // L-7 — fixture doesn't need to assert specific zones for the drop-cap
+    // test; empty is the lightest valid value (the helper would produce 3
+    // zones for this badge context but we don't read them here).
+    badgeSafeZones: [],
   };
 }
 

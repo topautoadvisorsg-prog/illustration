@@ -23,6 +23,7 @@ import {
 } from '../../pipeline/experimental/whole-page-render/render-whole-page.js';
 import { renderBlueprintPng } from '../../pipeline/stage-3-generation/blueprint.js';
 import type { PlanningZone } from '../../pipeline/stage-6-layout/layout-director.js';
+import type { BadgeSafeZone } from '../../pipeline/publishing-standard/badge-zones.js';
 import { resolveGeometry } from '../../pipeline/publishing-standard/index.js';
 import { computePageGeometry } from '../../pipeline/stage-6-layout/page-geometry.js';
 import type { WholePageSpec } from '../../pipeline/experimental/whole-page-render/types.js';
@@ -69,6 +70,11 @@ export interface RenderProofPackage {
       typographyZones: PlanningZone[];
       imagePriorityZones: PlanningZone[];
       textSafeZones: PlanningZone[];
+      /** L-7 — reserved rects the AI was instructed to leave clean and
+       *  print-prep stamps badges/folio into. Surfaced here so the operator
+       *  can audit exactly which zones shipped for any render. Empty array
+       *  means the page had no badges + no folio (O-6 release / O-7 drop). */
+      badgeSafeZones: BadgeSafeZone[];
     };
     sourceText: string;
     sourceTextChars: number;
@@ -121,7 +127,15 @@ export async function buildPreviewPackageForPage(pageId: string): Promise<Render
   if (!page) throw new Error(`page_not_found:${pageId}`);
   const prepared = await prepareRender(pageId);
   const [bw, bh] = prepared.size.split('x').map(Number);
-  const { png: blueprintPng } = await renderBlueprintPng(prepared.allocation, bw ?? 1024, bh ?? 1536);
+  // L-7 — keep blueprint preview in lockstep with the live render path.
+  const { trim, bleedIn } = prepared.spec.layoutGeometry;
+  const canvasIn = { w: trim.widthIn + 2 * bleedIn, h: trim.heightIn + 2 * bleedIn };
+  const { png: blueprintPng } = await renderBlueprintPng(
+    prepared.allocation,
+    bw ?? 1024,
+    bh ?? 1536,
+    { badgeSafeZones: prepared.spec.badgeSafeZones, canvasIn },
+  );
 
   return assemblePackage({
     pageId,
@@ -212,7 +226,17 @@ export async function buildProofPackageForRender(renderId: string): Promise<Rend
 
 async function regenerateBlueprintDataUri(prepared: PreparedRender): Promise<string> {
   const [bw, bh] = prepared.size.split('x').map(Number);
-  const { png } = await renderBlueprintPng(prepared.allocation, bw ?? 1024, bh ?? 1536);
+  // L-7 — legacy renders (rows without persisted blueprintPath) get a
+  // regenerated blueprint that includes the badge-safe zones, so the operator
+  // audit surface matches the new contract even for pre-L-7 rows.
+  const { trim, bleedIn } = prepared.spec.layoutGeometry;
+  const canvasIn = { w: trim.widthIn + 2 * bleedIn, h: trim.heightIn + 2 * bleedIn };
+  const { png } = await renderBlueprintPng(
+    prepared.allocation,
+    bw ?? 1024,
+    bh ?? 1536,
+    { badgeSafeZones: prepared.spec.badgeSafeZones, canvasIn },
+  );
   return `data:image/png;base64,${png.toString('base64')}`;
 }
 
@@ -262,6 +286,9 @@ async function assemblePackage(input: AssembleInput): Promise<RenderProofPackage
         typographyZones: prepared.allocation.typographyZones,
         imagePriorityZones: prepared.allocation.imagePriorityZones,
         textSafeZones: prepared.allocation.textSafeZones,
+        // L-7 — same rects the AI was told to leave clean (BADGE-SAFE ZONES
+        // block in the prompt) and the print-prep stamper writes into.
+        badgeSafeZones: spec.badgeSafeZones,
       },
       sourceText: spec.pageText.body,
       sourceTextChars: (spec.pageText.body ?? '').length,

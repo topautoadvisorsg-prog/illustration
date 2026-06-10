@@ -14,7 +14,12 @@ import type { PageRow } from '../../../db/repositories/pagination.repo.js';
 import type { LayoutAllocation, PlanningZone } from '../../stage-6-layout/layout-director.js';
 import type { PageGeometry } from '../../stage-6-layout/page-geometry.js';
 import { deriveSubjectPackage } from '../../stage-2-planner/plan-pages.js';
-import { assembleIllustrationDna, toRoman, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
+import {
+  assembleIllustrationDna,
+  computeBadgeSafeZones,
+  toRoman,
+  WILDLANDS_STANDARD,
+} from '../../publishing-standard/index.js';
 import { stripReadingFieldMetadata } from '../../subject-badges/extract-badges.js';
 import { markdownToBlocks, blocksToPlainText } from './markdown-blocks.js';
 import {
@@ -196,5 +201,17 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
     },
     decorativeElements: buildDecorativeElements(pageType),
     badgeContext: input.badgeContext ?? { hazard: ['NONE'], region: 'GENERAL', source: 'GENERAL_REFERENCE' },
+    // L-7 — derive reserved badge / folio zones from the single source of truth.
+    // Canvas is symmetric trim+2×bleed (the render canvas the AI sees).
+    badgeSafeZones: computeBadgeSafeZones({
+      badgeContext: input.badgeContext ?? { hazard: ['NONE'], region: 'GENERAL', source: 'GENERAL_REFERENCE' },
+      // pageRow.layoutTemplate is nullable in the schema; empty string never
+      // matches FOLIO_DROPPED_LAYOUTS so folio stays reserved by default.
+      layoutFamily: pageRow.layoutTemplate ?? '',
+      canvasIn: {
+        w: input.geometry.trimWidthIn + 2 * input.geometry.bleedIn,
+        h: input.geometry.trimHeightIn + 2 * input.geometry.bleedIn,
+      },
+    }),
   };
 }

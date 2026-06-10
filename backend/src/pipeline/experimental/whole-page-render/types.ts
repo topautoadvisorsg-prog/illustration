@@ -6,6 +6,7 @@
  */
 
 import type { LayoutTemplateId } from '@wildlands/shared';
+import type { BadgeSafeZone } from '../../publishing-standard/badge-zones.js';
 
 export interface InchSize {
   widthIn: number;
@@ -107,6 +108,12 @@ export interface WholePageSpec {
   decorativeElements: DecorativeElementsDTO;
   /** Badge metadata (context only; never drawn by the model). */
   badgeContext: BadgeContextDTO;
+  /** L-7 — reserved rects the model must leave visually clean. Derived from
+   *  badgeContext + layoutFamily + canvas via the shared single-source-of-
+   *  truth helper `computeBadgeSafeZones()` in publishing-standard. The
+   *  print-prep stamper writes badges into the SAME rects, so the AI's
+   *  "leave clean" zones and the stamper's "stamp here" zones never drift. */
+  badgeSafeZones: BadgeSafeZone[];
 }
 
 // Persisted render shape now lives in the DB row (WholePageRenderRow in

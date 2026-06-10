@@ -186,8 +186,17 @@ export async function executeRender(
     const prepared = await prepareRender(existing.pageId);
 
     // Same deterministic blueprint production uses for the layout zones.
+    // L-7 — also paint the reserved badge / folio rects from the spec so the
+    // model gets a visual "do not render here" signal alongside the prose.
     const [bw, bh] = prepared.size.split('x').map(Number);
-    const { png: blueprintPng } = await renderBlueprintPng(prepared.allocation, bw ?? 1024, bh ?? 1536);
+    const { trim, bleedIn } = prepared.spec.layoutGeometry;
+    const canvasIn = { w: trim.widthIn + 2 * bleedIn, h: trim.heightIn + 2 * bleedIn };
+    const { png: blueprintPng } = await renderBlueprintPng(
+      prepared.allocation,
+      bw ?? 1024,
+      bh ?? 1536,
+      { badgeSafeZones: prepared.spec.badgeSafeZones, canvasIn },
+    );
 
     const image = await generator({ prompt: prepared.assembledPrompt, blueprintPng, size: prepared.size });
 
