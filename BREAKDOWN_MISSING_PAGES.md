@@ -80,18 +80,40 @@ breakdown:
   Spine width depends on final page count and paper stock; only possible after
   body assembly.
 
-## 7. Manuscript-prose front/back matter — silent-drop risk
+## 7. Manuscript-prose front/back matter — CONFIRMED silent-drop
 
-If the original `.md` manuscript contained ANY of:
-- a paragraph before `# CHAPTER 1`
-- an `# Introduction` / `# Preface` / `# Foreword` heading
-- an `# Acknowledgments` / `# About` heading after the last chapter
-- a copyright block at top or bottom
+**Root cause located in `parse-manuscript-outline.ts:161-164`:**
+```js
+const explicitChapterHeadings = headings.filter(
+  h => h.level === 1 && /^chapter\s+\d+/i.test(h.title)
+);
+const chapterHeadings = explicitChapterHeadings.length > 0
+  ? explicitChapterHeadings      // ← ONLY "# CHAPTER N" wins
+  : headings.filter(h => h.level === 1);
+```
 
-…the breakdown likely either (a) ignored it or (b) attached it to the nearest
-chapter as an entry. Today no log warns the operator that prose was dropped.
-**Action when we revisit:** add a breakdown-time warning for any markdown
-section the parser couldn't classify as a chapter entry.
+When the manuscript has any `# CHAPTER N` headings, every other H1 is
+**silently dropped** — no warning, no log entry, no breakdown summary line.
+Headings the parser *does* warn about: only `NO_CHAPTERS_DETECTED` (zero H1s
+in file) and `DEEP_HEADING_IGNORED` (h4/h5/h6). Neither fires for an
+`# Introduction` before `# CHAPTER 1`.
+
+**For this specific manuscript:** if `# Introduction`, `# Preface`,
+`# Foreword`, `# Acknowledgments`, `# About`, or any other H1 exists outside
+the 8 `# CHAPTER N` blocks, it WAS dropped in the 2026-06-09 breakdown that
+produced 129 entries. Operator confirmation pending: this manuscript is
+believed to contain `# Introduction` between cover/title and Chapter 1 —
+that text is currently absent from the project and will not appear in the
+assembled book unless front matter is added manually or v1 lands.
+
+**Action when we revisit:**
+1. Emit a breakdown-time warning for every H1 that does NOT match
+   `^chapter\s+\d+/i` (and isn't a recognized front-matter heading).
+2. Recognize standard front-matter headings (introduction / preface /
+   foreword / dedication / acknowledgments / about / colophon) and route
+   them to front-matter rows once front-matter v1 ships.
+3. Until then, surface "dropped section" warnings in the breakdown summary
+   so the operator can't be silently stripped of content.
 
 ---
 
