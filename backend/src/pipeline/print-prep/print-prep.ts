@@ -22,8 +22,8 @@ import { ProjectConfigSchema } from '@wildlands/shared';
 import { getProject } from '../../db/repositories/projects.repo.js';
 import {
   allWithinCanvas,
-  computeBadgeLayout,
-  computeFolioRect,
+  buildCartoucheSvg,
+  computeBadgeStackLayout,
   standardCanvas,
 } from './badge-geometry.js';
 import { runPreflight, type PreflightReport } from './preflight.js';
@@ -85,9 +85,24 @@ export async function composePrintPage(
     { input: upscaled, left: Math.max(0, Math.round((canvas.width - scaledW) / 2)), top: 0 },
   ];
 
-  // 3. Stamp badges (raster each STD-2 SVG at high density, composite at its rect).
-  const placed = computeBadgeLayout(badgesForPage(badgeSet), canvas);
-  for (const p of placed) {
+  // L-7.2 — single bottom-right cartouche containing ALL metadata
+  // (region / hazards / source / folio). Replaces the L-7/L-7.1 wide
+  // stamping band that was killing the page composition. The AI now
+  // has full composition freedom; the cartouche's soft parchment
+  // backing hides whatever it placed in this small corner.
+  const stack = computeBadgeStackLayout(badgesForPage(badgeSet), folioLabel, canvas);
+
+  // 3a. Parchment cartouche FIRST (sits behind every stamp).
+  const cartoucheSvg = buildCartoucheSvg(stack.cartoucheRect, PALETTE.parchment.hex);
+  const cartouchePng = await sharp(Buffer.from(cartoucheSvg)).png().toBuffer();
+  composites.push({
+    input: cartouchePng,
+    left: stack.cartoucheRect.left,
+    top: stack.cartoucheRect.top,
+  });
+
+  // 3b. Badges stamped ON TOP of the cartouche.
+  for (const p of stack.placedBadges) {
     const bpng = await sharp(Buffer.from(p.badge.svg), { density: 600 })
       .resize({
         width: p.rect.width,
@@ -100,14 +115,14 @@ export async function composePrintPage(
     composites.push({ input: bpng, left: p.rect.left, top: p.rect.top });
   }
 
-  // 4. Stamp folio (bottom-centre, serif, ink).
+  // 3c. Folio joins the corner stack (no longer a separate bottom-centre).
   let stampedFolio = false;
-  if (folioLabel) {
-    const r = computeFolioRect(canvas);
-    const fontPx = Math.round(0.18 * canvas.dpi);
+  if (stack.folio) {
+    const r = stack.folio.rect;
+    const fontPx = Math.round(0.16 * canvas.dpi);
     const folioSvg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${r.width}" height="${r.height}" viewBox="0 0 ${r.width} ${r.height}">` +
-      `<text x="${r.width / 2}" y="${r.height * 0.7}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" fill="${PALETTE.ink.hex}">${folioLabel}</text></svg>`;
+      `<text x="${r.width / 2}" y="${r.height * 0.75}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" fill="${PALETTE.ink.hex}">${stack.folio.label}</text></svg>`;
     const fpng = await sharp(Buffer.from(folioSvg)).png().toBuffer();
     composites.push({ input: fpng, left: r.left, top: r.top });
     stampedFolio = true;
@@ -137,8 +152,8 @@ export async function composePrintPage(
     heightPx: outMeta.height ?? canvas.height,
     dpi: canvas.dpi,
     colorMode: outMeta.space ?? 'srgb',
-    badgesWithinCanvas: allWithinCanvas(placed, canvas),
-    stampedBadges: placed.length,
+    badgesWithinCanvas: allWithinCanvas(stack.placedBadges, canvas),
+    stampedBadges: stack.placedBadges.length,
     stampedFolio,
   };
 }

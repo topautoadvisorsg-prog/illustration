@@ -155,3 +155,178 @@ export function allWithinCanvas(placed: PlacedBadge[], canvas: CanvasPx): boolea
       p.rect.top + p.rect.height <= canvas.height,
   );
 }
+
+// ─── L-7.2 — Bottom-right corner stack with parchment cartouche ────────────
+//
+// Replaces the wide "stamping band" of L-7/L-7.1. All metadata (region,
+// hazards, source, folio) goes into one tiny stack in the bottom-right
+// corner. A soft parchment-colored cartouche sits behind the stack to hide
+// any illustration detail underneath. The AI now gets the full page
+// composition back — no reserved zones, no clipping.
+//
+// Geometry (inches):
+//   inset from canvas right + bottom : 0.375 in (KDP safe + bleed)
+//   cartouche outer max               : 0.75 × 1.30 in (shrinks if items absent)
+//   stack padding inside cartouche    : 0.10 in
+//   stack items                       : region (0.32) → hazards (0.28) → source (0.20) → folio (0.20)
+//   gap between items                 : 0.05 in
+//
+// The cartouche SVG uses a Gaussian-blurred ellipse so the edges blend into
+// the underlying artwork rather than reading as a digital widget.
+
+const STACK_INSET_IN = 0.375;
+const STACK_MAX_WIDTH_IN = 0.55;
+const STACK_PADDING_IN = 0.10;
+const STACK_GAP_IN = 0.05;
+const STACK_ITEM_HEIGHTS_IN = {
+  region: 0.32,
+  hazards: 0.28,
+  source: 0.20,
+  folio: 0.20,
+} as const;
+
+export interface BadgeStackResult {
+  /** Soft parchment backing — rendered FIRST, behind all items. */
+  cartoucheRect: PxRect;
+  /** Each stamped badge, in render order. */
+  placedBadges: PlacedBadge[];
+  /** Folio (page number) text rect, if a folio was supplied. */
+  folio: { rect: PxRect; label: string } | null;
+}
+
+/**
+ * L-7.2 — place every badge + folio inside one bottom-right cartouche.
+ *
+ * @param badges    region (≤1), hazards (≤2), source (≤1), in any order
+ * @param folioLabel  page number string, or null to suppress folio
+ * @param canvas    300-DPI canvas dims
+ */
+export function computeBadgeStackLayout(
+  badges: StampableBadge[],
+  folioLabel: string | null,
+  canvas: CanvasPx,
+): BadgeStackResult {
+  const inset = Math.round(STACK_INSET_IN * canvas.dpi);
+  const stackWidth = Math.round(STACK_MAX_WIDTH_IN * canvas.dpi);
+  const padding = Math.round(STACK_PADDING_IN * canvas.dpi);
+  const gap = Math.round(STACK_GAP_IN * canvas.dpi);
+
+  const region = badges.find((b) => b.family === 'region');
+  const hazards = badges.filter((b) => b.family === 'hazard').sort((a, b) => a.order - b.order);
+  const source = badges.find((b) => b.family === 'source');
+  const hasFolio = !!folioLabel;
+
+  // Compute stack inner height by summing only the items that exist.
+  const items: Array<{ heightPx: number; renderer: (rect: PxRect, item: PlacedBadge | null) => void }> = [];
+  let stackInnerHeight = 0;
+  const addItem = (heightIn: number) => {
+    const h = Math.round(heightIn * canvas.dpi);
+    if (items.length > 0) stackInnerHeight += gap;
+    stackInnerHeight += h;
+    return h;
+  };
+  const regionH = region ? addItem(STACK_ITEM_HEIGHTS_IN.region) : 0;
+  const hazardsH = hazards.length > 0 ? addItem(STACK_ITEM_HEIGHTS_IN.hazards) : 0;
+  const sourceH = source ? addItem(STACK_ITEM_HEIGHTS_IN.source) : 0;
+  const folioH = hasFolio ? addItem(STACK_ITEM_HEIGHTS_IN.folio) : 0;
+
+  // Cartouche outer = stack + padding all around.
+  const cartoucheWidth = stackWidth + padding * 2;
+  const cartoucheHeight = stackInnerHeight + padding * 2;
+  const cartoucheRect: PxRect = {
+    left: canvas.width - inset - cartoucheWidth,
+    top: canvas.height - inset - cartoucheHeight,
+    width: cartoucheWidth,
+    height: cartoucheHeight,
+  };
+
+  // Stack inner origin = cartouche + padding.
+  const stackLeft = cartoucheRect.left + padding;
+  let cursorTop = cartoucheRect.top + padding;
+  const advance = (h: number): number => {
+    const y = cursorTop;
+    cursorTop += h + gap;
+    return y;
+  };
+
+  const placedBadges: PlacedBadge[] = [];
+
+  if (region && regionH > 0) {
+    const w = Math.round(regionH / FAMILY_ASPECT.region);
+    const x = stackLeft + Math.round((stackWidth - w) / 2);
+    placedBadges.push({
+      badge: region,
+      rect: { left: x, top: advance(regionH), width: w, height: regionH },
+    });
+  }
+
+  if (hazards.length > 0 && hazardsH > 0) {
+    const n = hazards.length;
+    const innerGap = n > 1 ? Math.round(0.02 * canvas.dpi) : 0;
+    let hazW = Math.round((stackWidth - innerGap * (n - 1)) / n);
+    let hazH = Math.round(hazW * FAMILY_ASPECT.hazard);
+    if (hazH > hazardsH) {
+      hazH = hazardsH;
+      hazW = Math.round(hazH / FAMILY_ASPECT.hazard);
+    }
+    const rowW = hazW * n + innerGap * (n - 1);
+    const rowLeft = stackLeft + Math.round((stackWidth - rowW) / 2);
+    const rowTop = advance(hazardsH);
+    hazards.forEach((b, i) => {
+      placedBadges.push({
+        badge: b,
+        rect: { left: rowLeft + i * (hazW + innerGap), top: rowTop, width: hazW, height: hazH },
+      });
+    });
+  }
+
+  if (source && sourceH > 0) {
+    const w = sourceH; // square aspect 1.0
+    const x = stackLeft + Math.round((stackWidth - w) / 2);
+    placedBadges.push({
+      badge: source,
+      rect: { left: x, top: advance(sourceH), width: w, height: sourceH },
+    });
+  }
+
+  let folio: BadgeStackResult['folio'] = null;
+  if (hasFolio && folioH > 0) {
+    folio = {
+      rect: {
+        left: stackLeft,
+        top: advance(folioH),
+        width: stackWidth,
+        height: folioH,
+      },
+      label: folioLabel!,
+    };
+  }
+
+  return { cartoucheRect, placedBadges, folio };
+}
+
+/**
+ * L-7.2 — soft-edged parchment cartouche that sits BEHIND the badge stack.
+ * The ellipse is Gaussian-blurred so the edges fade into the artwork instead
+ * of reading as a hard digital rectangle. Returns the SVG document body
+ * (caller rasterizes with sharp).
+ */
+export function buildCartoucheSvg(rect: PxRect, parchmentHex: string): string {
+  const w = rect.width;
+  const h = rect.height;
+  const cx = w / 2;
+  const cy = h / 2;
+  // Inset the ellipse so the blur halo stays inside the SVG viewBox.
+  const rx = (w / 2) * 0.95;
+  const ry = (h / 2) * 0.95;
+  // Blur radius scales with the cartouche so the softness reads the same at
+  // any DPI / canvas size.
+  const blur = Math.max(4, Math.round(Math.min(w, h) * 0.06));
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    `<defs><filter id="soft" x="-20%" y="-20%" width="140%" height="140%">` +
+    `<feGaussianBlur stdDeviation="${blur}"/></filter></defs>` +
+    `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${parchmentHex}" filter="url(#soft)"/>` +
+    `</svg>`
+  );
+}

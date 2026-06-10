@@ -51,17 +51,12 @@ function hardConstraints(spec: WholePageSpec): string {
     '- The whole page must read as ONE integrated composition. The illustration, the typography, and the ornamentation share the same paper, the same ink palette, the same period. The page should look like it was printed from a single plate, not assembled in software.',
     '- Vintage natural-history monograph aesthetic. No modern UI. No infographic styling. No flat icons. No drop-shadows that look digital. No gradients. No sans-serif anywhere on the page.',
     '- Do not add page numbers, captions, watermarks, signatures, copyright text, folios, or running heads unless explicitly listed in `decorativeElements`.',
-    // Standard v1.1 — badges are deterministic stamped overlays, NOT model-drawn.
-    '- Do NOT draw any badges, hazard symbols, warning icons, region/category icons, labels, or page numbers. The hazard/region/source values in BADGE CONTEXT are mood-setting context only; never render them as marks on the page.',
-    // L-7.1 — strong spatial language. The blueprint paints the reserved
-    // band YELLOW; the model should read "yellow region = empty parchment,
-    // hard stop." Prior wording ("leave VISUALLY CLEAN") was too abstract
-    // and the model kept extending swag ornaments and body text into the
-    // bottom band. This wording is explicit.
-    '- BOTTOM STAMPING BAND — the bottom approximately 1 inch of the page (every YELLOW region in the blueprint) is reserved EXEMPT parchment. The bottom-left corner, the bottom-right corner, and the centered bottom strip are stamped LATER by the renderer with badges and the page number. Within these YELLOW regions render NOTHING: no body text, no titles, no decorative ornament, no swag pinecones, no hairlines, no plant tendrils, no signatures, no artwork. The page background paper must show through cleanly.',
-    '- The decorative bottom swag (pinecone garland) must terminate ABOVE the yellow band — never crossing into it, never letting tendrils or pinecones extend into the bottom band.',
-    '- The body text column must terminate ABOVE the yellow band — the last line of body text sits above the band, never inside it.',
-    '- BADGE-SAFE ZONES (json above) are the exact rect coordinates of these reserved regions, in inches from canvas top-left. They are the hardest constraint on this page.',
+    // L-7.2 — the only remaining badge rule. No reserved zones, no spatial
+    // band, no clipped composition: artwork and ornaments flow naturally
+    // to the page edges. Print-prep stamps a small bottom-right cartouche
+    // with a soft parchment backing that covers whatever the model places
+    // underneath, so the model never needs to know about it.
+    '- Do NOT draw any badges, hazard symbols, warning icons, region/category icons, source seals, page numbers, or any other metadata marks. The hazard/region/source values in BADGE CONTEXT are mood-setting context only — never reproduce them as marks on the page. The renderer adds the publisher\'s mark in print-prep.',
     '- Output a finished, publishable page. If the result would not pass as a real spread in a collector-edition hardcover, it is wrong.',
   );
   return lines.join('\n');
@@ -109,15 +104,11 @@ export function assembleExperimentPrompt(spec: WholePageSpec): string {
     '',
     block('BADGE CONTEXT (mood only — do NOT draw these; the renderer stamps them)', spec.badgeContext),
     '',
-    // L-7 — exact reserved rects in inches from canvas top-left. The
-    // renderer stamps badges + folio into these rects; anything the model
-    // places here will collide. Empty array = no zones reserved (operator
-    // O-6 release rule applied).
-    block(
-      'BADGE-SAFE ZONES (reserved rects — leave VISUALLY CLEAN, inches from canvas top-left)',
-      spec.badgeSafeZones,
-    ),
-    '',
+    // L-7.2 — BADGE-SAFE ZONES block REMOVED. The model no longer receives
+    // any reserved-rect geometry. Print-prep handles all metadata stamping
+    // via a small bottom-right cartouche; the model gets back full
+    // composition freedom. badgeSafeZones is still on the spec (empty
+    // array) for backward compatibility with the proof package.
     hardConstraints(spec),
   ].join('\n');
 }
