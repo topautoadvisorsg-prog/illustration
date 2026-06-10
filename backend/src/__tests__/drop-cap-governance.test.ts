@@ -21,6 +21,7 @@ function makeSpec(over: { dropCap: string | null; decorativeInitial: string | nu
       marginsIn: { top: 0.75, bottom: 0.75, outside: 0.75, inside: 0.75 },
       bleedIn: 0.125,
     },
+    composition: { imagePlacement: 'left-side image-priority zone', textPlacement: 'body text uses the calm right-side text-safe zone' },
     readingFieldGeometry: { originIn: { x: 1, y: 1 }, sizeIn: { w: 6, h: 8 }, anchor: 'CENTER', widerThanProductionPct: 0 },
     typographyDNA: { ...EXPERIMENT_TYPOGRAPHY_DNA, titleHierarchy: [], decorativeInitial: over.decorativeInitial },
     illustrationDNA: { masterStyleBlock: 'style', subject: { primary: 'deer', supporting: [], environment: 'forest', mood: 'calm' } },
@@ -64,5 +65,19 @@ describe('drop-cap governance — dropCap is authoritative', () => {
     // decorativeInitial is non-null here, so it appears in the typography block,
     // but the hard-constraint drop-cap line (keyed on dropCap) must NOT.
     expect(prompt).not.toMatch(/drop-cap "/);
+  });
+});
+
+// ─── F-8 — composition contract reaches the prompt ─────────────────────────
+
+describe('F-8 — composition placement in the assembled prompt', () => {
+  it('emits the COMPOSITION CONTRACT with both placement strings', () => {
+    const spec = makeSpec({ dropCap: null, decorativeInitial: null });
+    const prompt = assembleExperimentPrompt(spec);
+    expect(prompt).toContain('COMPOSITION CONTRACT');
+    expect(prompt).toContain('left-side image-priority zone');
+    expect(prompt).toContain('calm right-side text-safe zone');
+    expect(prompt).toContain('do not mirror');
+    expect(prompt).toContain('do not enlarge a small accent');
   });
 });

@@ -156,6 +156,13 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
       // Bleed is owned by the resolved geometry (Rule Zero) — never hardcoded.
       bleedIn: geometry.bleedIn,
     },
+    // F-8 — placement prose from the layout director. The Chapter 1 run
+    // proved the blueprint alone is loosely followed (corner accents became
+    // full-width bands); these strings put the placement in the prompt text.
+    composition: {
+      imagePlacement: input.allocation.imagePlacement,
+      textPlacement: input.allocation.textPlacement,
+    },
     readingFieldGeometry: rfGeometry,
     typographyDNA: {
       ...EXPERIMENT_TYPOGRAPHY_DNA,

@@ -97,10 +97,22 @@ export interface BadgeContextDTO {
   source: string;
 }
 
+/** F-8 — explicit composition placement. The Chapter 1 production run proved
+ *  the blueprint PNG alone is NOT a reliable layout signal: both corner-accent
+ *  pages rendered as full-width bands and a 50/50 page mirrored. These strings
+ *  (already computed by the layout director) give the model the placement in
+ *  prose, alongside the blueprint's visual signal. */
+export interface CompositionDTO {
+  imagePlacement: string;
+  textPlacement: string;
+}
+
 export interface WholePageSpec {
   pageType: 'CHAPTER_OPENER' | 'INTERIOR' | 'COMPACTED' | 'CONTINUATION';
   layoutFamily: LayoutTemplateId;
   layoutGeometry: LayoutGeometryDTO;
+  /** F-8 — prose placement contract the model must respect. */
+  composition: CompositionDTO;
   readingFieldGeometry: ReadingFieldGeometryDTO;
   typographyDNA: TypographyDNA;
   illustrationDNA: IllustrationDNADTO;

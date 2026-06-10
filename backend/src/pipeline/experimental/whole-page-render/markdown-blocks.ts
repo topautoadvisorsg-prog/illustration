@@ -53,6 +53,14 @@ export function markdownToBlocks(body: string): BodyBlock[] {
       flushPara();
       continue;
     }
+    // F-9 — horizontal rules ("---", "***", "___") are manuscript section
+    // separators, never content. Without this they fell through to the
+    // paragraph path and the model printed a literal "---" on the page
+    // (observed on CH01_P005 and CH02_P010 production renders).
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
+      flushPara();
+      continue;
+    }
     // ATX heading: # … ###### . 1–2 = heading, 3+ = subheading.
     const h = line.match(/^(#{1,6})\s+(.+)$/);
     if (h) {

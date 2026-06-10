@@ -44,6 +44,11 @@ function hardConstraints(spec: WholePageSpec): string {
     }
   }
   lines.push(
+    // F-8 — the Chapter 1 production run proved the attached blueprint alone
+    // is loosely followed: corner-accent layouts rendered as full-width bands
+    // and a 50/50 page mirrored. State the placement contract in prose and
+    // forbid the three observed failure modes (move / mirror / enlarge).
+    `- COMPOSITION CONTRACT — image placement: ${spec.composition.imagePlacement}. Text placement: ${spec.composition.textPlacement}. Respect this placement EXACTLY: do not move the artwork to a different region, do not mirror left/right or top/bottom, do not enlarge a small accent into a band or a band into a full page. The attached layout reference image shows the same plan — follow it.`,
     '- Body text appears VERBATIM, every word, in order. Do not paraphrase, summarize, abbreviate, truncate, or invent.',
     `- Body typography: ${spec.typographyDNA.bodyFamily}. Set at approximately ${spec.typographyDNA.bodyPt}pt with ${spec.typographyDNA.bodyLineHeight} line height, reading measure approximately ${spec.typographyDNA.bodyMeasureChars} characters wide — generous and confident, never cramped.`,
     '- The reading field sits at the supplied coordinates. Do not move it. Do not shrink it. Do not change its proportions.',
