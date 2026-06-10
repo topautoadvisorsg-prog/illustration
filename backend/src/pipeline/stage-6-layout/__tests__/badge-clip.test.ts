@@ -26,9 +26,23 @@ function zone(id: string, yPct: number, heightPct: number): PlanningZone {
 }
 
 function alloc(zones: PlanningZone[]): LayoutAllocation {
+  // Minimal valid LayoutAllocation. The clip helper only reads four zone arrays
+  // (text-safe, typography, image-priority, regions). Everything else here is
+  // boilerplate satisfying the TS contract.
+  const emptyArtBox = {
+    xIn: 0,
+    yIn: 0,
+    widthIn: 0,
+    heightIn: 0,
+    recommendedWidthPx: 0,
+    recommendedHeightPx: 0,
+    bleedPaddingPx: 0,
+    aspectRatio: '1:1',
+    overlaySafeArea: '',
+  };
   return {
-    priorityEdge: 'top',
-    imagePriorityZone: { xPct: 0, yPct: 0, widthPct: 0, heightPct: 0 },
+    priorityEdge: 'TOP_BAND',
+    imagePriorityZone: emptyArtBox,
     textSafeZones: zones,
     typographyZones: [],
     imagePriorityZones: [],
@@ -44,7 +58,7 @@ function alloc(zones: PlanningZone[]): LayoutAllocation {
     wordsPerContinuationPage: 0,
     notes: [],
     architecture: 'TOP_BAND',
-    artBox: { xPct: 0, yPct: 0, widthPct: 0, heightPct: 0 },
+    artBox: emptyArtBox,
   };
 }
 
