@@ -370,12 +370,22 @@ async function runTextFitStage(
     };
   }
 
-  // F-1 — gate unification. The old binary check (readyForImageSpend ⇔
-  // overflow === 0) could NEVER pass with by-design compacted overflow
-  // pages, while the pagination stage tolerated overflowMax. A gate that
-  // never passes is noise — every production run needed a human bypass.
-  // Both stages now share ONE tolerance: policy.pagination.overflowMax.
-  const overflowCount = preview.totals.overflow;
+  // F-1 — gate unification. Two bugs made the old gate noise:
+  //   1. The binary check (readyForImageSpend ⇔ overflow === 0) could never
+  //      pass with by-design compacted overflow pages.
+  //   2. previewProjectTextFit measures whole ENTRIES against single-page
+  //      capacity — a PRE-pagination question. After pagination splits
+  //      entries into continuations, that count is meaningless (live book:
+  //      preview said 37, the actual paginated pages had 2).
+  // The gate now keys on the PAGINATED fit distribution (the pages that
+  // will actually render) when pagination has run, sharing the same
+  // tolerance as the pagination stage. The entry-level preview remains a
+  // pre-pagination fallback.
+  const paginationReport = await getPaginationReport(projectId);
+  const paginated = paginationReport.totalPages > 0;
+  const overflowCount = paginated
+    ? (paginationReport.fitDistribution['OVERFLOW'] ?? 0)
+    : preview.totals.overflow;
   const withinTolerance = overflowCount <= policy.pagination.overflowMax;
   if (policy.textFit.readyForImageSpendRequired && !withinTolerance) {
     findings.push({
