@@ -43,6 +43,13 @@
       "when": 1780956500665,
       "tag": "0005_blueprint_path",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781110933110,
+      "tag": "0006_rich_anita_blake",
+      "breakpoints": true
     }
   ]
 }

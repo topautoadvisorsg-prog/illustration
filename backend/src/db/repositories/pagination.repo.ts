@@ -42,7 +42,12 @@ export async function persistPaginatedPages(
 ): Promise<PersistPaginatedPagesResult> {
   const db = getDb();
   return db.transaction(async (tx) => {
-    await tx.delete(pages).where(eq(pages.projectId, input.projectId));
+    // Front Matter v1 (R5): pagination owns the BODY section ONLY. Front/
+    // back-matter rows belong to the front-matter planner — deleting them
+    // here would orphan their composed print files on every re-paginate.
+    await tx
+      .delete(pages)
+      .where(and(eq(pages.projectId, input.projectId), eq(pages.section, 'BODY')));
     if (input.paginatedPages.length === 0) {
       return { pagesWritten: 0 };
     }

@@ -28,6 +28,7 @@ import {
   type WholePageRenderRow,
 } from '../db/repositories/whole-page-render.repo.js';
 import { getProjectStorage } from '../services/storage/project-storage.js';
+import { getPaginatedPageById } from '../db/repositories/pagination.repo.js';
 import {
   buildPreviewPackageForPage,
   buildProofPackageForRender,
@@ -187,6 +188,17 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
     const { pageId } = PageParamsSchema.parse(request.params);
     const body = RenderBodySchema.parse(request.body ?? {});
     try {
+      // Front Matter v1 — non-BODY pages are composed deterministically by
+      // the front-matter planner; the AI render path must refuse them so a
+      // batch sweep can never spend tokens re-imagining a copyright page.
+      const pageRow = await getPaginatedPageById(pageId);
+      if (pageRow && (pageRow as { section?: string }).section && (pageRow as { section?: string }).section !== 'BODY') {
+        return reply.code(422).send({
+          error: 'Unprocessable Entity',
+          message: `Page ${pageId} is ${(pageRow as { section?: string }).section} — composed deterministically by the front-matter planner, never AI-rendered.`,
+          statusCode: 422,
+        });
+      }
       // F-7 — idempotent path for batch runs: an existing good render short-
       // circuits BEFORE any row creation or model call. No spend.
       if (body.skipIfRendered) {
@@ -328,6 +340,29 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
       bookReady: summary.bookReady,
       renders: summary.rows.map(serializeRender),
     };
+  });
+
+  // ── Front Matter v1: plan + compose front/back matter deterministically ──
+  // Idempotent: re-running replaces every non-BODY page row + its files;
+  // BODY rows and their renders are never touched.
+  app.post('/api/experimental/front-matter/:projectId/plan', async (request, reply) => {
+    if (flagOff()) return reply.code(503).send(flagDisabledResponse());
+    const { projectId } = ProjectParamsSchema.parse(request.params);
+    try {
+      const { planFrontMatter } = await import('../pipeline/front-matter/plan-front-matter.js');
+      const report = await planFrontMatter(projectId);
+      return report;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.startsWith('project_not_found')) {
+        return reply.code(404).send({ error: 'Not Found', message, statusCode: 404 });
+      }
+      if (message.startsWith('front_matter_requires_pagination') || message.startsWith('ai_introduction_not_configured')) {
+        return reply.code(422).send({ error: 'Unprocessable Entity', message, statusCode: 422 });
+      }
+      request.log.error({ err }, 'front-matter plan failed');
+      return reply.code(500).send({ error: 'Internal Server Error', message, statusCode: 500 });
+    }
   });
 
   // ── Book Assembly: merge book-ready pages into one KDP interior PDF ──

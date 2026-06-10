@@ -17,17 +17,28 @@ export interface SpinePage {
   spineOrder?: number | null;
 }
 
-/** Order pages for the book spine. */
+/** FRONT_MATTER < BODY < BACK_MATTER; missing section = BODY (legacy rows). */
+function sectionRank(section: string | null | undefined): number {
+  if (section === 'FRONT_MATTER') return 0;
+  if (section === 'BACK_MATTER') return 2;
+  return 1;
+}
+
+/** Order pages for the book spine (Front Matter v1):
+ *  sections in rank order; front/back matter by spineOrder inside their
+ *  section; BODY by (chapterNumber, plannedPageNumber) exactly as before.
+ *  Body rows carry null spineOrder, so a global spineOrder sort would have
+ *  put the body BEFORE the front matter — section rank goes first. */
 export function resolveSpine<T extends SpinePage>(pages: T[]): T[] {
-  const usesSpineOrder = pages.some((p) => p.spineOrder != null);
   const sorted = [...pages];
-  if (usesSpineOrder) {
-    sorted.sort((a, b) => (a.spineOrder ?? 0) - (b.spineOrder ?? 0));
-  } else {
-    sorted.sort(
-      (a, b) => a.chapterNumber - b.chapterNumber || a.plannedPageNumber - b.plannedPageNumber,
-    );
-  }
+  sorted.sort((a, b) => {
+    const rank = sectionRank(a.section) - sectionRank(b.section);
+    if (rank !== 0) return rank;
+    if (sectionRank(a.section) !== 1) {
+      return (a.spineOrder ?? 0) - (b.spineOrder ?? 0);
+    }
+    return a.chapterNumber - b.chapterNumber || a.plannedPageNumber - b.plannedPageNumber;
+  });
   return sorted;
 }
 

@@ -53,6 +53,9 @@ export const imageStatusEnum = pgEnum('image_status', [
 // `continuation` = later printed pages of a multi-page entry; clean reading layout.
 // `compacted`    = single printed page carrying multiple short adjacent entries.
 export const pageRoleEnum = pgEnum('page_role', ['opener', 'continuation', 'compacted']);
+// Front Matter v1 — which part of the book spine a page belongs to. BODY
+// default keeps every existing row correct with zero backfill.
+export const pageSectionEnum = pgEnum('page_section', ['FRONT_MATTER', 'BODY', 'BACK_MATTER']);
 // Pagination v1 — how the assigned text fits the Reading Field for the printed page.
 // PENDING = not yet computed. FITS / TIGHT / OVERFLOW / UNDERFILL per SPEC §5.5.
 export const fitStatusEnum = pgEnum('fit_status', ['PENDING', 'FITS', 'TIGHT', 'OVERFLOW', 'UNDERFILL']);
@@ -219,6 +222,21 @@ export const pages = pgTable(
     previewApproved: boolean('preview_approved').default(false).notNull(),
     previewApprovedAt: timestamp('preview_approved_at', { withTimezone: true }),
     previewApprovedBy: text('preview_approved_by'),
+    // ── Front Matter v1 (FRONT_MATTER_V1_SPEC.md) — additive, BODY default ──
+    /** Spine section. Existing rows stay BODY with zero backfill. */
+    section: pageSectionEnum('section').default('BODY').notNull(),
+    /** Front/back-matter page kind (HALF_TITLE, TITLE_PAGE, COPYRIGHT_PAGE,
+     *  DEDICATION, CONTENTS, INTRODUCTION, ABOUT_AUTHOR, ABOUT_SERIES,
+     *  RESOURCES, BLANK). Null for BODY pages. Text (not enum) so v1.1 page
+     *  kinds need no enum migration; zod validates at the boundary. */
+    frontMatterType: text('front_matter_type'),
+    /** Absolute order in the printed book. Assembly's single sort key:
+     *  FRONT_MATTER < BODY < BACK_MATTER. Null for BODY (which keeps
+     *  ordering by plannedPageNumber inside its section). */
+    spineOrder: integer('spine_order'),
+    /** The folio EXACTLY as printed ('i', 'iv', '1', '203', or null for
+     *  unprinted folios — half title / title / copyright / blanks). */
+    pageLabel: text('page_label'),
     ...timestamps,
   },
   (table) => ({

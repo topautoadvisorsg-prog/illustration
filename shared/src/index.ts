@@ -445,6 +445,53 @@ export const PageQualityResolutionSchema = z.object({
 export type PageQualityResolution = z.infer<typeof PageQualityResolutionSchema>;
 export type PageQualityResolutionStatus = z.infer<typeof PageQualityResolutionStatusSchema>;
 
+// ── Front Matter v1 — generic publishing metadata (FRONT_MATTER_V1_SPEC.md §5).
+// Platform-level: NOTHING book-, brand-, or series-specific is hardcoded here.
+// Every field is data; templates and AI prompts read from this block only.
+export const PublishingMetadataSchema = z.object({
+  /** Overrides project title/subtitle/author when present; falls back to them. */
+  title: z.string().min(1).optional(),
+  subtitle: z.string().optional(),
+  authors: z.array(z.string().min(1)).optional(),
+  language: z.string().default('en'),
+  publisher: z
+    .object({
+      imprint: z.string().min(1),
+      location: z.string().optional(),
+      url: z.string().optional(),
+    })
+    .optional(),
+  copyrightYear: z.number().int().optional(),
+  copyrightHolder: z.string().optional(),
+  edition: z.string().default('First Edition'),
+  isbn: z.object({ print: z.string().optional(), ebook: z.string().optional() }).optional(),
+  printedIn: z.string().optional(),
+  dedication: z.string().optional(),
+  disclaimers: z.array(z.string()).default([]),
+  credits: z.string().optional(),
+  additionalResources: z
+    .object({ heading: z.string().min(1), items: z.array(z.string().min(1)) })
+    .optional(),
+  series: z
+    .object({
+      name: z.string().min(1),
+      description: z.string().optional(),
+      volumeNumber: z.number().int().positive().optional(),
+      otherVolumes: z.array(z.string()).optional(),
+    })
+    .optional(),
+  audienceDescription: z.string().optional(),
+  bookPurpose: z.string().optional(),
+  toneKeywords: z.array(z.string()).default([]),
+  authorBio: z
+    .object({ verbatim: z.string().optional(), facts: z.array(z.string()).optional() })
+    .optional(),
+  bookDescription: z.object({ hooks: z.array(z.string()).optional() }).optional(),
+  aiIntroduction: z.object({ enabled: z.boolean().default(false) }).default({ enabled: false }),
+  coverAssetPath: z.string().optional(),
+});
+export type PublishingMetadata = z.infer<typeof PublishingMetadataSchema>;
+
 export const ProjectConfigSchema = z.object({
   brand: BrandSchema.default('THE_WILDLANDS'),
   audience: AudienceSchema.default('ADULT'),
@@ -475,6 +522,9 @@ export const ProjectConfigSchema = z.object({
   outputProfile: OutputProfileSchema.default({}),
   /** Set by Page Plan; compared against current config to detect a stale plan. */
   planMeta: PlanMetaSchema.optional(),
+  /** Front Matter v1 — generic publishing metadata. Additive + optional so
+   *  every existing project config parses unchanged. */
+  publishing: PublishingMetadataSchema.default({}),
 });
 
 export const CreateProjectRequestSchema = z.object({
