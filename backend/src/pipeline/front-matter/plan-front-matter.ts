@@ -153,9 +153,11 @@ export async function planFrontMatter(projectId: string): Promise<FrontMatterPla
   const storage = getProjectStorage();
   const omitted: FrontMatterPlanReport['omitted'] = [];
 
-  // ── Introduction recovery (operator priority order) ──
+  // ── Introduction + disclaimer recovery (operator priority order) ──
   let introductionSource: FrontMatterPlanReport['introductionSource'] = 'none';
   let introParagraphs: string[] = [];
+  let disclaimerParagraphs: string[] = [];
+  let disclaimerHeading = 'Disclaimer';
   if (project.manuscriptPath) {
     const manuscript = (await storage.readProjectFile(project.manuscriptPath)).toString('utf8');
     const sections = recoverFrontMatterSections(manuscript);
@@ -167,6 +169,13 @@ export async function planFrontMatter(projectId: string): Promise<FrontMatterPla
     // Dedication recovered from manuscript wins over metadata absence.
     const ded = sections.find((s) => s.kind === 'DEDICATION');
     if (ded && !meta.dedication) meta.dedication = ded.markdown;
+    // Author-written disclaimer gets its own front page(s) — far too long
+    // for the copyright block, and the author's text is authoritative.
+    const disc = sections.find((s) => s.kind === 'DISCLAIMER');
+    if (disc) {
+      disclaimerHeading = disc.headingText.replace(/\b\w/g, (c) => c.toUpperCase());
+      disclaimerParagraphs = sectionParagraphs(disc.markdown);
+    }
   }
   if (introductionSource === 'none' && meta.bookPurpose && meta.aiIntroduction.enabled) {
     // AI fallback is LAST resort and never silent. v1 has no text-LLM wired
@@ -232,6 +241,19 @@ export async function planFrontMatter(projectId: string): Promise<FrontMatterPla
   });
   const copyrightLines = buildCopyrightLines(meta);
   push({ kind: 'COPYRIGHT_PAGE', frontMatterType: 'COPYRIGHT_PAGE', pageLabel: null, compose: { copyrightLines }, auditText: copyrightLines.join('\n') });
+  if (disclaimerParagraphs.length > 0) {
+    ensureRecto();
+    const split = splitTextPages(disclaimerParagraphs, canvasIn);
+    split.forEach((paras, i) => {
+      push({
+        kind: 'TEXT_PAGE',
+        frontMatterType: 'DISCLAIMER',
+        pageLabel: toRoman(nextIndex()).toLowerCase(),
+        compose: { heading: i === 0 ? disclaimerHeading : undefined, paragraphs: paras },
+        auditText: paras.join('\n\n'),
+      });
+    });
+  }
   if (meta.dedication) {
     ensureRecto();
     push({ kind: 'DEDICATION', frontMatterType: 'DEDICATION', pageLabel: null, compose: { dedicationText: meta.dedication }, auditText: meta.dedication });

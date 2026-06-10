@@ -59,6 +59,46 @@ describe('recoverFrontMatterSections — the silently-dropped sections come back
     const sections = recoverFrontMatterSections('# Introduction\n\n# CHAPTER 1 — X\n\nbody');
     expect(sections).toHaveLength(0);
   });
+
+  it('recovers H2 sections under a title H1 (the real New England shape)', () => {
+    const ms = [
+      '---',
+      '',
+      '## COVER PAGE',
+      '',
+      '# THE WILD LANDS: NEW ENGLAND',
+      '',
+      '## DISCLAIMER',
+      '',
+      '**Please read this page before using this book in the field.**',
+      '',
+      'It is intended to build general knowledge.',
+      '',
+      '---',
+      '',
+      '## TABLE OF CONTENTS',
+      '',
+      '- Disclaimer',
+      '',
+      '## INTRODUCTION',
+      '',
+      'The landscape you are walking through is the direct result of ice.',
+      '',
+      '# CHAPTER 1 — KNOW YOUR REGION',
+      '',
+      'body',
+    ].join('\n');
+    const sections = recoverFrontMatterSections(ms);
+    const kinds = sections.map((s) => s.kind).sort();
+    expect(kinds).toEqual(['DISCLAIMER', 'INTRODUCTION']);
+    const disc = sections.find((s) => s.kind === 'DISCLAIMER')!;
+    expect(disc.markdown).toContain('general knowledge');
+    expect(disc.markdown).not.toContain('TABLE OF CONTENTS'); // H2 section ends at next H2
+    expect(disc.markdown).not.toMatch(/^-{3,}$/m); // separators stripped
+    const intro = sections.find((s) => s.kind === 'INTRODUCTION')!;
+    expect(intro.markdown).toContain('result of ice');
+    expect(intro.markdown).not.toContain('CHAPTER 1'); // ends at the H1
+  });
 });
 
 describe('composer helpers', () => {
