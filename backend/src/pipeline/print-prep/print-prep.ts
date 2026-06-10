@@ -101,7 +101,9 @@ export async function composePrintPage(
     top: stack.cartoucheRect.top,
   });
 
-  // 3b. Badges stamped ON TOP of the cartouche.
+  // 3b. Badges stamped ON TOP of the cartouche. L-7.2.2 — 15% brightness
+  // reduction (modulate preserves hue + alpha) makes the stamps read a touch
+  // bolder against the parchment without changing the warm sepia ink character.
   for (const p of stack.placedBadges) {
     const bpng = await sharp(Buffer.from(p.badge.svg), { density: 600 })
       .resize({
@@ -110,12 +112,14 @@ export async function composePrintPage(
         fit: 'contain',
         background: { r: 0, g: 0, b: 0, alpha: 0 },
       })
+      .modulate({ brightness: 0.85 })
       .png()
       .toBuffer();
     composites.push({ input: bpng, left: p.rect.left, top: p.rect.top });
   }
 
   // 3c. Folio joins the corner stack (no longer a separate bottom-centre).
+  // Same 15% brightness reduction so the page number matches the badges.
   let stampedFolio = false;
   if (stack.folio) {
     const r = stack.folio.rect;
@@ -123,7 +127,7 @@ export async function composePrintPage(
     const folioSvg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${r.width}" height="${r.height}" viewBox="0 0 ${r.width} ${r.height}">` +
       `<text x="${r.width / 2}" y="${r.height * 0.75}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" fill="${PALETTE.ink.hex}">${stack.folio.label}</text></svg>`;
-    const fpng = await sharp(Buffer.from(folioSvg)).png().toBuffer();
+    const fpng = await sharp(Buffer.from(folioSvg)).modulate({ brightness: 0.85 }).png().toBuffer();
     composites.push({ input: fpng, left: r.left, top: r.top });
     stampedFolio = true;
   }
