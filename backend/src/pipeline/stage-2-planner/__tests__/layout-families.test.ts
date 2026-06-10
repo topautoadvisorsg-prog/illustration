@@ -136,3 +136,53 @@ describe('FAMILY_BY_TEMPLATE is internally consistent with FAMILY_DEFAULT_TEMPLA
     }
   });
 });
+
+// ─── P2a — 25 % accent selection (word-count routing + corner rotation) ────
+
+describe('chooseSimplifiedLayout — P2a length routing', () => {
+  const config = makeConfig();
+  const longBody = Array.from({ length: 450 }, (_, i) => `word${i}`).join(' ');
+  const shortBody = Array.from({ length: 120 }, (_, i) => `word${i}`).join(' ');
+
+  it('long default-content entry routes to a 25 % accent corner', () => {
+    const pick = chooseSimplifiedLayout(makeEntry({ bodyMarkdown: longBody }), config);
+    expect(pick.family).toBe('C');
+    expect(pick.template).toMatch(/^LAYOUT_C_CORNER_/);
+    expect(pick.reason).toContain('accent');
+  });
+
+  it('short default-content entry keeps the 50/50 layout', () => {
+    const pick = chooseSimplifiedLayout(makeEntry({ bodyMarkdown: shortBody }), config);
+    expect(pick.family).toBe('B');
+    expect(pick.template).toBe('LAYOUT_B_IMAGE_RIGHT');
+  });
+
+  it('corner rotation is deterministic per chapter+page and varies across pages', () => {
+    const a1 = chooseSimplifiedLayout(makeEntry({ bodyMarkdown: longBody, chapterNumber: 2, pageNumber: 3 }), config);
+    const a2 = chooseSimplifiedLayout(makeEntry({ bodyMarkdown: longBody, chapterNumber: 2, pageNumber: 3 }), config);
+    expect(a1.template).toBe(a2.template); // stable across re-pagination
+    const corners = new Set(
+      [1, 2, 3, 4].map(
+        (p) => chooseSimplifiedLayout(makeEntry({ bodyMarkdown: longBody, pageNumber: p }), config).template,
+      ),
+    );
+    expect(corners.size).toBeGreaterThan(1); // rotation actually rotates
+  });
+
+  it('danger override beats length routing', () => {
+    const pick = chooseSimplifiedLayout(
+      makeEntry({ bodyMarkdown: longBody, contentType: 'WARNING_PAGE' }),
+      config,
+    );
+    expect(pick.template).toBe('LAYOUT_B_IMAGE_TOP');
+  });
+
+  it('encyclopedia entries route to accent corners with rotation', () => {
+    const pick = chooseSimplifiedLayout(
+      makeEntry({ bodyMarkdown: shortBody, contentType: 'ENCYCLOPEDIA_ENTRY' }),
+      config,
+    );
+    expect(pick.family).toBe('C');
+    expect(pick.template).toMatch(/^LAYOUT_C_CORNER_/);
+  });
+});

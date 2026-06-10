@@ -37,10 +37,10 @@ const FAMILY_LABEL: Partial<Record<LayoutTemplateId, string>> = {
   LAYOUT_B_IMAGE_BOTTOM: 'Layout B — 50/50 (image bottom)',
   LAYOUT_B_IMAGE_LEFT: 'Layout B — 50/50 (image left)',
   LAYOUT_B_IMAGE_RIGHT: 'Layout B — 50/50 (image right)',
-  LAYOUT_C_CORNER_TOP_LEFT: 'Layout C — 25% Support (top-left corner)',
-  LAYOUT_C_CORNER_TOP_RIGHT: 'Layout C — 25% Support (top-right corner)',
-  LAYOUT_C_CORNER_BOTTOM_LEFT: 'Layout C — 25% Support (bottom-left corner)',
-  LAYOUT_C_CORNER_BOTTOM_RIGHT: 'Layout C — 25% Support (bottom-right corner)',
+  LAYOUT_C_CORNER_TOP_LEFT: 'Layout C — 25% Accent (top-left corner)',
+  LAYOUT_C_CORNER_TOP_RIGHT: 'Layout C — 25% Accent (top-right corner)',
+  LAYOUT_C_CORNER_BOTTOM_LEFT: 'Layout C — 25% Accent (bottom-left corner)',
+  LAYOUT_C_CORNER_BOTTOM_RIGHT: 'Layout C — 25% Accent (bottom-right corner)',
   LAYOUT_D_PURE_TEXT: 'Layout D — Pure Text / Back Matter',
 };
 

@@ -153,6 +153,14 @@ function placementFor(slot: ArtSlot): { imagePlacement: string; textPlacement: s
       return { imagePlacement: 'scattered image-priority study zones inside the full-page artwork', textPlacement: 'text uses the calm reading path between studies' };
     case 'CENTER_WRAP':
       return { imagePlacement: 'central image-priority zone inside the full-page artwork', textPlacement: 'text uses calm surrounding and lower text-safe zones' };
+    case 'CORNER_TOP_LEFT':
+      return { imagePlacement: 'small top-left corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: a column beside the accent, then the full lower block' };
+    case 'CORNER_TOP_RIGHT':
+      return { imagePlacement: 'small top-right corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: a column beside the accent, then the full lower block' };
+    case 'CORNER_BOTTOM_LEFT':
+      return { imagePlacement: 'small bottom-left corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: the full upper block, then a column beside the accent' };
+    case 'CORNER_BOTTOM_RIGHT':
+      return { imagePlacement: 'small bottom-right corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: the full upper block, then a column beside the accent' };
     default:
       return { imagePlacement: 'left-side image-priority zone within the full-page artwork', textPlacement: 'body text uses the calm right-side text-safe zone, then continues below' };
   }
@@ -300,6 +308,64 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation
         typographyZones: [title],
         imagePriorityZones: [zone('image-priority-right', 'primary-art', imgX, FOCAL_TOP, imgW, BOTTOM - FOCAL_TOP, 'Focal subject lives along the right while the full page stays one illustration; it opens into the reading field to its left.')],
         textSafeZones: [zone('reading-field-left', 'body', 6, FOCAL_TOP, Math.max(32, imgX - GUTTER - 6), BOTTOM - FOCAL_TOP, 'Readable long-form reading field: a calm parchment column the artwork dissolves into at the seam. No hard edge, panel, or card.', 'organic')],
+      };
+    }
+    case 'CORNER_TOP_LEFT':
+    case 'CORNER_TOP_RIGHT':
+    case 'CORNER_BOTTOM_LEFT':
+    case 'CORNER_BOTTOM_RIGHT': {
+      // P2a — 25 % accent family (LAYOUT_C, operator-approved rebuild).
+      // A small specimen study holds ONE corner; text owns the rest of the
+      // page in an L: a column beside the accent plus a full-width block on
+      // the other half. Accent ≈ 44 × 36 of the usable area ≈ 25 % of the
+      // composition — a true accent, never competing with the text.
+      const accW = clampN(imagePercent * 1.8, 38, 46); // ~44 % width
+      const accH = 34; // ~36 % of usable height
+      const onTop = slot === 'CORNER_TOP_LEFT' || slot === 'CORNER_TOP_RIGHT';
+      const onLeft = slot === 'CORNER_TOP_LEFT' || slot === 'CORNER_BOTTOM_LEFT';
+      const accX = onLeft ? 4 : 96 - accW;
+      const accY = onTop ? FOCAL_TOP : BOTTOM - accH;
+      const corner = `${onTop ? 'top' : 'bottom'}-${onLeft ? 'left' : 'right'}`;
+      // Column beside the accent (same rows), block on the opposite half.
+      const colX = onLeft ? accX + accW + GUTTER : 6;
+      const colW = Math.max(30, (onLeft ? 94 - colX : accX - GUTTER - 6));
+      const blockY = onTop ? accY + accH + GUTTER : FOCAL_TOP;
+      const blockH = onTop ? BOTTOM - blockY : accY - GUTTER - FOCAL_TOP;
+      return {
+        typographyZones: [title],
+        imagePriorityZones: [
+          zone(
+            `image-accent-${corner}`,
+            'primary-art',
+            accX,
+            accY,
+            accW,
+            accH,
+            `Small ${corner} specimen accent (~25 % of the composition) — a single naturalist study (mushroom, leaf, feather, track, tool, botanical detail) rendered directly on the page like a museum plate. It supports the text; it never dominates. No card, frame, or colored block.`,
+          ),
+        ],
+        textSafeZones: [
+          zone(
+            `reading-field-beside-${corner}`,
+            'body',
+            colX,
+            accY,
+            colW,
+            accH,
+            'Readable long-form reading field beside the accent study: calm parchment, organic transition at the seam. No box, panel, or card.',
+            'organic',
+          ),
+          zone(
+            `reading-field-main-${corner}`,
+            'body',
+            6,
+            blockY,
+            88,
+            Math.max(20, blockH),
+            'Primary reading field: a calm, full-measure parchment block. The accent study stays in its corner; the artwork dissolves into this field, never a hard edge.',
+            'organic',
+          ),
+        ],
       };
     }
     case 'SCATTERED':

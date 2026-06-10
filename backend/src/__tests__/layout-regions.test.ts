@@ -39,3 +39,45 @@ describe('layout director — four region types', () => {
     }
   });
 });
+
+// ─── P2a — 25 % accent corner geometry (LAYOUT_C rebuilt) ───────────────────
+
+describe('layout director — LAYOUT_C true 25 % accent', () => {
+  const corners: Array<[LayoutTemplateId, { top: boolean; left: boolean }]> = [
+    ['LAYOUT_C_CORNER_TOP_LEFT', { top: true, left: true }],
+    ['LAYOUT_C_CORNER_TOP_RIGHT', { top: true, left: false }],
+    ['LAYOUT_C_CORNER_BOTTOM_LEFT', { top: false, left: true }],
+    ['LAYOUT_C_CORNER_BOTTOM_RIGHT', { top: false, left: false }],
+  ];
+
+  it('accent zone is a true accent (≤ 30 % of the page), never full-page', () => {
+    for (const [template] of corners) {
+      const a = alloc(template);
+      expect(a.imagePriorityZones).toHaveLength(1);
+      const img = a.imagePriorityZones[0]!;
+      const areaPct = (img.widthPct * img.heightPct) / 100; // % of page
+      expect(areaPct, `${template} accent area`).toBeLessThanOrEqual(30);
+      expect(areaPct, `${template} accent area`).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  it('accent sits in its named corner', () => {
+    for (const [template, pos] of corners) {
+      const img = alloc(template).imagePriorityZones[0]!;
+      const centerX = img.xPct + img.widthPct / 2;
+      const centerY = img.yPct + img.heightPct / 2;
+      expect(pos.left ? centerX < 50 : centerX > 50, `${template} horizontal`).toBe(true);
+      expect(pos.top ? centerY < 56 : centerY > 50, `${template} vertical`).toBe(true);
+    }
+  });
+
+  it('text owns the page: two reading fields whose area dwarfs the accent', () => {
+    for (const [template] of corners) {
+      const a = alloc(template);
+      expect(a.textSafeZones.length).toBe(2);
+      const textArea = a.textSafeZones.reduce((s, z) => s + z.widthPct * z.heightPct, 0);
+      const imgArea = a.imagePriorityZones.reduce((s, z) => s + z.widthPct * z.heightPct, 0);
+      expect(textArea, `${template} text:image ratio`).toBeGreaterThan(imgArea * 2);
+    }
+  });
+});
