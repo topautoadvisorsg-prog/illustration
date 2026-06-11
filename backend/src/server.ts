@@ -15,7 +15,7 @@ import { registerPageRoutes } from './api/pages.routes.js';
 import { registerIntelligenceRoutes } from './api/intelligence.routes.js';
 import { registerAgentRoutes } from './api/agents.routes.js';
 import { registerPaginationRoutes } from './api/pagination.routes.js';
-import { registerExperimentalRoutes } from './api/experimental.routes.js';
+import { registerWholePageRoutes } from './api/whole-page.routes.js';
 import { registerSubjectBadgeRoutes } from './api/subject-badges.routes.js';
 import { registerSupervisorRoutes } from './api/supervisor.routes.js';
 
@@ -58,8 +58,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Pagination v1 — routes are registered always; each one self-gates on
   // PAGINATION_V1_ENABLED and returns 503 when the flag is off.
   await registerPaginationRoutes(app);
-  // Whole-page render experiment — self-gates on WHOLE_PAGE_EXPERIMENT_ENABLED.
-  await registerExperimentalRoutes(app);
+  // Whole-page render pipeline — self-gates on WHOLE_PAGE_RENDER_ENABLED.
+  await registerWholePageRoutes(app);
   // Subject + Badge metadata cleanup (Standard v1.1) — deterministic, no AI.
   await registerSubjectBadgeRoutes(app);
   // Book Production Supervisor — orchestrates the no-spend half of the pipeline

@@ -13,11 +13,11 @@
  */
 
 import { ProjectConfigSchema, type ProjectConfig } from '@wildlands/shared';
-import { getProject } from '../../../db/repositories/projects.repo.js';
+import { getProject } from '../../db/repositories/projects.repo.js';
 import {
   getEntryMetaByKeys,
   getPaginatedPageById,
-} from '../../../db/repositories/pagination.repo.js';
+} from '../../db/repositories/pagination.repo.js';
 import {
   createRenderRow,
   getRenderById,
@@ -25,19 +25,19 @@ import {
   markRendered,
   markRendering,
   type WholePageRenderRow,
-} from '../../../db/repositories/whole-page-render.repo.js';
-import { WILDLANDS_STANDARD, resolveGeometry } from '../../publishing-standard/index.js';
-import { directLayout, type LayoutAllocation } from '../../stage-6-layout/layout-director.js';
-import { computePageGeometry } from '../../stage-6-layout/page-geometry.js';
-import { renderBlueprintPng } from '../../stage-3-generation/blueprint.js';
+} from '../../db/repositories/whole-page-render.repo.js';
+import { WILDLANDS_STANDARD, resolveGeometry } from '../publishing-standard/index.js';
+import { directLayout, type LayoutAllocation } from '../stage-6-layout/layout-director.js';
+import { computePageGeometry } from '../stage-6-layout/page-geometry.js';
+import { renderBlueprintPng } from '../stage-3-generation/blueprint.js';
 import {
   generateImageFromBlueprint,
   type GeneratedImage,
   type ImageSize,
-} from '../../../services/openai/openai.js';
-import { getProjectStorage } from '../../../services/storage/project-storage.js';
+} from '../../services/openai/openai.js';
+import { getProjectStorage } from '../../services/storage/project-storage.js';
 import { buildPageSpec } from './build-page-spec.js';
-import { assembleExperimentPrompt } from './assemble-experiment-prompt.js';
+import { assemblePagePrompt } from './assemble-page-prompt.js';
 import { buildPageRolePolicy, roleAllowsEmptyBody } from './page-role-policy.js';
 import type { WholePageSpec } from './types.js';
 
@@ -121,7 +121,7 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
     badgeContext,
     pageRolePolicy,
   });
-  const assembledPrompt = assembleExperimentPrompt(spec);
+  const assembledPrompt = assemblePagePrompt(spec);
   const size = pickSize(geometry.trimWidthIn, geometry.trimHeightIn);
   return {
     projectId: pageRow.projectId,

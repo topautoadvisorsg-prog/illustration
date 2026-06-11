@@ -1,5 +1,5 @@
 /**
- * Whole-page render experiment — typography DNA.
+ * Whole-page render pipeline — typography DNA.
  *
  * v1.0+: this file no longer defines DNA. It composes the DNA used by the
  * prompt assembler from the locked Wild Lands Publishing Standard
@@ -11,11 +11,11 @@ import {
   PALETTE,
   TYPOGRAPHY,
   WILDLANDS_STANDARD,
-} from '../../publishing-standard/index.js';
+} from '../publishing-standard/index.js';
 import type { TypographyDNA } from './types.js';
 
-/** Derive the experiment's typography DNA from the locked publishing standard. */
-export const EXPERIMENT_TYPOGRAPHY_DNA: TypographyDNA = {
+/** Derive the pipeline's typography DNA from the locked publishing standard. */
+export const PAGE_TYPOGRAPHY_DNA: TypographyDNA = {
   identity: `Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version} — museum-grade collector edition, vintage natural-history monograph. Paper ${PALETTE.parchment.hex}, ink ${PALETTE.ink.hex}.`,
   bodyFamily: TYPOGRAPHY.body.family + '. ' + TYPOGRAPHY.body.treatment,
   bodyPt: TYPOGRAPHY.body.pt,
@@ -36,9 +36,9 @@ export const EXPERIMENT_TYPOGRAPHY_DNA: TypographyDNA = {
 };
 
 /**
- * How much wider the experimental reading field is vs. the legacy production
+ * How much wider the widened reading field is vs. the legacy production
  * measure. Feeds `readingFieldGeometry.widerThanProductionPct` in the spec, a
  * hint to the model that the text column is generous. The absolute measure
  * itself is locked by the Standard (70 chars).
  */
-export const EXPERIMENT_READING_FIELD_WIDENING_PCT = 20;
+export const READING_FIELD_WIDENING_PCT = 20;

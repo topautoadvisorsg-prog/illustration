@@ -65,13 +65,20 @@ const EnvSchema = z.object({
   // code as latent infrastructure either way.
   LAYOUT_SIMPLIFIED_V1: z.coerce.boolean().default(false),
 
-  // Whole-page render experiment. When false (default), the experimental route
-  // returns 503. When true, the operator can POST to
-  // /api/experimental/whole-page-render/:pageId to test a JSON-page-spec-driven
-  // single-shot render. Production renderer / Stage 3 / Pagination v1 are
-  // never touched by this flag.
+  // Whole-page render pipeline gate. When false (default), the routes return
+  // 503. WHOLE_PAGE_RENDER_ENABLED is the current name; WHOLE_PAGE_EXPERIMENT_ENABLED
+  // is the legacy name kept as a fallback so the deployed Railway variable keeps
+  // working until it is renamed. Resolve via `wholePageRenderEnabled()`.
+  WHOLE_PAGE_RENDER_ENABLED: z.coerce.boolean().default(false),
   WHOLE_PAGE_EXPERIMENT_ENABLED: z.coerce.boolean().default(false),
 });
+
+/** True if the whole-page render pipeline is enabled, honoring the legacy
+ *  env var name as a fallback during the rename transition. */
+export function wholePageRenderEnabled(): boolean {
+  const env = getEnv();
+  return env.WHOLE_PAGE_RENDER_ENABLED || env.WHOLE_PAGE_EXPERIMENT_ENABLED;
+}
 
 export type Env = z.infer<typeof EnvSchema>;
 

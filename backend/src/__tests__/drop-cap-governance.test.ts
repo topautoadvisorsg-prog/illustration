@@ -8,9 +8,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { assembleExperimentPrompt } from '../pipeline/experimental/whole-page-render/assemble-experiment-prompt.js';
-import { EXPERIMENT_TYPOGRAPHY_DNA } from '../pipeline/experimental/whole-page-render/typography-dna.js';
-import type { WholePageSpec } from '../pipeline/experimental/whole-page-render/types.js';
+import { assemblePagePrompt } from '../pipeline/whole-page-render/assemble-page-prompt.js';
+import { PAGE_TYPOGRAPHY_DNA } from '../pipeline/whole-page-render/typography-dna.js';
+import type { WholePageSpec } from '../pipeline/whole-page-render/types.js';
 
 function makeSpec(over: { dropCap: string | null; decorativeInitial: string | null; pageType?: WholePageSpec['pageType'] }): WholePageSpec {
   return {
@@ -23,7 +23,7 @@ function makeSpec(over: { dropCap: string | null; decorativeInitial: string | nu
     },
     composition: { imagePlacement: 'left-side image-priority zone', textPlacement: 'body text uses the calm right-side text-safe zone' },
     readingFieldGeometry: { originIn: { x: 1, y: 1 }, sizeIn: { w: 6, h: 8 }, anchor: 'CENTER', widerThanProductionPct: 0 },
-    typographyDNA: { ...EXPERIMENT_TYPOGRAPHY_DNA, titleHierarchy: [], decorativeInitial: over.decorativeInitial },
+    typographyDNA: { ...PAGE_TYPOGRAPHY_DNA, titleHierarchy: [], decorativeInitial: over.decorativeInitial },
     illustrationDNA: { masterStyleBlock: 'style', subject: { primary: 'deer', supporting: [], environment: 'forest', mood: 'calm' } },
     pageText: {
       title: { kicker: '', number: '', name: '' },
@@ -44,14 +44,14 @@ const DROPCAP_LANGUAGE = /drop-cap|decorativeInitial|illuminated|dropCapSurround
 
 describe('drop-cap governance — dropCap is authoritative', () => {
   it('NULL dropCap → the prompt contains NO drop-cap language at all', () => {
-    const prompt = assembleExperimentPrompt(makeSpec({ dropCap: null, decorativeInitial: null }));
+    const prompt = assemblePagePrompt(makeSpec({ dropCap: null, decorativeInitial: null }));
     expect(DROPCAP_LANGUAGE.test(prompt)).toBe(false);
     // and the typography block must not even carry a stray "decorativeInitial" key
     expect(prompt).not.toContain('decorativeInitial');
   });
 
   it('SET dropCap on a CHAPTER_OPENER → the prompt DOES describe the illuminated initial', () => {
-    const prompt = assembleExperimentPrompt(
+    const prompt = assemblePagePrompt(
       makeSpec({ pageType: 'CHAPTER_OPENER', dropCap: 'T', decorativeInitial: 'engraved botanical surround' }),
     );
     expect(prompt).toMatch(/drop-cap "T"/);
@@ -61,7 +61,7 @@ describe('drop-cap governance — dropCap is authoritative', () => {
   it('an interior page never receives drop-cap instruction even if decorativeInitial leaked non-null', () => {
     // Defense in depth: assembler keys on the spec's dropCap field; an interior
     // page with dropCap=null stays clean regardless.
-    const prompt = assembleExperimentPrompt(makeSpec({ dropCap: null, decorativeInitial: 'stray surround text' }));
+    const prompt = assemblePagePrompt(makeSpec({ dropCap: null, decorativeInitial: 'stray surround text' }));
     // decorativeInitial is non-null here, so it appears in the typography block,
     // but the hard-constraint drop-cap line (keyed on dropCap) must NOT.
     expect(prompt).not.toMatch(/drop-cap "/);
@@ -73,7 +73,7 @@ describe('drop-cap governance — dropCap is authoritative', () => {
 describe('F-8 — composition placement in the assembled prompt', () => {
   it('emits the COMPOSITION CONTRACT with both placement strings', () => {
     const spec = makeSpec({ dropCap: null, decorativeInitial: null });
-    const prompt = assembleExperimentPrompt(spec);
+    const prompt = assemblePagePrompt(spec);
     expect(prompt).toContain('COMPOSITION CONTRACT');
     expect(prompt).toContain('left-side image-priority zone');
     expect(prompt).toContain('calm right-side text-safe zone');

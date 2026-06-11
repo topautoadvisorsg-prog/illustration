@@ -5,7 +5,7 @@ import {
   buildPageRolePolicy,
   isWholePageAiAllowedForRow,
   roleAllowsEmptyBody,
-} from '../pipeline/experimental/whole-page-render/page-role-policy.js';
+} from '../pipeline/whole-page-render/page-role-policy.js';
 
 const config = ProjectConfigSchema.parse({
   volume: 1,

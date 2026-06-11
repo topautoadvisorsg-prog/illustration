@@ -1,26 +1,26 @@
 /**
- * Whole-page render experiment — build the JSON page specification.
+ * Whole-page render pipeline — build the JSON page specification.
  *
  * Pure builder: takes the persisted paginated page + project config + entry
  * meta + the LayoutAllocation and returns a `WholePageSpec`. No I/O, no
  * randomness, no side effects.
  *
- * The spec is the contract between the experiment and the image model: every
+ * The spec is the contract between the pipeline and the image model: every
  * piece of information needed to render a finished page lives here.
  */
 
 import type { PageManifest, ProjectConfig } from '@wildlands/shared';
-import type { PageRow } from '../../../db/repositories/pagination.repo.js';
-import type { LayoutAllocation, PlanningZone } from '../../stage-6-layout/layout-director.js';
-import type { PageGeometry } from '../../stage-6-layout/page-geometry.js';
-import { deriveSubjectPackage } from '../../stage-2-planner/plan-pages.js';
-import { assembleIllustrationDna, toRoman, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
-import { stripReadingFieldMetadata } from '../../subject-badges/extract-badges.js';
+import type { PageRow } from '../../db/repositories/pagination.repo.js';
+import type { LayoutAllocation, PlanningZone } from '../stage-6-layout/layout-director.js';
+import type { PageGeometry } from '../stage-6-layout/page-geometry.js';
+import { deriveSubjectPackage } from '../stage-2-planner/plan-pages.js';
+import { assembleIllustrationDna, toRoman, WILDLANDS_STANDARD } from '../publishing-standard/index.js';
+import { stripReadingFieldMetadata } from '../subject-badges/extract-badges.js';
 import { markdownToBlocks, blocksToPlainText } from './markdown-blocks.js';
 import { buildPageRolePolicy, type PageRolePolicy } from './page-role-policy.js';
 import {
-  EXPERIMENT_READING_FIELD_WIDENING_PCT,
-  EXPERIMENT_TYPOGRAPHY_DNA,
+  READING_FIELD_WIDENING_PCT,
+  PAGE_TYPOGRAPHY_DNA,
 } from './typography-dna.js';
 import type {
   DecorativeElementsDTO,
@@ -116,7 +116,7 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
       h: rfZone ? pctToIn(rfZone.heightPct, geometry.trimHeightIn) : geometry.trimHeightIn,
     },
     anchor: inferReadingFieldAnchor(rfZone),
-    widerThanProductionPct: EXPERIMENT_READING_FIELD_WIDENING_PCT,
+    widerThanProductionPct: READING_FIELD_WIDENING_PCT,
   };
 
   // Subject package — same derivation as production Stage 2 so we test prompt
@@ -187,12 +187,12 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
     },
     readingFieldGeometry: rfGeometry,
     typographyDNA: {
-      ...EXPERIMENT_TYPOGRAPHY_DNA,
+      ...PAGE_TYPOGRAPHY_DNA,
       // Drop-cap governance (SPEC_GEOMETRY_RECONCILIATION §3): the drop-cap
       // surround is authoritative on `dropCap`. When there is no drop-cap
       // (every interior/continuation page), emit NOTHING about it — otherwise
       // the model draws an illuminated initial on pages that should have none.
-      decorativeInitial: dropCap ? EXPERIMENT_TYPOGRAPHY_DNA.decorativeInitial : null,
+      decorativeInitial: dropCap ? PAGE_TYPOGRAPHY_DNA.decorativeInitial : null,
       // For non-chapter-openers we don't enforce a fixed title hierarchy.
       titleHierarchy,
     },

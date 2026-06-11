@@ -9,7 +9,7 @@ import {
   stripInlineMarkup,
   blocksToPlainText,
   type BodyBlock,
-} from '../pipeline/experimental/whole-page-render/markdown-blocks.js';
+} from '../pipeline/whole-page-render/markdown-blocks.js';
 
 const hasMarkdownChar = (blocks: BodyBlock[]): boolean =>
   blocks.some((b) => /[#*_`|]/.test(b.text) || /\u{1F000}-\u{1FAFF}/u.test(b.text));

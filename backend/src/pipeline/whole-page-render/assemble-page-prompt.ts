@@ -1,5 +1,5 @@
 /**
- * Whole-page render experiment — JSON spec → image-model prompt.
+ * Whole-page render pipeline — JSON spec → image-model prompt.
  *
  * The thesis: the image model performs better when handed structured data
  * instead of prose about what to do. So this assembler does the bare minimum
@@ -16,7 +16,7 @@
  *   8. Hard constraints
  */
 
-import { PALETTE, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
+import { PALETTE, WILDLANDS_STANDARD } from '../publishing-standard/index.js';
 import type { WholePageSpec } from './types.js';
 
 const HEADER = [
@@ -31,7 +31,21 @@ function rendersBodyText(spec: WholePageSpec): boolean {
   return !['COVER_WRAP', 'TITLE_PAGE', 'GLOSSARY_ORNAMENT', 'INDEX_ORNAMENT'].includes(spec.pageType);
 }
 
+/** The cover bakes its full typography into the illustration (operator
+ *  decision); only the barcode stays engine-stamped. */
+function isCover(spec: WholePageSpec): boolean {
+  return spec.pageType === 'COVER_WRAP';
+}
+
 function promptHeader(spec: WholePageSpec): string {
+  if (isCover(spec)) {
+    return [
+      `You are rendering a complete, FINISHED, publishable full-wrap book COVER under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version}.`,
+      'The target quality is a museum-grade, vintage natural-history monograph dust jacket.',
+      'Render the whole wrap as ONE finished illustration. The title, subtitle, author, and back-cover copy specified below are PART of the artwork and MUST be drawn INTO the illustration as integrated, engraved, period-correct typography — not a pasted label.',
+      'The ONLY element you do NOT draw is the barcode: leave its reserved zone clean for the publisher to stamp.',
+    ].join(' ');
+  }
   if (rendersBodyText(spec)) return HEADER;
   return [
     `You are rendering a complete, FINISHED, publishable collector-edition book page under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version}.`,
@@ -57,18 +71,37 @@ function hardConstraints(spec: WholePageSpec): string {
       );
     }
   }
+  if (isCover(spec) && spec.coverCopy) {
+    const cc = spec.coverCopy;
+    lines.push(
+      `- FRONT COVER typography, drawn INTO the illustration as an engraved title block: title "${cc.title}"${cc.subtitle ? `, subtitle "${cc.subtitle}"` : ''}${cc.author ? `, author "${cc.author}"` : ''}. Stately serif caps in warm sepia ink, integrated into the scene — never a pasted label, sticker, box, or card.`,
+    );
+    if (cc.backCover?.length) {
+      lines.push(
+        `- BACK COVER copy, rendered as readable typeset lines over the calm back-cover area, EXACTLY: ${cc.backCover.map((s) => `"${s}"`).join(' · ')}. Same serif and ink, legible against the artwork.`,
+      );
+    }
+    lines.push(
+      `- SPINE: set the title "${cc.title}"${cc.author ? ` and author "${cc.author}"` : ''} as vertical spine typography in the same ink.`,
+      '- BARCODE — the ONE element you must NOT draw: leave a clean, empty rectangular zone (~2 × 1.2 in) in the LOWER-RIGHT of the BACK cover. Render nothing there — no barcode, no ISBN, no price box. The publisher stamps a real scannable barcode into that zone.',
+    );
+  }
   lines.push(
     // F-8 — the Chapter 1 production run proved the attached blueprint alone
     // is loosely followed: corner-accent layouts rendered as full-width bands
     // and a 50/50 page mirrored. State the placement contract in prose and
     // forbid the three observed failure modes (move / mirror / enlarge).
     `- COMPOSITION CONTRACT — image placement: ${spec.composition.imagePlacement}. Text placement: ${spec.composition.textPlacement}. Respect this placement EXACTLY: do not move the artwork to a different region, do not mirror left/right or top/bottom, do not enlarge a small accent into a band or a band into a full page. The attached layout reference image shows the same plan — follow it.`,
-    rendersBodyText(spec)
-      ? '- Body text appears VERBATIM, every word, in order. Do not paraphrase, summarize, abbreviate, truncate, or invent.'
-      : '- Do not render body copy, title copy, author text, spine text, barcode, ISBN, glossary terms, index entries, or any other readable text. The publishing engine adds all critical typography.',
-    rendersBodyText(spec)
-      ? `- Body typography: ${spec.typographyDNA.bodyFamily}. Set at approximately ${spec.typographyDNA.bodyPt}pt with ${spec.typographyDNA.bodyLineHeight} line height, reading measure approximately ${spec.typographyDNA.bodyMeasureChars} characters wide - generous and confident, never cramped.`
-      : '- Preserve calm, readable text-safe regions for the publishing engine. These zones must feel naturally integrated into the illustration, not like blank boxes, cards, labels, or cutouts.',
+    isCover(spec)
+      ? '- Render ONLY the cover typography specified above (title, subtitle, author, back-cover copy, spine) — every word EXACTLY as given, no invented or altered text, nothing beyond it.'
+      : rendersBodyText(spec)
+        ? '- Body text appears VERBATIM, every word, in order. Do not paraphrase, summarize, abbreviate, truncate, or invent.'
+        : '- Do not render body copy, title copy, author text, spine text, barcode, ISBN, glossary terms, index entries, or any other readable text. The publishing engine adds all critical typography.',
+    isCover(spec)
+      ? '- Cover typography is engraved, period-correct, and integrated into the wrap illustration — never modern UI, a flat label, a sticker, or a software-assembled overlay.'
+      : rendersBodyText(spec)
+        ? `- Body typography: ${spec.typographyDNA.bodyFamily}. Set at approximately ${spec.typographyDNA.bodyPt}pt with ${spec.typographyDNA.bodyLineHeight} line height, reading measure approximately ${spec.typographyDNA.bodyMeasureChars} characters wide - generous and confident, never cramped.`
+        : '- Preserve calm, readable text-safe regions for the publishing engine. These zones must feel naturally integrated into the illustration, not like blank boxes, cards, labels, or cutouts.',
     '- The reading field sits at the supplied coordinates. Do not move it. Do not shrink it. Do not change its proportions.',
     '- Ornamentation: engraved botanical swags top and bottom, with centered pinecone medallions, drawn in the same warm sepia ink. Hairline decorative rules around the CHAPTER kicker and the title. Period-correct, line-engraving feel — never clip art, never digital flourish.',
     '- The whole page must read as ONE integrated composition. The illustration, the typography, and the ornamentation share the same paper, the same ink palette, the same period. The page should look like it was printed from a single plate, not assembled in software.',
@@ -85,7 +118,7 @@ function hardConstraints(spec: WholePageSpec): string {
   return lines.join('\n');
 }
 
-export function assembleExperimentPrompt(spec: WholePageSpec): string {
+export function assemblePagePrompt(spec: WholePageSpec): string {
   // Drop-cap governance (SPEC_GEOMETRY_RECONCILIATION §3): when there is no
   // drop-cap, the surround description must not reach the model at all — drop
   // `decorativeInitial` from the typography block entirely rather than emit a
@@ -97,22 +130,32 @@ export function assembleExperimentPrompt(spec: WholePageSpec): string {
           return rest;
         })()
       : spec.typographyDNA;
-  const bodySection = rendersBodyText(spec)
+  const bodySection = isCover(spec)
     ? [
-        'PAGE BODY - render every block below IN ORDER. "heading" = a bold serif',
-        'section heading; "subheading" = a smaller bold heading; "paragraph" = body',
-        'prose. The text is already plain - it contains NO markdown. Render each',
-        'block\'s text EXACTLY and verbatim; never print the block labels, the word',
-        '"type"/"text", braces, or any #/*/_ characters.',
+        'COVER COPY - render these strings EXACTLY into the wrap illustration as',
+        'engraved typography: front-cover title block, back-cover copy, and spine.',
+        'Do not invent, alter, translate, or reorder any words. The barcode is the',
+        'only element you do not draw (leave its zone clean).',
         '```json',
-        JSON.stringify(spec.pageText.bodyBlocks, null, 2),
+        JSON.stringify(spec.coverCopy ?? {}, null, 2),
         '```',
       ]
-    : [
-        'TEXT POLICY - the image model must not render critical text for this role.',
-        'Create artwork, ornament, paper texture, and calm text-safe/typography zones only.',
-        'The publishing engine will add title, author, spine, barcode, ISBN, glossary/index entries, and any other readable copy.',
-      ];
+    : rendersBodyText(spec)
+      ? [
+          'PAGE BODY - render every block below IN ORDER. "heading" = a bold serif',
+          'section heading; "subheading" = a smaller bold heading; "paragraph" = body',
+          'prose. The text is already plain - it contains NO markdown. Render each',
+          'block\'s text EXACTLY and verbatim; never print the block labels, the word',
+          '"type"/"text", braces, or any #/*/_ characters.',
+          '```json',
+          JSON.stringify(spec.pageText.bodyBlocks, null, 2),
+          '```',
+        ]
+      : [
+          'TEXT POLICY - the image model must not render critical text for this role.',
+          'Create artwork, ornament, paper texture, and calm text-safe/typography zones only.',
+          'The publishing engine will add title, author, spine, barcode, ISBN, glossary/index entries, and any other readable copy.',
+        ];
 
   return [
     promptHeader(spec),

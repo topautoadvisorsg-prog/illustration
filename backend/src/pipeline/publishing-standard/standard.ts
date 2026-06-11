@@ -3,7 +3,7 @@
  *
  * Single machine source of truth for the visual identity of every
  * Wild Lands page. Imported by:
- *   - the whole-page render experiment (prompt assembly)
+ *   - the whole-page render pipeline (prompt assembly)
  *   - the print-prep pipeline (paper-color matching)
  *   - any future renderer / page builder
  *
