@@ -116,13 +116,15 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
       relPath.includes('/experimental/whole-page/') ||
       relPath.includes('/print-ready/') ||
       relPath.includes('/front-matter/') ||
-      relPath.includes('/cover/');
+      relPath.includes('/cover/') ||
+      relPath.includes('/exports/') ||
+      relPath.includes('/editions/');
     if (relPath.includes('..') || !allowed) {
       return reply
         .code(400)
         .send({
           error: 'Bad Request',
-          message: 'Path must be under experimental/whole-page/ or print-ready/.',
+          message: 'Path must be under an approved render artifact folder.',
           statusCode: 400,
         });
     }
