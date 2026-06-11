@@ -68,6 +68,8 @@ export async function assembleBook(projectId: string): Promise<AssemblyReport> {
       pageKey: p.pageKey,
       chapterNumber: p.chapterNumber,
       plannedPageNumber: p.plannedPageNumber,
+      section: p.section,
+      spineOrder: p.spineOrder,
     })),
   );
   const frontMatter = frontMatterStatus(spine);

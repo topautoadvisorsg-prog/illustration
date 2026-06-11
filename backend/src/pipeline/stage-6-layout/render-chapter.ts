@@ -28,6 +28,7 @@ import { listManifests, listPages } from '../../db/repositories/manifests.repo.j
 import { getActiveImage } from '../../db/repositories/images.repo.js';
 import { recordExport } from '../../db/repositories/exports.repo.js';
 import { getProjectStorage, type ProjectStorage } from '../../services/storage/project-storage.js';
+import { listPaginatedPagesForProject } from '../../db/repositories/pagination.repo.js';
 import { logger } from '../../lib/logger.js';
 import { computePageGeometry } from './page-geometry.js';
 import { buildBookHtml, buildCoverHtml, buildPageHtml, computeCoverDimensions, type ChapterPageRender, type BookChapter } from './render-html.js';
@@ -385,7 +386,47 @@ export async function renderBookPdf(projectId: string): Promise<BookRenderResult
 export interface CoverRenderResult {
   pdf: Buffer;
   storedPath: string;
+  pageCount: number;
+  dimensions: ReturnType<typeof computeCoverDimensions>;
+  validation: CoverValidation;
   artifact?: ProofArtifact;
+}
+
+export interface CoverValidation {
+  checks: Array<{ key: string; ok: boolean; message: string }>;
+  ready: boolean;
+}
+
+function validateCoverInputs(config: ProjectConfig, pageCount: number, dimensions: ReturnType<typeof computeCoverDimensions>): CoverValidation {
+  const hooks = config.publishing.bookDescription?.hooks ?? [];
+  const checks = [
+    {
+      key: 'page_count',
+      ok: pageCount > 0,
+      message: pageCount > 0 ? `Cover sized from ${pageCount} planned interior pages.` : 'No planned pages found for spine calculation.',
+    },
+    {
+      key: 'spine_width',
+      ok: dimensions.spineIn >= 0.06,
+      message: `Spine width ${dimensions.spineIn.toFixed(3)}in.`,
+    },
+    {
+      key: 'back_cover_copy',
+      ok: hooks.length > 0,
+      message: hooks.length > 0 ? `${hooks.length} back-cover hook(s) supplied.` : 'No publishing.bookDescription.hooks supplied; using title/subtitle placeholder.',
+    },
+    {
+      key: 'cover_art',
+      ok: Boolean(config.publishing.coverAssetPath),
+      message: config.publishing.coverAssetPath ? 'Cover art asset configured.' : 'No cover art asset configured; rendering typographic cover.',
+    },
+    {
+      key: 'barcode_zone',
+      ok: true,
+      message: '2x1.2in barcode zone reserved on back cover.',
+    },
+  ];
+  return { checks, ready: checks.every((c) => c.ok) };
 }
 
 /** Render the print-ready full-wrap cover PDF (spine width from interior page count). */
@@ -395,11 +436,30 @@ export async function renderCoverPdf(projectId: string): Promise<CoverRenderResu
   if (!project) throw new RenderBlockedError('Project not found.', 'not_found');
   const config = project.config as ProjectConfig;
 
-  // Page count drives spine width; render the interior first to measure it.
-  const { pageCount } = await renderBookPdf(projectId);
+  // Page count drives spine width. Do NOT render the entire interior just to
+  // size the cover; the active production path already has a spine/page table.
+  // This keeps cover validation cheap and avoids pulling the legacy full-book
+  // renderer into a cover-only request.
+  const pageCount = (await listPaginatedPagesForProject(projectId)).length;
+  if (pageCount === 0) throw new RenderBlockedError('No planned pages found; run pagination/front matter before rendering the cover.', 'no_pages');
   const polyfillJs = await loadPagedPolyfill();
-  const html = buildCoverHtml(config, pageCount, { polyfillJs });
   const dims = computeCoverDimensions(config, pageCount);
+  const validation = validateCoverInputs(config, pageCount, dims);
+  let coverArtDataUri: string | undefined;
+  if (config.publishing.coverAssetPath) {
+    try {
+      const coverBuf = await getProjectStorage().readProjectFile(config.publishing.coverAssetPath);
+      coverArtDataUri = `data:image/png;base64,${coverBuf.toString('base64')}`;
+    } catch {
+      validation.checks.push({
+        key: 'cover_art_file',
+        ok: false,
+        message: `Configured cover art asset could not be read: ${config.publishing.coverAssetPath}`,
+      });
+      validation.ready = false;
+    }
+  }
+  const html = buildCoverHtml(config, pageCount, { polyfillJs, coverArtDataUri });
   const { buffer } = await renderHtmlToPdf(html, {
     pageWidthIn: dims.fullWidthIn,
     pageHeightIn: dims.fullHeightIn,
@@ -415,5 +475,5 @@ export async function renderCoverPdf(projectId: string): Promise<CoverRenderResu
     fileSizeBytes: stored.sizeBytes,
     totalPages: 1,
   });
-  return { pdf: buffer, storedPath: stored.relativePath, artifact };
+  return { pdf: buffer, storedPath: stored.relativePath, pageCount, dimensions: dims, validation, artifact };
 }

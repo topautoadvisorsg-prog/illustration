@@ -99,6 +99,25 @@ describe('recoverFrontMatterSections — the silently-dropped sections come back
     expect(intro.markdown).toContain('result of ice');
     expect(intro.markdown).not.toContain('CHAPTER 1'); // ends at the H1
   });
+
+  it('recovers a glossary anywhere in the manuscript for back matter', () => {
+    const ms = [
+      '# CHAPTER 1 — X',
+      '',
+      'body',
+      '',
+      '## Glossary',
+      '',
+      '**Erratic** — a boulder carried by glacial ice.',
+      '',
+      '**Treeline** — the upper edge of continuous forest.',
+    ].join('\n');
+    const sections = recoverFrontMatterSections(ms);
+    const glossary = sections.find((s) => s.kind === 'GLOSSARY');
+    expect(glossary).toBeDefined();
+    expect(glossary!.markdown).toContain('Erratic');
+    expect(glossary!.markdown).toContain('Treeline');
+  });
 });
 
 describe('composer helpers', () => {

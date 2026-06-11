@@ -2153,8 +2153,22 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     const { id } = ProjectParamsSchema.parse(request.params);
     try {
       const result = await renderCoverPdf(id);
+      if ((request.query as { format?: string } | undefined)?.format === 'json') {
+        return reply.send({
+          ok: true,
+          pageCount: result.pageCount,
+          dimensions: result.dimensions,
+          validation: result.validation,
+          storedPath: result.storedPath,
+          artifact: result.artifact,
+        });
+      }
       reply.header('content-type', 'application/pdf');
       reply.header('content-disposition', 'inline; filename="wildlands-cover.pdf"');
+      reply.header('x-page-count', String(result.pageCount));
+      reply.header('x-cover-width-in', String(result.dimensions.fullWidthIn));
+      reply.header('x-cover-height-in', String(result.dimensions.fullHeightIn));
+      reply.header('x-spine-width-in', String(result.dimensions.spineIn));
       if (result.artifact) {
         reply.header('x-proof-artifact-id', result.artifact.id);
         reply.header('x-proof-created-at', result.artifact.createdAt);

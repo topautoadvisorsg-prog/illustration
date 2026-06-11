@@ -739,7 +739,12 @@ export function computeCoverDimensions(config: ProjectConfig, pageCount: number)
  * dimensions, with the spine width derived from the interior page count. A clean
  * typographic cover — front title/author, spine text, back blurb + barcode zone.
  */
-export function buildCoverHtml(config: ProjectConfig, pageCount: number, opts: { polyfillJs?: string }): string {
+export interface CoverHtmlOptions {
+  polyfillJs?: string;
+  coverArtDataUri?: string;
+}
+
+export function buildCoverHtml(config: ProjectConfig, pageCount: number, opts: CoverHtmlOptions): string {
   const t = config.typography;
   const c = config.colorPalette;
   const dims = computeCoverDimensions(config, pageCount);
@@ -747,6 +752,23 @@ export function buildCoverHtml(config: ProjectConfig, pageCount: number, opts: {
   const subtitle = config.subtitle ? escapeHtml(config.subtitle) : '';
   const author = escapeHtml(config.authorName);
   const polyfill = opts.polyfillJs ? `<script>${opts.polyfillJs}</script>` : '';
+  const backHooks = config.publishing.bookDescription?.hooks?.length
+    ? config.publishing.bookDescription.hooks
+    : [config.subtitle || config.title];
+  const backBlurb = backHooks
+    .map((line) => `<p>${escapeHtml(line)}</p>`)
+    .join('');
+  const coverArtCss = opts.coverArtDataUri
+    ? `
+  .front::before, .back::before {
+    content: ""; position: absolute; inset: 0; z-index: 0;
+    background-image: url("${opts.coverArtDataUri}");
+    background-size: cover; background-position: center; opacity: 0.42;
+  }
+  .front > *, .back > * { position: relative; z-index: 1; }
+  .front { text-shadow: 0 2px 8px rgba(0,0,0,0.45); }
+  .back .blurb { text-shadow: 0 0 6px ${c.paper}, 0 0 10px ${c.paper}; }`
+    : '';
   const round = (n: number) => Math.round(n * 1000) / 1000;
 
   return `<!DOCTYPE html>
@@ -759,9 +781,10 @@ ${fontLinkTags(t)}
   @page { size: ${round(dims.fullWidthIn)}in ${round(dims.fullHeightIn)}in; margin: 0; }
   html, body { margin: 0; padding: 0; }
   .cover { display: flex; width: ${round(dims.fullWidthIn)}in; height: ${round(dims.fullHeightIn)}in; background: ${c.paper}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .panel { box-sizing: border-box; height: 100%; padding: ${round(config.trimSize.bleedIn + 0.4)}in; }
+  .panel { box-sizing: border-box; height: 100%; padding: ${round(config.trimSize.bleedIn + 0.4)}in; position: relative; overflow: hidden; }
   .back { width: ${round(config.trimSize.widthIn + config.trimSize.bleedIn)}in; display: flex; flex-direction: column; justify-content: space-between; }
   .back .blurb { font-family: var(--font-body); font-size: ${t.bodyPt}pt; color: ${c.ink}; line-height: 1.4; }
+  .back .blurb p { margin: 0 0 10pt; }
   .back .barcode { align-self: flex-end; width: 2in; height: 1.2in; background: #fff; border: 1px solid #999; display: flex; align-items: center; justify-content: center; font-family: var(--font-body); font-size: 8pt; color: #555; }
   .spine { width: ${round(dims.spineIn)}in; background: ${c.accent}; display: flex; align-items: center; justify-content: center; }
   .spine .spine-text { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--font-display); font-weight: 600; font-size: ${Math.min(t.sectionHeadingPt, Math.max(8, dims.spineIn * 40))}pt; color: ${c.paper}; white-space: nowrap; letter-spacing: 0.04em; }
@@ -769,12 +792,13 @@ ${fontLinkTags(t)}
   .front .book-title { font-family: var(--font-display); font-weight: 600; font-size: ${t.bookTitlePt}pt; line-height: 1.05; margin: 0; }
   .front .subtitle { font-family: var(--font-display); font-style: italic; font-size: ${t.chapterTitlePt}pt; margin: 16pt 0 0; opacity: 0.92; }
   .front .author { font-family: var(--font-display); font-size: ${t.sectionHeadingPt}pt; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 48pt; }
+  ${coverArtCss}
 </style>
 </head>
 <body>
   <div class="cover">
     <div class="panel back">
-      <div class="blurb">${subtitle || bookTitle}</div>
+      <div class="blurb">${backBlurb}</div>
       <div class="barcode">ISBN barcode area</div>
     </div>
     <div class="panel spine"><span class="spine-text">${bookTitle} &nbsp;·&nbsp; ${author}</span></div>

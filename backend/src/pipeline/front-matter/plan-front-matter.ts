@@ -157,6 +157,7 @@ export async function planFrontMatter(projectId: string): Promise<FrontMatterPla
   let introductionSource: FrontMatterPlanReport['introductionSource'] = 'none';
   let introParagraphs: string[] = [];
   let disclaimerParagraphs: string[] = [];
+  let glossaryParagraphs: string[] = [];
   let disclaimerHeading = 'Disclaimer';
   if (project.manuscriptPath) {
     const manuscript = (await storage.readProjectFile(project.manuscriptPath)).toString('utf8');
@@ -175,6 +176,10 @@ export async function planFrontMatter(projectId: string): Promise<FrontMatterPla
     if (disc) {
       disclaimerHeading = disc.headingText.replace(/\b\w/g, (c) => c.toUpperCase());
       disclaimerParagraphs = sectionParagraphs(disc.markdown);
+    }
+    const glossary = sections.find((s) => s.kind === 'GLOSSARY');
+    if (glossary) {
+      glossaryParagraphs = sectionParagraphs(glossary.markdown);
     }
   }
   if (introductionSource === 'none' && meta.bookPurpose && meta.aiIntroduction.enabled) {
@@ -205,6 +210,28 @@ export async function planFrontMatter(projectId: string): Promise<FrontMatterPla
     const title = c.chapterTitle.replace(/^chapter\s+\d+\s*[—–:-]\s*/i, '').trim() || c.chapterTitle;
     return { label: toRoman(c.chapterNumber), title, pageNumber: first === Number.MAX_SAFE_INTEGER ? 1 : first };
   });
+
+  const entryTitleByKey = new Map<string, string>();
+  for (const row of await listManifests(projectId, 'PAGE')) {
+    const content = row.content as { entryTitle?: string } | null;
+    const title = content?.entryTitle?.trim();
+    if (title) entryTitleByKey.set(row.externalId, title);
+  }
+  const firstBodyPageByEntry = new Map<string, number>();
+  for (const p of bodyPages) {
+    if (!p.entryKey || p.pageRole === 'continuation') continue;
+    const current = firstBodyPageByEntry.get(p.entryKey);
+    if (current == null || p.plannedPageNumber < current) {
+      firstBodyPageByEntry.set(p.entryKey, p.plannedPageNumber);
+    }
+  }
+  const indexEntries: TocEntry[] = Array.from(firstBodyPageByEntry.entries())
+    .map(([entryKey, pageNumber]) => ({
+      label: '',
+      title: entryTitleByKey.get(entryKey) ?? entryKey,
+      pageNumber,
+    }))
+    .sort((a, b) => a.title.localeCompare(b.title));
 
   // ── FRONT sequence with recto/verso parity (index 1 = recto) ──
   const front: PlannedPage[] = [];
@@ -290,6 +317,42 @@ export async function planFrontMatter(projectId: string): Promise<FrontMatterPla
     backFolio += 1;
     back.push({ ...p, pageKey: '', section: 'BACK_MATTER', pageLabel: printedFolio ? String(backFolio) : null });
   };
+
+  if (glossaryParagraphs.length > 0) {
+    const split = splitTextPages(glossaryParagraphs, canvasIn);
+    split.forEach((paras, i) => {
+      pushBack(
+        {
+          kind: 'TEXT_PAGE',
+          frontMatterType: 'GLOSSARY',
+          pageLabel: null,
+          compose: { heading: i === 0 ? 'Glossary' : undefined, paragraphs: paras },
+          auditText: paras.join('\n\n'),
+        },
+        true,
+      );
+    });
+  } else {
+    omitted.push({ page: 'GLOSSARY', reason: 'no glossary section found in manuscript' });
+  }
+
+  if (indexEntries.length > 0) {
+    const indexPages = splitTocEntries(indexEntries, canvasIn);
+    indexPages.forEach((entries, i) => {
+      pushBack(
+        {
+          kind: 'CONTENTS',
+          frontMatterType: 'INDEX',
+          pageLabel: null,
+          compose: { tocHeading: i === 0 ? 'Index' : 'Index Continued', tocEntries: entries },
+          auditText: entries.map((e) => `${e.title} ... ${e.pageNumber}`).join('\n'),
+        },
+        true,
+      );
+    });
+  } else {
+    omitted.push({ page: 'INDEX', reason: 'no body entry titles available for index' });
+  }
 
   // About the Author — verbatim → facts → OMIT (never invent).
   if (meta.authorBio?.verbatim) {
@@ -410,4 +473,14 @@ export async function planFrontMatter(projectId: string): Promise<FrontMatterPla
 
 function aboutAuthorHeading(authors: string[]): string {
   return authors.length > 1 ? 'About the Authors' : 'About the Author';
+}
+
+function splitTocEntries(entries: TocEntry[], canvasIn: { w: number; h: number }): TocEntry[][] {
+  const cap = textPageLineCapacity(canvasIn, true);
+  const rowsPerPage = Math.max(8, Math.floor(cap.linesPerPage * 0.62));
+  const pages: TocEntry[][] = [];
+  for (let i = 0; i < entries.length; i += rowsPerPage) {
+    pages.push(entries.slice(i, i + rowsPerPage));
+  }
+  return pages.length > 0 ? pages : [[]];
 }

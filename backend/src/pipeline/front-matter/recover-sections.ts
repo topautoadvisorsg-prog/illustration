@@ -19,7 +19,8 @@ export type RecoveredSectionKind =
   | 'PREFACE'
   | 'FOREWORD'
   | 'DEDICATION'
-  | 'DISCLAIMER';
+  | 'DISCLAIMER'
+  | 'GLOSSARY';
 
 export interface RecoveredSection {
   kind: RecoveredSectionKind;
@@ -38,6 +39,7 @@ const RECOGNIZED: Array<{ kind: RecoveredSectionKind; pattern: RegExp }> = [
   { kind: 'FOREWORD', pattern: /^foreword\b/i },
   { kind: 'DEDICATION', pattern: /^dedication\b/i },
   { kind: 'DISCLAIMER', pattern: /^disclaimer\b/i },
+  { kind: 'GLOSSARY', pattern: /^glossary\b/i },
 ];
 
 interface Heading {
