@@ -96,7 +96,12 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
   const rowLayout = row.layoutTemplate as LayoutTemplateId | null;
   const initialLayout = rowLayout ?? 'LAYOUT_1_STANDARD';
   const pageType = inferWholePageRole(row, initialLayout);
-  const layoutTemplate = rowLayout ?? defaultLayoutForRole(pageType);
+  let layoutTemplate = rowLayout ?? defaultLayoutForRole(pageType);
+  // Layout Audit 1 §4 — a continuation page carries NO new subject, so it must
+  // not reserve illustration area. Force it to the text-first pure-text layout
+  // (large reading field + edge ornaments) regardless of the stored template,
+  // which also retires the legacy LAYOUT_2_TEXT_HEAVY it used to inherit.
+  if (pageType === 'CONTINUATION') layoutTemplate = 'LAYOUT_D_PURE_TEXT';
   const title = resolvedTitle(config);
   const subtitle = resolvedSubtitle(config);
   const author = resolvedAuthor(config);

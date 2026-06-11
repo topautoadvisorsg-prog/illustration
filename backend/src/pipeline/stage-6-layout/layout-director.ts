@@ -167,6 +167,20 @@ function placementFor(slot: ArtSlot): { imagePlacement: string; textPlacement: s
 }
 
 function refinedPlacement(slot: ArtSlot, imagePercent: number): { imagePlacement: string; textPlacement: string } {
+  if (slot === 'FULL_PAGE') {
+    if (imagePercent >= 90) {
+      return {
+        imagePlacement: 'the ENTIRE page is one full-canvas illustration, edge to edge',
+        textPlacement: 'no separate text zone — any title or caption is rendered into the illustration itself',
+      };
+    }
+    if (imagePercent <= 8) {
+      return {
+        imagePlacement: 'small decorative ornaments at the top and bottom edges ONLY — visual continuity, not a subject illustration',
+        textPlacement: 'a large uninterrupted reading field fills the page between the edge ornaments',
+      };
+    }
+  }
   if (imagePercent <= 15 && (slot === 'FLOAT_LEFT' || slot === 'FLOAT_RIGHT')) {
     const side = slot === 'FLOAT_LEFT' ? 'upper-left' : 'upper-right';
     return {
@@ -387,7 +401,33 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation
         textSafeZones: [zone('reading-field-lower', 'body', 10, 64, 80, BOTTOM - 64, 'Readable long-form reading field on a calm parchment field the artwork dissolves into. No box, card, or panel.', 'organic')],
       };
     case 'FULL_PAGE':
-    default:
+    default: {
+      // Layout Audit 1 — the FULL_PAGE slot is shared by two OPPOSITE intents,
+      // so the zone plan must honor the profile's image fraction, not the slot.
+      if (imagePercent >= 90) {
+        // FULL ILLUSTRATION (LAYOUT_A_ILLUSTRATION / LAYOUT_10). The ENTIRE
+        // page is one illustration, edge to edge. No reserved text/title zones
+        // and no carved-out margins — the AI renders any title/caption INTO the
+        // illustration and owns all negative space.
+        return {
+          typographyZones: [],
+          imagePriorityZones: [zone('image-priority-full-canvas', 'primary-art', 0, 0, 100, 100, 'FULL-CANVAS illustration: the artwork fills the entire page, edge to edge. Render any title or caption INTO the illustration yourself; reserve no separate text panel, margin, band, or carved-out zone.')],
+          textSafeZones: [],
+        };
+      }
+      if (imagePercent <= 8) {
+        // PURE TEXT (LAYOUT_D_PURE_TEXT, and reworked continuation). A large
+        // uninterrupted reading field with only small decorative ornaments at
+        // the top and bottom edges — visual continuity, NOT a subject plate.
+        return {
+          typographyZones: [title],
+          imagePriorityZones: [
+            zone('ornament-top', 'supporting-art', 12, 2, 76, 6, 'Small decorative top-edge ornament ONLY (a thin engraved botanical band) — visual continuity, never a subject illustration.'),
+            zone('ornament-bottom', 'supporting-art', 12, 92, 76, 6, 'Small decorative bottom-edge ornament ONLY (a thin engraved botanical band) — visual continuity, never a subject illustration.'),
+          ],
+          textSafeZones: [zone('reading-field-full', 'body', 6, 18, 88, 72, 'Large uninterrupted reading field: a calm parchment text column filling the page between the edge ornaments. Text-first page — no subject illustration, no panels, no cards.', 'organic')],
+        };
+      }
       return {
         typographyZones: [
           title,
@@ -396,6 +436,7 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation
         imagePriorityZones: [zone('image-priority-full', 'primary-art', 0, FOCAL_TOP, 100, 100 - FOCAL_TOP, 'Full-page plate: focal detail fills the composition below the calm title band; respect the small overlay zones.')],
         textSafeZones: [],
       };
+    }
   }
 }
 
