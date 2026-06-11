@@ -107,6 +107,16 @@ export interface CompositionDTO {
   textPlacement: string;
 }
 
+/** Cover typography the AI bakes INTO the full-wrap illustration (operator
+ *  decision): title, subtitle, author, and back-cover copy are rendered by the
+ *  image model, not an HTML overlay. Only the barcode stays engine-stamped. */
+export interface CoverCopyDTO {
+  title: string;
+  subtitle?: string;
+  author?: string;
+  backCover?: string[];
+}
+
 export interface WholePageSpec {
   pageType:
     | 'CHAPTER_OPENER'
@@ -129,6 +139,8 @@ export interface WholePageSpec {
   illustrationDNA: IllustrationDNADTO;
   pageText: PageTextDTO;
   decorativeElements: DecorativeElementsDTO;
+  /** Cover-only: typography the AI bakes into the wrap illustration. */
+  coverCopy?: CoverCopyDTO;
   /** Badge metadata (context only; never drawn by the model). */
   badgeContext: BadgeContextDTO;
   /** L-7 — reserved rects the model must leave visually clean. Derived from

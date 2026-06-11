@@ -798,17 +798,15 @@ ${fontLinkTags(t)}
 </style>
 </head>
 <body>
+  <!-- Operator decision: the AI bakes ALL cover typography (title, subtitle,
+       author, back-cover copy, spine) INTO the wrap illustration. The ONLY
+       engine-stamped element is the barcode; every text node is removed here. -->
   <div class="cover">
     <div class="panel back">
-      <div class="blurb">${backBlurb}</div>
       <div class="barcode">ISBN barcode area</div>
     </div>
-    <div class="panel spine"><span class="spine-text">${bookTitle} &nbsp;·&nbsp; ${author}</span></div>
-    <div class="panel front">
-      <h1 class="book-title">${bookTitle}</h1>
-      ${subtitle ? `<p class="subtitle">${subtitle}</p>` : ''}
-      <p class="author">${author}</p>
-    </div>
+    <div class="panel spine"></div>
+    <div class="panel front"></div>
   </div>
   ${polyfill}
 </body>

@@ -521,7 +521,9 @@ export async function renderCoverPdf(projectId: string, options: RenderCoverOpti
   };
 }
 
-/** Generate and persist the full-wrap cover artwork layer. Typography is added later by buildCoverHtml(). */
+/** Generate and persist the full-wrap cover artwork. The AI bakes the cover
+ *  typography (title/subtitle/author/back-copy/spine) into this image; only the
+ *  barcode is added later as an engine-stamped element by buildCoverHtml(). */
 export async function generateCoverWrapArtwork(
   projectId: string,
   options: RenderCoverOptions = {},
@@ -566,7 +568,7 @@ export async function generateCoverWrapArtwork(
   };
 }
 
-function buildCoverWrapPrompt(
+export function buildCoverWrapPrompt(
   config: ProjectConfig,
   pageCount: number,
   dims: ReturnType<typeof computeCoverDimensions>,
@@ -626,6 +628,14 @@ function buildCoverWrapPrompt(
       body: '',
       bodyBlocks: [],
       dropCap: null,
+    },
+    // Operator decision: the AI bakes the full cover typography into the wrap
+    // illustration; only the barcode stays an engine-stamped element.
+    coverCopy: {
+      title: title.toUpperCase(),
+      subtitle: subtitle || undefined,
+      author: authors || undefined,
+      backCover: hooks.length ? hooks : undefined,
     },
     decorativeElements: {
       topRule: null,
