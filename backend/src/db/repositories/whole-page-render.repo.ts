@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { getDb } from '../client.js';
 import { wholePageRenders } from '../schema/index.js';
-import type { WholePageSpec } from '../../pipeline/experimental/whole-page-render/types.js';
+import type { WholePageSpec } from '../../pipeline/whole-page-render/types.js';
 
 export type WholePageRenderRow = typeof wholePageRenders.$inferSelect;
 

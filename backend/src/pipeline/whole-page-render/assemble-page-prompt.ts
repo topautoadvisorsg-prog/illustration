@@ -1,5 +1,5 @@
 /**
- * Whole-page render experiment — JSON spec → image-model prompt.
+ * Whole-page render pipeline — JSON spec → image-model prompt.
  *
  * The thesis: the image model performs better when handed structured data
  * instead of prose about what to do. So this assembler does the bare minimum
@@ -16,7 +16,7 @@
  *   8. Hard constraints
  */
 
-import { PALETTE, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
+import { PALETTE, WILDLANDS_STANDARD } from '../publishing-standard/index.js';
 import type { WholePageSpec } from './types.js';
 
 const HEADER = [
@@ -85,7 +85,7 @@ function hardConstraints(spec: WholePageSpec): string {
   return lines.join('\n');
 }
 
-export function assembleExperimentPrompt(spec: WholePageSpec): string {
+export function assemblePagePrompt(spec: WholePageSpec): string {
   // Drop-cap governance (SPEC_GEOMETRY_RECONCILIATION §3): when there is no
   // drop-cap, the surround description must not reach the model at all — drop
   // `decorativeInitial` from the typography block entirely rather than emit a

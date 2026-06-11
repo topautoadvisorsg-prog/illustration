@@ -1,5 +1,5 @@
 import type { LayoutTemplateId, ProjectConfig } from '@wildlands/shared';
-import type { PageRow } from '../../../db/repositories/pagination.repo.js';
+import type { PageRow } from '../../db/repositories/pagination.repo.js';
 import type { WholePageSpec } from './types.js';
 
 export type WholePageRole = WholePageSpec['pageType'];

@@ -28,7 +28,7 @@ import {
 } from '../../db/repositories/front-matter.repo.js';
 import { getProjectStorage } from '../../services/storage/project-storage.js';
 import { resolveGeometry, toRoman, WILDLANDS_STANDARD } from '../publishing-standard/index.js';
-import { markdownToBlocks } from '../experimental/whole-page-render/markdown-blocks.js';
+import { markdownToBlocks } from '../whole-page-render/markdown-blocks.js';
 import { recoverFrontMatterSections, pickIntroductionSection } from './recover-sections.js';
 import {
   composeFrontMatterPage,

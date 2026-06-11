@@ -1,12 +1,12 @@
 /**
- * Whole-page render experiment — types.
+ * Whole-page render pipeline — types.
  *
  * The JSON page specification handed to the image model. Production code
- * does NOT import these types. Everything here is scoped to the experiment.
+ * does NOT import these types. Everything here is scoped to the pipeline.
  */
 
 import type { LayoutTemplateId } from '@wildlands/shared';
-import type { BadgeSafeZone } from '../../publishing-standard/badge-zones.js';
+import type { BadgeSafeZone } from '../publishing-standard/badge-zones.js';
 
 export interface InchSize {
   widthIn: number;

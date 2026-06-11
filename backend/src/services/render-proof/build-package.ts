@@ -20,13 +20,13 @@ import { getPaginatedPageById } from '../../db/repositories/pagination.repo.js';
 import {
   prepareRender,
   type PreparedRender,
-} from '../../pipeline/experimental/whole-page-render/render-whole-page.js';
+} from '../../pipeline/whole-page-render/render-whole-page.js';
 import { renderBlueprintPng } from '../../pipeline/stage-3-generation/blueprint.js';
 import type { PlanningZone } from '../../pipeline/stage-6-layout/layout-director.js';
 import type { BadgeSafeZone } from '../../pipeline/publishing-standard/badge-zones.js';
 import { resolveGeometry } from '../../pipeline/publishing-standard/index.js';
 import { computePageGeometry } from '../../pipeline/stage-6-layout/page-geometry.js';
-import type { WholePageSpec } from '../../pipeline/experimental/whole-page-render/types.js';
+import type { WholePageSpec } from '../../pipeline/whole-page-render/types.js';
 
 /** Operator-language map for the simplified family layouts. Kept in lockstep
  *  with frontend SIMPLIFIED_FAMILY_LABELS. */
@@ -165,7 +165,7 @@ export async function buildProofPackageForRender(renderId: string): Promise<Rend
   const prepared = await prepareRender(row.pageId);
 
   const fileUrl = (path: string | null): string =>
-    path ? `/api/experimental/whole-page-render/file?path=${encodeURIComponent(path)}` : '';
+    path ? `/api/whole-page-render/file?path=${encodeURIComponent(path)}` : '';
 
   const output =
     row.imagePath != null

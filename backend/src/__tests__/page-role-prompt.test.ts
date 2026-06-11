@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { assembleExperimentPrompt } from '../pipeline/experimental/whole-page-render/assemble-experiment-prompt.js';
-import { EXPERIMENT_TYPOGRAPHY_DNA } from '../pipeline/experimental/whole-page-render/typography-dna.js';
-import type { WholePageSpec } from '../pipeline/experimental/whole-page-render/types.js';
+import { assemblePagePrompt } from '../pipeline/whole-page-render/assemble-page-prompt.js';
+import { PAGE_TYPOGRAPHY_DNA } from '../pipeline/whole-page-render/typography-dna.js';
+import type { WholePageSpec } from '../pipeline/whole-page-render/types.js';
 
 function makeSpec(pageType: WholePageSpec['pageType']): WholePageSpec {
   return {
@@ -22,7 +22,7 @@ function makeSpec(pageType: WholePageSpec['pageType']): WholePageSpec {
       anchor: 'CENTER',
       widerThanProductionPct: 0,
     },
-    typographyDNA: { ...EXPERIMENT_TYPOGRAPHY_DNA, titleHierarchy: [], decorativeInitial: null },
+    typographyDNA: { ...PAGE_TYPOGRAPHY_DNA, titleHierarchy: [], decorativeInitial: null },
     illustrationDNA: {
       masterStyleBlock: 'MASTER STYLE DNA',
       subject: { primary: 'New England wilderness', supporting: [], environment: 'forest', mood: 'calm' },
@@ -41,13 +41,13 @@ function makeSpec(pageType: WholePageSpec['pageType']): WholePageSpec {
 
 describe('PageRole prompt text policy', () => {
   it('keeps verbatim body instructions for normal interior pages', () => {
-    const prompt = assembleExperimentPrompt(makeSpec('INTERIOR'));
+    const prompt = assemblePagePrompt(makeSpec('INTERIOR'));
     expect(prompt).toContain('Body text appears VERBATIM');
     expect(prompt).toContain('PAGE BODY');
   });
 
   it('keeps critical typography out of title-page image generation', () => {
-    const prompt = assembleExperimentPrompt(makeSpec('TITLE_PAGE'));
+    const prompt = assemblePagePrompt(makeSpec('TITLE_PAGE'));
     expect(prompt).toContain('TEXT POLICY');
     expect(prompt).toContain('publishing engine will add title');
     expect(prompt).toContain('Do not render body copy');
@@ -57,7 +57,7 @@ describe('PageRole prompt text policy', () => {
 
   it('keeps glossary and index ornament renders text-free', () => {
     for (const role of ['GLOSSARY_ORNAMENT', 'INDEX_ORNAMENT'] as const) {
-      const prompt = assembleExperimentPrompt(makeSpec(role));
+      const prompt = assemblePagePrompt(makeSpec(role));
       expect(prompt).toContain('TEXT POLICY');
       expect(prompt).toContain('glossary/index entries');
       expect(prompt).toContain('Do not render body copy');

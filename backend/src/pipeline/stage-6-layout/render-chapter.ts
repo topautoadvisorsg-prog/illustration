@@ -35,9 +35,9 @@ import { buildBookHtml, buildCoverHtml, buildPageHtml, computeCoverDimensions, t
 import { directLayout } from './layout-director.js';
 import { isChromiumAvailable, loadPagedPolyfill, renderHtmlToPdf } from './render-pdf.js';
 import { preflightBook, stitchPdfs, type PreflightReport } from '../stage-7-pdf-compile/stitch-book.js';
-import { assembleExperimentPrompt } from '../experimental/whole-page-render/assemble-experiment-prompt.js';
-import { EXPERIMENT_TYPOGRAPHY_DNA } from '../experimental/whole-page-render/typography-dna.js';
-import type { WholePageSpec } from '../experimental/whole-page-render/types.js';
+import { assemblePagePrompt } from '../whole-page-render/assemble-page-prompt.js';
+import { PAGE_TYPOGRAPHY_DNA } from '../whole-page-render/typography-dna.js';
+import type { WholePageSpec } from '../whole-page-render/types.js';
 import { assembleIllustrationDna } from '../publishing-standard/index.js';
 import { generateImage } from '../../services/openai/openai.js';
 import sharp from 'sharp';
@@ -603,7 +603,7 @@ function buildCoverWrapPrompt(
       widerThanProductionPct: 0,
     },
     typographyDNA: {
-      ...EXPERIMENT_TYPOGRAPHY_DNA,
+      ...PAGE_TYPOGRAPHY_DNA,
       titleHierarchy: [title, subtitle, authors].filter(Boolean),
       decorativeInitial: null,
     },
@@ -635,5 +635,5 @@ function buildCoverWrapPrompt(
     badgeContext: { hazard: ['NONE'], region: 'GENERAL', source: 'GENERAL_REFERENCE' },
     badgeSafeZones: [],
   };
-  return assembleExperimentPrompt(spec);
+  return assemblePagePrompt(spec);
 }

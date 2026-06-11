@@ -1,7 +1,7 @@
 /**
  * Whole-page render (AI-first pipeline) — HTTP routes.
  *
- * Every route is dormant unless `WHOLE_PAGE_EXPERIMENT_ENABLED` is true (503
+ * Every route is dormant unless the whole-page render flag is enabled (503
  * envelope mirrors the Pagination v1 pattern). Persists to `whole_page_renders`
  * and never mutates legacy `images` / `pages.status` state.
  *
@@ -13,9 +13,9 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { getEnv } from '../env.js';
-import { createAndRunRender } from '../pipeline/experimental/whole-page-render/render-whole-page.js';
-import { isWholePageAiAllowedForRow } from '../pipeline/experimental/whole-page-render/page-role-policy.js';
+import { wholePageRenderEnabled } from '../env.js';
+import { createAndRunRender } from '../pipeline/whole-page-render/render-whole-page.js';
+import { isWholePageAiAllowedForRow } from '../pipeline/whole-page-render/page-role-policy.js';
 import { printPrepRender } from '../pipeline/print-prep/print-prep.js';
 import { assembleBook } from '../pipeline/book-assembly/assemble-book.js';
 import {
@@ -59,13 +59,13 @@ const DecisionBodySchema = z.object({
 function flagDisabledResponse() {
   return {
     error: 'Service Unavailable',
-    message: 'WHOLE_PAGE_EXPERIMENT_ENABLED is false; the whole-page render pipeline is dormant.',
+    message: 'WHOLE_PAGE_RENDER_ENABLED is false; the whole-page render pipeline is dormant.',
     statusCode: 503,
   };
 }
 
 function flagOff(): boolean {
-  return !getEnv().WHOLE_PAGE_EXPERIMENT_ENABLED;
+  return !wholePageRenderEnabled();
 }
 
 /** Serialize a render row to a stable JSON shape (Dates → ISO strings). */
@@ -98,10 +98,10 @@ function serializeRender(row: WholePageRenderRow) {
   };
 }
 
-export async function registerExperimentalRoutes(app: FastifyInstance): Promise<void> {
+export async function registerWholePageRoutes(app: FastifyInstance): Promise<void> {
   // ── Serve an artifact (image / spec / prompt) by stored relative path ──
   const FileQuerySchema = z.object({ path: z.string().min(1) });
-  app.get('/api/experimental/whole-page-render/file', async (request, reply) => {
+  app.get('/api/whole-page-render/file', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const parsed = FileQuerySchema.safeParse(request.query);
     if (!parsed.success) {
@@ -151,7 +151,7 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   // ── Proof package (post-render) ─────────────────────────────────────────
   // Returns AUTHORITY / INPUT / OUTPUT / PRINT for an existing render row.
   // Operator can audit every render package from one endpoint, no file hunt.
-  app.get('/api/experimental/whole-page-render/:renderId/proof-package', async (request, reply) => {
+  app.get('/api/whole-page-render/:renderId/proof-package', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { renderId } = RenderParamsSchema.parse(request.params);
     try {
@@ -174,7 +174,7 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   // operator can inspect exactly what WOULD be sent to the model before
   // authorizing image-generation spend. AUTHORITY + INPUT only. Uses
   // prepareRender + renderBlueprintPng locally (no AI call).
-  app.get('/api/experimental/whole-page-render/page/:pageId/preview-package', async (request, reply) => {
+  app.get('/api/whole-page-render/page/:pageId/preview-package', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { pageId } = PageParamsSchema.parse(request.params);
     try {
@@ -264,11 +264,11 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
     }
   };
 
-  app.post('/api/experimental/whole-page-render/:pageId', runHandler);
-  app.post('/api/experimental/whole-page-render/:pageId/regenerate', runHandler);
+  app.post('/api/whole-page-render/:pageId', runHandler);
+  app.post('/api/whole-page-render/:pageId/regenerate', runHandler);
 
   // ── List all versions for a page ──
-  app.get('/api/experimental/whole-page-render/page/:pageId/versions', async (request, reply) => {
+  app.get('/api/whole-page-render/page/:pageId/versions', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { pageId } = PageParamsSchema.parse(request.params);
     const rows = await listRendersForPage(pageId);
@@ -276,7 +276,7 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   });
 
   // ── Approve a version (many allowed) ──
-  app.post('/api/experimental/whole-page-render/:renderId/approve', async (request, reply) => {
+  app.post('/api/whole-page-render/:renderId/approve', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { renderId } = RenderParamsSchema.parse(request.params);
     const body = DecisionBodySchema.parse(request.body ?? {});
@@ -292,7 +292,7 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   // ── Print-prep a render (STD-3): KDP-ready PNG + PDF + preflight ──
   // Allowed on any RENDERED render (deterministic, no spend). Assembly later
   // consumes only approved_for_book + preflight_passed.
-  app.post('/api/experimental/whole-page-render/:renderId/print-prep', async (request, reply) => {
+  app.post('/api/whole-page-render/:renderId/print-prep', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { renderId } = RenderParamsSchema.parse(request.params);
     const existing = await getRenderById(renderId);
@@ -311,7 +311,7 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   });
 
   // ── Select THE version for the book (one per page) ──
-  app.post('/api/experimental/whole-page-render/:renderId/select-for-book', async (request, reply) => {
+  app.post('/api/whole-page-render/:renderId/select-for-book', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { renderId } = RenderParamsSchema.parse(request.params);
     const body = DecisionBodySchema.parse(request.body ?? {});
@@ -331,7 +331,7 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   });
 
   // ── Reject a version ──
-  app.post('/api/experimental/whole-page-render/:renderId/reject', async (request, reply) => {
+  app.post('/api/whole-page-render/:renderId/reject', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { renderId } = RenderParamsSchema.parse(request.params);
     const body = DecisionBodySchema.parse(request.body ?? {});
@@ -342,7 +342,7 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   });
 
   // ── Project-wide render dashboard ──
-  app.get('/api/experimental/whole-page-render/project/:projectId', async (request, reply) => {
+  app.get('/api/whole-page-render/project/:projectId', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { projectId } = ProjectParamsSchema.parse(request.params);
     const summary = await getProjectRenderSummary(projectId);
@@ -358,7 +358,7 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   // ── Front Matter v1: plan + compose front/back matter deterministically ──
   // Idempotent: re-running replaces every non-BODY page row + its files;
   // BODY rows and their renders are never touched.
-  app.post('/api/experimental/front-matter/:projectId/plan', async (request, reply) => {
+  app.post('/api/front-matter/:projectId/plan', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { projectId } = ProjectParamsSchema.parse(request.params);
     const body = ChapterScopeBodySchema.parse(request.body ?? {});
@@ -382,7 +382,7 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   // ── Book Assembly: merge book-ready pages into one KDP interior PDF ──
   // Hard-blocks if any required page is missing / un-print-prepped / failed
   // preflight / wrong size. Cover wrap is a separate artifact (not here).
-  app.post('/api/experimental/whole-page-render/project/:projectId/assemble', async (request, reply) => {
+  app.post('/api/whole-page-render/project/:projectId/assemble', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { projectId } = ProjectParamsSchema.parse(request.params);
     const body = ChapterScopeBodySchema.parse(request.body ?? {});

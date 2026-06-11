@@ -9,7 +9,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
-import { registerExperimentalRoutes } from '../api/experimental.routes.js';
+import { registerWholePageRoutes } from '../api/whole-page.routes.js';
 
 vi.mock('../env.js', async () => {
   const actual = await vi.importActual<typeof import('../env.js')>('../env.js');
@@ -23,7 +23,7 @@ async function makeApp() {
   const app = Fastify();
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
-  await registerExperimentalRoutes(app);
+  await registerWholePageRoutes(app);
   await app.ready();
   return app;
 }
@@ -31,16 +31,16 @@ async function makeApp() {
 const UUID = '00000000-0000-0000-0000-000000000000';
 
 const ROUTES: Array<{ method: 'GET' | 'POST'; url: string; payload?: unknown }> = [
-  { method: 'POST', url: `/api/experimental/whole-page-render/${UUID}`, payload: { decidedBy: 't' } },
-  { method: 'POST', url: `/api/experimental/whole-page-render/${UUID}/regenerate`, payload: { decidedBy: 't' } },
-  { method: 'GET', url: `/api/experimental/whole-page-render/page/${UUID}/versions` },
-  { method: 'POST', url: `/api/experimental/whole-page-render/${UUID}/approve`, payload: { decidedBy: 't' } },
-  { method: 'POST', url: `/api/experimental/whole-page-render/${UUID}/print-prep`, payload: {} },
-  { method: 'POST', url: `/api/experimental/whole-page-render/${UUID}/select-for-book`, payload: { decidedBy: 't' } },
-  { method: 'POST', url: `/api/experimental/whole-page-render/${UUID}/reject`, payload: { decidedBy: 't', reason: 'x' } },
-  { method: 'GET', url: `/api/experimental/whole-page-render/project/${UUID}` },
-  { method: 'POST', url: `/api/experimental/whole-page-render/project/${UUID}/assemble`, payload: {} },
-  { method: 'GET', url: `/api/experimental/whole-page-render/file?path=x/experimental/whole-page/y.png` },
+  { method: 'POST', url: `/api/whole-page-render/${UUID}`, payload: { decidedBy: 't' } },
+  { method: 'POST', url: `/api/whole-page-render/${UUID}/regenerate`, payload: { decidedBy: 't' } },
+  { method: 'GET', url: `/api/whole-page-render/page/${UUID}/versions` },
+  { method: 'POST', url: `/api/whole-page-render/${UUID}/approve`, payload: { decidedBy: 't' } },
+  { method: 'POST', url: `/api/whole-page-render/${UUID}/print-prep`, payload: {} },
+  { method: 'POST', url: `/api/whole-page-render/${UUID}/select-for-book`, payload: { decidedBy: 't' } },
+  { method: 'POST', url: `/api/whole-page-render/${UUID}/reject`, payload: { decidedBy: 't', reason: 'x' } },
+  { method: 'GET', url: `/api/whole-page-render/project/${UUID}` },
+  { method: 'POST', url: `/api/whole-page-render/project/${UUID}/assemble`, payload: {} },
+  { method: 'GET', url: `/api/whole-page-render/file?path=x/experimental/whole-page/y.png` },
 ];
 
 describe('Whole-page render routes — flag off (default)', () => {
@@ -56,7 +56,7 @@ describe('Whole-page render routes — flag off (default)', () => {
         expect(res.statusCode).toBe(503);
         const body = res.json();
         expect(body.error).toBe('Service Unavailable');
-        expect(body.message).toContain('WHOLE_PAGE_EXPERIMENT_ENABLED');
+        expect(body.message).toContain('WHOLE_PAGE_RENDER_ENABLED');
       } finally {
         await app.close();
       }
