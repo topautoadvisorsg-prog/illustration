@@ -53,6 +53,7 @@ export interface FrontMatterPlanReport {
   totalBookPages: number;
   backCoverCopyAsset: string | null;
   filesWritten: number;
+  compositionPrompts: Array<{ pageKey: string; kind: string; promptPath: string; promptPreview: string }>;
 }
 
 export interface FrontMatterPlanOptions {
@@ -499,27 +500,39 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   const idByKey = new Map(inserted.map((r) => [r.pageKey, r.id]));
 
   let filesWritten = 0;
+  const compositionPrompts: FrontMatterPlanReport['compositionPrompts'] = [];
   for (const p of [...front, ...back]) {
-    const composed = await composeFrontMatterPage({
+    const composeSpec = {
       kind: p.kind,
       canvasIn,
       pageLabel: p.pageLabel,
       ...p.compose,
-    });
+    };
+    const assembledPrompt = buildFrontMatterCompositionPrompt(p.pageKey, composeSpec);
+    const composed = await composeFrontMatterPage(composeSpec);
     const png = await storage.writeProjectFile(projectId, ['front-matter', `${p.pageKey}.png`], composed.pngBuffer);
+    const promptFile = await storage.writeProjectFile(projectId, ['front-matter', `${p.pageKey}.composition.txt`], assembledPrompt);
     const printPng = await storage.writeProjectFile(projectId, ['print-ready', `${p.pageKey}.print.png`], composed.pngBuffer);
     const printPdf = await storage.writeProjectFile(projectId, ['print-ready', `${p.pageKey}.print.pdf`], composed.pdfBuffer);
-    filesWritten += 3;
+    filesWritten += 4;
+    compositionPrompts.push({
+      pageKey: p.pageKey,
+      kind: p.frontMatterType,
+      promptPath: promptFile.relativePath,
+      promptPreview: assembledPrompt.slice(0, 1200),
+    });
     await insertDeterministicRender({
       pageId: idByKey.get(p.pageKey)!,
       projectId,
       imagePath: png.relativePath,
+      promptPath: promptFile.relativePath,
       printPngPath: printPng.relativePath,
       printPdfPath: printPdf.relativePath,
       widthPx: composed.widthPx,
       heightPx: composed.heightPx,
       standardVersion: WILDLANDS_STANDARD.version,
-      composeSpec: { frontMatter: true, kind: p.kind, pageLabel: p.pageLabel, ...p.compose },
+      composeSpec: { frontMatter: true, ...composeSpec },
+      assembledPrompt,
     });
   }
 
@@ -535,9 +548,104 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     totalBookPages: front.length + bodyCount + back.length,
     backCoverCopyAsset,
     filesWritten,
+    compositionPrompts,
   };
 }
 
 function aboutAuthorHeading(authors: string[]): string {
   return authors.length > 1 ? 'About the Authors' : 'About the Author';
+}
+
+function buildFrontMatterCompositionPrompt(pageKey: string, input: ComposeInput): string {
+  const base = [
+    `FRONT/BACK MATTER COMPOSITION INSTRUCTION`,
+    `Page key: ${pageKey}`,
+    `Page kind: ${input.kind}`,
+    `Canvas: ${input.canvasIn.w} x ${input.canvasIn.h} inches, full bleed.`,
+    '',
+    'Production model:',
+    '- This page is composed by the publishing layout engine for exact text fidelity.',
+    '- Do not invent, rewrite, summarize, or reorder text.',
+    '- Text is system-typeset from manuscript/configuration data.',
+    '- Decorative art must support readability and must never cover the text frame.',
+  ];
+
+  if (input.kind === 'HALF_TITLE' || input.kind === 'TITLE_PAGE') {
+    base.push(
+      '',
+      'Visual intent:',
+      '- Premium natural-history front matter.',
+      '- Full-page parchment presentation with refined title typography.',
+      '- Small restrained ornaments are allowed.',
+      '- If an illustration layer is added later, it should be cinematic naturalist artwork with calm title-safe space.',
+      '- Title, subtitle, author, imprint, and all typography remain system-rendered, not guessed by an image model.',
+      '',
+      'Text payload:',
+      `- Title: ${input.title ?? ''}`,
+      `- Subtitle: ${input.subtitle ?? ''}`,
+      `- Authors: ${(input.authors ?? []).join(', ')}`,
+    );
+  } else if (input.kind === 'GLOSSARY') {
+    base.push(
+      '',
+      'Visual intent:',
+      '- Glossary is a reference page, not an illustration page.',
+      '- Target coverage: about 95% text, 5% restrained ornament.',
+      '- Use compact two-column back-matter typography.',
+      '- Ornaments, if present, belong only on edges/corners and must never consume the reading columns.',
+      '- This page should feel like a professional field-guide glossary: dense, scannable, clean.',
+      '',
+      'Text payload:',
+      `- Heading: ${input.heading ?? 'Glossary Continued'}`,
+      `- Entries on this page: ${(input.paragraphs ?? []).length}`,
+      `- Words on this page: ${countWords((input.paragraphs ?? []).join(' '))}`,
+    );
+  } else if (input.kind === 'INDEX') {
+    base.push(
+      '',
+      'Visual intent:',
+      '- Index is a reference page, not an illustration page.',
+      '- Target coverage: about 95% text, 5% restrained ornament.',
+      '- Use compact two-column index typography with page numbers aligned for scanning.',
+      '- Ornaments, if present, belong only on edges/corners and must never cover entries or page numbers.',
+      '- This page should feel like a professional reference index, not a decorative spread.',
+      '',
+      'Text payload:',
+      `- Heading: ${input.tocHeading ?? 'Index Continued'}`,
+      `- Index entries on this page: ${(input.tocEntries ?? []).length}`,
+      `- Approximate words on this page: ${countWords((input.tocEntries ?? []).map((e) => `${e.title} ${e.pageNumber}`).join(' '))}`,
+    );
+  } else if (input.kind === 'CONTENTS') {
+    base.push(
+      '',
+      'Visual intent:',
+      '- Contents page is text-led navigation.',
+      '- Keep chapter titles and page references clear and easy to scan.',
+      '- Use only restrained divider rules or small ornaments.',
+      '',
+      'Text payload:',
+      `- Heading: ${input.tocHeading ?? 'Contents'}`,
+      `- Entries: ${(input.tocEntries ?? []).length}`,
+    );
+  } else if (input.kind === 'TEXT_PAGE') {
+    base.push(
+      '',
+      'Visual intent:',
+      '- Text page with formal book typography.',
+      '- Reading comes first; any ornament must stay outside the reading field.',
+      '',
+      'Text payload:',
+      `- Heading: ${input.heading ?? ''}`,
+      `- Paragraphs: ${(input.paragraphs ?? []).length}`,
+      `- Words: ${countWords((input.paragraphs ?? []).join(' '))}`,
+    );
+  } else {
+    base.push('', 'Visual intent:', '- Minimal deterministic front/back matter page.');
+  }
+
+  return base.join('\n');
+}
+
+function countWords(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
 }

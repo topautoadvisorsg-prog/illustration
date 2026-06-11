@@ -73,6 +73,7 @@ export interface DeterministicRenderInsert {
   pageId: string;
   projectId: string;
   imagePath: string;
+  promptPath?: string | null;
   printPngPath: string;
   printPdfPath: string;
   widthPx: number;
@@ -80,6 +81,7 @@ export interface DeterministicRenderInsert {
   standardVersion: string;
   /** What the composer was asked to produce — audit payload. */
   composeSpec: unknown;
+  assembledPrompt?: string | null;
 }
 
 /**
@@ -90,7 +92,7 @@ export interface DeterministicRenderInsert {
  */
 export async function insertDeterministicRender(input: DeterministicRenderInsert): Promise<string> {
   const db = getDb();
-  const prompt = 'deterministic front-matter composition (no AI; see FRONT_MATTER_V1_SPEC R2)';
+  const prompt = input.assembledPrompt?.trim() || 'deterministic front-matter composition (no AI; see FRONT_MATTER_V1_SPEC R2)';
   const [row] = await db
     .insert(wholePageRenders)
     .values({
@@ -106,6 +108,7 @@ export async function insertDeterministicRender(input: DeterministicRenderInsert
       approvedForBook: true,
       attempts: 0,
       imagePath: input.imagePath,
+      promptPath: input.promptPath ?? null,
       printPngPath: input.printPngPath,
       printPdfPath: input.printPdfPath,
       preflightPassed: true,

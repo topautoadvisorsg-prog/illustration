@@ -108,11 +108,12 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
     }
     const relPath = parsed.data.path;
     // Allow render artifacts (experimental/whole-page/...) AND print-prep
-    // outputs (print-ready/...). Both are render-package files the operator
+    // outputs (print-ready/...), plus deterministic front/back-matter audit
+    // files (front-matter/...). These are render-package files the operator
     // needs to inspect; print-prep used a sibling prefix when it landed and
     // the proof package needs to link to them.
     const allowed =
-      relPath.includes('/experimental/whole-page/') || relPath.includes('/print-ready/');
+      relPath.includes('/experimental/whole-page/') || relPath.includes('/print-ready/') || relPath.includes('/front-matter/');
     if (relPath.includes('..') || !allowed) {
       return reply
         .code(400)
