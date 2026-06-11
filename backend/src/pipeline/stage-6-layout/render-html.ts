@@ -760,13 +760,15 @@ export function buildCoverHtml(config: ProjectConfig, pageCount: number, opts: C
     .join('');
   const coverArtCss = opts.coverArtDataUri
     ? `
-  .front::before, .back::before {
+  .cover::before {
     content: ""; position: absolute; inset: 0; z-index: 0;
     background-image: url("${opts.coverArtDataUri}");
-    background-size: cover; background-position: center; opacity: 0.42;
+    background-size: cover; background-position: center; opacity: 1;
   }
-  .front > *, .back > * { position: relative; z-index: 1; }
-  .front { text-shadow: 0 2px 8px rgba(0,0,0,0.45); }
+  .cover > * { position: relative; z-index: 1; }
+  .front, .back, .spine { background: transparent; }
+  .front { text-shadow: 0 2px 8px rgba(0,0,0,0.52), 0 0 14px rgba(0,0,0,0.28); }
+  .spine .spine-text { text-shadow: 0 1px 5px rgba(0,0,0,0.55); }
   .back .blurb { text-shadow: 0 0 6px ${c.paper}, 0 0 10px ${c.paper}; }`
     : '';
   const round = (n: number) => Math.round(n * 1000) / 1000;
@@ -780,7 +782,7 @@ ${fontLinkTags(t)}
 <style>
   @page { size: ${round(dims.fullWidthIn)}in ${round(dims.fullHeightIn)}in; margin: 0; }
   html, body { margin: 0; padding: 0; }
-  .cover { display: flex; width: ${round(dims.fullWidthIn)}in; height: ${round(dims.fullHeightIn)}in; background: ${c.paper}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .cover { display: flex; position: relative; width: ${round(dims.fullWidthIn)}in; height: ${round(dims.fullHeightIn)}in; background: ${c.paper}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .panel { box-sizing: border-box; height: 100%; padding: ${round(config.trimSize.bleedIn + 0.4)}in; position: relative; overflow: hidden; }
   .back { width: ${round(config.trimSize.widthIn + config.trimSize.bleedIn)}in; display: flex; flex-direction: column; justify-content: space-between; }
   .back .blurb { font-family: var(--font-body); font-size: ${t.bodyPt}pt; color: ${c.ink}; line-height: 1.4; }
