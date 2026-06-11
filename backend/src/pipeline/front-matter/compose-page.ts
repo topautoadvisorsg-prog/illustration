@@ -26,7 +26,9 @@ export type FrontMatterPageKind =
   | 'COPYRIGHT_PAGE'
   | 'DEDICATION'
   | 'CONTENTS'
-  | 'TEXT_PAGE';
+  | 'TEXT_PAGE'
+  | 'GLOSSARY'
+  | 'INDEX';
 
 export interface TocEntry {
   label: string; // e.g. roman or plain chapter title prefix
@@ -97,6 +99,11 @@ interface Frame {
   dpi: number;
 }
 
+interface CompactFrame extends Frame {
+  columnGap: number;
+  columnWidth: number;
+}
+
 function frame(canvasIn: { w: number; h: number }): Frame {
   const dpi = SPACING.printDpi;
   const W = Math.round(canvasIn.w * dpi);
@@ -105,6 +112,44 @@ function frame(canvasIn: { w: number; h: number }): Frame {
   // Front-matter pages breathe more than body pages: 1in margins inside trim.
   const m = 1.0 * dpi;
   return { W, H, left: bleed + m, right: W - bleed - m, top: bleed + m, bottom: H - bleed - m, dpi };
+}
+
+function compactFrame(canvasIn: { w: number; h: number }): CompactFrame {
+  const dpi = SPACING.printDpi;
+  const W = Math.round(canvasIn.w * dpi);
+  const H = Math.round(canvasIn.h * dpi);
+  const bleed = SPACING.bleedIn * dpi;
+  // Back-matter reference sections are scanning pages, not ceremonial front
+  // pages. Keep a solid print-safe margin but use a denser two-column frame.
+  const m = 0.65 * dpi;
+  const columnGap = 0.24 * dpi;
+  const left = bleed + m;
+  const right = W - bleed - m;
+  const top = bleed + 0.7 * dpi;
+  const bottom = H - bleed - 0.65 * dpi;
+  return {
+    W,
+    H,
+    left,
+    right,
+    top,
+    bottom,
+    dpi,
+    columnGap,
+    columnWidth: (right - left - columnGap) / 2,
+  };
+}
+
+function headingBlock(parts: string[], f: Frame, heading: string, y: number, pt = 16): number {
+  const cx = f.W / 2;
+  const fitted = fitTitle(heading.toUpperCase(), pt, f.right - f.left, 5, true, 11, 2);
+  for (const line of fitted.lines) {
+    parts.push(text(cx, y, line, fitted.pt, { tracking: 5 }));
+    y += (fitted.pt / 72) * f.dpi * 1.25;
+  }
+  y += 0.08 * f.dpi;
+  parts.push(hairline(cx - 0.7 * f.dpi, cx + 0.7 * f.dpi, y, 1.5));
+  return y + 0.28 * f.dpi;
 }
 
 /** Conservative width estimate (px) for a line at `pt`. Caps factor 0.72 is
@@ -322,6 +367,64 @@ function buildBody(input: ComposeInput, f: Frame): string {
       }
       break;
     }
+
+    case 'GLOSSARY': {
+      const cf = compactFrame({ w: f.W / f.dpi, h: f.H / f.dpi });
+      let y = cf.top;
+      if (input.heading) {
+        y = headingBlock(parts, cf, input.heading, y, 16);
+      }
+
+      const pt = 9.25;
+      const lineH = (pt / 72) * cf.dpi * 1.18;
+      const maxChars = referenceTextPageCapacity({ w: f.W / f.dpi, h: f.H / f.dpi }, Boolean(input.heading)).maxCharsPerLine;
+      let col = 0;
+      const colX = [cf.left, cf.left + cf.columnWidth + cf.columnGap];
+      const colY = [y, y];
+
+      for (const para of input.paragraphs ?? []) {
+        const lines = wrapText(para, maxChars);
+        const blockH = lines.length * lineH + lineH * 0.22;
+        if (colY[col]! + blockH > cf.bottom && col === 0) col = 1;
+        let currentY = colY[col]!;
+        for (const line of lines) {
+          parts.push(text(colX[col]!, currentY, line, pt, { anchor: 'start' }));
+          currentY += lineH;
+        }
+        colY[col] = currentY + lineH * 0.22;
+      }
+      break;
+    }
+
+    case 'INDEX': {
+      const cf = compactFrame({ w: f.W / f.dpi, h: f.H / f.dpi });
+      let y = headingBlock(parts, cf, input.tocHeading ?? 'Index', cf.top, 16);
+      const pt = 9.0;
+      const lineH = (pt / 72) * cf.dpi * 1.18;
+      const pageNumberWidth = 0.34 * cf.dpi;
+      const titleWidth = cf.columnWidth - pageNumberWidth - 0.06 * cf.dpi;
+      const maxTitleChars = Math.floor((titleWidth / cf.dpi) / ((pt / 72) * 0.5));
+      let col = 0;
+      const colX = [cf.left, cf.left + cf.columnWidth + cf.columnGap];
+      const colY = [y, y];
+
+      for (const entry of input.tocEntries ?? []) {
+        const lines = wrapText(entry.title, maxTitleChars);
+        const blockH = lines.length * lineH + lineH * 0.18;
+        if (colY[col]! + blockH > cf.bottom && col === 0) col = 1;
+        const x = colX[col]!;
+        let currentY = colY[col]!;
+        parts.push(text(x, currentY, lines[0] ?? entry.title, pt, { anchor: 'start' }));
+        parts.push(text(x + cf.columnWidth, currentY, String(entry.pageNumber), pt, { anchor: 'end' }));
+        currentY += lineH;
+        for (const line of lines.slice(1)) {
+          parts.push(text(x + 0.12 * cf.dpi, currentY, line, pt, { anchor: 'start' }));
+          currentY += lineH;
+        }
+        colY[col] = currentY + lineH * 0.18;
+      }
+      break;
+    }
   }
 
   parts.push(folioSvg(f, input.pageLabel));
@@ -349,6 +452,42 @@ export function textPageLineCapacity(canvasIn: { w: number; h: number }, withHea
   return {
     linesPerPage: Math.max(8, Math.floor(usable / lineH)),
     maxCharsPerLine: Math.floor(frameWidthIn / ((pt / 72) * 0.5)),
+  };
+}
+
+export function referenceTextPageCapacity(canvasIn: { w: number; h: number }, withHeading: boolean): {
+  totalLineUnits: number;
+  linesPerColumn: number;
+  maxCharsPerLine: number;
+} {
+  const f = compactFrame(canvasIn);
+  const pt = 9.25;
+  const lineH = (pt / 72) * f.dpi * 1.18;
+  const usable = (f.bottom - f.top) - (withHeading ? 0.62 * f.dpi : 0);
+  const linesPerColumn = Math.max(12, Math.floor(usable / lineH));
+  return {
+    totalLineUnits: linesPerColumn * 2 * 10,
+    linesPerColumn,
+    maxCharsPerLine: Math.floor((f.columnWidth / f.dpi) / ((pt / 72) * 0.5)),
+  };
+}
+
+export function indexPageCapacity(canvasIn: { w: number; h: number }, withHeading: boolean): {
+  totalLineUnits: number;
+  linesPerColumn: number;
+  maxTitleCharsPerLine: number;
+} {
+  const f = compactFrame(canvasIn);
+  const pt = 9.0;
+  const lineH = (pt / 72) * f.dpi * 1.18;
+  const usable = (f.bottom - f.top) - (withHeading ? 0.62 * f.dpi : 0);
+  const pageNumberWidth = 0.34;
+  const titleWidth = f.columnWidth / f.dpi - pageNumberWidth - 0.06;
+  const linesPerColumn = Math.max(12, Math.floor(usable / lineH));
+  return {
+    totalLineUnits: linesPerColumn * 2 * 10,
+    linesPerColumn,
+    maxTitleCharsPerLine: Math.floor(titleWidth / ((pt / 72) * 0.5)),
   };
 }
 

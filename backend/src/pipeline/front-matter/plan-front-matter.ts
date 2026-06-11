@@ -32,7 +32,9 @@ import { markdownToBlocks } from '../experimental/whole-page-render/markdown-blo
 import { recoverFrontMatterSections, pickIntroductionSection } from './recover-sections.js';
 import {
   composeFrontMatterPage,
+  indexPageCapacity,
   joinAuthors,
+  referenceTextPageCapacity,
   textPageLineCapacity,
   wrapText,
   type ComposeInput,
@@ -149,6 +151,54 @@ function splitTextPages(
   return pages.length > 0 ? pages : [[]];
 }
 
+/** Split glossary/reference entries with the compact two-column back-matter frame. */
+function splitReferenceTextPages(
+  paragraphs: string[],
+  canvasIn: { w: number; h: number },
+): string[][] {
+  const pages: string[][] = [];
+  let current: string[] = [];
+  let used = 0;
+  let cap = referenceTextPageCapacity(canvasIn, true);
+
+  for (const para of paragraphs) {
+    const units = wrapText(para, cap.maxCharsPerLine).length * 10 + 2;
+    if (used + units > cap.totalLineUnits && current.length > 0) {
+      pages.push(current);
+      current = [];
+      used = 0;
+      cap = referenceTextPageCapacity(canvasIn, false);
+    }
+    current.push(para);
+    used += units;
+  }
+
+  if (current.length > 0) pages.push(current);
+  return pages.length > 0 ? pages : [[]];
+}
+
+function splitIndexEntries(entries: TocEntry[], canvasIn: { w: number; h: number }): TocEntry[][] {
+  const pages: TocEntry[][] = [];
+  let current: TocEntry[] = [];
+  let used = 0;
+  let cap = indexPageCapacity(canvasIn, true);
+
+  for (const entry of entries) {
+    const units = wrapText(entry.title, cap.maxTitleCharsPerLine).length * 10 + 2;
+    if (used + units > cap.totalLineUnits && current.length > 0) {
+      pages.push(current);
+      current = [];
+      used = 0;
+      cap = indexPageCapacity(canvasIn, false);
+    }
+    current.push(entry);
+    used += units;
+  }
+
+  if (current.length > 0) pages.push(current);
+  return pages.length > 0 ? pages : [[]];
+}
+
 export async function planFrontMatter(projectId: string, options: FrontMatterPlanOptions = {}): Promise<FrontMatterPlanReport> {
   const project = await getProject(projectId);
   if (!project) throw new Error(`project_not_found:${projectId}`);
@@ -229,10 +279,16 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   }
   const firstBodyPageByEntry = new Map<string, number>();
   for (const p of bodyPages) {
-    if (!p.entryKey || p.pageRole === 'continuation') continue;
-    const current = firstBodyPageByEntry.get(p.entryKey);
-    if (current == null || p.plannedPageNumber < current) {
-      firstBodyPageByEntry.set(p.entryKey, p.plannedPageNumber);
+    if (p.pageRole === 'continuation') continue;
+    const compactedEntryKeys = Array.isArray(p.compactedEntryKeys)
+      ? p.compactedEntryKeys.filter((key): key is string => typeof key === 'string' && key.length > 0)
+      : [];
+    const entryKeys = compactedEntryKeys.length ? compactedEntryKeys : p.entryKey ? [p.entryKey] : [];
+    for (const entryKey of entryKeys) {
+      const current = firstBodyPageByEntry.get(entryKey);
+      if (current == null || p.plannedPageNumber < current) {
+        firstBodyPageByEntry.set(entryKey, p.plannedPageNumber);
+      }
     }
   }
   const indexEntries: TocEntry[] = Array.from(firstBodyPageByEntry.entries())
@@ -329,11 +385,11 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   };
 
   if (glossaryParagraphs.length > 0) {
-    const split = splitTextPages(glossaryParagraphs, canvasIn);
+    const split = splitReferenceTextPages(glossaryParagraphs, canvasIn);
     split.forEach((paras, i) => {
       pushBack(
         {
-          kind: 'TEXT_PAGE',
+          kind: 'GLOSSARY',
           frontMatterType: 'GLOSSARY',
           pageLabel: null,
           compose: { heading: i === 0 ? 'Glossary' : undefined, paragraphs: paras },
@@ -347,11 +403,11 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   }
 
   if (indexEntries.length > 0) {
-    const indexPages = splitTocEntries(indexEntries, canvasIn);
+    const indexPages = splitIndexEntries(indexEntries, canvasIn);
     indexPages.forEach((entries, i) => {
       pushBack(
         {
-          kind: 'CONTENTS',
+          kind: 'INDEX',
           frontMatterType: 'INDEX',
           pageLabel: null,
           compose: { tocHeading: i === 0 ? 'Index' : 'Index Continued', tocEntries: entries },
@@ -484,14 +540,4 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
 
 function aboutAuthorHeading(authors: string[]): string {
   return authors.length > 1 ? 'About the Authors' : 'About the Author';
-}
-
-function splitTocEntries(entries: TocEntry[], canvasIn: { w: number; h: number }): TocEntry[][] {
-  const cap = textPageLineCapacity(canvasIn, true);
-  const rowsPerPage = Math.max(8, Math.floor(cap.linesPerPage * 0.62));
-  const pages: TocEntry[][] = [];
-  for (let i = 0; i < entries.length; i += rowsPerPage) {
-    pages.push(entries.slice(i, i + rowsPerPage));
-  }
-  return pages.length > 0 ? pages : [[]];
 }

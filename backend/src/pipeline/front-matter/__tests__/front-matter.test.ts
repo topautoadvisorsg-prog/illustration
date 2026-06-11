@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pickIntroductionSection, recoverFrontMatterSections } from '../recover-sections.js';
-import { joinAuthors, textPageLineCapacity, wrapText } from '../compose-page.js';
+import { indexPageCapacity, joinAuthors, referenceTextPageCapacity, textPageLineCapacity, wrapText } from '../compose-page.js';
 import { frontMatterStatus, resolveSpine } from '../../book-assembly/spine-order.js';
 
 const MANUSCRIPT = `# THE WILD LANDS
@@ -135,6 +135,17 @@ describe('composer helpers', () => {
     expect(cap.maxCharsPerLine).toBeGreaterThan(40);
   });
 
+  it('back-matter reference capacity is compact enough for glossary/index pages', () => {
+    const text = textPageLineCapacity({ w: 7.25, h: 10.25 }, true);
+    const glossary = referenceTextPageCapacity({ w: 7.25, h: 10.25 }, true);
+    const index = indexPageCapacity({ w: 7.25, h: 10.25 }, true);
+
+    expect(glossary.totalLineUnits / 10).toBeGreaterThan(text.linesPerPage * 3);
+    expect(index.totalLineUnits / 10).toBeGreaterThan(text.linesPerPage * 3);
+    expect(glossary.maxCharsPerLine).toBeGreaterThan(30);
+    expect(index.maxTitleCharsPerLine).toBeGreaterThan(25);
+  });
+
   it('joinAuthors handles 1, 2, and 3+ authors', () => {
     expect(joinAuthors(['A'])).toBe('A');
     expect(joinAuthors(['A', 'B'])).toBe('A and B');
@@ -232,6 +243,41 @@ describe('composeFrontMatterPage — ink stays inside the trim-safe area', () =>
         { label: 'I', title: 'KNOW YOUR REGION', pageNumber: 1 },
         { label: 'VIII', title: 'BUSHCRAFT & THE LIVING FOREST', pageNumber: 230 },
       ],
+    });
+    const b = await inkBounds(page.pngBuffer);
+    const safePx = SAFE_IN * 300;
+    expect(b.left).toBeGreaterThanOrEqual(safePx - 1);
+    expect(b.right).toBeLessThanOrEqual(b.w - safePx + 1);
+  }, 30000);
+
+  it('glossary page uses compact two-column back-matter composition', async () => {
+    const page = await composeFrontMatterPage({
+      kind: 'GLOSSARY',
+      canvasIn,
+      pageLabel: '23',
+      heading: 'Glossary',
+      paragraphs: Array.from(
+        { length: 34 },
+        (_, i) => `Term ${i + 1} - a concise field-guide definition used for quick reference in the back matter.`,
+      ),
+    });
+    const b = await inkBounds(page.pngBuffer);
+    const safePx = SAFE_IN * 300;
+    expect(b.left).toBeGreaterThanOrEqual(safePx - 1);
+    expect(b.right).toBeLessThanOrEqual(b.w - safePx + 1);
+  }, 30000);
+
+  it('index page uses compact two-column back-matter composition', async () => {
+    const page = await composeFrontMatterPage({
+      kind: 'INDEX',
+      canvasIn,
+      pageLabel: '24',
+      tocHeading: 'Index',
+      tocEntries: Array.from({ length: 72 }, (_, i) => ({
+        label: '',
+        title: `Reference Topic ${String(i + 1).padStart(2, '0')}`,
+        pageNumber: i + 1,
+      })),
     });
     const b = await inkBounds(page.pngBuffer);
     const safePx = SAFE_IN * 300;
