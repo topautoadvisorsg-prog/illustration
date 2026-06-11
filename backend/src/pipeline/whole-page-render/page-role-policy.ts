@@ -143,16 +143,24 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         allowsEmptyBody: false,
         renderBodyText: true,
       };
-    case 'SERIES_PAGE':
+    case 'SERIES_PAGE': {
+      // Same role + text-first layout, but Sources and Series are distinct
+      // pages — only the subject + heading differ (production model). RESOURCES
+      // = Sources / Further Reading (citations, trust); ABOUT_SERIES = the
+      // series brand page.
+      const isSources = frontMatterType(row) === 'RESOURCES';
       return {
         pageType,
         layoutTemplate,
-        title: { kicker: '', number: '', name: frontMatterType(row).replace(/_/g, ' ') || 'SERIES' },
-        entryTitle: frontMatterType(row).replace(/_/g, ' ') || 'Series',
-        imageSubject: 'Restrained Wild Lands series/resource-page ornament: field map, pine, granite, compass, aged parchment',
+        title: { kicker: '', number: '', name: isSources ? 'SOURCES & FURTHER READING' : 'THE WILD LANDS SERIES' },
+        entryTitle: isSources ? 'Sources & Further Reading' : 'The Wild Lands Series',
+        imageSubject: isSources
+          ? 'Sources / further-reading page edge ornament only: thin engraved botanical corner details framing a calm citations/references text block; quiet and scholarly'
+          : 'Wild Lands series-page ornament: field map, pine, granite, compass, aged parchment — brands the book as part of the series',
         allowsEmptyBody: false,
         renderBodyText: true,
       };
+    }
     case 'GLOSSARY_ORNAMENT':
       return {
         pageType,
