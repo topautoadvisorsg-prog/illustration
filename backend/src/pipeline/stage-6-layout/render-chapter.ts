@@ -158,7 +158,7 @@ export async function renderPagePdf(projectId: string, pageKey: string): Promise
 
   const project = await getProject(projectId);
   if (!project) throw new RenderBlockedError('Project not found.', 'not_found');
-  const config = project.config as ProjectConfig;
+  const config = ProjectConfigSchema.parse(project.config);
 
   const pageManifest = (await listManifests(projectId, 'PAGE'))
     .map((r) => PageManifestSchema.parse(r.content))
@@ -204,7 +204,7 @@ export async function renderChapterPdf(projectId: string, chapterNumber: number)
 
   const project = await getProject(projectId);
   if (!project) throw new RenderBlockedError('Project not found.', 'not_found');
-  const config = project.config as ProjectConfig;
+  const config = ProjectConfigSchema.parse(project.config);
 
   const manifestRows = await listManifests(projectId, 'CHAPTER');
   const chapterRow = manifestRows
@@ -337,7 +337,7 @@ export async function renderBookPdf(projectId: string): Promise<BookRenderResult
 
   const project = await getProject(projectId);
   if (!project) throw new RenderBlockedError('Project not found.', 'not_found');
-  const config = project.config as ProjectConfig;
+  const config = ProjectConfigSchema.parse(project.config);
   const geometry = computePageGeometry(config.trimSize);
 
   const chapters = await gatherChapterPages(projectId, config, geometry);
@@ -434,7 +434,7 @@ export async function renderCoverPdf(projectId: string): Promise<CoverRenderResu
   if (!isChromiumAvailable()) throw new RenderBlockedError('Chromium is not available on this host.', 'no_chromium');
   const project = await getProject(projectId);
   if (!project) throw new RenderBlockedError('Project not found.', 'not_found');
-  const config = project.config as ProjectConfig;
+  const config = ProjectConfigSchema.parse(project.config);
 
   // Page count drives spine width. Do NOT render the entire interior just to
   // size the cover; the active production path already has a spine/page table.
