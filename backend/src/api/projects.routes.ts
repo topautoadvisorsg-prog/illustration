@@ -33,7 +33,14 @@ import { UnsupportedManuscriptError } from '../pipeline/stage-1-ingestion/extrac
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
-import { RenderBlockedError, renderBookPdf, renderChapterPdf, renderCoverPdf, renderPagePdf } from '../pipeline/stage-6-layout/render-chapter.js';
+import {
+  RenderBlockedError,
+  generateCoverWrapArtwork,
+  renderBookPdf,
+  renderChapterPdf,
+  renderCoverPdf,
+  renderPagePdf,
+} from '../pipeline/stage-6-layout/render-chapter.js';
 import { countImagesForProject, listImagesForProject, listImagesForPage } from '../db/repositories/images.repo.js';
 import { computePageGeometry } from '../pipeline/stage-6-layout/page-geometry.js';
 import { analyzeTextFit } from '../pipeline/stage-6-layout/text-fit.js';
@@ -2138,6 +2145,32 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         reply.header('x-proof-created-at', result.artifact.createdAt);
       }
       return reply.send(result.pdf);
+    } catch (error) {
+      if (error instanceof RenderBlockedError) {
+        const status = renderErrorStatus(error.code);
+        return reply.code(status).send({ error: 'Render Blocked', message: error.message, statusCode: status });
+      }
+      throw error;
+    }
+  });
+
+  app.post('/api/projects/:id/generate-cover-artwork', async (request, reply) => {
+    const { id } = ProjectParamsSchema.parse(request.params);
+    try {
+      const body = z.object({ chapters: z.array(z.number().int().positive()).optional() }).default({}).parse(request.body ?? {});
+      const result = await generateCoverWrapArtwork(id, { chapters: body.chapters });
+      return reply.send({
+        ok: true,
+        pageCount: result.pageCount,
+        scopeChapters: result.scopeChapters,
+        dimensions: result.dimensions,
+        imagePath: result.imagePath,
+        promptPath: result.promptPath,
+        promptPreview: result.promptPreview,
+        widthPx: result.widthPx,
+        heightPx: result.heightPx,
+        model: result.model,
+      });
     } catch (error) {
       if (error instanceof RenderBlockedError) {
         const status = renderErrorStatus(error.code);

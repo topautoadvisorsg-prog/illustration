@@ -38,6 +38,7 @@ import {
 import { getProjectStorage } from '../../../services/storage/project-storage.js';
 import { buildPageSpec } from './build-page-spec.js';
 import { assembleExperimentPrompt } from './assemble-experiment-prompt.js';
+import { buildPageRolePolicy, roleAllowsEmptyBody } from './page-role-policy.js';
 import type { WholePageSpec } from './types.js';
 
 /** Injectable generator — tests pass a stub so no OpenAI spend happens. */
@@ -81,13 +82,14 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
   const project = await getProject(pageRow.projectId);
   if (!project) throw new Error(`project_not_found:${pageRow.projectId}`);
   const config: ProjectConfig = ProjectConfigSchema.parse(project.config);
+  const pageRolePolicy = buildPageRolePolicy(pageRow, config);
 
   const entryKey = pageRow.entryKey ?? pageRow.pageKey;
   const entryMeta = await getEntryMetaByKeys(pageRow.projectId, [entryKey]);
   const meta = entryMeta.get(entryKey);
-  const entryTitle = meta?.entryTitle || pageRow.pageKey;
+  const entryTitle = meta?.entryTitle || pageRolePolicy.entryTitle;
   // Standard v1.1: prefer the clean subject. Warnings live in badges, never here.
-  const imageSubject = meta?.cleanSubject || meta?.imageSubject || entryTitle;
+  const imageSubject = meta?.cleanSubject || meta?.imageSubject || pageRolePolicy.imageSubject;
   const badgeContext = {
     hazard: meta?.hazard ?? [],
     region: meta?.region ?? 'GENERAL',
@@ -103,13 +105,22 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
   // (computeBadgeStackLayout) over whatever the model renders there.
   const allocation = directLayout({
     bodyMarkdown: pageRow.readingFieldText ?? '',
-    layoutTemplate: pageRow.layoutTemplate as Parameters<typeof directLayout>[0]['layoutTemplate'],
+    layoutTemplate: pageRolePolicy.layoutTemplate as Parameters<typeof directLayout>[0]['layoutTemplate'],
     geometry,
     bodyPt: config.typography.bodyPt,
     lineHeight: config.typography.lineHeight,
   });
 
-  const spec = buildPageSpec({ pageRow, config, geometry, allocation, entryTitle, imageSubject, badgeContext });
+  const spec = buildPageSpec({
+    pageRow,
+    config,
+    geometry,
+    allocation,
+    entryTitle,
+    imageSubject,
+    badgeContext,
+    pageRolePolicy,
+  });
   const assembledPrompt = assembleExperimentPrompt(spec);
   const size = pickSize(geometry.trimWidthIn, geometry.trimHeightIn);
   return {
@@ -147,7 +158,7 @@ export async function createAndRunRender(
   // never paginated (readingFieldText null). Throws BEFORE creating a render row
   // or calling the model. NOTE: when front matter is built, COVER/TITLE pages
   // legitimately have no body — exempt those page types here at that time.
-  if (!(prepared.spec.pageText.body ?? '').trim()) {
+  if (!(prepared.spec.pageText.body ?? '').trim() && !roleAllowsEmptyBody(prepared.spec.pageType)) {
     throw new Error(`empty_body_text:${pageId}`);
   }
 

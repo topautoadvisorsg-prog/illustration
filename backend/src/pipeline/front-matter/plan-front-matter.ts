@@ -558,13 +558,14 @@ function aboutAuthorHeading(authors: string[]): string {
 
 function buildFrontMatterCompositionPrompt(pageKey: string, input: ComposeInput): string {
   const base = [
-    `FRONT/BACK MATTER COMPOSITION INSTRUCTION`,
+    `FRONT/BACK MATTER COMPOSITION AUDIT RECORD`,
     `Page key: ${pageKey}`,
     `Page kind: ${input.kind}`,
     `Canvas: ${input.canvasIn.w} x ${input.canvasIn.h} inches, full bleed.`,
     '',
     'Production model:',
     '- This page is composed by the publishing layout engine for exact text fidelity.',
+    '- This is an audit record, not an image-generation prompt.',
     '- Do not invent, rewrite, summarize, or reorder text.',
     '- Text is system-typeset from manuscript/configuration data.',
     '- Decorative art must support readability and must never cover the text frame.',

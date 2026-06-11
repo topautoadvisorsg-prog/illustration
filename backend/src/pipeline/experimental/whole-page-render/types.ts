@@ -108,7 +108,18 @@ export interface CompositionDTO {
 }
 
 export interface WholePageSpec {
-  pageType: 'CHAPTER_OPENER' | 'INTERIOR' | 'COMPACTED' | 'CONTINUATION';
+  pageType:
+    | 'CHAPTER_OPENER'
+    | 'INTERIOR'
+    | 'COMPACTED'
+    | 'CONTINUATION'
+    | 'COVER_WRAP'
+    | 'TITLE_PAGE'
+    | 'INTRO_OPENER'
+    | 'AUTHOR_PAGE'
+    | 'SERIES_PAGE'
+    | 'GLOSSARY_ORNAMENT'
+    | 'INDEX_ORNAMENT';
   layoutFamily: LayoutTemplateId;
   layoutGeometry: LayoutGeometryDTO;
   /** F-8 — prose placement contract the model must respect. */

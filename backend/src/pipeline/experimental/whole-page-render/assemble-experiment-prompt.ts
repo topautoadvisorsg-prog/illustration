@@ -27,6 +27,20 @@ const HEADER = [
   'The specification below is authoritative. Render the page exactly as specified. Do not invent text. Do not rearrange the layout. Do not substitute words. The body text is provided verbatim and must appear on the page exactly as supplied.',
 ].join(' ');
 
+function rendersBodyText(spec: WholePageSpec): boolean {
+  return !['COVER_WRAP', 'TITLE_PAGE', 'GLOSSARY_ORNAMENT', 'INDEX_ORNAMENT'].includes(spec.pageType);
+}
+
+function promptHeader(spec: WholePageSpec): string {
+  if (rendersBodyText(spec)) return HEADER;
+  return [
+    `You are rendering a complete, FINISHED, publishable collector-edition book page under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version}.`,
+    'The target quality is a museum-grade, vintage natural-history monograph.',
+    'Render the artwork, ornament, paper character, composition, and reserved zones only.',
+    'Do not invent readable text. Critical typography and reference copy are added by the publishing engine.',
+  ].join(' ');
+}
+
 function block(title: string, payload: unknown): string {
   return [title, '```json', JSON.stringify(payload, null, 2), '```'].join('\n');
 }
@@ -49,8 +63,12 @@ function hardConstraints(spec: WholePageSpec): string {
     // and a 50/50 page mirrored. State the placement contract in prose and
     // forbid the three observed failure modes (move / mirror / enlarge).
     `- COMPOSITION CONTRACT — image placement: ${spec.composition.imagePlacement}. Text placement: ${spec.composition.textPlacement}. Respect this placement EXACTLY: do not move the artwork to a different region, do not mirror left/right or top/bottom, do not enlarge a small accent into a band or a band into a full page. The attached layout reference image shows the same plan — follow it.`,
-    '- Body text appears VERBATIM, every word, in order. Do not paraphrase, summarize, abbreviate, truncate, or invent.',
-    `- Body typography: ${spec.typographyDNA.bodyFamily}. Set at approximately ${spec.typographyDNA.bodyPt}pt with ${spec.typographyDNA.bodyLineHeight} line height, reading measure approximately ${spec.typographyDNA.bodyMeasureChars} characters wide — generous and confident, never cramped.`,
+    rendersBodyText(spec)
+      ? '- Body text appears VERBATIM, every word, in order. Do not paraphrase, summarize, abbreviate, truncate, or invent.'
+      : '- Do not render body copy, title copy, author text, spine text, barcode, ISBN, glossary terms, index entries, or any other readable text. The publishing engine adds all critical typography.',
+    rendersBodyText(spec)
+      ? `- Body typography: ${spec.typographyDNA.bodyFamily}. Set at approximately ${spec.typographyDNA.bodyPt}pt with ${spec.typographyDNA.bodyLineHeight} line height, reading measure approximately ${spec.typographyDNA.bodyMeasureChars} characters wide - generous and confident, never cramped.`
+      : '- Preserve calm, readable text-safe regions for the publishing engine. These zones must feel naturally integrated into the illustration, not like blank boxes, cards, labels, or cutouts.',
     '- The reading field sits at the supplied coordinates. Do not move it. Do not shrink it. Do not change its proportions.',
     '- Ornamentation: engraved botanical swags top and bottom, with centered pinecone medallions, drawn in the same warm sepia ink. Hairline decorative rules around the CHAPTER kicker and the title. Period-correct, line-engraving feel — never clip art, never digital flourish.',
     '- The whole page must read as ONE integrated composition. The illustration, the typography, and the ornamentation share the same paper, the same ink palette, the same period. The page should look like it was printed from a single plate, not assembled in software.',
@@ -79,9 +97,25 @@ export function assembleExperimentPrompt(spec: WholePageSpec): string {
           return rest;
         })()
       : spec.typographyDNA;
+  const bodySection = rendersBodyText(spec)
+    ? [
+        'PAGE BODY - render every block below IN ORDER. "heading" = a bold serif',
+        'section heading; "subheading" = a smaller bold heading; "paragraph" = body',
+        'prose. The text is already plain - it contains NO markdown. Render each',
+        'block\'s text EXACTLY and verbatim; never print the block labels, the word',
+        '"type"/"text", braces, or any #/*/_ characters.',
+        '```json',
+        JSON.stringify(spec.pageText.bodyBlocks, null, 2),
+        '```',
+      ]
+    : [
+        'TEXT POLICY - the image model must not render critical text for this role.',
+        'Create artwork, ornament, paper texture, and calm text-safe/typography zones only.',
+        'The publishing engine will add title, author, spine, barcode, ISBN, glossary/index entries, and any other readable copy.',
+      ];
 
   return [
-    HEADER,
+    promptHeader(spec),
     '',
     block('TYPOGRAPHY DNA', typographyDNA),
     '',
@@ -96,14 +130,7 @@ export function assembleExperimentPrompt(spec: WholePageSpec): string {
     '',
     block('PAGE TEXT — title', spec.pageText.title),
     '',
-    'PAGE BODY — render every block below IN ORDER. "heading" = a bold serif',
-    'section heading; "subheading" = a smaller bold heading; "paragraph" = body',
-    'prose. The text is already plain — it contains NO markdown. Render each',
-    'block\'s text EXACTLY and verbatim; never print the block labels, the word',
-    '"type"/"text", braces, or any #/*/_ characters.',
-    '```json',
-    JSON.stringify(spec.pageText.bodyBlocks, null, 2),
-    '```',
+    ...bodySection,
     '',
     block('DECORATIVE ELEMENTS', spec.decorativeElements),
     '',

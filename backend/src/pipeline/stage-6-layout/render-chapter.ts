@@ -35,6 +35,11 @@ import { buildBookHtml, buildCoverHtml, buildPageHtml, computeCoverDimensions, t
 import { directLayout } from './layout-director.js';
 import { isChromiumAvailable, loadPagedPolyfill, renderHtmlToPdf } from './render-pdf.js';
 import { preflightBook, stitchPdfs, type PreflightReport } from '../stage-7-pdf-compile/stitch-book.js';
+import { assembleExperimentPrompt } from '../experimental/whole-page-render/assemble-experiment-prompt.js';
+import { EXPERIMENT_TYPOGRAPHY_DNA } from '../experimental/whole-page-render/typography-dna.js';
+import type { WholePageSpec } from '../experimental/whole-page-render/types.js';
+import { assembleIllustrationDna } from '../publishing-standard/index.js';
+import { generateImage } from '../../services/openai/openai.js';
 import sharp from 'sharp';
 
 export class RenderBlockedError extends Error {
@@ -395,6 +400,19 @@ export interface CoverRenderResult {
   artifact?: ProofArtifact;
 }
 
+export interface CoverArtworkResult {
+  projectId: string;
+  imagePath: string;
+  promptPath: string;
+  promptPreview: string;
+  widthPx: number;
+  heightPx: number;
+  model: string;
+  pageCount: number;
+  dimensions: ReturnType<typeof computeCoverDimensions>;
+  scopeChapters: number[] | null;
+}
+
 export interface CoverValidation {
   checks: Array<{ key: string; ok: boolean; message: string }>;
   ready: boolean;
@@ -458,7 +476,7 @@ export async function renderCoverPdf(projectId: string, options: RenderCoverOpti
   const polyfillJs = await loadPagedPolyfill();
   const dims = computeCoverDimensions(config, pageCount);
   const validation = validateCoverInputs(config, pageCount, dims);
-  const coverArtPrompt = buildCoverArtDirectionPrompt(config, pageCount, dims);
+  const coverArtPrompt = buildCoverWrapPrompt(config, pageCount, dims);
   let coverArtDataUri: string | undefined;
   if (config.publishing.coverAssetPath) {
     try {
@@ -503,47 +521,119 @@ export async function renderCoverPdf(projectId: string, options: RenderCoverOpti
   };
 }
 
-function buildCoverArtDirectionPrompt(
+/** Generate and persist the full-wrap cover artwork layer. Typography is added later by buildCoverHtml(). */
+export async function generateCoverWrapArtwork(
+  projectId: string,
+  options: RenderCoverOptions = {},
+): Promise<CoverArtworkResult> {
+  const project = await getProject(projectId);
+  if (!project) throw new RenderBlockedError('Project not found.', 'not_found');
+  const config = ProjectConfigSchema.parse(project.config);
+  const scopeChapters = options.chapters?.length
+    ? Array.from(new Set(options.chapters)).sort((a, b) => a - b)
+    : null;
+  const pageCount = (await listPaginatedPagesForProject(projectId)).filter(
+    (p) => p.section !== 'BODY' || !scopeChapters || scopeChapters.includes(p.chapterNumber),
+  ).length;
+  if (pageCount === 0) throw new RenderBlockedError('No planned pages found; run pagination/front matter before generating the cover.', 'no_pages');
+
+  const dims = computeCoverDimensions(config, pageCount);
+  const prompt = buildCoverWrapPrompt(config, pageCount, dims);
+  const image = await generateImage({ prompt, size: '1536x1024', quality: 'high' });
+
+  const storage = getProjectStorage();
+  const promptStored = await storage.writeProjectFile(projectId, ['cover', 'cover-wrap.prompt.txt'], prompt);
+  const imageStored = await storage.writeProjectFile(projectId, ['cover', 'cover-wrap-art.png'], image.pngBuffer);
+  await updateProjectConfig(projectId, {
+    ...config,
+    publishing: {
+      ...config.publishing,
+      coverAssetPath: imageStored.relativePath,
+    },
+  });
+
+  return {
+    projectId,
+    imagePath: imageStored.relativePath,
+    promptPath: promptStored.relativePath,
+    promptPreview: prompt.slice(0, 1600),
+    widthPx: image.widthPx,
+    heightPx: image.heightPx,
+    model: image.model,
+    pageCount,
+    dimensions: dims,
+    scopeChapters,
+  };
+}
+
+function buildCoverWrapPrompt(
   config: ProjectConfig,
   pageCount: number,
   dims: ReturnType<typeof computeCoverDimensions>,
 ): string {
   const hooks = config.publishing.bookDescription?.hooks ?? [];
-  return [
-    'COVER ART DIRECTION PROMPT',
-    `Title: ${config.title}`,
-    `Subtitle: ${config.subtitle ?? ''}`,
-    `Author / imprint line: ${config.authorName}`,
-    `Format: ${config.publishingStandard?.label ?? 'configured print format'}`,
-    `Interior page count for spine: ${pageCount}`,
-    `Full wrap size: ${dims.fullWidthIn.toFixed(3)} x ${dims.fullHeightIn.toFixed(3)} inches.`,
-    `Spine width: ${dims.spineIn.toFixed(3)} inches.`,
-    '',
-    'Production model:',
-    '- Generate full-wrap cover artwork only.',
-    '- The image covers back cover, spine, and front cover as one continuous full-bleed composition.',
-    '- Do not render readable title, subtitle, author name, spine text, barcode, ISBN, or back-cover copy inside the artwork.',
-    '- Typography is added by the publishing layout engine after artwork generation.',
-    '',
-    'Front-cover composition:',
-    '- Premium cinematic natural-history field-guide cover.',
-    '- Reserve a calm title-safe zone in the upper/central front cover for title and subtitle typography.',
-    '- Reserve a smaller calm zone near the lower front cover for author/imprint typography.',
-    '- Use strong wilderness identity: New England mountain terrain, forest, granite, lake/river atmosphere, naturalist archival tone.',
-    '',
-    'Spine composition:',
-    '- Keep the spine visually calm enough for vertical title text.',
-    '- Avoid busy high-contrast details in the spine strip.',
-    '',
-    'Back-cover composition:',
-    '- Reserve readable negative space for back-cover copy.',
-    '- Reserve a clean barcode zone in the lower-right back cover.',
-    '- Back-cover art should support copy, not compete with it.',
-    '',
-    'Style DNA:',
-    config.imageGeneration.masterStyleBlockText,
-    '',
-    'Back-cover copy context:',
-    hooks.length ? hooks.map((hook) => `- ${hook}`).join('\n') : '- No hook copy supplied yet.',
-  ].join('\n');
+  const title = config.publishing.title ?? config.title;
+  const subtitle = config.publishing.subtitle ?? config.subtitle ?? '';
+  const authors = config.publishing.authors?.length ? config.publishing.authors.join(', ') : config.authorName;
+  const frontPanelXIn = config.trimSize.bleedIn + config.trimSize.widthIn + dims.spineIn;
+  const spec: WholePageSpec = {
+    pageType: 'COVER_WRAP',
+    layoutFamily: 'LAYOUT_A_ILLUSTRATION',
+    layoutGeometry: {
+      trim: { widthIn: dims.fullWidthIn, heightIn: dims.fullHeightIn },
+      marginsIn: { top: 0, bottom: 0, outside: 0, inside: 0 },
+      bleedIn: 0,
+    },
+    composition: {
+      imagePlacement: [
+        'full-wrap artwork canvas covering back cover, spine, and front cover as one continuous full-bleed composition',
+        `full wrap ${dims.fullWidthIn.toFixed(3)} x ${dims.fullHeightIn.toFixed(3)} inches`,
+        `spine width ${dims.spineIn.toFixed(3)} inches`,
+      ].join('; '),
+      textPlacement: [
+        'front cover: calm upper/central title-safe zone and smaller lower author/imprint zone',
+        'spine: visually calm vertical strip for system-set spine typography',
+        'back cover: readable negative space for system-set back-cover copy plus clean lower-right barcode zone',
+      ].join('; '),
+    },
+    readingFieldGeometry: {
+      originIn: { x: frontPanelXIn + 0.65, y: 0.8 },
+      sizeIn: { w: Math.max(1, config.trimSize.widthIn - 1.3), h: Math.max(1, dims.fullHeightIn - 1.6) },
+      anchor: 'CENTER',
+      widerThanProductionPct: 0,
+    },
+    typographyDNA: {
+      ...EXPERIMENT_TYPOGRAPHY_DNA,
+      titleHierarchy: [title, subtitle, authors].filter(Boolean),
+      decorativeInitial: null,
+    },
+    illustrationDNA: {
+      masterStyleBlock: assembleIllustrationDna(),
+      subject: {
+        primary: 'Full-wrap New England wilderness cover artwork for a premium natural-history field guide.',
+        supporting: [
+          'front cover: cinematic mountains, spruce forest, granite, lake or river atmosphere',
+          'spine: quiet continuous texture with low visual contrast',
+          'back cover: restrained landscape atmosphere that supports readable copy',
+          hooks.length ? `back-cover copy context: ${hooks.join(' ')}` : 'back-cover copy context: no hook copy supplied yet',
+        ],
+        environment: 'New England mountain-and-forest landscape, archival naturalist atmosphere, continuous wrap composition',
+        mood: 'premium, cinematic, rugged, calm enough for system typography',
+      },
+    },
+    pageText: {
+      title: { kicker: subtitle, number: '', name: title.toUpperCase() },
+      body: '',
+      bodyBlocks: [],
+      dropCap: null,
+    },
+    decorativeElements: {
+      topRule: null,
+      bottomRule: null,
+      badges: [],
+    },
+    badgeContext: { hazard: ['NONE'], region: 'GENERAL', source: 'GENERAL_REFERENCE' },
+    badgeSafeZones: [],
+  };
+  return assembleExperimentPrompt(spec);
 }

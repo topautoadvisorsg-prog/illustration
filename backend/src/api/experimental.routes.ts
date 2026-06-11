@@ -15,6 +15,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { getEnv } from '../env.js';
 import { createAndRunRender } from '../pipeline/experimental/whole-page-render/render-whole-page.js';
+import { isWholePageAiAllowedForRow } from '../pipeline/experimental/whole-page-render/page-role-policy.js';
 import { printPrepRender } from '../pipeline/print-prep/print-prep.js';
 import { assembleBook } from '../pipeline/book-assembly/assemble-book.js';
 import {
@@ -200,14 +201,14 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
     const { pageId } = PageParamsSchema.parse(request.params);
     const body = RenderBodySchema.parse(request.body ?? {});
     try {
-      // Front Matter v1 — non-BODY pages are composed deterministically by
-      // the front-matter planner; the AI render path must refuse them so a
-      // batch sweep can never spend tokens re-imagining a copyright page.
+      // PageRole gate: BODY pages and supported visual front-matter roles may use
+      // the whole-page AI path. Reference/deterministic pages stay on the
+      // composed typography/ornament path so batch runs do not waste spend.
       const pageRow = await getPaginatedPageById(pageId);
-      if (pageRow && (pageRow as { section?: string }).section && (pageRow as { section?: string }).section !== 'BODY') {
+      if (pageRow && !isWholePageAiAllowedForRow(pageRow)) {
         return reply.code(422).send({
           error: 'Unprocessable Entity',
-          message: `Page ${pageId} is ${(pageRow as { section?: string }).section} — composed deterministically by the front-matter planner, never AI-rendered.`,
+          message: `Page ${pageId} is not eligible for whole-page AI rendering. Reference and deterministic pages stay on the composed typography/ornament path.`,
           statusCode: 422,
         });
       }

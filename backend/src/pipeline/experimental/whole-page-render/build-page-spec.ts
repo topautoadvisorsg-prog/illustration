@@ -9,7 +9,7 @@
  * piece of information needed to render a finished page lives here.
  */
 
-import type { LayoutTemplateId, PageManifest, ProjectConfig } from '@wildlands/shared';
+import type { PageManifest, ProjectConfig } from '@wildlands/shared';
 import type { PageRow } from '../../../db/repositories/pagination.repo.js';
 import type { LayoutAllocation, PlanningZone } from '../../stage-6-layout/layout-director.js';
 import type { PageGeometry } from '../../stage-6-layout/page-geometry.js';
@@ -17,6 +17,7 @@ import { deriveSubjectPackage } from '../../stage-2-planner/plan-pages.js';
 import { assembleIllustrationDna, toRoman, WILDLANDS_STANDARD } from '../../publishing-standard/index.js';
 import { stripReadingFieldMetadata } from '../../subject-badges/extract-badges.js';
 import { markdownToBlocks, blocksToPlainText } from './markdown-blocks.js';
+import { buildPageRolePolicy, type PageRolePolicy } from './page-role-policy.js';
 import {
   EXPERIMENT_READING_FIELD_WIDENING_PCT,
   EXPERIMENT_TYPOGRAPHY_DNA,
@@ -35,6 +36,7 @@ export interface BuildPageSpecInput {
   entryTitle: string;
   imageSubject: string;
   badgeContext?: { hazard: string[]; region: string; source: string };
+  pageRolePolicy?: PageRolePolicy;
 }
 
 /** Pick the largest text-safe zone — the actual reading field for this layout. */
@@ -59,19 +61,6 @@ function inferReadingFieldAnchor(zone: PlanningZone | null): ReadingFieldGeometr
   return 'CENTER';
 }
 
-function inferPageType(layout: LayoutTemplateId, pageRow: PageRow): WholePageSpec['pageType'] {
-  if (pageRow.pageRole === 'continuation') return 'CONTINUATION';
-  if (pageRow.pageRole === 'compacted') return 'COMPACTED';
-  // KNOWN v1.0 LIMITATION: only LAYOUT_13_FEATURE_BANNER openers get the full
-  // CHAPTER hierarchy + badges. An opener on another layout (e.g. P002 on
-  // LAYOUT_4_DANGER_WARNING) currently falls through to INTERIOR — no kicker,
-  // numeral, or badges. Surfaced in the P002 render. Broadening this to "any
-  // pageRole === 'opener'" is a flagged decision, not a silent change.
-  if (pageRow.pageRole === 'opener' && layout === 'LAYOUT_13_FEATURE_BANNER') {
-    return 'CHAPTER_OPENER';
-  }
-  return 'INTERIOR';
-}
 
 /**
  * Decorative elements per the Wild Lands Publishing Standard. Family is always
@@ -84,10 +73,17 @@ function inferPageType(layout: LayoutTemplateId, pageRow: PageRow): WholePageSpe
  * contradict the prompt's "do not draw badges" hard constraint.
  */
 function buildDecorativeElements(pageType: WholePageSpec['pageType']): DecorativeElementsDTO {
-  if (pageType === 'CHAPTER_OPENER') {
+  if (pageType === 'CHAPTER_OPENER' || pageType === 'INTRO_OPENER') {
     return {
       topRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':top_swag', position: 'above_illustration' },
       bottomRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':bottom_swag', position: 'below_body' },
+      badges: [],
+    };
+  }
+  if (pageType === 'TITLE_PAGE') {
+    return {
+      topRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':hairline_top', position: 'above_title' },
+      bottomRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':restrained_bottom_swag', position: 'below_title' },
       badges: [],
     };
   }
@@ -101,9 +97,12 @@ function buildDecorativeElements(pageType: WholePageSpec['pageType']): Decorativ
 export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
   // `config` stays on the input for callers/back-compat but is no longer read
   // here: Illustration DNA now comes from the Standard, not project config.
-  const { pageRow, geometry, allocation, entryTitle, imageSubject } = input;
-  const layout = pageRow.layoutTemplate as LayoutTemplateId;
-  const pageType = inferPageType(layout, pageRow);
+  const { pageRow, geometry, allocation } = input;
+  const policy = input.pageRolePolicy ?? buildPageRolePolicy(pageRow, input.config);
+  const layout = policy.layoutTemplate;
+  const pageType = policy.pageType;
+  const entryTitle = input.entryTitle || policy.entryTitle;
+  const imageSubject = input.imageSubject || policy.imageSubject;
 
   // Reading-field geometry — convert the textSafeZone (percent of trim) to inches.
   const rfZone = pickReadingFieldZone(allocation);
@@ -128,19 +127,42 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
     pageNumber: pageRow.plannedPageNumber,
     entryTitle,
     imageSubject,
-    bodyMarkdown: pageRow.readingFieldText ?? ' ',
+    bodyMarkdown: policy.renderBodyText ? (pageRow.readingFieldText ?? ' ') : ' ',
     layoutTemplate: layout,
     warnings: [],
   };
   const subjectPackage = deriveSubjectPackage(fauxManifest);
 
   // Strip the metadata header, then parse markdown → typed plain-text blocks.
-  const bodyBlocks = markdownToBlocks(stripReadingFieldMetadata(pageRow.readingFieldText ?? ''));
+  const bodyBlocks = policy.renderBodyText
+    ? markdownToBlocks(stripReadingFieldMetadata(pageRow.readingFieldText ?? ''))
+    : [];
 
   const dropCap =
     pageType === 'CHAPTER_OPENER' && bodyBlocks.length > 0
       ? (bodyBlocks.find((b) => b.type === 'paragraph')?.text.charAt(0).toUpperCase() ?? null) || null
       : null;
+  const titleHierarchy =
+    pageType === 'CHAPTER_OPENER'
+      ? ['CHAPTER', toRoman(pageRow.chapterNumber), entryTitle.toUpperCase()]
+      : pageType === 'TITLE_PAGE'
+        ? [policy.title.name, policy.title.kicker].filter(Boolean)
+        : pageType === 'INTRO_OPENER'
+          ? [policy.title.name]
+          : [];
+  const pageTitle =
+    pageType === 'CHAPTER_OPENER'
+      ? {
+          kicker: 'CHAPTER',
+          number: toRoman(pageRow.chapterNumber),
+          name: entryTitle.toUpperCase(),
+        }
+      : pageType === 'TITLE_PAGE' ||
+          pageType === 'INTRO_OPENER' ||
+          pageType === 'AUTHOR_PAGE' ||
+          pageType === 'SERIES_PAGE'
+        ? policy.title
+        : { kicker: '', number: '', name: '' };
 
   return {
     pageType,
@@ -172,10 +194,7 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
       // the model draws an illuminated initial on pages that should have none.
       decorativeInitial: dropCap ? EXPERIMENT_TYPOGRAPHY_DNA.decorativeInitial : null,
       // For non-chapter-openers we don't enforce a fixed title hierarchy.
-      titleHierarchy:
-        pageType === 'CHAPTER_OPENER'
-          ? ['CHAPTER', toRoman(pageRow.chapterNumber), entryTitle.toUpperCase()]
-          : [],
+      titleHierarchy,
     },
     illustrationDNA: {
       // Standard v1.2: Illustration DNA comes from the single authority (the
@@ -186,14 +205,7 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
       subject: subjectPackage,
     },
     pageText: {
-      title:
-        pageType === 'CHAPTER_OPENER'
-          ? {
-              kicker: 'CHAPTER',
-              number: toRoman(pageRow.chapterNumber),
-              name: entryTitle.toUpperCase(),
-            }
-          : { kicker: '', number: '', name: '' },
+      title: pageTitle,
       // Strip the manuscript metadata header (binomial + hazard markers), then
       // parse markdown into typed plain-text blocks — the model never sees a
       // markdown character (no `###`/`**` can bleed onto the page).
