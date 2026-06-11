@@ -113,7 +113,10 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
     // needs to inspect; print-prep used a sibling prefix when it landed and
     // the proof package needs to link to them.
     const allowed =
-      relPath.includes('/experimental/whole-page/') || relPath.includes('/print-ready/') || relPath.includes('/front-matter/');
+      relPath.includes('/experimental/whole-page/') ||
+      relPath.includes('/print-ready/') ||
+      relPath.includes('/front-matter/') ||
+      relPath.includes('/cover/');
     if (relPath.includes('..') || !allowed) {
       return reply
         .code(400)

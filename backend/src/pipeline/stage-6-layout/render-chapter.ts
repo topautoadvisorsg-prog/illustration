@@ -386,6 +386,8 @@ export async function renderBookPdf(projectId: string): Promise<BookRenderResult
 export interface CoverRenderResult {
   pdf: Buffer;
   storedPath: string;
+  coverArtPromptPath: string;
+  coverArtPromptPreview: string;
   pageCount: number;
   dimensions: ReturnType<typeof computeCoverDimensions>;
   validation: CoverValidation;
@@ -456,6 +458,7 @@ export async function renderCoverPdf(projectId: string, options: RenderCoverOpti
   const polyfillJs = await loadPagedPolyfill();
   const dims = computeCoverDimensions(config, pageCount);
   const validation = validateCoverInputs(config, pageCount, dims);
+  const coverArtPrompt = buildCoverArtDirectionPrompt(config, pageCount, dims);
   let coverArtDataUri: string | undefined;
   if (config.publishing.coverAssetPath) {
     try {
@@ -477,6 +480,7 @@ export async function renderCoverPdf(projectId: string, options: RenderCoverOpti
   } as unknown as ReturnType<typeof computePageGeometry>);
 
   const storage = getProjectStorage();
+  const coverPrompt = await storage.writeProjectFile(projectId, ['cover', 'cover-art-direction.txt'], coverArtPrompt);
   const stored = await storage.writeProjectFile(projectId, ['editions', 'COVER.pdf'], buffer);
   const artifact = await recordProofArtifact(projectId, config, {
     kind: 'COVER_PROOF',
@@ -486,5 +490,60 @@ export async function renderCoverPdf(projectId: string, options: RenderCoverOpti
     fileSizeBytes: stored.sizeBytes,
     totalPages: 1,
   });
-  return { pdf: buffer, storedPath: stored.relativePath, pageCount, dimensions: dims, validation, scopeChapters, artifact };
+  return {
+    pdf: buffer,
+    storedPath: stored.relativePath,
+    coverArtPromptPath: coverPrompt.relativePath,
+    coverArtPromptPreview: coverArtPrompt.slice(0, 1600),
+    pageCount,
+    dimensions: dims,
+    validation,
+    scopeChapters,
+    artifact,
+  };
+}
+
+function buildCoverArtDirectionPrompt(
+  config: ProjectConfig,
+  pageCount: number,
+  dims: ReturnType<typeof computeCoverDimensions>,
+): string {
+  const hooks = config.publishing.bookDescription?.hooks ?? [];
+  return [
+    'COVER ART DIRECTION PROMPT',
+    `Title: ${config.title}`,
+    `Subtitle: ${config.subtitle ?? ''}`,
+    `Author / imprint line: ${config.authorName}`,
+    `Format: ${config.publishingStandard?.label ?? 'configured print format'}`,
+    `Interior page count for spine: ${pageCount}`,
+    `Full wrap size: ${dims.fullWidthIn.toFixed(3)} x ${dims.fullHeightIn.toFixed(3)} inches.`,
+    `Spine width: ${dims.spineIn.toFixed(3)} inches.`,
+    '',
+    'Production model:',
+    '- Generate full-wrap cover artwork only.',
+    '- The image covers back cover, spine, and front cover as one continuous full-bleed composition.',
+    '- Do not render readable title, subtitle, author name, spine text, barcode, ISBN, or back-cover copy inside the artwork.',
+    '- Typography is added by the publishing layout engine after artwork generation.',
+    '',
+    'Front-cover composition:',
+    '- Premium cinematic natural-history field-guide cover.',
+    '- Reserve a calm title-safe zone in the upper/central front cover for title and subtitle typography.',
+    '- Reserve a smaller calm zone near the lower front cover for author/imprint typography.',
+    '- Use strong wilderness identity: New England mountain terrain, forest, granite, lake/river atmosphere, naturalist archival tone.',
+    '',
+    'Spine composition:',
+    '- Keep the spine visually calm enough for vertical title text.',
+    '- Avoid busy high-contrast details in the spine strip.',
+    '',
+    'Back-cover composition:',
+    '- Reserve readable negative space for back-cover copy.',
+    '- Reserve a clean barcode zone in the lower-right back cover.',
+    '- Back-cover art should support copy, not compete with it.',
+    '',
+    'Style DNA:',
+    config.imageGeneration.masterStyleBlockText,
+    '',
+    'Back-cover copy context:',
+    hooks.length ? hooks.map((hook) => `- ${hook}`).join('\n') : '- No hook copy supplied yet.',
+  ].join('\n');
 }

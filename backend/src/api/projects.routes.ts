@@ -2162,6 +2162,8 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           dimensions: result.dimensions,
           validation: result.validation,
           storedPath: result.storedPath,
+          coverArtPromptPath: result.coverArtPromptPath,
+          coverArtPromptPreview: result.coverArtPromptPreview,
           artifact: result.artifact,
         });
       }
