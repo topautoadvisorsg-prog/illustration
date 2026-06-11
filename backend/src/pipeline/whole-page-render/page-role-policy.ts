@@ -49,6 +49,10 @@ export function inferWholePageRole(row: PageRow, layoutTemplate: LayoutTemplateI
         return 'GLOSSARY_ORNAMENT';
       case 'INDEX':
         return 'INDEX_ORNAMENT';
+      case 'COPYRIGHT_PAGE':
+        return 'COPYRIGHT_PAGE';
+      case 'CONTENTS':
+        return 'CONTENTS';
       default:
         return 'INTERIOR';
     }
@@ -69,6 +73,8 @@ export function defaultLayoutForRole(pageType: WholePageRole): LayoutTemplateId 
     case 'SERIES_PAGE':
     case 'GLOSSARY_ORNAMENT':
     case 'INDEX_ORNAMENT':
+    case 'COPYRIGHT_PAGE':
+    case 'CONTENTS':
       return 'LAYOUT_D_PURE_TEXT';
     case 'INTRO_OPENER':
       return 'LAYOUT_5_CHAPTER_OPENER';
@@ -167,6 +173,31 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         allowsEmptyBody: false,
         renderBodyText: false,
       };
+    case 'COPYRIGHT_PAGE':
+      // Text-first page: the AI renders the copyright text (from readingFieldText)
+      // with only small edge ornaments. NOTE: exact tokens (ISBN) are AI-rendered
+      // here per operator decision — watch for mangling in the render test.
+      return {
+        pageType,
+        layoutTemplate,
+        title: { kicker: '', number: '', name: '' },
+        entryTitle: 'Copyright',
+        imageSubject: 'Copyright-page edge ornament only: thin engraved botanical corner details framing a calm centered text block; quiet, restrained',
+        allowsEmptyBody: false,
+        renderBodyText: true,
+      };
+    case 'CONTENTS':
+      // Text-first table of contents rendered by the AI. NOTE: page numbers are
+      // AI-rendered per operator decision — verify them in the render test.
+      return {
+        pageType,
+        layoutTemplate,
+        title: { kicker: '', number: '', name: 'CONTENTS' },
+        entryTitle: 'Contents',
+        imageSubject: 'Table-of-contents edge ornament only: thin engraved botanical corner details outside the contents listing and its page numbers',
+        allowsEmptyBody: false,
+        renderBodyText: true,
+      };
     default:
       return {
         pageType,
@@ -192,5 +223,7 @@ export function isWholePageAiAllowedForRow(row: PageRow): boolean {
     'RESOURCES',
     'GLOSSARY',
     'INDEX',
+    'COPYRIGHT_PAGE',
+    'CONTENTS',
   ].includes(frontMatterType(row));
 }

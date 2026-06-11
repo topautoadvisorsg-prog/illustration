@@ -160,7 +160,9 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
       : pageType === 'TITLE_PAGE' ||
           pageType === 'INTRO_OPENER' ||
           pageType === 'AUTHOR_PAGE' ||
-          pageType === 'SERIES_PAGE'
+          pageType === 'SERIES_PAGE' ||
+          pageType === 'COPYRIGHT_PAGE' ||
+          pageType === 'CONTENTS'
         ? policy.title
         : { kicker: '', number: '', name: '' };
 

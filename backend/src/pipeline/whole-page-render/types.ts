@@ -129,7 +129,9 @@ export interface WholePageSpec {
     | 'AUTHOR_PAGE'
     | 'SERIES_PAGE'
     | 'GLOSSARY_ORNAMENT'
-    | 'INDEX_ORNAMENT';
+    | 'INDEX_ORNAMENT'
+    | 'COPYRIGHT_PAGE'
+    | 'CONTENTS';
   layoutFamily: LayoutTemplateId;
   layoutGeometry: LayoutGeometryDTO;
   /** F-8 — prose placement contract the model must respect. */
