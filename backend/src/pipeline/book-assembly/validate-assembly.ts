@@ -12,6 +12,7 @@ export interface BookReadyRenderRef {
   renderId: string;
   pageId: string;
   printPdfPath: string | null;
+  printPngPath?: string | null;
   preflightPassed: boolean | null;
 }
 

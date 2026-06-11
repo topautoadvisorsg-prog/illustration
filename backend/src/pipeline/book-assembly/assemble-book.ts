@@ -25,13 +25,14 @@ import {
   type PageDimsPt,
   type AssemblyValidation,
 } from './validate-assembly.js';
-import { mergeSinglePagePdfs, readFirstPageDimsPt } from './pdf-merge.js';
+import { assembleReviewPdfFromPrintPngs, mergeSinglePagePdfs, readFirstPageDimsPt } from './pdf-merge.js';
 
 export interface AssemblySpineEntry {
   position: number;
   pageKey: string;
   renderId: string | null;
   printPdfPath: string | null;
+  printPngPath: string | null;
 }
 
 export interface AssemblyReport {
@@ -48,6 +49,9 @@ export interface AssemblyReport {
   noPrintOutput: string[];
   dimensionFailures: string[];
   interiorPdfPath: string | null;
+  interiorPdfBytes: number;
+  artifactQuality: 'PRINT_READY' | 'REVIEW_FALLBACK' | null;
+  warnings: string[];
   finalPageCount: number;
   pageCountAdvisory: ReturnType<typeof pageCountAdvisory>;
   finalTrim: { trimIn: { w: number; h: number }; bleedIn: number };
@@ -94,6 +98,7 @@ export async function assembleBook(projectId: string, options: AssembleBookOptio
       pageId: r.pageId,
       printPdfPath: r.printPdfPath,
       preflightPassed: r.preflightPassed,
+      printPngPath: r.printPngPath,
     });
   }
 
@@ -119,10 +124,22 @@ export async function assembleBook(projectId: string, options: AssembleBookOptio
   const buildSpine = (): AssemblySpineEntry[] =>
     spine.map((page, i) => {
       const r = renderByPageId.get(page.id);
-      return { position: i + 1, pageKey: page.pageKey, renderId: r?.renderId ?? null, printPdfPath: r?.printPdfPath ?? null };
+      return {
+        position: i + 1,
+        pageKey: page.pageKey,
+        renderId: r?.renderId ?? null,
+        printPdfPath: r?.printPdfPath ?? null,
+        printPngPath: r?.printPngPath ?? null,
+      };
     });
 
-  const baseReport = (interiorPdfPath: string | null, finalCount: number): AssemblyReport => ({
+  const baseReport = (
+    interiorPdfPath: string | null,
+    finalCount: number,
+    interiorPdfBytes = 0,
+    artifactQuality: AssemblyReport['artifactQuality'] = null,
+    warnings: string[] = [],
+  ): AssemblyReport => ({
     projectId,
     runId,
     blocked: validation.blocked,
@@ -136,6 +153,9 @@ export async function assembleBook(projectId: string, options: AssembleBookOptio
     noPrintOutput: validation.noPrintOutput,
     dimensionFailures: validation.dimensionFailures,
     interiorPdfPath,
+    interiorPdfBytes,
+    artifactQuality,
+    warnings,
     finalPageCount: finalCount,
     pageCountAdvisory: pageCountAdvisory(finalCount),
     finalTrim: { trimIn: { w: geometry.trimSize.widthIn, h: geometry.trimSize.heightIn }, bleedIn: geometry.trimSize.bleedIn },
@@ -150,16 +170,42 @@ export async function assembleBook(projectId: string, options: AssembleBookOptio
   // 5. Merge (spine order) → interior PDF → store → audit.
   const orderedBytes = spine.map((p) => bytesByPageId.get(p.id)!);
   const interior = await mergeSinglePagePdfs(orderedBytes);
-  const sha256 = createHash('sha256').update(interior).digest('hex');
-  const stored = await storage.writeProjectFile(projectId, ['exports', `interior-${runId}.pdf`], interior);
+  let artifactQuality: AssemblyReport['artifactQuality'] = 'PRINT_READY';
+  let artifact = interior;
+  let warnings: string[] = [];
+  let stored;
+  try {
+    stored = await storage.writeProjectFile(projectId, ['exports', `interior-${runId}.pdf`], artifact);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!message.toLowerCase().includes('maximum allowed size')) throw err;
+
+    const orderedPngs: Buffer[] = [];
+    for (const page of spine) {
+      const pngPath = renderByPageId.get(page.id)?.printPngPath;
+      if (!pngPath) throw new Error(`assembly_review_fallback_missing_png:${page.pageKey}`);
+      orderedPngs.push(await storage.readProjectFile(pngPath));
+    }
+    artifact = await assembleReviewPdfFromPrintPngs(
+      orderedPngs.map((png) => ({ png })),
+      { canvasIn: geometry.canvasIn },
+    );
+    artifactQuality = 'REVIEW_FALLBACK';
+    warnings = [
+      `Full print-ready interior was ${interior.length} bytes and exceeded the storage object limit.`,
+      'Uploaded a compressed review proof from the same approved print pages; keep per-page print PDFs as the print-grade sources.',
+    ];
+    stored = await storage.writeProjectFile(projectId, ['exports', `interior-review-${runId}.pdf`], artifact);
+  }
+  const sha256 = createHash('sha256').update(artifact).digest('hex');
   await recordExport({
     projectId,
     kind: 'PREMIUM_PDF',
     status: 'READY',
     filePath: stored.relativePath,
     sha256,
-    fileSizeBytes: interior.length,
+    fileSizeBytes: artifact.length,
   });
 
-  return baseReport(stored.relativePath, spine.length);
+  return baseReport(stored.relativePath, spine.length, artifact.length, artifactQuality, warnings);
 }

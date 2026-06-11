@@ -12,7 +12,7 @@ import {
   type BookReadyRenderRef,
   type PageDimsPt,
 } from '../pipeline/book-assembly/validate-assembly.js';
-import { readFirstPageDimsPt, mergeSinglePagePdfs } from '../pipeline/book-assembly/pdf-merge.js';
+import { assembleReviewPdfFromPrintPngs, readFirstPageDimsPt, mergeSinglePagePdfs } from '../pipeline/book-assembly/pdf-merge.js';
 
 const page = (id: string, ch: number, n: number, extra: Partial<SpinePage> = {}): SpinePage => ({
   id, pageKey: id, chapterNumber: ch, plannedPageNumber: n, ...extra,
@@ -144,5 +144,20 @@ describe('pdf merge (real pdf-lib on fixtures)', () => {
     const doc = await PDFDocument.load(merged);
     expect(doc.getPageCount()).toBe(3);
     expect(doc.getPage(0).getSize()).toEqual({ width: 630, height: 810 });
+  });
+
+  it('builds a lighter review PDF from approved print PNGs', async () => {
+    const tinyPng = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
+      'base64',
+    );
+    const proof = await assembleReviewPdfFromPrintPngs([{ png: tinyPng }, { png: tinyPng }], {
+      canvasIn: { w: 7.25, h: 10.25 },
+      dpi: 72,
+      jpegQuality: 80,
+    });
+    const doc = await PDFDocument.load(proof);
+    expect(doc.getPageCount()).toBe(2);
+    expect(doc.getPage(0).getSize()).toEqual({ width: 522, height: 738 });
   });
 });
