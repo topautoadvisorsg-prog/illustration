@@ -156,3 +156,86 @@ describe('resolveSpine — Front Matter v1 section ordering', () => {
     expect(frontMatterStatus([page({ section: 'FRONT_MATTER' })])).toBe('included');
   });
 });
+
+// ─── Composer ink-bounds — the clipped-title defect can never return ────────
+
+import sharp from 'sharp';
+import { composeFrontMatterPage, fitTitle } from '../compose-page.js';
+
+describe('composeFrontMatterPage — ink stays inside the trim-safe area', () => {
+  const canvasIn = { w: 7.25, h: 10.25 };
+  // Safe area: bleed (0.125in) + 0.25in inside trim.
+  const SAFE_IN = 0.375;
+
+  async function inkBounds(png: Buffer): Promise<{ left: number; right: number; w: number }> {
+    const meta = await sharp(png).metadata();
+    // trim() crops uniform border; info gives the offset of the ink box.
+    const { info } = await sharp(png).trim({ threshold: 12 }).toBuffer({ resolveWithObject: true });
+    const left = -(info.trimOffsetLeft ?? 0);
+    return { left, right: left + info.width, w: meta.width! };
+  }
+
+  it('the live defect case: long tracked title no longer clips the page edges', async () => {
+    const page = await composeFrontMatterPage({
+      kind: 'TITLE_PAGE',
+      canvasIn,
+      pageLabel: null,
+      title: 'The Wildlands Field Guide',
+      subtitle: 'New England Volume',
+      authors: ['The Wildlands'],
+    });
+    const b = await inkBounds(page.pngBuffer);
+    const safePx = SAFE_IN * 300;
+    expect(b.left).toBeGreaterThanOrEqual(safePx);
+    expect(b.right).toBeLessThanOrEqual(b.w - safePx);
+  }, 30000);
+
+  it('an absurdly long title wraps + shrinks instead of clipping', async () => {
+    const page = await composeFrontMatterPage({
+      kind: 'HALF_TITLE',
+      canvasIn,
+      pageLabel: null,
+      title: 'The Comprehensive Wilderness Survival And Natural History Compendium',
+    });
+    const b = await inkBounds(page.pngBuffer);
+    const safePx = SAFE_IN * 300;
+    expect(b.left).toBeGreaterThanOrEqual(safePx);
+    expect(b.right).toBeLessThanOrEqual(b.w - safePx);
+  }, 30000);
+
+  it('contents page with real chapter titles stays inside the frame', async () => {
+    const page = await composeFrontMatterPage({
+      kind: 'CONTENTS',
+      canvasIn,
+      pageLabel: 'xi',
+      tocHeading: 'Contents',
+      tocEntries: [
+        { label: 'I', title: 'KNOW YOUR REGION', pageNumber: 1 },
+        { label: 'VIII', title: 'BUSHCRAFT & THE LIVING FOREST', pageNumber: 230 },
+      ],
+    });
+    const b = await inkBounds(page.pngBuffer);
+    const safePx = SAFE_IN * 300;
+    expect(b.left).toBeGreaterThanOrEqual(safePx - 1);
+    expect(b.right).toBeLessThanOrEqual(b.w - safePx + 1);
+  }, 30000);
+});
+
+describe('fitTitle', () => {
+  it('keeps short titles at base size', () => {
+    const r = fitTitle('SHORT', 34, 1500, 8, true);
+    expect(r.pt).toBe(34);
+    expect(r.lines).toEqual(['SHORT']);
+  });
+
+  it('shrinks long titles, then wraps to at most three lines that all fit', () => {
+    const r = fitTitle('THE COMPREHENSIVE WILDERNESS SURVIVAL COMPENDIUM OF THE NORTHEAST', 34, 1500, 8, true);
+    expect(r.lines.length).toBeLessThanOrEqual(3);
+    expect(r.pt).toBeGreaterThanOrEqual(14);
+    for (const line of r.lines) {
+      expect(line.length * (0.72 * (r.pt / 72) * 300 + 8)).toBeLessThanOrEqual(1500 + 1);
+    }
+    // No words lost in the wrap.
+    expect(r.lines.join(' ')).toBe('THE COMPREHENSIVE WILDERNESS SURVIVAL COMPENDIUM OF THE NORTHEAST');
+  });
+});

@@ -107,6 +107,62 @@ function frame(canvasIn: { w: number; h: number }): Frame {
   return { W, H, left: bleed + m, right: W - bleed - m, top: bleed + m, bottom: H - bleed - m, dpi };
 }
 
+/** Conservative width estimate (px) for a line at `pt`. Caps factor 0.72 is
+ *  a safe UPPER bound for Liberation Serif capitals; mixed case uses 0.52.
+ *  Estimates high on purpose: a too-small title is a style nit, an
+ *  edge-clipped title is a print defect (the first live title page clipped
+ *  at both edges — this is that fix). */
+function estimateWidthPx(content: string, pt: number, tracking: number, allCaps: boolean): number {
+  const em = (pt / 72) * 300;
+  const factor = allCaps ? 0.72 : 0.52;
+  return content.length * (factor * em + tracking);
+}
+
+/** Greedy word-wrap into lines that each fit `charBudget` characters. A
+ *  single word longer than the budget gets its own line (pathological). */
+function greedyWrap(content: string, charBudget: number): string[] {
+  const words = content.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = '';
+  for (const w of words) {
+    const candidate = current ? `${current} ${w}` : w;
+    if (candidate.length <= charBudget || !current) current = candidate;
+    else {
+      lines.push(current);
+      current = w;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+/**
+ * Fit a title into maxWidth: walk pt downward from basePt; at each size,
+ * greedy-wrap and accept the first size where the wrap needs ≤ maxLines and
+ * every line fits. At minPt, return the wrap regardless (every line fits by
+ * construction unless one WORD exceeds the budget — pathological input).
+ * The first live title page clipped at both page edges; this is that fix.
+ */
+export function fitTitle(
+  content: string,
+  basePt: number,
+  maxWidthPx: number,
+  tracking: number,
+  allCaps: boolean,
+  minPt = 14,
+  maxLines = 3,
+): { lines: string[]; pt: number } {
+  const factor = allCaps ? 0.72 : 0.52;
+  for (let pt = basePt; pt >= minPt; pt--) {
+    const charBudget = Math.max(1, Math.floor(maxWidthPx / (factor * (pt / 72) * 300 + tracking)));
+    const lines = greedyWrap(content, charBudget);
+    const longest = Math.max(...lines.map((l) => l.length));
+    if (lines.length <= maxLines && longest <= charBudget) return { lines, pt };
+  }
+  const charBudget = Math.max(1, Math.floor(maxWidthPx / (factor * (minPt / 72) * 300 + tracking)));
+  return { lines: greedyWrap(content, charBudget), pt: minPt };
+}
+
 function text(
   x: number,
   y: number,
@@ -148,18 +204,36 @@ function buildBody(input: ComposeInput, f: Frame): string {
       break;
 
     case 'HALF_TITLE': {
-      const y = f.top + (f.bottom - f.top) * 0.28;
-      parts.push(text(cx, y, (input.title ?? '').toUpperCase(), 26, { tracking: 6 }));
-      parts.push(diamond(cx, y + 0.5 * f.dpi, 14));
+      const maxW = f.right - f.left;
+      const fitted = fitTitle((input.title ?? '').toUpperCase(), 26, maxW, 6, true);
+      let y = f.top + (f.bottom - f.top) * 0.28;
+      const lineH = (fitted.pt / 72) * f.dpi * 1.35;
+      for (const line of fitted.lines) {
+        parts.push(text(cx, y, line, fitted.pt, { tracking: 6 }));
+        y += lineH;
+      }
+      parts.push(diamond(cx, y + 0.25 * f.dpi, 14));
       break;
     }
 
     case 'TITLE_PAGE': {
+      const maxW = f.right - f.left;
+      const fitted = fitTitle((input.title ?? '').toUpperCase(), 34, maxW, 8, true);
       let y = f.top + (f.bottom - f.top) * 0.22;
-      parts.push(text(cx, y, (input.title ?? '').toUpperCase(), 34, { tracking: 8 }));
+      const lineH = (fitted.pt / 72) * f.dpi * 1.3;
+      for (const line of fitted.lines) {
+        parts.push(text(cx, y, line, fitted.pt, { tracking: 8 }));
+        y += lineH;
+      }
+      y -= lineH;
       if (input.subtitle) {
         y += 0.55 * f.dpi;
-        parts.push(text(cx, y, input.subtitle, 16, { italic: true }));
+        const sub = fitTitle(input.subtitle, 16, maxW, 0, false, 11);
+        for (const line of sub.lines) {
+          parts.push(text(cx, y, line, sub.pt, { italic: true }));
+          y += (sub.pt / 72) * f.dpi * 1.4;
+        }
+        y -= (sub.pt / 72) * f.dpi * 1.4;
       }
       y += 0.5 * f.dpi;
       parts.push(hairline(cx - 1.0 * f.dpi, cx + 1.0 * f.dpi, y));
@@ -201,7 +275,8 @@ function buildBody(input: ComposeInput, f: Frame): string {
 
     case 'CONTENTS': {
       let y = f.top + 0.3 * f.dpi;
-      parts.push(text(cx, y, (input.tocHeading ?? 'CONTENTS').toUpperCase(), 20, { tracking: 8 }));
+      const tocFit = fitTitle((input.tocHeading ?? 'CONTENTS').toUpperCase(), 20, f.right - f.left, 8, true);
+      parts.push(text(cx, y, tocFit.lines[0]!, tocFit.pt, { tracking: 8 }));
       y += 0.25 * f.dpi;
       parts.push(hairline(cx - 0.9 * f.dpi, cx + 0.9 * f.dpi, y));
       y += 0.55 * f.dpi;
@@ -224,7 +299,12 @@ function buildBody(input: ComposeInput, f: Frame): string {
     case 'TEXT_PAGE': {
       let y = f.top + 0.2 * f.dpi;
       if (input.heading) {
-        parts.push(text(cx, y, input.heading.toUpperCase(), 18, { tracking: 6 }));
+        const hFit = fitTitle(input.heading.toUpperCase(), 18, f.right - f.left, 6, true, 13);
+        for (const line of hFit.lines) {
+          parts.push(text(cx, y, line, hFit.pt, { tracking: 6 }));
+          y += (hFit.pt / 72) * f.dpi * 1.35;
+        }
+        y -= (hFit.pt / 72) * f.dpi * 1.35;
         y += 0.2 * f.dpi;
         parts.push(hairline(cx - 0.8 * f.dpi, cx + 0.8 * f.dpi, y));
         y += 0.45 * f.dpi;
