@@ -2152,11 +2152,13 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
   app.post('/api/projects/:id/render-cover', async (request, reply) => {
     const { id } = ProjectParamsSchema.parse(request.params);
     try {
-      const result = await renderCoverPdf(id);
+      const body = z.object({ chapters: z.array(z.number().int().positive()).optional() }).default({}).parse(request.body ?? {});
+      const result = await renderCoverPdf(id, { chapters: body.chapters });
       if ((request.query as { format?: string } | undefined)?.format === 'json') {
         return reply.send({
           ok: true,
           pageCount: result.pageCount,
+          scopeChapters: result.scopeChapters,
           dimensions: result.dimensions,
           validation: result.validation,
           storedPath: result.storedPath,

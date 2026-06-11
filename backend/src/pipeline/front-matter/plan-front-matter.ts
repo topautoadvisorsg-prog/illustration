@@ -41,6 +41,7 @@ import {
 
 export interface FrontMatterPlanReport {
   projectId: string;
+  scopeChapters: number[] | null;
   frontPages: Array<{ pageKey: string; kind: string; pageLabel: string | null }>;
   backPages: Array<{ pageKey: string; kind: string; pageLabel: string | null }>;
   introductionSource: 'manuscript:INTRODUCTION' | 'manuscript:PREFACE' | 'manuscript:FOREWORD' | 'operator' | 'ai' | 'none';
@@ -50,6 +51,11 @@ export interface FrontMatterPlanReport {
   totalBookPages: number;
   backCoverCopyAsset: string | null;
   filesWritten: number;
+}
+
+export interface FrontMatterPlanOptions {
+  /** When present, build front/back matter for a standalone chapter proof book. */
+  chapters?: number[];
 }
 
 interface PlannedPage {
@@ -143,7 +149,7 @@ function splitTextPages(
   return pages.length > 0 ? pages : [[]];
 }
 
-export async function planFrontMatter(projectId: string): Promise<FrontMatterPlanReport> {
+export async function planFrontMatter(projectId: string, options: FrontMatterPlanOptions = {}): Promise<FrontMatterPlanReport> {
   const project = await getProject(projectId);
   if (!project) throw new Error(`project_not_found:${projectId}`);
   const config = ProjectConfigSchema.parse(project.config);
@@ -194,14 +200,18 @@ export async function planFrontMatter(projectId: string): Promise<FrontMatterPla
   }
 
   // ── TOC data from BOOK manifest + paginated body ──
+  const scopeChapters = options.chapters?.length
+    ? Array.from(new Set(options.chapters)).sort((a, b) => a - b)
+    : null;
   const bodyPages = (await listPaginatedPagesForProject(projectId)).filter(
     (p) => (p as { section?: string }).section === 'BODY' || (p as { section?: string }).section == null,
-  );
+  ).filter((p) => !scopeChapters || scopeChapters.includes(p.chapterNumber));
   if (bodyPages.length === 0) throw new Error('front_matter_requires_pagination: run Pagination before the front-matter plan (TOC needs body page numbers).');
   const bookManifests = await listManifests(projectId, 'BOOK');
   const chapters =
     ((bookManifests[0]?.content as { chapters?: Array<{ chapterNumber: number; chapterTitle: string }> })
-      ?.chapters ?? []);
+      ?.chapters ?? [])
+      .filter((c) => !scopeChapters || scopeChapters.includes(c.chapterNumber));
   const tocEntries: TocEntry[] = chapters.map((c) => {
     const first = bodyPages
       .filter((p) => p.chapterNumber === c.chapterNumber)
@@ -459,6 +469,7 @@ export async function planFrontMatter(projectId: string): Promise<FrontMatterPla
 
   return {
     projectId,
+    scopeChapters,
     frontPages: front.map((p) => ({ pageKey: p.pageKey, kind: p.frontMatterType, pageLabel: p.pageLabel })),
     backPages: back.map((p) => ({ pageKey: p.pageKey, kind: p.frontMatterType, pageLabel: p.pageLabel })),
     introductionSource,

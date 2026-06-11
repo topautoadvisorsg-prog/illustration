@@ -389,6 +389,7 @@ export interface CoverRenderResult {
   pageCount: number;
   dimensions: ReturnType<typeof computeCoverDimensions>;
   validation: CoverValidation;
+  scopeChapters: number[] | null;
   artifact?: ProofArtifact;
 }
 
@@ -430,7 +431,12 @@ function validateCoverInputs(config: ProjectConfig, pageCount: number, dimension
 }
 
 /** Render the print-ready full-wrap cover PDF (spine width from interior page count). */
-export async function renderCoverPdf(projectId: string): Promise<CoverRenderResult> {
+export interface RenderCoverOptions {
+  /** When present, size the cover for a standalone proof book containing only these body chapters. */
+  chapters?: number[];
+}
+
+export async function renderCoverPdf(projectId: string, options: RenderCoverOptions = {}): Promise<CoverRenderResult> {
   if (!isChromiumAvailable()) throw new RenderBlockedError('Chromium is not available on this host.', 'no_chromium');
   const project = await getProject(projectId);
   if (!project) throw new RenderBlockedError('Project not found.', 'not_found');
@@ -440,7 +446,12 @@ export async function renderCoverPdf(projectId: string): Promise<CoverRenderResu
   // size the cover; the active production path already has a spine/page table.
   // This keeps cover validation cheap and avoids pulling the legacy full-book
   // renderer into a cover-only request.
-  const pageCount = (await listPaginatedPagesForProject(projectId)).length;
+  const scopeChapters = options.chapters?.length
+    ? Array.from(new Set(options.chapters)).sort((a, b) => a - b)
+    : null;
+  const pageCount = (await listPaginatedPagesForProject(projectId)).filter(
+    (p) => p.section !== 'BODY' || !scopeChapters || scopeChapters.includes(p.chapterNumber),
+  ).length;
   if (pageCount === 0) throw new RenderBlockedError('No planned pages found; run pagination/front matter before rendering the cover.', 'no_pages');
   const polyfillJs = await loadPagedPolyfill();
   const dims = computeCoverDimensions(config, pageCount);
@@ -475,5 +486,5 @@ export async function renderCoverPdf(projectId: string): Promise<CoverRenderResu
     fileSizeBytes: stored.sizeBytes,
     totalPages: 1,
   });
-  return { pdf: buffer, storedPath: stored.relativePath, pageCount, dimensions: dims, validation, artifact };
+  return { pdf: buffer, storedPath: stored.relativePath, pageCount, dimensions: dims, validation, scopeChapters, artifact };
 }

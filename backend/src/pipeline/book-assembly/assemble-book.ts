@@ -51,9 +51,15 @@ export interface AssemblyReport {
   finalPageCount: number;
   pageCountAdvisory: ReturnType<typeof pageCountAdvisory>;
   finalTrim: { trimIn: { w: number; h: number }; bleedIn: number };
+  scopeChapters: number[] | null;
 }
 
-export async function assembleBook(projectId: string): Promise<AssemblyReport> {
+export interface AssembleBookOptions {
+  /** When present, assemble a standalone proof book for only these body chapters. */
+  chapters?: number[];
+}
+
+export async function assembleBook(projectId: string, options: AssembleBookOptions = {}): Promise<AssemblyReport> {
   // 0. Resolve the project geometry — the single source for the expected page
   //    size and the reported final trim (SPEC_GEOMETRY_RECONCILIATION §1).
   const project = await getProject(projectId);
@@ -61,7 +67,12 @@ export async function assembleBook(projectId: string): Promise<AssemblyReport> {
   const geometry = resolveGeometry(config);
 
   // 1. Expected pages, in spine order.
-  const pageRows = await listPaginatedPagesForProject(projectId);
+  const scopeChapters = options.chapters?.length
+    ? Array.from(new Set(options.chapters)).sort((a, b) => a - b)
+    : null;
+  const pageRows = (await listPaginatedPagesForProject(projectId)).filter(
+    (p) => p.section !== 'BODY' || !scopeChapters || scopeChapters.includes(p.chapterNumber),
+  );
   const spine: SpinePage[] = resolveSpine(
     pageRows.map((p) => ({
       id: p.id,
@@ -128,6 +139,7 @@ export async function assembleBook(projectId: string): Promise<AssemblyReport> {
     finalPageCount: finalCount,
     pageCountAdvisory: pageCountAdvisory(finalCount),
     finalTrim: { trimIn: { w: geometry.trimSize.widthIn, h: geometry.trimSize.heightIn }, bleedIn: geometry.trimSize.bleedIn },
+    scopeChapters,
   });
 
   if (validation.blocked) {

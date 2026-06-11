@@ -37,6 +37,9 @@ import {
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
 const RenderParamsSchema = z.object({ renderId: z.string().uuid() });
 const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
+const ChapterScopeBodySchema = z.object({
+  chapters: z.array(z.number().int().positive()).optional(),
+}).default({});
 
 const RenderBodySchema = z.object({
   decidedBy: z.string().min(1).default('operator'),
@@ -79,6 +82,9 @@ function serializeRender(row: WholePageRenderRow) {
     widthPx: row.widthPx,
     heightPx: row.heightPx,
     model: row.model,
+    printPngPath: row.printPngPath,
+    printPdfPath: row.printPdfPath,
+    preflightPassed: row.preflightPassed,
     active: row.active,
     approvedForBook: row.approvedForBook,
     attempts: row.attempts,
@@ -348,9 +354,10 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   app.post('/api/experimental/front-matter/:projectId/plan', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { projectId } = ProjectParamsSchema.parse(request.params);
+    const body = ChapterScopeBodySchema.parse(request.body ?? {});
     try {
       const { planFrontMatter } = await import('../pipeline/front-matter/plan-front-matter.js');
-      const report = await planFrontMatter(projectId);
+      const report = await planFrontMatter(projectId, { chapters: body.chapters });
       return report;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -371,8 +378,9 @@ export async function registerExperimentalRoutes(app: FastifyInstance): Promise<
   app.post('/api/experimental/whole-page-render/project/:projectId/assemble', async (request, reply) => {
     if (flagOff()) return reply.code(503).send(flagDisabledResponse());
     const { projectId } = ProjectParamsSchema.parse(request.params);
+    const body = ChapterScopeBodySchema.parse(request.body ?? {});
     try {
-      const report = await assembleBook(projectId);
+      const report = await assembleBook(projectId, { chapters: body.chapters });
       // 200 with the report whether or not it produced a PDF; `blocked` says which.
       return report;
     } catch (err) {
