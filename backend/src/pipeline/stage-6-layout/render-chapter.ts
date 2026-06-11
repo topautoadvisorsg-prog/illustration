@@ -35,7 +35,7 @@ import { buildBookHtml, buildCoverHtml, buildPageHtml, computeCoverDimensions, t
 import { directLayout } from './layout-director.js';
 import { isChromiumAvailable, loadPagedPolyfill, renderHtmlToPdf } from './render-pdf.js';
 import { preflightBook, stitchPdfs, type PreflightReport } from '../stage-7-pdf-compile/stitch-book.js';
-import { assemblePagePrompt } from '../whole-page-render/assemble-page-prompt.js';
+import { assembleCoverPrompt } from '../whole-page-render/assemble-page-prompt.js';
 import { PAGE_TYPOGRAPHY_DNA } from '../whole-page-render/typography-dna.js';
 import type { WholePageSpec } from '../whole-page-render/types.js';
 import { assembleIllustrationDna } from '../publishing-standard/index.js';
@@ -645,5 +645,5 @@ export function buildCoverWrapPrompt(
     badgeContext: { hazard: ['NONE'], region: 'GENERAL', source: 'GENERAL_REFERENCE' },
     badgeSafeZones: [],
   };
-  return assemblePagePrompt(spec);
+  return assembleCoverPrompt(spec);
 }

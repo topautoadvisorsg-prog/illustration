@@ -172,7 +172,7 @@ export const ILLUSTRATION_DNA = {
   naturalistPrecision:
     'Anatomically accurate to field-guide standard — habitat, gill structure, bark texture, leaf venation, track patterns, and proportional scale rendered correctly. Naturalist precision is the foundation; the painterly handling is the surface.',
   lighting: 'Warm, soft, and directional — as if from a high window in an autumn study.',
-  paperTexture: 'Aged fibrous parchment with subtle fiber and gentle patina (paper colour owned by PALETTE.parchment).',
+  paperTexture: 'Aged fibrous parchment with subtle fibers, natural texture, and gentle historical patina.',
   edgeTreatment: 'The wash has soft, feathered edges — no hard rectangular border on the artwork itself.',
   antiStyle: [
     'no photography, photorealism, or photographic lighting',
