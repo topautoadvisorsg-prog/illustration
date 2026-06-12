@@ -94,3 +94,25 @@ backend/utilization-report.png
 
 # Graphify (knowledge-graph) outputs — large, regenerable
 graphify-out/
+
+# Whole-book render outputs & baselines (paid renders + no-spend previews).
+# Local QA references only — never committed. Regenerable (paid ones cost spend).
+baseline/
+test-book-review-renders/
+test-book-review-renders-live/
+backend/catalog/
+backend/cover-render.png
+backend/title-blueprint*.png
+backend/title-prompt.txt
+backend/titlepkg.json
+complete-test-book-*.pdf
+
+# Front-matter / chapter-run scratch reports (no-spend, regenerable)
+fm-report*.json
+fm-after-fix.json
+live-*.json
+pages-run.json
+preview-ch01p001.json
+railway-status-after-artifact.json
+supervisor-*.json
+ch01-*.txt
