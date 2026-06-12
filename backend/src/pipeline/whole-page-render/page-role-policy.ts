@@ -120,9 +120,17 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
   // Copyright is fine print regardless of any layout stored on the row by an
   // earlier breakdown — force the low fine-print block layout.
   if (pageType === 'COPYRIGHT_PAGE') layoutTemplate = 'LAYOUT_FINE_PRINT';
-  // Glossary/Index are dense two-column reference pages, regardless of any
-  // single-column layout an earlier breakdown stored on the row.
-  if (pageType === 'GLOSSARY_ORNAMENT' || pageType === 'INDEX_ORNAMENT') layoutTemplate = 'LAYOUT_REFERENCE';
+  // Reference sections — Glossary, Index, and Sources (RESOURCES) — are dense
+  // two-column reference pages, regardless of any single-column layout an
+  // earlier breakdown stored on the row. Sources rides the SERIES_PAGE role
+  // (shared with the About-the-Series page) but is reference, not prose.
+  if (
+    pageType === 'GLOSSARY_ORNAMENT' ||
+    pageType === 'INDEX_ORNAMENT' ||
+    (pageType === 'SERIES_PAGE' && frontMatterType(row) === 'RESOURCES')
+  ) {
+    layoutTemplate = 'LAYOUT_REFERENCE';
+  }
   const title = resolvedTitle(config);
   const subtitle = resolvedSubtitle(config);
   const author = resolvedAuthor(config);

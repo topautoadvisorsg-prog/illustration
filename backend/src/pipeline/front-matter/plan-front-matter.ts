@@ -32,14 +32,83 @@ import { markdownToBlocks } from '../whole-page-render/markdown-blocks.js';
 import { recoverFrontMatterSections, pickIntroductionSection } from './recover-sections.js';
 import {
   composeFrontMatterPage,
-  indexPageCapacity,
   joinAuthors,
-  referenceTextPageCapacity,
   textPageLineCapacity,
   wrapText,
   type ComposeInput,
   type TocEntry,
 } from './compose-page.js';
+import { analyzeTextFit } from '../stage-6-layout/text-fit.js';
+import { computePageGeometry } from '../stage-6-layout/page-geometry.js';
+import { REFERENCE_TYPOGRAPHY } from '../stage-6-layout/layout-profiles.js';
+
+/**
+ * Reference sections (Glossary, Index, Sources) — paginated and rendered by the
+ * SINGLE LAYOUT_REFERENCE model, never the chapter flow engine and never the
+ * single-column text-page capacity. AI render is the source of truth for these
+ * pages, so the planner creates their rows but does NOT deterministically
+ * compose them (see the compose loop's reference skip).
+ */
+const REFERENCE_FRONT_MATTER_TYPES = new Set(['GLOSSARY', 'INDEX', 'RESOURCES']);
+function isReferenceSection(frontMatterType: string): boolean {
+  return REFERENCE_FRONT_MATTER_TYPES.has(frontMatterType);
+}
+
+/** Per-page char capacity for a reference page — the EXACT same LAYOUT_REFERENCE
+ *  capacity the renderer uses (two columns at REFERENCE_TYPOGRAPHY). Planning and
+ *  rendering therefore share one capacity model and cannot drift. */
+function referenceCapacityChars(trimSize: { widthIn: number; heightIn: number; bleedIn: number }): number {
+  const fit = analyzeTextFit({
+    bodyMarkdown: '',
+    layoutTemplate: 'LAYOUT_REFERENCE',
+    geometry: computePageGeometry(trimSize),
+    bodyPt: REFERENCE_TYPOGRAPHY.bodyPt,
+    lineHeight: REFERENCE_TYPOGRAPHY.lineHeight,
+  });
+  return fit.capacityChars;
+}
+
+/** Pack paragraph strings into reference pages by the shared capacity. Targets
+ *  ~95% fill — dense like a real field-guide glossary, with just enough margin
+ *  that the render never overflows. We do NOT inflate page count with slack. */
+function splitReferenceParagraphs(paragraphs: string[], capacityChars: number): string[][] {
+  const budget = Math.max(1, Math.floor(capacityChars * 0.95));
+  const pages: string[][] = [];
+  let current: string[] = [];
+  let used = 0;
+  for (const para of paragraphs) {
+    const cost = para.length + 2; // + paragraph break
+    if (used + cost > budget && current.length > 0) {
+      pages.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(para);
+    used += cost;
+  }
+  if (current.length > 0) pages.push(current);
+  return pages.length > 0 ? pages : [[]];
+}
+
+/** Same packing for structured index entries (cost = "Title … 12" line). */
+function splitReferenceIndex(entries: TocEntry[], capacityChars: number): TocEntry[][] {
+  const budget = Math.max(1, Math.floor(capacityChars * 0.95));
+  const pages: TocEntry[][] = [];
+  let current: TocEntry[] = [];
+  let used = 0;
+  for (const entry of entries) {
+    const cost = entry.title.length + String(entry.pageNumber).length + 6;
+    if (used + cost > budget && current.length > 0) {
+      pages.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(entry);
+    used += cost;
+  }
+  if (current.length > 0) pages.push(current);
+  return pages.length > 0 ? pages : [[]];
+}
 
 export interface FrontMatterPlanReport {
   projectId: string;
@@ -152,54 +221,6 @@ function splitTextPages(
   return pages.length > 0 ? pages : [[]];
 }
 
-/** Split glossary/reference entries with the compact two-column back-matter frame. */
-function splitReferenceTextPages(
-  paragraphs: string[],
-  canvasIn: { w: number; h: number },
-): string[][] {
-  const pages: string[][] = [];
-  let current: string[] = [];
-  let used = 0;
-  let cap = referenceTextPageCapacity(canvasIn, true);
-
-  for (const para of paragraphs) {
-    const units = wrapText(para, cap.maxCharsPerLine).length * 10 + 2;
-    if (used + units > cap.totalLineUnits && current.length > 0) {
-      pages.push(current);
-      current = [];
-      used = 0;
-      cap = referenceTextPageCapacity(canvasIn, false);
-    }
-    current.push(para);
-    used += units;
-  }
-
-  if (current.length > 0) pages.push(current);
-  return pages.length > 0 ? pages : [[]];
-}
-
-function splitIndexEntries(entries: TocEntry[], canvasIn: { w: number; h: number }): TocEntry[][] {
-  const pages: TocEntry[][] = [];
-  let current: TocEntry[] = [];
-  let used = 0;
-  let cap = indexPageCapacity(canvasIn, true);
-
-  for (const entry of entries) {
-    const units = wrapText(entry.title, cap.maxTitleCharsPerLine).length * 10 + 2;
-    if (used + units > cap.totalLineUnits && current.length > 0) {
-      pages.push(current);
-      current = [];
-      used = 0;
-      cap = indexPageCapacity(canvasIn, false);
-    }
-    current.push(entry);
-    used += units;
-  }
-
-  if (current.length > 0) pages.push(current);
-  return pages.length > 0 ? pages : [[]];
-}
-
 export async function planFrontMatter(projectId: string, options: FrontMatterPlanOptions = {}): Promise<FrontMatterPlanReport> {
   const project = await getProject(projectId);
   if (!project) throw new Error(`project_not_found:${projectId}`);
@@ -207,6 +228,9 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   const meta = resolveMeta(config);
   const geometry = resolveGeometry(config);
   const canvasIn = geometry.canvasIn;
+  // Reference sections (Glossary/Index/Sources) split to the SAME capacity the
+  // LAYOUT_REFERENCE renderer uses — one model for planning and rendering.
+  const refCapacityChars = referenceCapacityChars(geometry.trimSize);
   const storage = getProjectStorage();
   const omitted: FrontMatterPlanReport['omitted'] = [];
 
@@ -386,7 +410,7 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   };
 
   if (glossaryParagraphs.length > 0) {
-    const split = splitReferenceTextPages(glossaryParagraphs, canvasIn);
+    const split = splitReferenceParagraphs(glossaryParagraphs, refCapacityChars);
     split.forEach((paras, i) => {
       pushBack(
         {
@@ -404,7 +428,7 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   }
 
   if (indexEntries.length > 0) {
-    const indexPages = splitIndexEntries(indexEntries, canvasIn);
+    const indexPages = splitReferenceIndex(indexEntries, refCapacityChars);
     indexPages.forEach((entries, i) => {
       pushBack(
         {
@@ -451,10 +475,23 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   }
 
   if (meta.additionalResources) {
-    pushBack(
-      { kind: 'TEXT_PAGE', frontMatterType: 'RESOURCES', pageLabel: null, compose: { heading: meta.additionalResources.heading, paragraphs: meta.additionalResources.items }, auditText: meta.additionalResources.items.join('\n') },
-      true,
-    );
+    // Sources / Further Reading is a REFERENCE section — paginate it with the
+    // shared LAYOUT_REFERENCE capacity (two-column), not the single-column text
+    // model, and let the AI render it two-column like the glossary/index.
+    const resources = meta.additionalResources;
+    const split = splitReferenceParagraphs(resources.items, refCapacityChars);
+    split.forEach((items, i) => {
+      pushBack(
+        {
+          kind: 'TEXT_PAGE',
+          frontMatterType: 'RESOURCES',
+          pageLabel: null,
+          compose: { heading: i === 0 ? resources.heading : undefined, paragraphs: items },
+          auditText: items.join('\n\n'),
+        },
+        true,
+      );
+    });
   } else {
     omitted.push({ page: 'RESOURCES', reason: 'no additionalResources metadata' });
   }
@@ -502,6 +539,11 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   let filesWritten = 0;
   const compositionPrompts: FrontMatterPlanReport['compositionPrompts'] = [];
   for (const p of [...front, ...back]) {
+    // Reference pages (Glossary/Index/Sources) are NOT deterministically
+    // composed — the LAYOUT_REFERENCE AI render is their single source of truth.
+    // The planner still created their rows (with readingFieldText above); the
+    // whole-page render path renders them by role.
+    if (isReferenceSection(p.frontMatterType)) continue;
     const composeSpec = {
       kind: p.kind,
       canvasIn,

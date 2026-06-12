@@ -12,6 +12,7 @@
 import type { PageManifest, ProjectConfig } from '@wildlands/shared';
 import type { PageRow } from '../../db/repositories/pagination.repo.js';
 import type { LayoutAllocation, PlanningZone } from '../stage-6-layout/layout-director.js';
+import { REFERENCE_TYPOGRAPHY } from '../stage-6-layout/layout-profiles.js';
 import type { PageGeometry } from '../stage-6-layout/page-geometry.js';
 import { deriveSubjectPackage } from '../stage-2-planner/plan-pages.js';
 import { assembleIllustrationDna, toRoman, WILDLANDS_STANDARD } from '../publishing-standard/index.js';
@@ -181,7 +182,11 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
   // a smaller point size and narrower per-column measure.
   const referenceType =
     layout === 'LAYOUT_REFERENCE'
-      ? { bodyPt: 8.5, bodyLineHeight: 1.3, bodyMeasureChars: 40 }
+      ? {
+          bodyPt: REFERENCE_TYPOGRAPHY.bodyPt,
+          bodyLineHeight: REFERENCE_TYPOGRAPHY.lineHeight,
+          bodyMeasureChars: REFERENCE_TYPOGRAPHY.measureChars,
+        }
       : null;
 
   return {

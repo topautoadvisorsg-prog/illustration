@@ -104,6 +104,15 @@ export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
   LAYOUT_REFERENCE: { textAreaFactor: 0.95, artSlot: 'REFERENCE_COLUMNS', artAreaFraction: 0.9, textLight: false },
 };
 
+/**
+ * Reference typography — the SINGLE source of truth for the dense two-column
+ * reference type (glossary / index / sources). Both the renderer
+ * (build-page-spec sets the page's typography to this) AND the front-matter
+ * planner (computes how many entries fit per reference page) read these exact
+ * values, so planning and rendering can never disagree about capacity.
+ */
+export const REFERENCE_TYPOGRAPHY = { bodyPt: 8.5, lineHeight: 1.3, measureChars: 40 } as const;
+
 export function getLayoutProfile(template: LayoutTemplateId): LayoutProfile {
   return LAYOUT_PROFILES[template] ?? LAYOUT_PROFILES.LAYOUT_1_STANDARD;
 }
