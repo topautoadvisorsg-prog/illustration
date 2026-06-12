@@ -1,5 +1,5 @@
 /**
- * Wild Lands — Operator Production Console.
+ * Wild Lands — Operator Production Console.  [build: cover-PDF export]
  *
  * The single operator path. Drives the VALIDATED whole-page AI publishing
  * pipeline end to end — NOT the legacy Paged.js / clean-art workflow:
