@@ -52,6 +52,13 @@ zones, no boxes. `LayoutAllocation` exposes `priorityEdge` + `imagePriorityZone`
 any remaining occurrence is an explicit reference to the retired term so Cody
 recognizes legacy material.
 
+**Display/ceremonial pages** (title, dedication, epigraph, quote, special notes)
+use the `LAYOUT_TITLE_DISPLAY` family — a compact centered text block with large
+negative space framed by thin top/bottom edge ornaments (`TITLE_BLOCK`
+architecture / `TITLE_DISPLAY` content type). It is a first-class catalog layout
+the planner can select for very-short non-illustration pages, not a per-page
+override. The Title Page is its first use case. See `docs/LAYERED_LAYOUT.md`.
+
 ## Workflow state safety (don't regress these)
 
 - **Plan staleness:** Page Plan stamps a `planMeta` snapshot; the UI shows a banner
@@ -120,6 +127,31 @@ yarn workspace frontend build
 ```
 
 Run locally: `yarn workspace @wildlands/backend dev` · `yarn workspace frontend dev`.
+
+## Whole-book production path
+
+Use this when the book is planned and the operator has authorized image spend.
+The two scripts are deliberately split so paid rendering and no-spend finalizing
+cannot be confused.
+
+```powershell
+$env:PROJECT_ID="e51e5b4c-05c7-4d6e-8c00-60aa15de8992"
+$env:BACKEND_URL="https://wildlandsbackend-production.up.railway.app"
+
+# Paid: render only pages that do not already have a RENDERED/APPROVED row.
+corepack yarn workspace @wildlands/backend tsx scripts/render-batch.ts --chapter 2
+
+# No spend: approve existing renders if needed, print-prep, select-for-book.
+corepack yarn workspace @wildlands/backend tsx scripts/finalize-book-renders.ts --chapter 2
+
+# No spend: once every page is rendered/finalized, merge the interior PDF.
+corepack yarn workspace @wildlands/backend tsx scripts/finalize-book-renders.ts --all --assemble
+```
+
+`render-batch.ts` always verifies against the database before retrying, so a bad
+HTTP response cannot cause a duplicate paid render. `finalize-book-renders.ts`
+never calls the paid render route; if a page is missing art, it reports the page
+key and exits with code `2`.
 
 ## Deploy / Railway gotchas
 

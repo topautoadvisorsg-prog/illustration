@@ -11,11 +11,16 @@ Content Type  â†’  Coverage  â†’  Architecture  â†’  Master Style
   `SPECIES_PROFILE`, `COMPARISON`, `DIAGNOSTIC_DIAGRAM`, `CHAPTER_OPENER`,
   `HABITAT_OVERVIEW`, `PROGRESSION_STUDY`, `CUTAWAY_ILLUSTRATION`, `SIDEBAR_FEATURE`,
   `REFERENCE_PAGE`, `WARNING_PAGE`, `BOTANICAL_PLATE`, `TERRAIN_ANALYSIS`,
-  `FIELD_NOTES_PAGE`, `ENCYCLOPEDIA_ENTRY`, â€¦ (`@wildlands/shared` `ContentTypeSchema`).
+  `FIELD_NOTES_PAGE`, `ENCYCLOPEDIA_ENTRY`, `TITLE_DISPLAY`, â€¦ (`@wildlands/shared` `ContentTypeSchema`).
 - **Coverage** â€” how MUCH of the page is imagery: `15 | 25 | 40 | 50 | 60 | 75 | 100` %.
 - **Architecture** â€” how the image space is ARRANGED, independent of coverage:
   `FLOAT_LEFT`, `FLOAT_RIGHT`, `TOP_BAND`, `BOTTOM_BAND`, `FULL_PAGE`, `SIDEBAR_RIGHT`,
-  `SCATTERED`, `CENTER_WRAP`.
+  `SCATTERED`, `CENTER_WRAP`, `CORNER_TOP_LEFT`, `CORNER_TOP_RIGHT`,
+  `CORNER_BOTTOM_LEFT`, `CORNER_BOTTOM_RIGHT`, `TITLE_BLOCK`.
+  `TITLE_BLOCK` is the display/ceremonial composition: a compact centered text
+  block with large negative space and thin top/bottom edge ornaments. Paired with
+  the `TITLE_DISPLAY` content type it forms the `LAYOUT_TITLE_DISPLAY` family,
+  used for short ceremonial pages (title page, dedication, epigraph, quote).
 - **Master Style** â€” the brand visual DNA (e.g. THE_WILDLANDS Cinematic Naturalist),
   injected into every image prompt. Orthogonal to the above.
 - **Subject** â€” the page's actual organism/scene.
