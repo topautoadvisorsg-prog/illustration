@@ -472,7 +472,10 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     <div style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{renders.merged.length} pages · {renders.merged.filter((m) => m.status !== "NOT RENDERED").length} rendered · {renders.bookReady || 0} book-ready</div>
                     <div style={S.grid}>
                       {renders.merged.map((m) => (
-                        <div key={m.pageId} style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: 8, background: "#fff" }}>
+                        // content-visibility:auto keeps off-screen cards unpainted and their
+                        // full-res page images undecoded, so a large book (hundreds of pages)
+                        // stays responsive instead of stalling on accumulated image memory.
+                        <div key={m.pageId} style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: 8, background: "#fff", contentVisibility: "auto", containIntrinsicSize: "180px 340px" }}>
                           {m.imagePath ? <img alt={m.pageKey} src={fileUrl(m.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", borderRadius: 4, display: "block" }} /> :<div style={{ height: 110, background: "#f0ead6", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: 11 }}>not rendered</div>}
                           <div style={{ fontSize: 11, marginTop: 6, fontWeight: 700, wordBreak: "break-all" }}>{m.pageKey}</div>
                           <div style={{ marginTop: 4, display: "flex", gap: 5, alignItems: "center" }}>
