@@ -300,10 +300,19 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return { notice: "Cover artwork generated." };
   });
 
-  const assemble = () => run("Assembling interior PDF", async () => {
+  const assemble = () => run("Assembling the finished book", async () => {
     const d = await api(`/api/whole-page-render/project/${project.id}/assemble`, { method: "POST", body: "{}" });
-    setAssembly(d);
-    return { notice: d.blocked ? "Assembly blocked — see validation report." : `Interior assembled: ${d.assembledPages} pages.` };
+    if (d.blocked) { setAssembly(d); return { notice: "Assembly blocked — finish the pages listed below, then assemble again." }; }
+    // A printer-complete export is interior PDF + the separate full-wrap cover PDF
+    // (spine sized to the final page count). Produce both here so the operator
+    // leaves this step with everything the printer needs.
+    let coverPdfPath = null;
+    try {
+      const c = await api(`/api/projects/${project.id}/render-cover?format=json`, { method: "POST", body: "{}" });
+      coverPdfPath = c.storedPath || null;
+    } catch { /* cover PDF needs the cover artwork (step 8); interior is still valid without it */ }
+    setAssembly({ ...d, coverPdfPath });
+    return { notice: coverPdfPath ? `Book assembled: ${d.assembledPages} pages + print cover.` : `Interior assembled: ${d.assembledPages} pages. Generate the cover (step 8) for a complete print package.` };
   });
 
   const doneFlags = useMemo(() => ({
@@ -464,7 +473,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     <div style={S.grid}>
                       {renders.merged.map((m) => (
                         <div key={m.pageId} style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: 8, background: "#fff" }}>
-                          {m.imagePath ? <img alt={m.pageKey} src={fileUrl(m.imagePath)} style={{ width: "100%", borderRadius: 4, display: "block" }} /> : <div style={{ height: 110, background: "#f0ead6", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: 11 }}>not rendered</div>}
+                          {m.imagePath ? <img alt={m.pageKey} src={fileUrl(m.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", borderRadius: 4, display: "block" }} /> :<div style={{ height: 110, background: "#f0ead6", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: 11 }}>not rendered</div>}
                           <div style={{ fontSize: 11, marginTop: 6, fontWeight: 700, wordBreak: "break-all" }}>{m.pageKey}</div>
                           <div style={{ marginTop: 4, display: "flex", gap: 5, alignItems: "center" }}>
                             <span style={S.pill(statusColor(m.status))}>{m.status}</span>
@@ -505,7 +514,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 <button style={S.btn("spend")} onClick={() => genCover().catch(() => {})}>Generate cover artwork →</button>
                 {cover && (
                   <div style={{ marginTop: 12 }}>
-                    {cover.imagePath && <img alt="cover" src={fileUrl(cover.imagePath)} style={{ width: "100%", maxWidth: 540, border: `1px solid ${C.line}`, borderRadius: 8, display: "block" }} />}
+                    {cover.imagePath && <img alt="cover" src={fileUrl(cover.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", maxWidth: 540, border: `1px solid ${C.line}`, borderRadius: 8, display: "block" }} />}
                     <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>
                       Full-wrap cover (back · spine · front){cover.pageCount ? ` — spine sized for ${cover.pageCount} interior pages` : ""}.
                     </div>
@@ -528,9 +537,15 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     {!assembly.blocked && (
                       <div style={{ marginTop: 10 }}>
                         <div><b>{assembly.assembledPages} pages</b> assembled in book order.</div>
+                        <div style={{ marginTop: 8, marginBottom: 4, color: assembly.coverPdfPath ? C.muted : C.red, fontSize: 13 }}>
+                          {assembly.coverPdfPath
+                            ? "Print package ready: interior PDF + full-wrap cover PDF — both files below are what the printer needs."
+                            : "Interior is ready, but there's no cover PDF yet. Generate the cover in step 8, then assemble again for the complete print package."}
+                        </div>
                         {assembly.interiorPdfPath && (
                           <>
-                            <a style={{ ...S.btn("ok"), textDecoration: "none", display: "inline-block" }} href={fileUrl(assembly.interiorPdfPath)} target="_blank" rel="noreferrer">Open / download interior PDF</a>
+                            <a style={{ ...S.btn("ok"), textDecoration: "none", display: "inline-block", marginRight: 8 }} href={fileUrl(assembly.interiorPdfPath)} target="_blank" rel="noreferrer">Open / download interior PDF</a>
+                            {assembly.coverPdfPath && <a style={{ ...S.btn("ok"), textDecoration: "none", display: "inline-block" }} href={fileUrl(assembly.coverPdfPath)} target="_blank" rel="noreferrer">Open / download cover PDF</a>}
                             <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>Final book preview (scroll through every page before you export):</div>
                             <iframe title="book-preview" src={fileUrl(assembly.interiorPdfPath)} style={{ width: "100%", height: 520, border: `1px solid ${C.line}`, borderRadius: 8, marginTop: 6 }} />
                           </>
