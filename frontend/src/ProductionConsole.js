@@ -80,6 +80,8 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
   const [breakdown, setBreakdown] = useState(null);
   const [pagination, setPagination] = useState(null);
+  const [pages, setPages] = useState(null); // paginated page rows (zones + text)
+  const [zoom, setZoom] = useState(null); // page being enlarged in the preview
   const [matter, setMatter] = useState(null);
   const [renders, setRenders] = useState(null); // { total, byStatus, bookReady, renders:[] }
   const [preview, setPreview] = useState(null); // active preview package
@@ -126,6 +128,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
     // Minimal, clean config — the whole-page pipeline takes its visual DNA from
     // the locked Publishing Standard, so NO legacy style/palette blob is sent.
     return {
+      volume: 1,
       title: form.title,
       subtitle: form.subtitle,
       authorName: form.author,
@@ -165,10 +168,44 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return { notice: `Breakdown complete${ch ? ` — ${ch} chapters` : ""}.` };
   });
 
-  const doPaginate = () => run("Paginating", async () => {
-    const d = await api(`/api/projects/${project.id}/paginate`, { method: "POST", body: "{}" });
-    setPagination(d);
-    return { notice: `Paginated: ${d.summary?.totalPages} pages (${d.summary?.openers} openers, ${d.summary?.continuations} continuations, ${d.summary?.compactions} compacted).` };
+  // Pull the planning preview: each page carries its layout zones + the text
+  // that flows into the reading field, so the operator can SEE the pages (where
+  // text goes, whether it fits and reads well) before any render spend.
+  const loadPreview = useCallback(async () => {
+    // text-fit-preview is the system's planning preview: per body page it returns
+    // the layout zones (allocation) + a precise fit analysis (chars vs capacity,
+    // fill ratio, FITS/TIGHT/OVERFLOW). That's the "where text goes / does it fit
+    // and read well" signal — no render, no spend.
+    const tf = await api(`/api/projects/${project.id}/text-fit-preview`, { method: "POST", body: "{}" });
+    const list = (tf.pages || []).map((p) => ({
+      pageKey: p.pageKey,
+      entryTitle: p.entryTitle,
+      layoutTemplate: p.layoutTemplate,
+      fitStatus: p.fit?.status,
+      fit: p.fit,
+      zones: p.allocation,
+      blockers: p.blockers,
+    }));
+    setPages(list);
+    return list;
+  }, [api, project]);
+
+  const doPaginate = (confirmOrphan = false) => run("Paginating", async () => {
+    try {
+      const d = await api(`/api/projects/${project.id}/paginate`, { method: "POST", body: JSON.stringify(confirmOrphan ? { confirmOrphanRenders: true } : {}) });
+      setPagination(d);
+      await loadPreview();
+      return { notice: `Paginated: ${d.summary?.totalPages} pages (${d.summary?.openers} openers, ${d.summary?.continuations} continuations, ${d.summary?.compactions} compacted).` };
+    } catch (e) {
+      // Re-pagination is blocked when it would orphan paid page renders — show
+      // the EXISTING page layouts instead of a raw error. The operator only
+      // re-paginates (discarding those renders) after changing the manuscript.
+      if (String(e.message || "").toUpperCase().includes("ORPHAN")) {
+        const list = await loadPreview();
+        return { notice: `Showing the current ${list.length} page layouts. Re-paginating would discard existing page renders — use “Re-paginate (discard renders)” only after a manuscript change.` };
+      }
+      throw e;
+    }
   });
 
   const doMatter = () => run("Planning front & back matter", async () => {
@@ -318,10 +355,31 @@ export default function ProductionConsole({ onExitToLegacy }) {
         )}
 
         {step === "paginate" && (
-          <StepRun title="Paginate" sub="Flow the chapter body into pages with the body flow engine (no spend). Reference sections use the two-column reference model."
-            project={project} setStep={setStep} actionLabel="Paginate body" onRun={() => doPaginate()} result={pagination && (
-              <Json data={pagination.summary} />
-            )} />
+          <Panel title="Paginate" sub="Flow the chapter body into pages with the body flow engine (no spend). Reference sections use the two-column reference model.">
+            <Guard project={project} setStep={setStep} />
+            {project && (
+              <div style={S.card}>
+                <button style={S.btn()} onClick={() => doPaginate(false).catch(() => {})}>Paginate body</button>
+                <button style={S.ghost} onClick={() => run("Loading page layouts", loadPreview).catch(() => {})}>View page layouts</button>
+                <button style={S.ghost} onClick={() => { if (window.confirm("Re-paginate? This DISCARDS existing page renders. Only do this after changing the manuscript.")) doPaginate(true).catch(() => {}); }}>Re-paginate (discard renders)</button>
+                {pagination && (
+                  <div style={{ marginTop: 10, fontSize: 14 }}>
+                    <b>{pagination.summary?.totalPages} pages</b> — {pagination.summary?.openers} openers · {pagination.summary?.continuations} continuations · {pagination.summary?.compactions} compacted.
+                  </div>
+                )}
+                {pages && pages.length > 0 && (
+                  <>
+                    <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>
+                      Planning preview — the text flowed into each layout (no illustration yet). Tinted blocks = where art will go. Check the <b>fit</b> chip and click any page to enlarge and confirm it reads well, <i>before</i> any render spend.
+                    </div>
+                    <div style={S.grid}>
+                      {pages.map((p) => <PagePreview key={p.pageKey} page={p} trim={trimSize(form.trim)} onZoom={setZoom} />)}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </Panel>
         )}
 
         {step === "matter" && (
@@ -407,7 +465,110 @@ export default function ProductionConsole({ onExitToLegacy }) {
             )}
           </Panel>
         )}
+        {zoom && <ZoomModal page={zoom} trim={trimSize(form.trim)} onClose={() => setZoom(null)} />}
       </main>
+    </div>
+  );
+}
+
+/** A scaled planning preview of one page: layout zones with the text flowed in,
+ *  illustration areas tinted (not rendered). Pure presentational. */
+function PageLayout({ page, width }) {
+  const z = page.zones || {};
+  const trimH = (page.__h && page.__w) ? page.__h / page.__w : 1.4;
+  const height = Math.round(width * trimH);
+  const fill = Math.max(0, Math.min(1.2, page.fit?.fillRatio ?? 0));
+  const over = (page.fit?.fillRatio ?? 0) > 1;
+  // How many "text lines" the body actually occupies (capped to the page's
+  // usable lines for the drawing). This makes the reading field LOOK like text
+  // filling the layout — without needing the words, which the planner doesn't
+  // expose until render.
+  const usable = Math.max(1, page.fit?.usableLines || 14);
+  const drawnLines = Math.min(usable, Math.max(1, Math.round((page.fit?.estimatedLines || 0))));
+  const pos = (zone) => ({ position: "absolute", left: `${zone.xPct}%`, top: `${zone.yPct}%`, width: `${zone.widthPct}%`, height: `${zone.heightPct}%`, boxSizing: "border-box" });
+  // EXACT blueprint legend the AI receives: strong blue = main illustration,
+  // light blue = full-page background illustration, orange = supporting art /
+  // ornaments, RED = every text zone (title + reading field). Black bars inside
+  // the red zones simulate where the type lands.
+  const artFill = (role) => role === "supporting-art" ? C.orange : role === "background-art" ? C.field : C.blue;
+  const lineH = 100 / usable; // % of the reading zone height per text line
+  return (
+    <div style={{ position: "relative", width, height, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 5, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
+      {(z.imagePriorityZones || []).map((zz, i) => <div key={`i${i}`} style={{ ...pos(zz), background: artFill(zz.role) }} />)}
+      {(z.typographyZones || []).map((zz, i) => (
+        <div key={`t${i}`} style={{ ...pos(zz), background: C.red, display: "flex", alignItems: "center", justifyContent: "center" }} title="heading (text)">
+          <div style={{ height: `${Math.max(8, 100 / 3)}%`, width: "60%", background: "rgba(0,0,0,0.7)", borderRadius: 1 }} />
+        </div>
+      ))}
+      {(z.textSafeZones || []).map((zz, i) => (
+        <div key={`x${i}`} style={{ ...pos(zz), background: C.red, overflow: "hidden", padding: `${Math.max(2, width / 45)}px` }} title="reading field (text)">
+          {Array.from({ length: drawnLines }).map((_, li) => (
+            <div key={li} style={{ height: `${Math.max(1, lineH * 0.5)}%`, marginBottom: `${Math.max(1, lineH * 0.5)}%`, background: "rgba(0,0,0,0.72)", width: li === drawnLines - 1 ? "55%" : "100%", borderRadius: 1 }} />
+          ))}
+          {over && <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 5, background: "#000" }} title="overflow" />}
+        </div>
+      ))}
+      <div style={{ position: "absolute", left: 4, bottom: 3, fontSize: Math.max(8, width / 22), color: over ? C.red : C.ink, fontWeight: 700, background: "rgba(251,247,234,0.85)", padding: "0 3px", borderRadius: 3 }}>
+        {Math.round(fill * 100)}% full
+      </div>
+    </div>
+  );
+}
+
+function fitMeta(fit) {
+  const f = String(fit || "").toUpperCase();
+  if (f === "FITS") return { bg: C.green, text: "Fits — reads well" };
+  if (f === "TIGHT") return { bg: C.orange, text: "Tight — near capacity" };
+  if (f === "OVERFLOW") return { bg: C.red, text: "Overflow — text won't fit" };
+  if (f === "UNDERFILL") return { bg: C.muted, text: "Under-filled — lots of space" };
+  return { bg: C.muted, text: f || "—" };
+}
+
+function PagePreview({ page, trim, onZoom }) {
+  const W = 168;
+  const p = { ...page, __w: trim.widthIn, __h: trim.heightIn };
+  const fm = fitMeta(page.fitStatus);
+  return (
+    <div style={{ width: W }}>
+      <div onClick={() => onZoom(page)} title="Click to enlarge" style={{ cursor: "zoom-in" }}>
+        <PageLayout page={p} width={W} />
+      </div>
+      <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, wordBreak: "break-all" }}>{page.pageKey}</div>
+      <div style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={S.pill(fm.bg)}>{page.fitStatus}</span>
+        <span style={{ fontSize: 10, color: C.muted }}>{page.entryTitle || page.layoutTemplate}</span>
+      </div>
+    </div>
+  );
+}
+
+function ZoomModal({ page, trim, onClose }) {
+  const W = 460;
+  const fm = fitMeta(page.fitStatus);
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(20,16,8,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9000, padding: 24 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.panel, borderRadius: 12, padding: 20, maxHeight: "92vh", overflow: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div><b>{page.pageKey}</b> · {page.layoutTemplate} · <span style={S.pill(fm.bg)}>{fm.text}</span></div>
+          <button style={S.ghost} onClick={onClose}>Close ✕</button>
+        </div>
+        <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
+          <PageLayout page={{ ...page, __w: trim.widthIn, __h: trim.heightIn }} width={W} />
+          <div style={{ fontSize: 13, minWidth: 200 }}>
+            <div style={{ marginBottom: 8 }}><b>{page.entryTitle}</b></div>
+            {page.fit && (
+              <table style={{ fontSize: 13, borderCollapse: "collapse" }}><tbody>
+                <tr><td style={{ color: C.muted, paddingRight: 10 }}>Text</td><td><b>{page.fit.charCount}</b> chars · {page.fit.estimatedLines} lines</td></tr>
+                <tr><td style={{ color: C.muted, paddingRight: 10 }}>Capacity</td><td>{page.fit.capacityChars} chars · {page.fit.usableLines} lines</td></tr>
+                <tr><td style={{ color: C.muted, paddingRight: 10 }}>Fill</td><td><b>{Math.round((page.fit.fillRatio || 0) * 100)}%</b></td></tr>
+                <tr><td style={{ color: C.muted, paddingRight: 10 }}>Pages</td><td>{page.fit.estimatedRenderedPages}</td></tr>
+              </tbody></table>
+            )}
+            {(page.blockers || []).length > 0 && <div style={{ marginTop: 8, color: C.red }}>Blockers: {page.blockers.join(", ")}</div>}
+            <div style={{ marginTop: 10, color: C.muted, fontSize: 12 }}>The exact words appear in step 7 (Render Pages → Preview), which shows the verbatim prompt before any spend.</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
