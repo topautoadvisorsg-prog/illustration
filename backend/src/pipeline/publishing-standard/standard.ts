@@ -141,7 +141,7 @@ export const ORNAMENTS = {
     bottomSwag:
       'Mirror of the top swag — slightly slimmer, same components, centered pinecone medallion.',
     hairlineRule:
-      'Thin engraved single line in warm sepia ink, paired around the kicker and the title name.',
+      'Thin engraved single line in warm sepia ink, paired around a heading where appropriate.',
     dropCapSurround:
       'Engraved botanical wreath — leaves, vines, a single small pinecone — surrounding the drop-cap letter.',
   },
@@ -190,13 +190,14 @@ export function assembleIllustrationDna(): string {
   return [
     ILLUSTRATION_DNA.medium,
     `Aesthetic: ${ILLUSTRATION_DNA.mood} Reference points: ${ILLUSTRATION_DNA.referenceArtists}`,
-    `LINE WORK: ${ILLUSTRATION_DNA.lineWork} Line colour is the Standard ink (${PALETTE.ink.hex}).`,
-    `COLOUR: ${ILLUSTRATION_DNA.colorDiscipline} Whites are the parchment paper itself (${PALETTE.parchment.hex}), never bright paper-white. Accents are drawn from the Standard palette.`,
+    `LINE WORK: ${ILLUSTRATION_DNA.lineWork} Line colour is the Standard sepia ink.`,
+    `COLOUR: ${ILLUSTRATION_DNA.colorDiscipline} Whites are the parchment paper itself, never bright paper-white. Accents are drawn from the Standard palette.`,
     `DETAIL: ${ILLUSTRATION_DNA.naturalistPrecision}`,
     `LIGHT: ${ILLUSTRATION_DNA.lighting}`,
     `PAPER: ${ILLUSTRATION_DNA.paperTexture}`,
     `EDGES: ${ILLUSTRATION_DNA.edgeTreatment}`,
-    `Avoid: ${ILLUSTRATION_DNA.antiStyle.join('; ')}.`,
+    // Negatives consolidated into the prompt's HARD NEGATIVES block (anti-style
+    // is no longer appended here); palette hex lives once in the prompt header.
   ].join('\n');
 }
 

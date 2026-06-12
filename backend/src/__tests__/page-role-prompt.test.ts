@@ -42,7 +42,7 @@ function makeSpec(pageType: WholePageSpec['pageType']): WholePageSpec {
 describe('PageRole prompt text policy', () => {
   it('keeps verbatim body instructions for normal interior pages', () => {
     const prompt = assemblePagePrompt(makeSpec('INTERIOR'));
-    expect(prompt).toContain('Body text appears VERBATIM');
+    expect(prompt).toContain('do not add, remove, translate, summarize, or reorder');
     expect(prompt).toContain('PAGE BODY');
   });
 
@@ -65,7 +65,7 @@ describe('PageRole prompt text policy', () => {
       spec.pageText.bodyBlocks = [{ type: 'paragraph', text: 'coyote, 12' }];
       const prompt = assemblePagePrompt(spec);
       expect(prompt).toContain('PAGE BODY');
-      expect(prompt).toContain('Body text appears VERBATIM');
+      expect(prompt).toContain('do not add, remove, translate, summarize, or reorder');
       expect(prompt).not.toContain('TEXT POLICY');
     }
   });

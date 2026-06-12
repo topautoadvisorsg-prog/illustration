@@ -19,13 +19,26 @@
 import { PALETTE, WILDLANDS_STANDARD } from '../publishing-standard/index.js';
 import type { WholePageSpec } from './types.js';
 
+// CORE IDENTITY — stated ONCE. The Wild Lands identity, the single-plate
+// composition principle, and the parchment/ink palette live here and nowhere
+// else; every other section (typography, illustration, constraints) assumes it.
 const HEADER = [
-  `You are rendering a complete, FINISHED, publishable collector-edition book page under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version}.`,
-  'The target quality is a museum-grade, vintage natural-history monograph — the kind of page that ships in a hardcover boxed edition.',
-  'This is NOT an illustration with text dropped on top. This is a single, integrated, designed page where the typography, ornamentation, and illustration belong to the same composition.',
-  `The page paper is parchment ${PALETTE.parchment.hex}. All typography ink is warm sepia ${PALETTE.ink.hex} — never pure black, never colored. Forest badges use ${PALETTE.forestGreen.hex}. Mountain badges use ${PALETTE.mountainOchre.hex}. These are not suggestions — they are house standards locked across every page in the series.`,
-  'The specification below is authoritative. Render the page exactly as specified. Do not invent text. Do not rearrange the layout. Do not substitute words. The body text is provided verbatim and must appear on the page exactly as supplied.',
+  `You are rendering a complete, FINISHED, publishable collector-edition book page under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version} — a museum-grade, vintage natural-history field guide in an expedition-journal aesthetic.`,
+  'It is ONE single, integrated page printed from a single plate: typography, ornamentation, and illustration share the same parchment, period, and ink — never artwork with text pasted on top.',
+  `The page paper is parchment ${PALETTE.parchment.hex}; all ink is warm sepia ${PALETTE.ink.hex} — never pure black, never colored.`,
+  'The specification below is authoritative — render it exactly as specified.',
 ].join(' ');
+
+// HARD NEGATIVES — stated ONCE, consolidated. Every "no modern UI / no
+// photography / no vector / no infographic" rule lives here, not scattered
+// across the typography DNA flags and the hard constraints.
+const HARD_NEGATIVES = [
+  'HARD NEGATIVES — never:',
+  '- No photography, photorealism, or photographic lighting; no 3D render, flat vector, isometric, low-poly, anime, manga, cartoon, or comic-book linework.',
+  '- No modern UI, infographic styling, flat icons, gradients, or digital drop-shadows.',
+  '- No sans-serif type anywhere on the page.',
+  '- No anthropomorphized animals, cartoon expressions, or whimsical fantasy elements.',
+].join('\n');
 
 /**
  * DEDICATED cover prompt. The cover is the flagship image — it gets its own
@@ -112,29 +125,20 @@ function hardConstraints(spec: WholePageSpec): string {
       `- TITLE-PAGE typography, baked INTO the artwork as the engraved title block — stacked and centered on calm parchment: ${stacked.map((s) => `"${s}"`).join(' / ')}. The title set largest in stately serif caps, then the subtitle, then the author/imprint line, all in warm sepia ink and framed by a refined botanical ornament. Never a pasted label, never modern type.`,
     );
   }
-  const hasBody = spec.pageText.bodyBlocks.length > 0;
   lines.push(
     // F-8 — the Chapter 1 production run proved the attached blueprint alone
     // is loosely followed: corner-accent layouts rendered as full-width bands
     // and a 50/50 page mirrored. State the placement contract in prose and
     // forbid the three observed failure modes (move / mirror / enlarge).
+    // Typography, ornamentation, negatives, and the verbatim rule are NOT
+    // repeated here — they live in the Typography DNA, Illustration DNA, the
+    // consolidated HARD NEGATIVES, and the PAGE BODY section respectively.
     `- COMPOSITION CONTRACT — image placement: ${spec.composition.imagePlacement}. Text placement: ${spec.composition.textPlacement}. Respect this placement EXACTLY: do not move the artwork to a different region, do not mirror left/right or top/bottom, do not enlarge a small accent into a band or a band into a full page. The attached layout reference image shows the same plan — follow it.`,
-    // Body-text lines only when the page actually has body (a title page has none).
-    ...(hasBody
-      ? [
-          '- Body text appears VERBATIM, every word, in order. Do not paraphrase, summarize, abbreviate, truncate, or invent.',
-          `- Body typography: ${spec.typographyDNA.bodyFamily} Set at approximately ${spec.typographyDNA.bodyPt}pt with ${spec.typographyDNA.bodyLineHeight} line height, reading measure approximately ${spec.typographyDNA.bodyMeasureChars} characters wide — generous and confident, never cramped.`,
-        ]
-      : []),
-    '- The reading field sits at the supplied coordinates. Do not move it. Do not shrink it. Do not change its proportions.',
-    '- Ornamentation: engraved botanical swags top and bottom, with centered pinecone medallions, drawn in the same warm sepia ink, plus hairline decorative rules around the title where appropriate. Period-correct, line-engraving feel — never clip art, never digital flourish.',
-    '- The whole page must read as ONE integrated composition. The illustration, the typography, and the ornamentation share the same paper, the same ink palette, the same period. The page should look like it was printed from a single plate, not assembled in software.',
-    '- Vintage natural-history monograph aesthetic. No modern UI. No infographic styling. No flat icons. No drop-shadows that look digital. No gradients. No sans-serif anywhere on the page.',
+    '- The reading field sits at the supplied coordinates. Do not move it, shrink it, or change its proportions.',
     // The copyright page legitimately renders copyright text as its body, so do
     // not forbid it there — only forbid the AI from INVENTING such furniture on
     // every other page.
     `- Do not add page numbers, captions, watermarks, signatures, ${spec.pageType === 'COPYRIGHT_PAGE' ? '' : 'copyright text, '}folios, or running heads unless explicitly listed in \`decorativeElements\`.`,
-    '- Output a finished, publishable page. If the result would not pass as a real spread in a collector-edition hardcover, it is wrong.',
   );
   return lines.join('\n');
 }
@@ -144,20 +148,32 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
   // drop-cap, the surround description must not reach the model at all — drop
   // `decorativeInitial` from the typography block entirely rather than emit a
   // stray "null" that still nudges the model toward an illuminated initial.
-  const typographyDNA =
-    spec.typographyDNA.decorativeInitial == null
-      ? (() => {
-          const { decorativeInitial: _omit, ...rest } = spec.typographyDNA;
-          return rest;
-        })()
-      : spec.typographyDNA;
+  // Shape the Typography DNA that reaches the model:
+  //  - `identity` lives in the header (core identity, stated once) — drop it.
+  //  - `noModernUi` / `noInfographic` live in HARD NEGATIVES — drop them.
+  //  - `titleFamily` carries the chapter kicker / Roman-numeral hierarchy, which
+  //    is ONLY relevant to chapter openers and title pages — omit it elsewhere
+  //    (a glossary/copyright page must never see "chapter kicker").
+  //  - `decorativeInitial` only when a drop-cap is actually present.
+  const emitTitleFamily = spec.pageType === 'CHAPTER_OPENER' || spec.pageType === 'TITLE_PAGE';
+  const {
+    identity: _identity,
+    noModernUi: _noModernUi,
+    noInfographic: _noInfographic,
+    titleFamily,
+    decorativeInitial,
+    ...typoRest
+  } = spec.typographyDNA;
+  const typographyDNA = {
+    ...typoRest,
+    ...(emitTitleFamily ? { titleFamily } : {}),
+    ...(decorativeInitial != null ? { decorativeInitial } : {}),
+  };
   const bodySection = rendersBodyText(spec)
     ? [
-        'PAGE BODY - render every block below IN ORDER. "heading" = a bold serif',
-        'section heading; "subheading" = a smaller bold heading; "paragraph" = body',
-        'prose. The text is already plain - it contains NO markdown. Render each',
-        'block\'s text EXACTLY and verbatim; never print the block labels, the word',
-        '"type"/"text", braces, or any #/*/_ characters.',
+        // The single, strongest text-fidelity statement lives HERE and nowhere else.
+        'PAGE BODY — render every block below IN ORDER, as its type ("heading" = bold serif section heading, "subheading" = smaller bold heading, "paragraph" = body prose).',
+        'Render the provided text EXACTLY: do not add, remove, translate, summarize, or reorder any words. The text is already plain — never print the block labels, the words "type"/"text", braces, or any markdown (#/*/_).',
         '```json',
         JSON.stringify(spec.pageText.bodyBlocks, null, 2),
         '```',
@@ -192,5 +208,7 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
     // decision): badges are stamped deterministically by print-prep in a fixed
     // bottom-right corner, so the model never needs to know about them.
     hardConstraints(spec),
+    '',
+    HARD_NEGATIVES,
   ].join('\n');
 }

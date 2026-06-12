@@ -23,9 +23,14 @@ describe('Standard version', () => {
 describe('Illustration DNA — Rule Zero (colour only via PALETTE tokens)', () => {
   const dna = assembleIllustrationDna();
 
-  it('uses the Standard ink + parchment token values', () => {
-    expect(dna).toContain(PALETTE.ink.hex); // #543C24
-    expect(dna).toContain(PALETTE.parchment.hex); // #E0C8A0
+  it('references the Standard colours by name; hex lives once in the prompt header', () => {
+    // Post-prompt-cleanup: the palette hex is stated ONCE in the prompt header,
+    // not repeated inside the Illustration DNA. The DNA refers to the Standard
+    // colours by name instead of hardcoding the hex values.
+    expect(dna).toContain('Standard sepia ink');
+    expect(dna).toContain('parchment paper itself');
+    expect(dna).not.toContain(PALETTE.ink.hex);
+    expect(dna).not.toContain(PALETTE.parchment.hex);
   });
 
   it('contains NO deleted/contradictory hex', () => {
