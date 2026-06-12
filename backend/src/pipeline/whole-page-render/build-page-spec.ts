@@ -10,6 +10,7 @@
  */
 
 import type { PageManifest, ProjectConfig } from '@wildlands/shared';
+import { buildSeriesLine } from '@wildlands/shared';
 import type { PageRow } from '../../db/repositories/pagination.repo.js';
 import type { LayoutAllocation, PlanningZone } from '../stage-6-layout/layout-director.js';
 import { REFERENCE_TYPOGRAPHY } from '../stage-6-layout/layout-profiles.js';
@@ -150,10 +151,13 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
         ? [
             policy.title.name,
             policy.title.kicker,
+            input.config.publishing.coverDescription,
             input.config.publishing.authors?.length
               ? input.config.publishing.authors.join(', ')
               : input.config.authorName,
-          ].filter(Boolean)
+            // Same series line as the cover — one source of truth so they can't drift.
+            buildSeriesLine(input.config.publishing.series?.name, input.config.volume) ?? undefined,
+          ].filter((x): x is string => Boolean(x))
         : pageType === 'INTRO_OPENER'
           ? [policy.title.name]
           : [];

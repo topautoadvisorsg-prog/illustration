@@ -512,6 +512,8 @@ export const PublishingMetadataSchema = z.object({
     .optional(),
   bookDescription: z.object({ hooks: z.array(z.string()).optional() }).optional(),
   aiIntroduction: z.object({ enabled: z.boolean().default(false) }).default({ enabled: false }),
+  /** Front-cover descriptive line (e.g. "A Field Guide to ..."). Data-driven, per book. */
+  coverDescription: z.string().optional(),
   coverAssetPath: z.string().optional(),
   // Cover/interior synchronization record (Phase 0 production gate). Captured
   // when the cover ARTWORK is generated — the spine width is baked into the art
@@ -526,6 +528,33 @@ export const PublishingMetadataSchema = z.object({
     .optional(),
 });
 export type PublishingMetadata = z.infer<typeof PublishingMetadataSchema>;
+
+/** Volume numbers are stored as integers; Roman numerals are a DISPLAY concern only. */
+export function toRoman(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return '';
+  const table: Array<[number, string]> = [
+    [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
+    [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+  ];
+  let out = '';
+  let rem = Math.floor(n);
+  for (const [value, sym] of table) {
+    while (rem >= value) { out += sym; rem -= value; }
+  }
+  return out;
+}
+
+/**
+ * The single source of truth for the series line printed on the cover, title
+ * page, and series page: "[SERIES NAME] — VOLUME [Roman]". Fully data-driven —
+ * returns null when no series name is set (nothing book-specific in code).
+ */
+export function buildSeriesLine(seriesName?: string | null, volume?: number | null): string | null {
+  const name = (seriesName ?? '').trim();
+  if (!name) return null;
+  const roman = volume != null ? toRoman(volume) : '';
+  return roman ? `${name.toUpperCase()} — VOLUME ${roman}` : name.toUpperCase();
+}
 
 export const ProjectConfigSchema = z.object({
   brand: BrandSchema.default('THE_WILDLANDS'),

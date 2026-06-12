@@ -113,7 +113,11 @@ export interface CompositionDTO {
 export interface CoverCopyDTO {
   title: string;
   subtitle?: string;
+  /** Front-cover descriptive line (e.g. "A Field Guide to ..."). Data-driven. */
+  coverDescription?: string;
   author?: string;
+  /** "[SERIES NAME] — VOLUME [Roman]", from buildSeriesLine(). Null when no series. */
+  seriesLine?: string;
   backCover?: string[];
 }
 

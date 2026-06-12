@@ -64,9 +64,10 @@ export function assembleCoverPrompt(spec: WholePageSpec): string {
     // 3. COMPOSITION ZONES
     'COMPOSITION — one continuous full-bleed wrap:',
     `- ${spec.composition.imagePlacement}.`,
-    '- FRONT COVER: the title block — title, then subtitle, then author — as the engraved focal typography over the strongest part of the scene.',
+    '- FRONT COVER: the title block — title, then subtitle, then the cover-description line — as the engraved focal typography over the strongest part of the scene; the author line lower on the front cover; and, ONLY if a series line is provided in the text, that series line as small engraved caps along the very bottom edge of the front cover.',
     '- SPINE: the title and author as vertical spine typography in the same ink.',
     '- BACK COVER: the back-cover lines as readable engraved typesetting over calm landscape negative space.',
+    '- Render ONLY the words provided in the text block above; if a field is absent, omit it (do not invent a subtitle, description, author, or series line).',
     '',
     // 4. VISUAL DNA — the heart of the style
     'WILD LANDS VISUAL DNA:',
@@ -80,7 +81,7 @@ export function assembleCoverPrompt(spec: WholePageSpec): string {
     // 6. HARD NEGATIVES
     'HARD NEGATIVES:',
     '- No photography, photorealism, 3D render, flat vector, low-poly, anime/cartoon, modern UI, infographic styling, gradients, or digital drop-shadows.',
-    '- No chapter kicker, Roman numerals, chapter ornaments, page numbers, folios, running heads, or badges — this is a cover, not an interior page.',
+    '- No chapter kicker, chapter ornaments, page numbers, folios, running heads, or badges — this is a cover, not an interior page. (A series "VOLUME" line with a Roman numeral IS allowed when provided in the text above.)',
     '- Do not invent any text beyond the words specified above.',
     '- If the result would not pass as a real collector-edition hardcover wrap on a bookstore shelf, it is wrong.',
   ].join('\n');
@@ -122,7 +123,7 @@ function hardConstraints(spec: WholePageSpec): string {
   if (spec.pageType === 'TITLE_PAGE') {
     const stacked = spec.typographyDNA.titleHierarchy.filter(Boolean);
     lines.push(
-      `- TITLE-PAGE typography, baked INTO the artwork as the engraved title block — stacked and centered on calm parchment: ${stacked.map((s) => `"${s}"`).join(' / ')}. The title set largest in stately serif caps, then the subtitle, then the author/imprint line, all in warm sepia ink and framed by a refined botanical ornament. Never a pasted label, never modern type.`,
+      `- TITLE-PAGE typography, baked INTO the artwork as the engraved title block — stacked and centered on calm parchment, in this exact order top to bottom: ${stacked.map((s) => `"${s}"`).join(' / ')}. The title set largest in stately serif caps; the subtitle and description beneath it; the author/imprint line lower; and the final series "VOLUME" line, when present, as small tracked caps at the bottom. All in warm sepia ink, framed by a refined ornament. Render only these lines, in this order; never a pasted label, never modern type.`,
     );
   }
   lines.push(

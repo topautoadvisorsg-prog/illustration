@@ -66,6 +66,15 @@ function statusColor(s) {
   return C.muted;
 }
 
+// Display-only Roman numeral for the Volume preview (volume is stored as a number).
+function roman(n) {
+  if (!Number.isFinite(n) || n <= 0) return "";
+  const t = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
+  let out = "", rem = Math.floor(n);
+  for (const [v, sym] of t) while (rem >= v) { out += sym; rem -= v; }
+  return out;
+}
+
 export default function ProductionConsole({ onExitToLegacy }) {
   const [step, setStep] = useState("project");
   const [busy, setBusy] = useState("");
@@ -74,7 +83,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
   const [projects, setProjects] = useState([]);
   const [project, setProject] = useState(null); // active project object
-  const [form, setForm] = useState({ title: "The Wildlands Field Guide", subtitle: "New England Volume", author: "The Wildlands", trim: "7x10" });
+  const [form, setForm] = useState({ title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10" });
   const [manuscript, setManuscript] = useState("");
   const [manuscriptName, setManuscriptName] = useState("");
 
@@ -160,7 +169,10 @@ export default function ProductionConsole({ onExitToLegacy }) {
       setForm({
         title: cfg.publishing?.title ?? cfg.title ?? "",
         subtitle: cfg.publishing?.subtitle ?? cfg.subtitle ?? "",
+        coverDescription: cfg.publishing?.coverDescription ?? "",
         author: (authors && authors.length ? authors.join(", ") : cfg.authorName) ?? "",
+        series: cfg.publishing?.series?.name ?? "",
+        volume: cfg.volume ?? cfg.publishing?.series?.volumeNumber ?? 1,
         trim,
       });
     }).catch(() => {});
@@ -176,8 +188,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
   function cleanConfig() {
     // Minimal, clean config — the whole-page pipeline takes its visual DNA from
     // the locked Publishing Standard, so NO legacy style/palette blob is sent.
+    // All book identity (title/subtitle/cover description/author/series/volume)
+    // is data, set per book — nothing book- or series-specific is hardcoded.
+    const vol = Math.max(1, parseInt(form.volume, 10) || 1);
+    const series = (form.series || "").trim();
+    const coverDescription = (form.coverDescription || "").trim();
     return {
-      volume: 1,
+      volume: vol,
       title: form.title,
       subtitle: form.subtitle,
       authorName: form.author,
@@ -186,6 +203,8 @@ export default function ProductionConsole({ onExitToLegacy }) {
         title: form.title,
         subtitle: form.subtitle,
         authors: form.author.split(",").map((a) => a.trim()).filter(Boolean),
+        coverDescription: coverDescription || undefined,
+        series: series ? { name: series, volumeNumber: vol } : undefined,
       },
     };
   }
@@ -435,13 +454,19 @@ export default function ProductionConsole({ onExitToLegacy }) {
         )}
 
         {step === "setup" && (
-          <Panel title="Book Setup" sub="The essentials the production pipeline needs. Visual style is locked by the Wild Lands Publishing Standard — there is nothing to configure there.">
+          <Panel title="Book Setup" sub="The book's identity — title, subtitle/region, cover description, author, series, and volume. These print on the cover, title page, and series page. Visual style is locked by the Publishing Standard.">
             <Guard project={project} setStep={setStep} />
             {project && (
               <div style={S.card}>
                 <LabeledInput label="Book title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} />
-                <LabeledInput label="Subtitle" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} />
+                <LabeledInput label="Subtitle / region" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} />
+                <LabeledInput label="Cover description line" value={form.coverDescription} onChange={(v) => setForm({ ...form, coverDescription: v })} />
                 <LabeledInput label="Author / pen name (comma-separate co-authors)" value={form.author} onChange={(v) => setForm({ ...form, author: v })} />
+                <LabeledInput label="Series name" value={form.series} onChange={(v) => setForm({ ...form, series: v })} />
+                <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 600 }}>Volume
+                  <input type="number" min="1" step="1" style={S.input} value={form.volume} onChange={(e) => setForm({ ...form, volume: e.target.value })} />
+                  <span style={{ fontWeight: 400, color: C.muted, fontSize: 12 }}>{form.series && Number(form.volume) > 0 ? `Prints as: ${form.series.toUpperCase()} — VOLUME ${roman(Number(form.volume))}` : "Stored as a number; printed as a Roman numeral."}</span>
+                </label>
                 <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 600 }}>Trim size
                   <select style={S.input} value={form.trim} onChange={(e) => setForm({ ...form, trim: e.target.value })}>
                     <option value="7x10">Hardcover 7 × 10</option>

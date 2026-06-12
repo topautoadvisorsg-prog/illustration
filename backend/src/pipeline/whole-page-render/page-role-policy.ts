@@ -172,14 +172,20 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
       // = Sources / Further Reading (citations, trust); ABOUT_SERIES = the
       // series brand page.
       const isSources = frontMatterType(row) === 'RESOURCES';
+      // Data-driven series page — heading comes from the project's series field,
+      // never a hardcoded brand. (RESOURCES rides this role but is Sources copy.)
+      const seriesName = (config.publishing.series?.name ?? '').trim();
+      // The operator enters the full series name (e.g. "THE WILDLANDS SERIES");
+      // use it verbatim as the heading — never append/prepend brand words.
+      const seriesHeading = seriesName ? seriesName.toUpperCase() : 'ABOUT THE SERIES';
       return {
         pageType,
         layoutTemplate,
-        title: { kicker: '', number: '', name: isSources ? 'SOURCES & FURTHER READING' : 'THE WILD LANDS SERIES' },
-        entryTitle: isSources ? 'Sources & Further Reading' : 'The Wild Lands Series',
+        title: { kicker: '', number: '', name: isSources ? 'SOURCES & FURTHER READING' : seriesHeading },
+        entryTitle: isSources ? 'Sources & Further Reading' : (seriesName || 'About the Series'),
         imageSubject: isSources
-          ? 'Sources / further-reading page edge ornament only: thin engraved botanical corner details framing a calm citations/references text block; quiet and scholarly'
-          : 'Wild Lands series-page ornament: field map, pine, granite, compass, aged parchment — brands the book as part of the series',
+          ? 'Sources / further-reading page edge ornament only: thin engraved corner details framing a calm citations/references text block; quiet and scholarly'
+          : 'Series-page edge ornament only: refined engraved corner details on aged parchment that brand the book as part of the series; restrained and atmospheric',
         allowsEmptyBody: false,
         renderBodyText: true,
       };

@@ -19,6 +19,7 @@ import {
   PageManifestSchema,
   ProofArtifactSchema,
   ProjectConfigSchema,
+  buildSeriesLine,
   type PageManifest,
   type ProofArtifact,
   type ProjectConfig,
@@ -600,6 +601,12 @@ export function buildCoverWrapPrompt(
   const title = config.publishing.title ?? config.title;
   const subtitle = config.publishing.subtitle ?? config.subtitle ?? '';
   const authors = config.publishing.authors?.length ? config.publishing.authors.join(', ') : config.authorName;
+  // Data-driven, per book — no hardcoded series/region. The scene follows the
+  // book's subtitle/region + cover description; the series line is the single
+  // source of truth from buildSeriesLine().
+  const coverDescription = config.publishing.coverDescription ?? '';
+  const seriesLine = buildSeriesLine(config.publishing.series?.name, config.volume) ?? undefined;
+  const sceneSubject = subtitle || title;
   const frontPanelXIn = config.trimSize.bleedIn + config.trimSize.widthIn + dims.spineIn;
   const spec: WholePageSpec = {
     pageType: 'COVER_WRAP',
@@ -629,21 +636,21 @@ export function buildCoverWrapPrompt(
     },
     typographyDNA: {
       ...PAGE_TYPOGRAPHY_DNA,
-      titleHierarchy: [title, subtitle, authors].filter(Boolean),
+      titleHierarchy: [title, subtitle, coverDescription, authors, seriesLine].filter(Boolean) as string[],
       decorativeInitial: null,
     },
     illustrationDNA: {
       masterStyleBlock: assembleIllustrationDna(),
       subject: {
-        primary: 'Full-wrap New England wilderness cover artwork for a premium natural-history field guide.',
+        primary: `Full-wrap cover artwork: a cinematic establishing scene evoking ${sceneSubject}${coverDescription ? ` (${coverDescription})` : ''}, as one continuous full-bleed composition across back cover, spine, and front cover.`,
         supporting: [
-          'front cover: cinematic mountains, spruce forest, granite, lake or river atmosphere',
+          `front cover: cinematic establishing view of the setting evoked by "${sceneSubject}", with depth and atmosphere`,
           'spine: quiet continuous texture with low visual contrast',
-          'back cover: restrained landscape atmosphere that supports readable copy',
+          'back cover: restrained atmosphere of the same setting that supports readable copy',
           hooks.length ? `back-cover copy context: ${hooks.join(' ')}` : 'back-cover copy context: no hook copy supplied yet',
         ],
-        environment: 'New England mountain-and-forest landscape, archival naturalist atmosphere, continuous wrap composition',
-        mood: 'premium, cinematic, rugged, calm enough for system typography',
+        environment: `setting evoked by "${sceneSubject}"${coverDescription ? `: ${coverDescription}` : ''}; archival painterly naturalist atmosphere; continuous wrap composition`,
+        mood: 'premium, cinematic, atmospheric, calm enough for system typography',
       },
     },
     pageText: {
@@ -657,7 +664,9 @@ export function buildCoverWrapPrompt(
     coverCopy: {
       title: title.toUpperCase(),
       subtitle: subtitle || undefined,
+      coverDescription: coverDescription || undefined,
       author: authors || undefined,
+      seriesLine,
       backCover: hooks.length ? hooks : undefined,
     },
     decorativeElements: {
