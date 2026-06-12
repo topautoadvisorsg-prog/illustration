@@ -48,6 +48,8 @@ const SHAPE_BY_SLOT: Record<ArtSlot, ImageShape> = {
   CORNER_TOP_RIGHT: 'square',
   CORNER_BOTTOM_LEFT: 'square',
   CORNER_BOTTOM_RIGHT: 'square',
+  // Centered title block on a portrait page — thin ornaments top and bottom.
+  TITLE_BLOCK: 'portrait',
 };
 
 export const LAYOUT_IMAGE_SHAPES: Record<LayoutTemplateId, ImageShape> = {
@@ -79,6 +81,7 @@ export const LAYOUT_IMAGE_SHAPES: Record<LayoutTemplateId, ImageShape> = {
   LAYOUT_C_CORNER_BOTTOM_LEFT: 'square',
   LAYOUT_C_CORNER_BOTTOM_RIGHT: 'square',
   LAYOUT_D_PURE_TEXT: 'square', // no image — placeholder for the Record completeness
+  LAYOUT_TITLE_DISPLAY: 'portrait', // centered title block, thin top/bottom ornaments
 };
 
 export function imageShapeForLayout(template: LayoutTemplateId): LayoutImageShape {

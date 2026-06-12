@@ -183,6 +183,7 @@ describe('layout-aware image shape mapping', () => {
       'LAYOUT_C_CORNER_TOP_LEFT',
       'LAYOUT_C_CORNER_TOP_RIGHT',
       'LAYOUT_D_PURE_TEXT',
+      'LAYOUT_TITLE_DISPLAY',
     ]);
   });
 

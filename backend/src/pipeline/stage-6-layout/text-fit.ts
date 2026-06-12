@@ -110,6 +110,11 @@ function textPanelDims(
       return a < FLOAT_PARALLEL_COLUMN_THRESHOLD
         ? { widthPt: W, heightPt: H * (1 - a) }      // small float → text wraps; line-loss
         : { widthPt: W * (1 - a), heightPt: H };     // large float / sidebar → parallel column
+    case 'TITLE_BLOCK':
+      // Display/ceremonial page — text is NOT a reading field but a compact
+      // centered block (≈72% wide × ≈26% tall) surrounded by large negative
+      // space. Capacity is intentionally tiny: a few short lines, not paragraphs.
+      return { widthPt: W * 0.72, heightPt: H * 0.26 };
   }
 }
 

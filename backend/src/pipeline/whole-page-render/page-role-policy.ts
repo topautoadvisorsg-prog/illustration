@@ -68,7 +68,11 @@ export function inferWholePageRole(row: PageRow, layoutTemplate: LayoutTemplateI
 
 export function defaultLayoutForRole(pageType: WholePageRole): LayoutTemplateId {
   switch (pageType) {
+    // The title page is a display/ceremonial composition (short centered text,
+    // big negative space) — the new LAYOUT_TITLE_DISPLAY, not the dense
+    // reading-field LAYOUT_D used by glossary/index/copyright/contents.
     case 'TITLE_PAGE':
+      return 'LAYOUT_TITLE_DISPLAY';
     case 'AUTHOR_PAGE':
     case 'SERIES_PAGE':
     case 'GLOSSARY_ORNAMENT':

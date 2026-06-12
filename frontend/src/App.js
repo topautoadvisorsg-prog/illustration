@@ -188,6 +188,7 @@ const LAYOUT_ZONE_PRESETS = {
   LAYOUT_C_CORNER_BOTTOM_LEFT:  { architecture: "CORNER_BOTTOM_LEFT",  openingPageImagePercent: 25, openingPageTextPercent: 75 },
   LAYOUT_C_CORNER_BOTTOM_RIGHT: { architecture: "CORNER_BOTTOM_RIGHT", openingPageImagePercent: 25, openingPageTextPercent: 75 },
   LAYOUT_D_PURE_TEXT:           { architecture: "FULL_PAGE",           openingPageImagePercent: 0,  openingPageTextPercent: 100 },
+  LAYOUT_TITLE_DISPLAY:         { architecture: "TITLE_BLOCK",         openingPageImagePercent: 6,  openingPageTextPercent: 94 },
 };
 
 const PUBLISHING_STANDARD_PRESETS = {
@@ -281,6 +282,7 @@ const SIMPLIFIED_FAMILY_LABELS = {
   LAYOUT_C_CORNER_BOTTOM_LEFT: "Layout C — 25% Accent (bottom-left corner)",
   LAYOUT_C_CORNER_BOTTOM_RIGHT: "Layout C — 25% Accent (bottom-right corner)",
   LAYOUT_D_PURE_TEXT: "Layout D — Pure Text / Back Matter",
+  LAYOUT_TITLE_DISPLAY: "Layout Title Display — Centered Short Text (title / dedication / epigraph)",
 };
 
 function simplifiedFamilyLabel(template) {
@@ -1199,6 +1201,16 @@ function zonePreviewLayers(source) {
       { id: "image-priority-bottom", kind: "image-priority", label: "Image-priority", xPct: 0, yPct: 100 - imgH, widthPct: 100, heightPct: imgH, instruction: "Concentrate focal visual detail in the lower artwork band; above it the artwork opens into a calm reading field." },
       baseTitle,
       { id: "text-safe-upper", kind: "text-safe", label: "Text-safe", xPct: 10, yPct: 24, widthPct: 80, heightPct: Math.max(20, 100 - imgH - 28) },
+    ];
+  }
+  if (architecture === "TITLE_BLOCK") {
+    // Display / ceremonial composition (LAYOUT_TITLE_DISPLAY): thin top/bottom
+    // edge ornaments + a compact centered text block with large negative space.
+    // Mirrors the backend zonePlanFor('TITLE_BLOCK') rects.
+    return [
+      { id: "image-priority-ornament-top", kind: "image-priority", label: "Image-priority", xPct: 18, yPct: 0.5, widthPct: 64, heightPct: 3, instruction: "Thin decorative top-edge ornament only." },
+      { id: "image-priority-ornament-bottom", kind: "image-priority", label: "Image-priority", xPct: 18, yPct: 96, widthPct: 64, heightPct: 3, instruction: "Thin decorative bottom-edge ornament only." },
+      { id: "text-safe-display-block", kind: "text-safe", label: "Text-safe", xPct: 14, yPct: 35, widthPct: 72, heightPct: 26, instruction: "Compact centered text block (title / dedication / epigraph) with generous negative space." },
     ];
   }
   if (architecture.startsWith("CORNER_")) {

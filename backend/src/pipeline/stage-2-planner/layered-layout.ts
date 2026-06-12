@@ -147,6 +147,12 @@ export const CONTENT_TYPE_POLICY: Record<ContentType, ContentTypePolicy> = {
     usedFor: ['watershed/mountain/river overviews', 'terrain feature breakdowns'],
     multiSubject: true,
   },
+  TITLE_DISPLAY: {
+    defaultCoverage: 5, defaultArchitecture: 'TITLE_BLOCK', template: 'LAYOUT_TITLE_DISPLAY',
+    purpose: 'A display/ceremonial page: a few short centered lines with large open negative space and thin edge ornaments.',
+    usedFor: ['title page', 'dedication', 'epigraph / opening quote', 'special edition note', 'acknowledgements'],
+    multiSubject: false,
+  },
 };
 
 export interface ContentTypeGuideEntry extends ContentTypePolicy {
@@ -199,6 +205,7 @@ export const LAYOUT_TEMPLATE_COMPOSITION: Record<LayoutTemplateId, LayoutComposi
   LAYOUT_C_CORNER_BOTTOM_LEFT: { contentType: 'SPECIES_PROFILE', coverage: 25, architecture: 'CORNER_BOTTOM_LEFT' },
   LAYOUT_C_CORNER_BOTTOM_RIGHT: { contentType: 'SPECIES_PROFILE', coverage: 25, architecture: 'CORNER_BOTTOM_RIGHT' },
   LAYOUT_D_PURE_TEXT: { contentType: 'REFERENCE_PAGE', coverage: 0, architecture: 'FULL_PAGE' },
+  LAYOUT_TITLE_DISPLAY: { contentType: 'TITLE_DISPLAY', coverage: 5, architecture: 'TITLE_BLOCK' },
 };
 
 export function decomposeTemplate(template: LayoutTemplateId): LayoutComposition {

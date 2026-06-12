@@ -33,7 +33,11 @@ export type ArtSlot =
   | 'CORNER_TOP_LEFT'
   | 'CORNER_TOP_RIGHT'
   | 'CORNER_BOTTOM_LEFT'
-  | 'CORNER_BOTTOM_RIGHT';
+  | 'CORNER_BOTTOM_RIGHT'
+  // Display/ceremonial composition: a compact centered text block with generous
+  // negative space + thin edge ornaments. The image-priority edge of the
+  // LAYOUT_TITLE_DISPLAY catalog layout (title page, dedication, epigraph, etc.).
+  | 'TITLE_BLOCK';
 
 export interface LayoutProfile {
   /** Fraction of the page available to body copy in the text-safe zone (0-1). */
@@ -80,6 +84,10 @@ export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
   LAYOUT_C_CORNER_BOTTOM_RIGHT: { textAreaFactor: 0.75, artSlot: 'CORNER_BOTTOM_RIGHT', artAreaFraction: 0.25, textLight: false },
   // Layout D — pure text / back matter (no illustration).
   LAYOUT_D_PURE_TEXT: { textAreaFactor: 1.0, artSlot: 'FULL_PAGE', artAreaFraction: 0, textLight: false },
+  // Title Display — centered short-text block, thin edge ornaments, large
+  // negative space. Very low text capacity by design (it is for a few lines,
+  // not paragraphs).
+  LAYOUT_TITLE_DISPLAY: { textAreaFactor: 0.15, artSlot: 'TITLE_BLOCK', artAreaFraction: 0.06, textLight: true },
 };
 
 export function getLayoutProfile(template: LayoutTemplateId): LayoutProfile {
@@ -117,6 +125,7 @@ const ART_SLOT_LABELS: Record<ArtSlot, string> = {
   CORNER_TOP_RIGHT: 'top-right corner',
   CORNER_BOTTOM_LEFT: 'bottom-left corner',
   CORNER_BOTTOM_RIGHT: 'bottom-right corner',
+  TITLE_BLOCK: 'centered title block',
 };
 
 /**

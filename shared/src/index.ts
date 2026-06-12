@@ -118,6 +118,11 @@ export const LayoutTemplateIdSchema = z.enum([
   'LAYOUT_C_CORNER_BOTTOM_RIGHT',
   // Layout D — pure text / back matter. No illustration.
   'LAYOUT_D_PURE_TEXT',
+  // Title Display — a centered, ceremonial text block with generous negative
+  // space + thin edge ornaments. For very short text: title, dedication,
+  // epigraph, quote, special notes. Fills the "little text, not a full
+  // illustration" gap no other layout covers.
+  'LAYOUT_TITLE_DISPLAY',
 ]);
 
 // â”€â”€ Layered layout model (Phase 1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -145,6 +150,9 @@ export const ContentTypeSchema = z.enum([
   'TERRAIN_ANALYSIS',
   'FIELD_NOTES_PAGE',
   'ENCYCLOPEDIA_ENTRY',
+  // Display/ceremonial short-text page (title, dedication, epigraph, quote,
+  // special note) — a compact centered text block, not a reading page.
+  'TITLE_DISPLAY',
 ]);
 
 /** How MUCH of the page the imagery occupies (percent buckets). */
@@ -175,6 +183,9 @@ export const ArchitectureSchema = z.enum([
   'CORNER_TOP_RIGHT',
   'CORNER_BOTTOM_LEFT',
   'CORNER_BOTTOM_RIGHT',
+  // A compact centered text block framed by thin top/bottom edge ornaments,
+  // with large surrounding negative space (display/ceremonial pages).
+  'TITLE_BLOCK',
 ]);
 
 export type ContentType = z.infer<typeof ContentTypeSchema>;

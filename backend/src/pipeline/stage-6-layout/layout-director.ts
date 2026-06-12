@@ -161,6 +161,11 @@ function placementFor(slot: ArtSlot): { imagePlacement: string; textPlacement: s
       return { imagePlacement: 'small bottom-left corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: the full upper block, then a column beside the accent' };
     case 'CORNER_BOTTOM_RIGHT':
       return { imagePlacement: 'small bottom-right corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: the full upper block, then a column beside the accent' };
+    case 'TITLE_BLOCK':
+      return {
+        imagePlacement: 'only thin decorative ornaments at the very top and bottom edges — no subject illustration',
+        textPlacement: 'a compact, vertically-centered text block (a few short lines) with generous open negative space above and below',
+      };
     default:
       return { imagePlacement: 'left-side image-priority zone within the full-page artwork', textPlacement: 'body text uses the calm right-side text-safe zone, then continues below' };
   }
@@ -382,6 +387,21 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation
         ],
       };
     }
+    case 'TITLE_BLOCK':
+      // Display / ceremonial composition (LAYOUT_TITLE_DISPLAY): a compact,
+      // vertically-centered text block with GENEROUS negative space, framed by
+      // extremely thin edge ornaments. For very short text — title, dedication,
+      // epigraph, quote, special notes. Not a reading field.
+      return {
+        typographyZones: [],
+        imagePriorityZones: [
+          zone('ornament-top', 'supporting-art', 18, 0.5, 64, 3, 'Extremely thin decorative top-EDGE ornament ONLY (a hairline engraved botanical band hugging the top edge). Never overlap the centered text block.'),
+          zone('ornament-bottom', 'supporting-art', 18, 96, 64, 3, 'Extremely thin decorative bottom-EDGE ornament ONLY (a hairline engraved botanical band hugging the bottom edge). Never overlap the centered text block.'),
+        ],
+        textSafeZones: [
+          zone('display-text-block', 'body', 14, 35, 72, 26, 'COMPACT CENTERED TEXT BLOCK (not a paragraph reading field): a few short lines — title largest in engraved serif caps, then any subordinate lines — stacked and VERTICALLY CENTERED. Surround it with generous open parchment above and below; this block is the only focal text on an otherwise calm page.', 'organic'),
+        ],
+      };
     case 'SCATTERED':
       // Supporting studies snap to the page corners/edges (no dead gaps); the reading
       // field is a calm parchment column that does not overlap any study.

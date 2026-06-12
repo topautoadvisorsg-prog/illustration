@@ -158,6 +158,10 @@ const DEFAULT_LAYOUT_CAPACITY: Record<LayoutTemplateId, { minWords: number; targ
   LAYOUT_C_CORNER_BOTTOM_RIGHT: { minWords: 320, targetWords: 440, maxWords: 600 },
   // Layout D — pure text, full page available. Highest body capacity.
   LAYOUT_D_PURE_TEXT: { minWords: 500, targetWords: 700, maxWords: 920 },
+  // Title Display — display/ceremonial composition (title, dedication, epigraph,
+  // quote). A few short lines only, never paragraphs — lowest capacity in the
+  // catalog so the planner reserves it for very-short non-illustration pages.
+  LAYOUT_TITLE_DISPLAY: { minWords: 0, targetWords: 12, maxWords: 60 },
 };
 
 const REQUIRED_LAYOUT_TEMPLATES = Object.keys(DEFAULT_LAYOUT_CAPACITY) as LayoutTemplateId[];
