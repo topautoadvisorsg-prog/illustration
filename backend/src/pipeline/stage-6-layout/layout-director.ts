@@ -163,8 +163,8 @@ function placementFor(slot: ArtSlot): { imagePlacement: string; textPlacement: s
       return { imagePlacement: 'small bottom-right corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: the full upper block, then a column beside the accent' };
     case 'TITLE_BLOCK':
       return {
-        imagePlacement: 'only thin decorative ornaments at the very top and bottom edges — no subject illustration',
-        textPlacement: 'a compact, vertically-centered text block (a few short lines) with generous open negative space above and below',
+        imagePlacement: 'a subtle full-page illustrated field — aged parchment, delicate botanical atmosphere, faint naturalist textures kept calm and low-contrast — with thin decorative ornament bands at the very top and bottom edges; the centered title block sits cleanly within this field',
+        textPlacement: 'a compact, vertically-centered text block (a few short lines) over the calm centre of the illustrated field, with generous open space above and below',
       };
     default:
       return { imagePlacement: 'left-side image-priority zone within the full-page artwork', textPlacement: 'body text uses the calm right-side text-safe zone, then continues below' };
@@ -393,14 +393,21 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation
       // extremely thin edge ornaments. For very short text — title, dedication,
       // epigraph, quote, special notes. Not a reading field.
       return {
-        typographyZones: [],
+        // The centered title block is Type-B OVERLAY display typography sitting
+        // over the illustrated field — NOT a long-form reading field. Classified
+        // as overlay-typography so it is (correctly) exempt from the reading-field
+        // vs image-priority invariant, and painted RED in the blueprint.
+        typographyZones: [
+          zone('display-text-block', 'caption', 14, 35, 72, 26, 'COMPACT CENTERED TITLE BLOCK (display typography, NOT a paragraph reading field): a few short lines — title largest in engraved serif caps, then any subordinate lines — stacked and VERTICALLY CENTERED over the calm centre of the field. Keep that centre low-contrast so the text stays legible.', 'organic'),
+        ],
         imagePriorityZones: [
+          // BLUE primary field: the whole page is a subtle illustrated environment,
+          // NOT blank paper. Drawn first so the ornaments and title block sit on top.
+          zone('display-illustration-field', 'primary-art', 0, 0, 100, 100, 'SUBTLE FULL-PAGE ILLUSTRATED FIELD — the entire page is a soft, low-contrast illustrated environment: aged parchment, delicate botanical atmosphere, faint pressed-leaf / fern / pine textures, gentle vintage paper grain. Keep it quiet and atmospheric so the centered title block stays the focal point; never busy, never a hard subject scene.'),
           zone('ornament-top', 'supporting-art', 18, 0.5, 64, 3, 'Extremely thin decorative top-EDGE ornament ONLY (a hairline engraved botanical band hugging the top edge). Never overlap the centered text block.'),
           zone('ornament-bottom', 'supporting-art', 18, 96, 64, 3, 'Extremely thin decorative bottom-EDGE ornament ONLY (a hairline engraved botanical band hugging the bottom edge). Never overlap the centered text block.'),
         ],
-        textSafeZones: [
-          zone('display-text-block', 'body', 14, 35, 72, 26, 'COMPACT CENTERED TEXT BLOCK (not a paragraph reading field): a few short lines — title largest in engraved serif caps, then any subordinate lines — stacked and VERTICALLY CENTERED. Surround it with generous open parchment above and below; this block is the only focal text on an otherwise calm page.', 'organic'),
-        ],
+        textSafeZones: [],
       };
     case 'SCATTERED':
       // Supporting studies snap to the page corners/edges (no dead gaps); the reading

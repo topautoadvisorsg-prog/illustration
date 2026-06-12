@@ -84,10 +84,10 @@ export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
   LAYOUT_C_CORNER_BOTTOM_RIGHT: { textAreaFactor: 0.75, artSlot: 'CORNER_BOTTOM_RIGHT', artAreaFraction: 0.25, textLight: false },
   // Layout D — pure text / back matter (no illustration).
   LAYOUT_D_PURE_TEXT: { textAreaFactor: 1.0, artSlot: 'FULL_PAGE', artAreaFraction: 0, textLight: false },
-  // Title Display — centered short-text block, thin edge ornaments, large
-  // negative space. Very low text capacity by design (it is for a few lines,
-  // not paragraphs).
-  LAYOUT_TITLE_DISPLAY: { textAreaFactor: 0.15, artSlot: 'TITLE_BLOCK', artAreaFraction: 0.06, textLight: true },
+  // Title Display — centered short-text block + thin edge ornaments over a
+  // SUBTLE full-page illustrated field (the whole page is illustration, not
+  // blank paper). Very low text capacity by design (a few lines, not paragraphs).
+  LAYOUT_TITLE_DISPLAY: { textAreaFactor: 0.15, artSlot: 'TITLE_BLOCK', artAreaFraction: 0.9, textLight: true },
 };
 
 export function getLayoutProfile(template: LayoutTemplateId): LayoutProfile {
