@@ -87,6 +87,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [preview, setPreview] = useState(null); // active preview package
   const [cover, setCover] = useState(null);
   const [assembly, setAssembly] = useState(null);
+  const [status, setStatus] = useState({}); // real backend progress for the step checkmarks
 
   const api = useCallback(async (path, options = {}) => {
     const res = await fetch(`${BACKEND}${path}`, {
@@ -117,6 +118,27 @@ export default function ProductionConsole({ onExitToLegacy }) {
   }), [api, run]);
 
   useEffect(() => { loadProjects().catch(() => {}); }, [loadProjects]);
+
+  // Step checkmarks reflect the project's REAL state (not just what was clicked
+  // this session): manifests => breakdown, CH pages => paginate, FM/BM pages =>
+  // matter, book-ready renders => render. Loaded whenever the active project
+  // changes, so opening a project shows an accurate, consistent progress trail.
+  const loadStatus = useCallback(async (id) => {
+    const [mans, pp, rd] = await Promise.all([
+      api(`/api/projects/${id}/manifests`).catch(() => ({ manifests: [] })),
+      api(`/api/projects/${id}/paginated-pages`).catch(() => ({ pages: [] })),
+      api(`/api/whole-page-render/project/${id}`).catch(() => ({ bookReady: 0 })),
+    ]);
+    const ps = pp.pages || pp.paginatedPages || [];
+    setStatus({
+      breakdown: (mans.manifests || []).length > 0,
+      paginate: ps.some((p) => String(p.pageKey || "").startsWith("CH")),
+      matter: ps.some((p) => /^(FM_|BM_)/.test(p.pageKey || "")),
+      render: (rd.bookReady || 0) > 0,
+    });
+  }, [api]);
+
+  useEffect(() => { if (project?.id) loadStatus(project.id).catch(() => {}); else setStatus({}); }, [project?.id, loadStatus]);
 
   function trimSize(t) {
     if (t === "6x9") return { widthIn: 6, heightIn: 9, bleedIn: 0.125 };
@@ -215,10 +237,31 @@ export default function ProductionConsole({ onExitToLegacy }) {
   });
 
   const loadRenders = useCallback(() => run("Loading page roster", async () => {
-    const d = await api(`/api/whole-page-render/project/${project.id}`);
-    setRenders(d);
-    return { notice: `${d.total} render rows · ${d.bookReady} book-ready.` };
+    // Merge the FULL page roster (every front/body/back page) with render
+    // statuses, so pages that have not been rendered yet (body, reference) still
+    // appear with a Render button — not just pages that already have a render.
+    const [roster, rd] = await Promise.all([
+      api(`/api/projects/${project.id}/paginated-pages`),
+      api(`/api/whole-page-render/project/${project.id}`),
+    ]);
+    const rosterPages = roster.pages || roster.paginatedPages || [];
+    const byPage = new Map();
+    for (const r of rd.renders || []) { if (!byPage.has(r.pageId) || r.active) byPage.set(r.pageId, r); }
+    const section = (k) => (k.startsWith("FM_") ? "Front" : k.startsWith("BM_") ? "Back" : "Body");
+    const merged = rosterPages
+      .map((p) => { const r = byPage.get(p.id) || null; return { pageId: p.id, pageKey: p.pageKey, section: section(p.pageKey), entryTitle: p.entryTitle, status: r ? r.status : "NOT RENDERED", imagePath: r ? r.imagePath : null, renderId: r ? r.id : null }; })
+      .sort((a, b) => a.pageKey.localeCompare(b.pageKey));
+    setRenders({ ...rd, merged });
+    const pending = merged.filter((m) => m.status === "NOT RENDERED").length;
+    return { notice: `${merged.length} pages · ${rd.bookReady || 0} book-ready · ${pending} not rendered.` };
   }), [api, project, run]);
+
+  const renderAll = (filter) => run("Rendering all pending pages (paid)", async () => {
+    const pending = (renders?.merged || []).filter((m) => m.status === "NOT RENDERED" && filter(m));
+    for (const m of pending) await api(`/api/whole-page-render/${m.pageId}`, { method: "POST", body: "{}" });
+    await loadRenders();
+    return { notice: `Rendered ${pending.length} page(s).` };
+  });
 
   const previewPage = (pageId) => run("Building no-spend preview", async () => {
     const d = await api(`/api/whole-page-render/page/${pageId}/preview-package`);
@@ -253,14 +296,14 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const doneFlags = useMemo(() => ({
     project: !!project,
     manuscript: !!project?.manuscriptPath,
-    setup: !!project,
-    breakdown: !!breakdown,
-    paginate: !!pagination,
-    matter: !!matter,
-    render: (renders?.bookReady || 0) > 0,
+    setup: !!project?.manuscriptPath,
+    breakdown: !!status.breakdown || !!breakdown,
+    paginate: !!status.paginate || !!pagination,
+    matter: !!status.matter || !!matter,
+    render: !!status.render || (renders?.bookReady || 0) > 0,
     cover: !!cover,
     assemble: !!assembly && !assembly.blocked,
-  }), [project, breakdown, pagination, matter, renders, cover, assembly]);
+  }), [project, status, breakdown, pagination, matter, renders, cover, assembly]);
 
   return (
     <div style={S.shell}>
@@ -399,28 +442,29 @@ export default function ProductionConsole({ onExitToLegacy }) {
             {project && (
               <>
                 <button style={S.ghost} onClick={() => loadRenders().catch(() => {})}>↻ Load roster</button>
-                {renders && (
+                {renders?.merged && (
+                  <button style={{ ...S.btn("spend"), fontSize: 13 }} onClick={() => { if (window.confirm(`Render all ${renders.merged.filter((m) => m.status === "NOT RENDERED").length} not-yet-rendered page(s)? This costs spend.`)) renderAll(() => true).catch(() => {}); }}>Render all pending →</button>
+                )}
+                {renders?.merged && (
                   <>
-                    <div style={{ marginTop: 8 }}>
-                      {Object.entries(renders.byStatus || {}).map(([k, v]) => <span key={k} style={{ ...S.pill(statusColor(k)), marginRight: 6 }}>{k}: {v}</span>)}
-                    </div>
+                    <div style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{renders.merged.length} pages · {renders.merged.filter((m) => m.status !== "NOT RENDERED").length} rendered · {renders.bookReady || 0} book-ready</div>
                     <div style={S.grid}>
-                      {(renders.renders || []).map((r) => {
-                        const key = (r.imagePath || "").match(/([^/]+)\.png$/)?.[1] || r.pageId.slice(0, 8);
-                        return (
-                          <div key={r.id} style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: 8, background: "#fff" }}>
-                            {r.imagePath ? <img alt={key} src={fileUrl(r.imagePath)} style={{ width: "100%", borderRadius: 4, display: "block" }} /> : <div style={{ height: 90, background: C.field, borderRadius: 4 }} />}
-                            <div style={{ fontSize: 11, marginTop: 6, fontWeight: 700, wordBreak: "break-all" }}>{key}</div>
-                            <div style={{ ...S.pill(statusColor(r.status)), marginTop: 4 }}>{r.status}</div>
-                            <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                              <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => previewPage(r.pageId).catch(() => {})}>Preview</button>
-                              <button style={{ ...S.btn("spend"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderPage(r.pageId).catch(() => {})}>Render</button>
-                              {r.status === "RENDERED" && <button style={{ ...S.btn("ok"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderAction(r.id, "approve", "Approve").catch(() => {})}>Approve</button>}
-                              {r.status === "APPROVED" && <button style={{ ...S.btn("ok"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderAction(r.id, "print-prep", "Print-prep").catch(() => {})}>Print-prep</button>}
-                            </div>
+                      {renders.merged.map((m) => (
+                        <div key={m.pageId} style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: 8, background: "#fff" }}>
+                          {m.imagePath ? <img alt={m.pageKey} src={fileUrl(m.imagePath)} style={{ width: "100%", borderRadius: 4, display: "block" }} /> : <div style={{ height: 110, background: "#f0ead6", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: 11 }}>not rendered</div>}
+                          <div style={{ fontSize: 11, marginTop: 6, fontWeight: 700, wordBreak: "break-all" }}>{m.pageKey}</div>
+                          <div style={{ marginTop: 4, display: "flex", gap: 5, alignItems: "center" }}>
+                            <span style={S.pill(statusColor(m.status))}>{m.status}</span>
+                            <span style={{ fontSize: 10, color: C.muted }}>{m.section}</span>
                           </div>
-                        );
-                      })}
+                          <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => previewPage(m.pageId).catch(() => {})}>Preview</button>
+                            <button style={{ ...S.btn("spend"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderPage(m.pageId).catch(() => {})}>Render</button>
+                            {m.status === "RENDERED" && m.renderId && <button style={{ ...S.btn("ok"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderAction(m.renderId, "approve", "Approve").catch(() => {})}>Approve</button>}
+                            {m.status === "APPROVED" && m.renderId && <button style={{ ...S.btn("ok"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderAction(m.renderId, "print-prep", "Print-prep").catch(() => {})}>Print-prep</button>}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </>
                 )}
