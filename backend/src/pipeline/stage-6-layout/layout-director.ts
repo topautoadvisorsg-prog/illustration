@@ -20,6 +20,10 @@ export interface LayoutDirectorInput {
   geometry: PageGeometry;
   bodyPt: number;
   lineHeight: number;
+  /** Whether the page actually has a heading/title. Default true. When false, a
+   *  pure-text layout drops the empty title band and raises its reading field
+   *  (copyright / continuation / compacted pages have no title). */
+  hasTitle?: boolean;
 }
 
 /** Position of the image-priority zone on the page (where focal visual content lives). */
@@ -188,8 +192,8 @@ function refinedPlacement(slot: ArtSlot, imagePercent: number): { imagePlacement
     }
     if (imagePercent <= 8) {
       return {
-        imagePlacement: 'small decorative ornaments at the top and bottom edges ONLY — visual continuity, not a subject illustration',
-        textPlacement: 'a large uninterrupted reading field fills the page between the edge ornaments',
+        imagePlacement: 'a SUBTLE full-page illustrated field — calm, low-contrast aged parchment with soft atmosphere and faint naturalist texture across the whole page (never blank paper) — framed by thin decorative ornament bands at the very top and bottom edges. Keep it quiet: no bold subject illustration, this stays a restful text page',
+        textPlacement: 'a single calm reading field for the body text, sitting over the subtle field between the edge ornaments',
       };
     }
   }
@@ -329,7 +333,7 @@ const BACKGROUND_FIELD_SLOTS = new Set<ArtSlot>([
   'CORNER_BOTTOM_RIGHT',
 ]);
 
-function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation, 'textSafeZones' | 'typographyZones' | 'imagePriorityZones'> {
+function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick<LayoutAllocation, 'textSafeZones' | 'typographyZones' | 'imagePriorityZones'> {
   const title = titleBand();
   switch (slot) {
     case 'TOP_BAND': {
@@ -484,18 +488,29 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation
         };
       }
       if (imagePercent <= 8) {
-        // PURE TEXT (LAYOUT_D_PURE_TEXT, and reworked continuation). A large
-        // uninterrupted reading field with only small decorative ornaments at
-        // the top and bottom edges — visual continuity, NOT a subject plate.
+        // PURE TEXT (LAYOUT_D_PURE_TEXT: continuation, compacted, copyright,
+        // glossary, index, contents…). A calm reading field with only thin
+        // decorative edge ornaments — visual continuity, NOT a subject plate.
+        // Ornaments sit at the very top/bottom edges, EXTREMELY THIN — they may
+        // touch the text zones but must never overlap them (operator fix).
+        const ornaments = [
+          zone('ornament-top', 'supporting-art', 12, 0.5, 76, 3, 'Extremely thin decorative top-EDGE ornament ONLY (a hairline engraved botanical band hugging the top edge) — visual continuity, never a subject illustration. Keep it a thin strip; never overlap the title or the reading field.'),
+          zone('ornament-bottom', 'supporting-art', 12, 96, 76, 3, 'Extremely thin decorative bottom-EDGE ornament ONLY (a hairline engraved botanical band hugging the bottom edge) — visual continuity, never a subject illustration. Keep it a thin strip; never overlap the reading field.'),
+        ];
+        // Titled pages (glossary/index/contents) reserve a top title band.
+        // Titleless pages (copyright/continuation/compacted) drop the empty band
+        // and raise the reading field so the text starts near the top edge.
+        if (hasTitle) {
+          return {
+            typographyZones: [title],
+            imagePriorityZones: ornaments,
+            textSafeZones: [zone('reading-field-full', 'body', 6, 18, 88, 72, 'Large uninterrupted reading field: a calm parchment text column filling the page between the edge ornaments. Text-first page — no subject illustration, no panels, no cards.', 'organic')],
+          };
+        }
         return {
-          typographyZones: [title],
-          // Ornaments sit at the very top/bottom edges, EXTREMELY THIN — they may
-          // touch the text zones but must never overlap them (operator fix).
-          imagePriorityZones: [
-            zone('ornament-top', 'supporting-art', 12, 0.5, 76, 3, 'Extremely thin decorative top-EDGE ornament ONLY (a hairline engraved botanical band hugging the top edge) — visual continuity, never a subject illustration. Keep it a thin strip; never overlap the title or the reading field.'),
-            zone('ornament-bottom', 'supporting-art', 12, 96, 76, 3, 'Extremely thin decorative bottom-EDGE ornament ONLY (a hairline engraved botanical band hugging the bottom edge) — visual continuity, never a subject illustration. Keep it a thin strip; never overlap the reading field.'),
-          ],
-          textSafeZones: [zone('reading-field-full', 'body', 6, 18, 88, 72, 'Large uninterrupted reading field: a calm parchment text column filling the page between the edge ornaments. Text-first page — no subject illustration, no panels, no cards.', 'organic')],
+          typographyZones: [],
+          imagePriorityZones: ornaments,
+          textSafeZones: [zone('reading-field-full', 'body', 6, 6, 88, 84, 'Single calm reading field with NO title band: the body text begins near the top edge and flows down one calm parchment column between the thin edge ornaments. Text-first page — no heading, no subject illustration, no panels, no cards.', 'organic')],
         };
       }
       return {
@@ -562,14 +577,18 @@ export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
   const textPercent = Math.max(0, 100 - imagePercent);
   const placement = refinedPlacement(profile.artSlot, imagePercent);
   const imagePriorityZone = imagePriorityZoneFor(profile.artSlot, profile.artAreaFraction, input.geometry);
-  const zonePlan = zonePlanFor(profile.artSlot, imagePercent);
-  // Illustration layouts read as one continuous page: lay a subtle background
-  // illustration field UNDER the focal art so no region looks blank. Pure-text
-  // (LAYOUT_D / FULL_PAGE ~0 image), the full-canvas plate (already 100% art),
-  // and TITLE_BLOCK (builds its own field) are excluded.
+  // A titleless page (copyright/continuation/compacted) drops the empty title
+  // band and raises its reading field; titled pages keep their heading band.
+  const hasTitle = input.hasTitle !== false;
+  const zonePlan = zonePlanFor(profile.artSlot, imagePercent, hasTitle);
+  // Every page is one continuous illustration: lay a subtle background field
+  // UNDER the focal art / text so no region looks blank — including the
+  // pure-text pages (a quiet parchment/atmosphere field behind the reading
+  // field). Only the full-canvas plate (already 100% art) and TITLE_BLOCK
+  // (builds its own field) are excluded.
   const wantsBackgroundField =
     BACKGROUND_FIELD_SLOTS.has(profile.artSlot) ||
-    (profile.artSlot === 'FULL_PAGE' && imagePercent > 8 && imagePercent < 90);
+    (profile.artSlot === 'FULL_PAGE' && imagePercent < 90);
   if (wantsBackgroundField) {
     zonePlan.imagePriorityZones = [backgroundField(), ...zonePlan.imagePriorityZones];
   }

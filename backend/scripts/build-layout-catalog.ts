@@ -62,6 +62,8 @@ interface Family {
   body: string;
   purpose: string;
   whenSelected: string;
+  /** False for titleless pure-text pages (copyright/continuation/compacted). */
+  hasTitle?: boolean;
 }
 
 const families: Family[] = [
@@ -71,8 +73,9 @@ const families: Family[] = [
   { name: '50/50', layoutTemplate: 'LAYOUT_B_IMAGE_TOP', pageRole: 'opener', section: 'BODY', frontMatterType: null, subject: 'eastern coyote portrait, upper band', body: SAMPLE_BODY, purpose: 'Even split — image band + reading field.', whenSelected: 'Equal weight of image and text.' },
   { name: '25% Accent', layoutTemplate: 'LAYOUT_C_CORNER_TOP_LEFT', pageRole: 'opener', section: 'BODY', frontMatterType: null, subject: 'corner vignette of a coyote paw print', body: SAMPLE_BODY, purpose: 'Corner accent — small art, text-led.', whenSelected: 'Text-forward pages wanting a light visual accent.' },
   // Layout Audit 1 §4 — Continuation reworked to the text-first pure-text layout (no subject reservation).
-  { name: 'Continuation', layoutTemplate: 'LAYOUT_D_PURE_TEXT', pageRole: 'continuation', section: 'BODY', frontMatterType: null, subject: '', body: SAMPLE_BODY, purpose: 'Flowed text continuing a prior entry; reading-space first, edge ornaments only.', whenSelected: 'When an entry overflows one page.' },
-  { name: 'Compacted', layoutTemplate: 'LAYOUT_D_PURE_TEXT', pageRole: 'compacted', section: 'BODY', frontMatterType: null, subject: '', body: SAMPLE_BODY, purpose: 'Multiple short entries merged onto one page.', whenSelected: 'Small entries packed to save pages.' },
+  { name: 'Continuation', layoutTemplate: 'LAYOUT_D_PURE_TEXT', pageRole: 'continuation', section: 'BODY', frontMatterType: null, subject: '', body: SAMPLE_BODY, purpose: 'Flowed text continuing a prior entry; reading-space first, edge ornaments only.', whenSelected: 'When an entry overflows one page.', hasTitle: false },
+  { name: 'Compacted', layoutTemplate: 'LAYOUT_D_PURE_TEXT', pageRole: 'compacted', section: 'BODY', frontMatterType: null, subject: '', body: SAMPLE_BODY, purpose: 'Multiple short entries merged onto one page.', whenSelected: 'Small entries packed to save pages.', hasTitle: false },
+  { name: 'Copyright', layoutTemplate: 'LAYOUT_D_PURE_TEXT', pageRole: 'opener', section: 'FRONT_MATTER', frontMatterType: 'COPYRIGHT_PAGE', subject: '', body: 'The Wildlands Field Guide — New England Volume\n\nCopyright © 2026 The Wildlands. All rights reserved. No part of this publication may be reproduced, stored in a retrieval system, or transmitted in any form or by any means without the prior written permission of the publisher, except for brief quotations used in reviews.\n\nFirst Edition', purpose: 'Copyright page — short legal text, no heading, thin edge ornaments over a subtle background field.', whenSelected: 'Front matter copyright/edition notice.', hasTitle: false },
   { name: 'Title Page', layoutTemplate: 'LAYOUT_TITLE_DISPLAY', pageRole: 'opener', section: 'FRONT_MATTER', frontMatterType: 'TITLE_PAGE', subject: '', body: '', purpose: 'Display/ceremonial page — a compact centered title block (title, subtitle, author) baked into the art, large negative space, thin edge ornaments.', whenSelected: 'Front matter title page; also dedication / epigraph / quote / special notes (LAYOUT_TITLE_DISPLAY family).' },
   { name: 'Intro Opener', layoutTemplate: 'LAYOUT_5_CHAPTER_OPENER', pageRole: 'opener', section: 'FRONT_MATTER', frontMatterType: 'INTRODUCTION', subject: '', body: SAMPLE_BODY, purpose: 'Introduction opener — threshold image + opening prose.', whenSelected: 'Front matter introduction.' },
   { name: 'Author Page', layoutTemplate: 'LAYOUT_D_PURE_TEXT', pageRole: 'opener', section: 'FRONT_MATTER', frontMatterType: 'ABOUT_AUTHOR', subject: '', body: SAMPLE_BODY, purpose: 'About-the-author page.', whenSelected: 'Front/back matter.' },
@@ -104,7 +107,7 @@ for (const f of families) {
   const dir = path.join(OUT, f.name.replace(/\s+/g, '_'));
   fs.mkdirSync(dir, { recursive: true });
   const profile = LAYOUT_PROFILES[f.layoutTemplate];
-  const allocation = directLayout({ bodyMarkdown: f.body || ' ', layoutTemplate: f.layoutTemplate, geometry, bodyPt, lineHeight });
+  const allocation = directLayout({ bodyMarkdown: f.body || ' ', layoutTemplate: f.layoutTemplate, geometry, bodyPt, lineHeight, hasTitle: f.hasTitle });
   const spec = buildPageSpec({ pageRow: makeRow(f), config, geometry, allocation, entryTitle: '', imageSubject: f.subject });
   const prompt = assemblePagePrompt(spec);
   const { png } = await renderBlueprintPng(allocation, 1024, 1536, { canvasIn });

@@ -109,6 +109,9 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
     geometry,
     bodyPt: config.typography.bodyPt,
     lineHeight: config.typography.lineHeight,
+    // Titleless pages (copyright/continuation/compacted) drop the empty title
+    // band so the reading field can use the full height.
+    hasTitle: Boolean(pageRolePolicy.title?.name?.trim()),
   });
 
   const spec = buildPageSpec({
