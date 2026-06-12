@@ -168,9 +168,21 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
           pageType === 'AUTHOR_PAGE' ||
           pageType === 'SERIES_PAGE' ||
           pageType === 'COPYRIGHT_PAGE' ||
-          pageType === 'CONTENTS'
+          pageType === 'CONTENTS' ||
+          // Glossary/Index now render their entries, so they also carry their
+          // heading ("GLOSSARY" / "INDEX") from the role policy.
+          pageType === 'GLOSSARY_ORNAMENT' ||
+          pageType === 'INDEX_ORNAMENT'
         ? policy.title
         : { kicker: '', number: '', name: '' };
+
+  // Reference pages (glossary/index) use smaller, two-column reference type so
+  // dense entries fit comfortably without overflowing — same serif family, just
+  // a smaller point size and narrower per-column measure.
+  const referenceType =
+    layout === 'LAYOUT_REFERENCE'
+      ? { bodyPt: 8.5, bodyLineHeight: 1.3, bodyMeasureChars: 40 }
+      : null;
 
   return {
     pageType,
@@ -196,6 +208,7 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
     readingFieldGeometry: rfGeometry,
     typographyDNA: {
       ...PAGE_TYPOGRAPHY_DNA,
+      ...(referenceType ?? {}),
       // Drop-cap governance (SPEC_GEOMETRY_RECONCILIATION §3): the drop-cap
       // surround is authoritative on `dropCap`. When there is no drop-cap
       // (every interior/continuation page), emit NOTHING about it — otherwise

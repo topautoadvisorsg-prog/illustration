@@ -77,10 +77,12 @@ export function defaultLayoutForRole(pageType: WholePageRole): LayoutTemplateId 
     // anchored low on a calm illustrated field (LAYOUT_FINE_PRINT).
     case 'COPYRIGHT_PAGE':
       return 'LAYOUT_FINE_PRINT';
-    case 'AUTHOR_PAGE':
-    case 'SERIES_PAGE':
+    // Glossary & Index are dense reference pages — two-column reference layout.
     case 'GLOSSARY_ORNAMENT':
     case 'INDEX_ORNAMENT':
+      return 'LAYOUT_REFERENCE';
+    case 'AUTHOR_PAGE':
+    case 'SERIES_PAGE':
     case 'CONTENTS':
       return 'LAYOUT_D_PURE_TEXT';
     case 'INTRO_OPENER':
@@ -118,6 +120,9 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
   // Copyright is fine print regardless of any layout stored on the row by an
   // earlier breakdown — force the low fine-print block layout.
   if (pageType === 'COPYRIGHT_PAGE') layoutTemplate = 'LAYOUT_FINE_PRINT';
+  // Glossary/Index are dense two-column reference pages, regardless of any
+  // single-column layout an earlier breakdown stored on the row.
+  if (pageType === 'GLOSSARY_ORNAMENT' || pageType === 'INDEX_ORNAMENT') layoutTemplate = 'LAYOUT_REFERENCE';
   const title = resolvedTitle(config);
   const subtitle = resolvedSubtitle(config);
   const author = resolvedAuthor(config);

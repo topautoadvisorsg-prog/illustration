@@ -182,6 +182,11 @@ function placementFor(slot: ArtSlot): { imagePlacement: string; textPlacement: s
         imagePlacement: 'a subtle full-page illustrated field — calm, low-contrast aged parchment with delicate botanical atmosphere and faint naturalist textures — framed by thin decorative ornament bands at the very top and bottom edges; the field owns the open space above the fine print',
         textPlacement: 'a SMALL block of quiet fine print anchored LOW on the page (lower third), small restrained type centered horizontally, with the calm illustrated field filling all the space above it',
       };
+    case 'REFERENCE_COLUMNS':
+      return {
+        imagePlacement: 'a subtle full-page illustrated field — calm, low-contrast aged parchment with faint botanical atmosphere — framed by thin decorative ornament bands at the very top and bottom edges; it sits quietly BEHIND the two reference columns',
+        textPlacement: 'a heading at the top, then the entries flow in TWO balanced columns of smaller but comfortable reference type (read down the left column, then continue down the right). Dense and orderly, like a real field-guide glossary/index — never a single wide block, never cramped',
+      };
     default:
       return { imagePlacement: 'left-side image-priority zone within the full-page artwork', textPlacement: 'body text uses the calm right-side text-safe zone, then continues below' };
   }
@@ -473,6 +478,23 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick
         ],
         textSafeZones: [
           zone('fine-print-block', 'body', 16, 72, 68, 18, 'SMALL FINE-PRINT BLOCK anchored low on the page (copyright / edition notice): a few lines of small, quiet legal/credits type, centered horizontally in the lower third. The calm illustrated field owns ALL the open space ABOVE it. Keep the type small and restrained — fine print, never a large reading field, never a heading.', 'organic'),
+        ],
+      };
+    case 'REFERENCE_COLUMNS':
+      // Reference page (LAYOUT_REFERENCE: glossary, index). A heading + TWO
+      // dense reading columns of smaller reference type, over the same calm
+      // illustrated field + thin edge ornaments. Same Wildlands DNA — only the
+      // text geometry changes (two columns instead of one full field).
+      return {
+        typographyZones: [title],
+        imagePriorityZones: [
+          backgroundField(),
+          zone('ornament-top', 'supporting-art', 12, 0.5, 76, 3, 'Extremely thin decorative top-EDGE ornament ONLY (a hairline engraved botanical band hugging the top edge). Never overlap the heading or the columns.'),
+          zone('ornament-bottom', 'supporting-art', 12, 96, 76, 3, 'Extremely thin decorative bottom-EDGE ornament ONLY (a hairline engraved botanical band hugging the bottom edge). Never overlap the columns.'),
+        ],
+        textSafeZones: [
+          zone('reading-column-left', 'body', 6, 18, 42, 72, 'LEFT reading column of a TWO-COLUMN reference page (glossary / index): dense entries set in smaller but comfortable reference type, flowing top-to-bottom, then continuing in the right column. A calm parchment column over the subtle field — no panel, box, or card.', 'organic'),
+          zone('reading-column-right', 'body', 52, 18, 42, 72, 'RIGHT reading column of the TWO-COLUMN reference page: the entries continue here from the left column, same smaller reference type. A calm parchment column over the subtle field — no panel, box, or card.', 'organic'),
         ],
       };
     case 'SCATTERED':

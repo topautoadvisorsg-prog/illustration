@@ -52,6 +52,8 @@ const SHAPE_BY_SLOT: Record<ArtSlot, ImageShape> = {
   TITLE_BLOCK: 'portrait',
   // Fine print sits low on a portrait page over a calm illustrated field.
   FINE_PRINT_BOTTOM: 'portrait',
+  // Two-column reference page on a portrait page over a calm illustrated field.
+  REFERENCE_COLUMNS: 'portrait',
 };
 
 export const LAYOUT_IMAGE_SHAPES: Record<LayoutTemplateId, ImageShape> = {
@@ -85,6 +87,7 @@ export const LAYOUT_IMAGE_SHAPES: Record<LayoutTemplateId, ImageShape> = {
   LAYOUT_D_PURE_TEXT: 'square', // no image — placeholder for the Record completeness
   LAYOUT_TITLE_DISPLAY: 'portrait', // centered title block, thin top/bottom ornaments
   LAYOUT_FINE_PRINT: 'portrait', // low fine-print block over a calm illustrated field
+  LAYOUT_REFERENCE: 'portrait', // two-column reference (glossary/index) over a calm field
 };
 
 export function imageShapeForLayout(template: LayoutTemplateId): LayoutImageShape {

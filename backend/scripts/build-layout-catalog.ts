@@ -80,8 +80,8 @@ const families: Family[] = [
   { name: 'Intro Opener', layoutTemplate: 'LAYOUT_5_CHAPTER_OPENER', pageRole: 'opener', section: 'FRONT_MATTER', frontMatterType: 'INTRODUCTION', subject: '', body: SAMPLE_BODY, purpose: 'Introduction opener — threshold image + opening prose.', whenSelected: 'Front matter introduction.' },
   { name: 'Author Page', layoutTemplate: 'LAYOUT_D_PURE_TEXT', pageRole: 'opener', section: 'FRONT_MATTER', frontMatterType: 'ABOUT_AUTHOR', subject: '', body: SAMPLE_BODY, purpose: 'About-the-author page.', whenSelected: 'Front/back matter.' },
   { name: 'Series Page', layoutTemplate: 'LAYOUT_D_PURE_TEXT', pageRole: 'opener', section: 'FRONT_MATTER', frontMatterType: 'ABOUT_SERIES', subject: '', body: SAMPLE_BODY, purpose: 'About-the-series / resources page.', whenSelected: 'Front/back matter.' },
-  { name: 'Glossary', layoutTemplate: 'LAYOUT_D_PURE_TEXT', pageRole: 'opener', section: 'BACK_MATTER', frontMatterType: 'GLOSSARY', subject: '', body: '', purpose: 'Glossary — edge ornament only; entries typeset by the engine.', whenSelected: 'Back matter.' },
-  { name: 'Index', layoutTemplate: 'LAYOUT_D_PURE_TEXT', pageRole: 'opener', section: 'BACK_MATTER', frontMatterType: 'INDEX', subject: '', body: '', purpose: 'Index — edge ornament only; entries typeset by the engine.', whenSelected: 'Back matter.' },
+  { name: 'Glossary', layoutTemplate: 'LAYOUT_REFERENCE', pageRole: 'opener', section: 'BACK_MATTER', frontMatterType: 'GLOSSARY', subject: '', body: 'Quick-reference definitions for field terms used throughout this book.\n\nAmatoxin — Lethal toxins in Amanita, Galerina, and Lepiota mushrooms. Cause delayed liver and kidney failure. Heat stable. No antidote.\n\nAnnulus — The ring-like skirt on a mushroom stem, remnant of the partial veil. Key identification feature in Amanita.\n\nArachnid — Eight-legged arthropod. Ticks are arachnids, not insects.\n\nAspect — The direction a slope faces. South-facing slopes are warmer and drier; affects vegetation and snowmelt timing.\n\nAuricle — A small backward-pointing lobe at the base of a leaf blade. Identifies sheep sorrel.\n\nBearing — A compass direction in degrees (0–360). Used for navigation off-trail.\n\nBoreal — The cold northern coniferous forest zone of spruce and fir.\n\nCambium — The thin growing layer beneath tree bark.\n\nCaltrop — A spiny seed or structure; underfoot hazard in some terrain.\n\nDiurnal — Active during daylight hours.\n\nEphemeral — Short-lived; spring ephemerals bloom before the canopy leafs out.\n\nForb — A broad-leaved herbaceous (non-grass) plant.', purpose: 'Glossary — dense two-column reference entries with the GLOSSARY heading.', whenSelected: 'Back matter glossary (LAYOUT_REFERENCE family).', hasTitle: true },
+  { name: 'Index', layoutTemplate: 'LAYOUT_REFERENCE', pageRole: 'opener', section: 'BACK_MATTER', frontMatterType: 'INDEX', subject: '', body: 'CLIMATE & SEASONS ... 7\nHazard 1 — Extreme Weather Above Treeline ... 13\nHazard 2 — Lyme Disease & Tick-Borne Illness ... 15\nHazard 3 — Moose ... 17\nHazard 4 — River Crossings in Spring ... 19\nHazard 5 — Hypothermia in All Seasons ... 20\nKEY HAZARDS — What Gets People in Trouble Here ... 12\nTHE BONES OF THE LAND — Geography & Geology ... 1\nTHE FIRST PEOPLES OF THIS LAND ... 10\nTHE THREE WILDERNESS ZONES ... 4', purpose: 'Index — two-column entry/page-number reference with the INDEX heading.', whenSelected: 'Back matter index (LAYOUT_REFERENCE family).', hasTitle: true },
 ];
 
 function makeRow(f: Family): PageRow {
@@ -107,11 +107,15 @@ for (const f of families) {
   const dir = path.join(OUT, f.name.replace(/\s+/g, '_'));
   fs.mkdirSync(dir, { recursive: true });
   const profile = LAYOUT_PROFILES[f.layoutTemplate];
-  const allocation = directLayout({ bodyMarkdown: f.body || ' ', layoutTemplate: f.layoutTemplate, geometry, bodyPt, lineHeight, hasTitle: f.hasTitle });
+  // Reference pages render at smaller two-column type — measure capacity at that
+  // size so the catalog reports the real fit, not a 13pt single-column estimate.
+  const fBodyPt = f.layoutTemplate === 'LAYOUT_REFERENCE' ? 8.5 : bodyPt;
+  const fLineHeight = f.layoutTemplate === 'LAYOUT_REFERENCE' ? 1.3 : lineHeight;
+  const allocation = directLayout({ bodyMarkdown: f.body || ' ', layoutTemplate: f.layoutTemplate, geometry, bodyPt: fBodyPt, lineHeight: fLineHeight, hasTitle: f.hasTitle });
   const spec = buildPageSpec({ pageRow: makeRow(f), config, geometry, allocation, entryTitle: '', imageSubject: f.subject });
   const prompt = assemblePagePrompt(spec);
   const { png } = await renderBlueprintPng(allocation, 1024, 1536, { canvasIn });
-  const fit = analyzeTextFit({ bodyMarkdown: f.body || ' ', layoutTemplate: f.layoutTemplate, geometry, bodyPt, lineHeight });
+  const fit = analyzeTextFit({ bodyMarkdown: f.body || ' ', layoutTemplate: f.layoutTemplate, geometry, bodyPt: fBodyPt, lineHeight: fLineHeight });
 
   fs.writeFileSync(path.join(dir, 'spec.json'), JSON.stringify(spec, null, 2), 'utf8');
   fs.writeFileSync(path.join(dir, 'prompt.txt'), prompt, 'utf8');

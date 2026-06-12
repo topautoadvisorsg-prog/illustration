@@ -119,6 +119,11 @@ function textPanelDims(
       // Fine-print page — a small low-anchored block (≈68% wide × ≈18% tall);
       // capacity is small by design (a few lines of legal/credits print).
       return { widthPt: W * 0.68, heightPt: H * 0.18 };
+    case 'REFERENCE_COLUMNS':
+      // Two-column reference page — the two columns are 42% wide each (≈84%
+      // combined; the rest is side margins + the centre gutter) over the column
+      // height (≈72%). Capacity is the two columns' combined area.
+      return { widthPt: W * 0.84, heightPt: H * 0.72 };
   }
 }
 

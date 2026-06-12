@@ -127,6 +127,9 @@ export const LayoutTemplateIdSchema = z.enum([
   // notice, colophon, "printed in" lines). A calm illustrated field fills the
   // space above; the legal/credits fine print sits quietly at the bottom.
   'LAYOUT_FINE_PRINT',
+  // Reference — a dense two-column reference page (glossary, index) at smaller
+  // reference type, over the same subtle illustrated field + edge ornaments.
+  'LAYOUT_REFERENCE',
 ]);
 
 // â”€â”€ Layered layout model (Phase 1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -193,6 +196,9 @@ export const ArchitectureSchema = z.enum([
   // A small text block anchored LOW on the page over a calm illustrated field
   // (fine-print pages: copyright, colophon, edition notice).
   'FINE_PRINT_BOTTOM',
+  // Two reading columns of dense reference type over the illustrated field
+  // (reference pages: glossary, index).
+  'REFERENCE_COLUMNS',
 ]);
 
 export type ContentType = z.infer<typeof ContentTypeSchema>;

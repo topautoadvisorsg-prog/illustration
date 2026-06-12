@@ -190,6 +190,7 @@ const LAYOUT_ZONE_PRESETS = {
   LAYOUT_D_PURE_TEXT:           { architecture: "FULL_PAGE",           openingPageImagePercent: 0,  openingPageTextPercent: 100 },
   LAYOUT_TITLE_DISPLAY:         { architecture: "TITLE_BLOCK",         openingPageImagePercent: 6,  openingPageTextPercent: 94 },
   LAYOUT_FINE_PRINT:            { architecture: "FINE_PRINT_BOTTOM",   openingPageImagePercent: 6,  openingPageTextPercent: 94 },
+  LAYOUT_REFERENCE:             { architecture: "REFERENCE_COLUMNS",   openingPageImagePercent: 6,  openingPageTextPercent: 94 },
 };
 
 const PUBLISHING_STANDARD_PRESETS = {
@@ -285,6 +286,7 @@ const SIMPLIFIED_FAMILY_LABELS = {
   LAYOUT_D_PURE_TEXT: "Layout D — Pure Text / Back Matter",
   LAYOUT_TITLE_DISPLAY: "Layout Title Display — Centered Short Text (title / dedication / epigraph)",
   LAYOUT_FINE_PRINT: "Layout Fine Print — Small Low Block (copyright / colophon / edition notice)",
+  LAYOUT_REFERENCE: "Layout Reference — Two-Column Dense Entries (glossary / index)",
 };
 
 function simplifiedFamilyLabel(template) {
@@ -1223,6 +1225,17 @@ function zonePreviewLayers(source) {
       { id: "image-priority-ornament-top", kind: "image-priority", label: "Image-priority", xPct: 12, yPct: 0.5, widthPct: 76, heightPct: 3, instruction: "Thin decorative top-edge ornament only." },
       { id: "image-priority-ornament-bottom", kind: "image-priority", label: "Image-priority", xPct: 12, yPct: 96, widthPct: 76, heightPct: 3, instruction: "Thin decorative bottom-edge ornament only." },
       { id: "text-safe-fine-print", kind: "text-safe", label: "Text-safe", xPct: 16, yPct: 72, widthPct: 68, heightPct: 18, instruction: "Small fine-print block (copyright / edition notice) anchored low; calm illustrated field fills the space above." },
+    ];
+  }
+  if (architecture === "REFERENCE_COLUMNS") {
+    // Two-column reference page (LAYOUT_REFERENCE: glossary / index): heading +
+    // two dense reading columns over the calm illustrated field + edge ornaments.
+    return [
+      { id: "image-priority-ornament-top", kind: "image-priority", label: "Image-priority", xPct: 12, yPct: 0.5, widthPct: 76, heightPct: 3, instruction: "Thin decorative top-edge ornament only." },
+      { id: "image-priority-ornament-bottom", kind: "image-priority", label: "Image-priority", xPct: 12, yPct: 96, widthPct: 76, heightPct: 3, instruction: "Thin decorative bottom-edge ornament only." },
+      { ...baseTitle },
+      { id: "text-safe-col-left", kind: "text-safe", label: "Text-safe", xPct: 6, yPct: 18, widthPct: 42, heightPct: 72, instruction: "Left reference column (dense smaller type)." },
+      { id: "text-safe-col-right", kind: "text-safe", label: "Text-safe", xPct: 52, yPct: 18, widthPct: 42, heightPct: 72, instruction: "Right reference column (entries continue)." },
     ];
   }
   if (architecture.startsWith("CORNER_")) {

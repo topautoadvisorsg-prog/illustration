@@ -44,6 +44,7 @@ const FAMILY_LABEL: Partial<Record<LayoutTemplateId, string>> = {
   LAYOUT_D_PURE_TEXT: 'Layout D — Pure Text / Back Matter',
   LAYOUT_TITLE_DISPLAY: 'Layout Title Display — Centered Short Text (title / dedication / epigraph)',
   LAYOUT_FINE_PRINT: 'Layout Fine Print — Small Low Block (copyright / colophon / edition notice)',
+  LAYOUT_REFERENCE: 'Layout Reference — Two-Column Dense Entries (glossary / index)',
 };
 
 function layoutFamilyLabel(t: LayoutTemplateId | string): string {

@@ -165,6 +165,9 @@ const DEFAULT_LAYOUT_CAPACITY: Record<LayoutTemplateId, { minWords: number; targ
   // Fine print — a small legal/credits block (copyright, colophon). A bit more
   // capacity than a title block (full copyright notice), still small by design.
   LAYOUT_FINE_PRINT: { minWords: 0, targetWords: 45, maxWords: 140 },
+  // Reference — two columns of dense small reference type (glossary/index) hold
+  // a lot of short entries per page.
+  LAYOUT_REFERENCE: { minWords: 200, targetWords: 480, maxWords: 640 },
 };
 
 const REQUIRED_LAYOUT_TEMPLATES = Object.keys(DEFAULT_LAYOUT_CAPACITY) as LayoutTemplateId[];

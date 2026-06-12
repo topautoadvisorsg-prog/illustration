@@ -41,7 +41,11 @@ export type ArtSlot =
   // Fine-print composition: a small text block anchored LOW on the page over a
   // calm illustrated field + thin edge ornaments (LAYOUT_FINE_PRINT — copyright,
   // colophon, edition notice).
-  | 'FINE_PRINT_BOTTOM';
+  | 'FINE_PRINT_BOTTOM'
+  // Two-column reference composition: a heading + two dense reading columns over
+  // the calm illustrated field + thin edge ornaments (LAYOUT_REFERENCE —
+  // glossary, index).
+  | 'REFERENCE_COLUMNS';
 
 export interface LayoutProfile {
   /** Fraction of the page available to body copy in the text-safe zone (0-1). */
@@ -95,6 +99,9 @@ export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
   // Fine Print — small low-anchored text block over a calm full-page illustrated
   // field. Very low text capacity by design (a few lines of legal/credits print).
   LAYOUT_FINE_PRINT: { textAreaFactor: 0.18, artSlot: 'FINE_PRINT_BOTTOM', artAreaFraction: 0.9, textLight: true },
+  // Reference — two dense reading columns (glossary/index) over the calm
+  // illustrated field. High text capacity (two columns of small reference type).
+  LAYOUT_REFERENCE: { textAreaFactor: 0.95, artSlot: 'REFERENCE_COLUMNS', artAreaFraction: 0.9, textLight: false },
 };
 
 export function getLayoutProfile(template: LayoutTemplateId): LayoutProfile {
@@ -134,6 +141,7 @@ const ART_SLOT_LABELS: Record<ArtSlot, string> = {
   CORNER_BOTTOM_RIGHT: 'bottom-right corner',
   TITLE_BLOCK: 'centered title block',
   FINE_PRINT_BOTTOM: 'bottom fine-print block',
+  REFERENCE_COLUMNS: 'two-column reference',
 };
 
 /**

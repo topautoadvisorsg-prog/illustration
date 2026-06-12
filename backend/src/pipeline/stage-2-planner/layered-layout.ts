@@ -209,6 +209,9 @@ export const LAYOUT_TEMPLATE_COMPOSITION: Record<LayoutTemplateId, LayoutComposi
   // Fine print shares the display/short-text content family; its arrangement is
   // the low-anchored fine-print block.
   LAYOUT_FINE_PRINT: { contentType: 'TITLE_DISPLAY', coverage: 5, architecture: 'FINE_PRINT_BOTTOM' },
+  // Reference page (glossary/index): a reference content type arranged as two
+  // dense reading columns.
+  LAYOUT_REFERENCE: { contentType: 'REFERENCE_PAGE', coverage: 5, architecture: 'REFERENCE_COLUMNS' },
 };
 
 export function decomposeTemplate(template: LayoutTemplateId): LayoutComposition {
