@@ -343,7 +343,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
   const assemble = () => run("Assembling the finished book", async () => {
     const d = await api(`/api/whole-page-render/project/${project.id}/assemble`, { method: "POST", body: "{}" });
-    if (d.blocked) { setAssembly(d); return { notice: "Assembly blocked — finish the pages listed below, then assemble again." }; }
+    if (d.blocked) { setAssembly(d); return { notice: d.coverStale ? "Export blocked — the cover is out of date for the current page count. Regenerate it in Step 8." : "Assembly blocked — finish the pages listed below, then assemble again." }; }
     // A printer-complete export is interior PDF + the separate full-wrap cover PDF
     // (spine sized to the final page count). Produce both here so the operator
     // leaves this step with everything the printer needs.
@@ -609,12 +609,25 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     )}
                     {assembly.blocked && (
                       <div style={{ marginTop: 10 }}>
-                        <div style={{ color: C.red, fontWeight: 600 }}>Some pages aren't book-ready yet. Go back to step 7 and render + approve these, then assemble again:</div>
-                        <ul style={{ marginTop: 6 }}>
-                          {(assembly.missing || []).map((x, i) => <li key={`m${i}`}>{typeof x === "string" ? x : (x.pageKey || JSON.stringify(x))}</li>)}
-                          {(assembly.preflightFailures || []).map((x, i) => <li key={`p${i}`} style={{ color: C.red }}>{(x.pageKey || x)} — preflight failed</li>)}
-                          {(assembly.noPrintOutput || []).map((x, i) => <li key={`n${i}`} style={{ color: C.red }}>{(x.pageKey || x)} — not print-prepped</li>)}
-                        </ul>
+                        {assembly.coverStale && (
+                          <div style={{ ...S.card, borderColor: C.red, marginTop: 0 }}>
+                            <div style={{ color: C.red, fontWeight: 700 }}>⚠ Cover is out of date</div>
+                            <div style={{ marginTop: 4 }}>
+                              The interior page count changed{assembly.coverBuiltForPageCount != null ? ` (the cover spine was built for ${assembly.coverBuiltForPageCount} pages; the interior is now ${assembly.finalPageCount})` : ""} and the spine width may be incorrect. Regenerate the cover before exporting.
+                            </div>
+                            <button style={{ ...S.btn(), marginTop: 8 }} onClick={() => setStep("cover")}>Go to Cover (Step 8) →</button>
+                          </div>
+                        )}
+                        {((assembly.missing || []).length > 0 || (assembly.preflightFailures || []).length > 0 || (assembly.noPrintOutput || []).length > 0) && (
+                          <>
+                            <div style={{ color: C.red, fontWeight: 600, marginTop: assembly.coverStale ? 12 : 0 }}>Some pages aren't book-ready yet. Go back to step 7 and render + approve these, then assemble again:</div>
+                            <ul style={{ marginTop: 6 }}>
+                              {(assembly.missing || []).map((x, i) => <li key={`m${i}`}>{typeof x === "string" ? x : (x.pageKey || JSON.stringify(x))}</li>)}
+                              {(assembly.preflightFailures || []).map((x, i) => <li key={`p${i}`} style={{ color: C.red }}>{(x.pageKey || x)} — preflight failed</li>)}
+                              {(assembly.noPrintOutput || []).map((x, i) => <li key={`n${i}`} style={{ color: C.red }}>{(x.pageKey || x)} — not print-prepped</li>)}
+                            </ul>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

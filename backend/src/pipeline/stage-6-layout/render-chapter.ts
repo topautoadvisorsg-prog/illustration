@@ -567,6 +567,13 @@ export async function generateCoverWrapArtwork(
     publishing: {
       ...config.publishing,
       coverAssetPath: imageStored.relativePath,
+      // Phase 0 sync record: the spine width is baked into THIS art at THIS page
+      // count. Final export compares it against the live interior page count.
+      coverSync: {
+        builtForPageCount: pageCount,
+        spineIn: dims.spineIn,
+        generatedAt: new Date().toISOString(),
+      },
     },
   });
 

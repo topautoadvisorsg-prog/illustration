@@ -35,6 +35,10 @@ export interface AssemblySpineEntry {
   printPngPath: string | null;
 }
 
+/** Operator-facing message when the cover spine no longer matches the interior. */
+export const COVER_STALE_MESSAGE =
+  'Cover is out of date. The interior page count changed and the spine width may be incorrect. Regenerate the cover before exporting.';
+
 export interface AssemblyReport {
   projectId: string;
   runId: string;
@@ -56,6 +60,27 @@ export interface AssemblyReport {
   pageCountAdvisory: ReturnType<typeof pageCountAdvisory>;
   finalTrim: { trimIn: { w: number; h: number }; bleedIn: number };
   scopeChapters: number[] | null;
+  /** Phase 0 cover/interior sync gate. coverStale blocks a full-book export. */
+  coverStale: boolean;
+  coverBuiltForPageCount: number | null;
+}
+
+/**
+ * Phase 0 cover/interior synchronization. The cover spine is baked into the AI
+ * art for a specific interior page count; if the interior count later changes,
+ * the spine is wrong. Only applies to a full-book export that HAS a cover with a
+ * recorded page count (covers made before this field, or chapter proofs, are
+ * exempt — there is nothing to compare).
+ */
+export function coverSyncStatus(opts: {
+  hasCover: boolean;
+  coverBuiltForPageCount: number | null | undefined;
+  interiorPageCount: number;
+  fullBook: boolean;
+}): { applicable: boolean; stale: boolean } {
+  const { hasCover, coverBuiltForPageCount, interiorPageCount, fullBook } = opts;
+  if (!fullBook || !hasCover || coverBuiltForPageCount == null) return { applicable: false, stale: false };
+  return { applicable: true, stale: coverBuiltForPageCount !== interiorPageCount };
 }
 
 export interface AssembleBookOptions {
@@ -120,6 +145,15 @@ export async function assembleBook(projectId: string, options: AssembleBookOptio
 
   // 4. Validate. Block on any failure.
   const validation = validateAssembly({ spine, renderByPageId, dimsByPageId, canvasIn: geometry.canvasIn });
+  // Phase 0 — cover/interior sync gate. A stale cover blocks a full-book export.
+  const coverBuiltForPageCount = config.publishing.coverSync?.builtForPageCount ?? null;
+  const cover = coverSyncStatus({
+    hasCover: Boolean(config.publishing.coverAssetPath),
+    coverBuiltForPageCount,
+    interiorPageCount: spine.length,
+    fullBook: scopeChapters === null,
+  });
+  const blocked = validation.blocked || cover.stale;
   const runId = randomUUID();
   const buildSpine = (): AssemblySpineEntry[] =>
     spine.map((page, i) => {
@@ -142,7 +176,7 @@ export async function assembleBook(projectId: string, options: AssembleBookOptio
   ): AssemblyReport => ({
     projectId,
     runId,
-    blocked: validation.blocked,
+    blocked,
     frontMatter,
     expectedPages: spine.length,
     assembledPages: interiorPdfPath ? finalCount : 0,
@@ -155,14 +189,16 @@ export async function assembleBook(projectId: string, options: AssembleBookOptio
     interiorPdfPath,
     interiorPdfBytes,
     artifactQuality,
-    warnings,
+    warnings: cover.stale ? [...warnings, COVER_STALE_MESSAGE] : warnings,
     finalPageCount: finalCount,
     pageCountAdvisory: pageCountAdvisory(finalCount),
     finalTrim: { trimIn: { w: geometry.trimSize.widthIn, h: geometry.trimSize.heightIn }, bleedIn: geometry.trimSize.bleedIn },
     scopeChapters,
+    coverStale: cover.stale,
+    coverBuiltForPageCount,
   });
 
-  if (validation.blocked) {
+  if (blocked) {
     await recordExport({ projectId, kind: 'PREMIUM_PDF', status: 'FAILED', filePath: null });
     return baseReport(null, spine.length); // page count reported for visibility; no PDF
   }

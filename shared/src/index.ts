@@ -513,6 +513,17 @@ export const PublishingMetadataSchema = z.object({
   bookDescription: z.object({ hooks: z.array(z.string()).optional() }).optional(),
   aiIntroduction: z.object({ enabled: z.boolean().default(false) }).default({ enabled: false }),
   coverAssetPath: z.string().optional(),
+  // Cover/interior synchronization record (Phase 0 production gate). Captured
+  // when the cover ARTWORK is generated — the spine width is baked into the art
+  // at that page count. Final export compares builtForPageCount against the
+  // current interior page count and blocks on a mismatch.
+  coverSync: z
+    .object({
+      builtForPageCount: z.number().int().nonnegative(),
+      spineIn: z.number(),
+      generatedAt: z.string(),
+    })
+    .optional(),
 });
 export type PublishingMetadata = z.infer<typeof PublishingMetadataSchema>;
 
