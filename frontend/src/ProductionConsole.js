@@ -197,8 +197,8 @@ export default function ProductionConsole({ onExitToLegacy }) {
     }
     const m = await api(`/api/projects/${project.id}/manifests`);
     setBreakdown(m);
-    const chapters = (m.manifests || []).find((x) => x.type === "BOOK")?.content?.chapters || [];
-    const entries = (m.manifests || []).filter((x) => x.type === "PAGE").length;
+    const chapters = (m.manifests || []).find((x) => x.kind === "BOOK")?.content?.chapters || [];
+    const entries = (m.manifests || []).filter((x) => x.kind === "PAGE").length;
     return { notice: `Breakdown: ${chapters.length} chapter(s), ${entries} entr${entries === 1 ? "y" : "ies"}.` };
   });
 
@@ -422,11 +422,18 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
         {step === "breakdown" && (
           <StepRun title="Breakdown" sub="Deterministically split the manuscript into chapters and entries (no AI, no spend)."
-            project={project} setStep={setStep} actionLabel="Run breakdown" onRun={() => doBreakdown()} result={breakdown && (
-              <ul style={{ marginTop: 10 }}>{((breakdown.manifests || []).find((m) => m.type === "BOOK")?.content?.chapters || []).map((c) => (
-                <li key={c.chapterNumber}>{c.chapterNumber}. {c.chapterTitle}</li>
-              ))}</ul>
-            )} />
+            project={project} setStep={setStep} actionLabel="Run breakdown" onRun={() => doBreakdown()} result={breakdown && (() => {
+              const chapters = (breakdown.manifests || []).find((m) => m.kind === "BOOK")?.content?.chapters || [];
+              const entries = (breakdown.manifests || []).filter((m) => m.kind === "PAGE").length;
+              return (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontWeight: 600 }}>{chapters.length} chapter{chapters.length === 1 ? "" : "s"} · {entries} entr{entries === 1 ? "y" : "ies"}</div>
+                  <ul style={{ marginTop: 6 }}>{chapters.map((c) => (
+                    <li key={c.chapterNumber}>{c.chapterTitle}{c.entryCount != null ? ` — ${c.entryCount} entr${c.entryCount === 1 ? "y" : "ies"}` : ""}</li>
+                  ))}</ul>
+                </div>
+              );
+            })()} />
         )}
 
         {step === "paginate" && (
