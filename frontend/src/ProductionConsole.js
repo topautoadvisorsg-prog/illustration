@@ -136,6 +136,9 @@ export default function ProductionConsole({ onExitToLegacy }) {
       matter: ps.some((p) => /^(FM_|BM_)/.test(p.pageKey || "")),
       render: (rd.bookReady || 0) > 0,
     });
+    // Surface the existing chapter structure on revisit so the Breakdown step
+    // shows what the book IS, not just a "Run breakdown" button.
+    if ((mans.manifests || []).length > 0) setBreakdown(mans);
   }, [api]);
 
   useEffect(() => { if (project?.id) loadStatus(project.id).catch(() => {}); else setStatus({}); }, [project?.id, loadStatus]);
@@ -184,7 +187,14 @@ export default function ProductionConsole({ onExitToLegacy }) {
   });
 
   const doBreakdown = () => run("Running breakdown", async () => {
-    await api(`/api/projects/${project.id}/manifests`, { method: "POST" });
+    // If the book was already broken down, the backend refuses a re-run. That's
+    // fine for the operator — we just show the existing structure instead of
+    // surfacing a developer-facing "rerun blocked" error.
+    try {
+      await api(`/api/projects/${project.id}/manifests`, { method: "POST" });
+    } catch (e) {
+      if (!/already has manifests|rerun is blocked|manifest versioning/i.test(String(e.message || e))) throw e;
+    }
     const m = await api(`/api/projects/${project.id}/manifests`);
     setBreakdown(m);
     const chapters = (m.manifests || []).find((x) => x.type === "BOOK")?.content?.chapters || [];
