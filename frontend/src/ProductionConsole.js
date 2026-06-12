@@ -184,10 +184,12 @@ export default function ProductionConsole({ onExitToLegacy }) {
   });
 
   const doBreakdown = () => run("Running breakdown", async () => {
-    const d = await api(`/api/projects/${project.id}/manifests`, { method: "POST" });
-    setBreakdown(d);
-    const ch = (d.manifests || []).find((m) => m.type === "BOOK")?.content?.chapters?.length;
-    return { notice: `Breakdown complete${ch ? ` — ${ch} chapters` : ""}.` };
+    await api(`/api/projects/${project.id}/manifests`, { method: "POST" });
+    const m = await api(`/api/projects/${project.id}/manifests`);
+    setBreakdown(m);
+    const chapters = (m.manifests || []).find((x) => x.type === "BOOK")?.content?.chapters || [];
+    const entries = (m.manifests || []).filter((x) => x.type === "PAGE").length;
+    return { notice: `Breakdown: ${chapters.length} chapter(s), ${entries} entr${entries === 1 ? "y" : "ies"}.` };
   });
 
   // Pull the planning preview: each page carries its layout zones + the text
@@ -275,10 +277,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return { notice: `Rendered v${d.version} (${d.status}).` };
   });
 
-  const renderAction = (renderId, action, label) => run(label, async () => {
-    await api(`/api/whole-page-render/${renderId}/${action}`, { method: "POST", body: "{}" });
+  // One operator action approves a page INTO the book: approve the render,
+  // print-prep it, and select it for the book. The technical 3-step sequence is
+  // hidden — the operator just decides "yes, this page belongs in the book".
+  const approveForBook = (renderId) => run("Approving page for the book", async () => {
+    await api(`/api/whole-page-render/${renderId}/approve`, { method: "POST", body: "{}" });
+    await api(`/api/whole-page-render/${renderId}/print-prep`, { method: "POST", body: "{}" });
+    await api(`/api/whole-page-render/${renderId}/select-for-book`, { method: "POST", body: "{}" }).catch(() => {});
     await loadRenders();
-    return { notice: `${label} done.` };
+    return { notice: "Page approved and added to the book." };
+  });
+
+  const rejectRender = (renderId) => run("Rejecting page", async () => {
+    await api(`/api/whole-page-render/${renderId}/reject`, { method: "POST", body: JSON.stringify({ reason: "operator rejected" }) });
+    await loadRenders();
+    return { notice: "Page rejected — render it again to try a new version." };
   });
 
   const genCover = () => run("Generating cover (paid)", async () => {
@@ -460,8 +473,9 @@ export default function ProductionConsole({ onExitToLegacy }) {
                           <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
                             <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => previewPage(m.pageId).catch(() => {})}>Preview</button>
                             <button style={{ ...S.btn("spend"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderPage(m.pageId).catch(() => {})}>Render</button>
-                            {m.status === "RENDERED" && m.renderId && <button style={{ ...S.btn("ok"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderAction(m.renderId, "approve", "Approve").catch(() => {})}>Approve</button>}
-                            {m.status === "APPROVED" && m.renderId && <button style={{ ...S.btn("ok"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderAction(m.renderId, "print-prep", "Print-prep").catch(() => {})}>Print-prep</button>}
+                            {m.status === "RENDERED" && m.renderId && <button style={{ ...S.btn("ok"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => approveForBook(m.renderId).catch(() => {})}>Approve for book</button>}
+                            {m.status === "RENDERED" && m.renderId && <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => rejectRender(m.renderId).catch(() => {})}>Reject</button>}
+                            {m.status === "APPROVED" && <span style={{ ...S.pill(C.green), alignSelf: "center" }}>✓ in book</span>}
                           </div>
                         </div>
                       ))}
@@ -470,9 +484,12 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 )}
                 {preview && (
                   <div style={S.card}>
-                    <b>Preview — {preview.authority?.entryTitle} ({preview.authority?.layoutFamilyLabel})</b>
-                    {preview.input?.blueprintImage?.dataUri && <img alt="blueprint" src={preview.input.blueprintImage.dataUri} style={{ width: 220, border: `1px solid ${C.line}`, borderRadius: 6, display: "block", marginTop: 8 }} />}
-                    <details style={{ marginTop: 8 }}><summary>Full prompt</summary><pre style={{ whiteSpace: "pre-wrap", fontSize: 11, background: "#fff", padding: 10, borderRadius: 6, maxHeight: 320, overflow: "auto" }}>{preview.input?.prompt}</pre></details>
+                    <button style={{ ...S.ghost, float: "right", margin: 0 }} onClick={() => setPreview(null)}>Close ✕</button>
+                    <b>{preview.authority?.entryTitle}</b> <span style={{ color: C.muted, fontSize: 13 }}>· {preview.authority?.layoutFamilyLabel}</span>
+                    <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>What this page will contain — rendered word-for-word by the AI (no spend yet):</div>
+                    <div style={{ marginTop: 6, background: "#fff", border: `1px solid ${C.line}`, borderRadius: 6, padding: 14, maxHeight: 320, overflow: "auto", whiteSpace: "pre-wrap", fontFamily: "Georgia,'Times New Roman',serif", fontSize: 13.5, lineHeight: 1.5 }}>
+                      {preview.authority?.sourceText || "(No body text — this page bakes only its title / heading.)"}
+                    </div>
                   </div>
                 )}
               </>
@@ -486,7 +503,14 @@ export default function ProductionConsole({ onExitToLegacy }) {
             {project && (
               <div style={S.card}>
                 <button style={S.btn("spend")} onClick={() => genCover().catch(() => {})}>Generate cover artwork →</button>
-                {cover && <Json data={cover} />}
+                {cover && (
+                  <div style={{ marginTop: 12 }}>
+                    {cover.imagePath && <img alt="cover" src={fileUrl(cover.imagePath)} style={{ width: "100%", maxWidth: 540, border: `1px solid ${C.line}`, borderRadius: 8, display: "block" }} />}
+                    <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>
+                      Full-wrap cover (back · spine · front){cover.pageCount ? ` — spine sized for ${cover.pageCount} interior pages` : ""}.
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </Panel>
@@ -499,10 +523,30 @@ export default function ProductionConsole({ onExitToLegacy }) {
               <div style={S.card}>
                 <button style={S.btn()} onClick={() => assemble().catch(() => {})}>Assemble interior PDF →</button>
                 {assembly && (
-                  <div style={{ marginTop: 10 }}>
-                    <span style={S.pill(assembly.blocked ? C.red : C.green)}>{assembly.blocked ? "BLOCKED" : "ASSEMBLED"}</span>
-                    {assembly.interiorPdfPath && <a style={{ ...S.btn("ok"), textDecoration: "none", display: "inline-block" }} href={fileUrl(assembly.interiorPdfPath)} target="_blank" rel="noreferrer">Download interior PDF</a>}
-                    {assembly.blocked && <Json data={{ missing: assembly.missing, preflightFailures: assembly.preflightFailures, noPrintOutput: assembly.noPrintOutput }} />}
+                  <div style={{ marginTop: 12 }}>
+                    <span style={S.pill(assembly.blocked ? C.red : C.green)}>{assembly.blocked ? "NOT READY" : "ASSEMBLED"}</span>
+                    {!assembly.blocked && (
+                      <div style={{ marginTop: 10 }}>
+                        <div><b>{assembly.assembledPages} pages</b> assembled in book order.</div>
+                        {assembly.interiorPdfPath && (
+                          <>
+                            <a style={{ ...S.btn("ok"), textDecoration: "none", display: "inline-block" }} href={fileUrl(assembly.interiorPdfPath)} target="_blank" rel="noreferrer">Open / download interior PDF</a>
+                            <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>Final book preview (scroll through every page before you export):</div>
+                            <iframe title="book-preview" src={fileUrl(assembly.interiorPdfPath)} style={{ width: "100%", height: 520, border: `1px solid ${C.line}`, borderRadius: 8, marginTop: 6 }} />
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {assembly.blocked && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ color: C.red, fontWeight: 600 }}>Some pages aren't book-ready yet. Go back to step 7 and render + approve these, then assemble again:</div>
+                        <ul style={{ marginTop: 6 }}>
+                          {(assembly.missing || []).map((x, i) => <li key={`m${i}`}>{typeof x === "string" ? x : (x.pageKey || JSON.stringify(x))}</li>)}
+                          {(assembly.preflightFailures || []).map((x, i) => <li key={`p${i}`} style={{ color: C.red }}>{(x.pageKey || x)} — preflight failed</li>)}
+                          {(assembly.noPrintOutput || []).map((x, i) => <li key={`n${i}`} style={{ color: C.red }}>{(x.pageKey || x)} — not print-prepped</li>)}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
