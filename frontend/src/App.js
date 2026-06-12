@@ -189,6 +189,7 @@ const LAYOUT_ZONE_PRESETS = {
   LAYOUT_C_CORNER_BOTTOM_RIGHT: { architecture: "CORNER_BOTTOM_RIGHT", openingPageImagePercent: 25, openingPageTextPercent: 75 },
   LAYOUT_D_PURE_TEXT:           { architecture: "FULL_PAGE",           openingPageImagePercent: 0,  openingPageTextPercent: 100 },
   LAYOUT_TITLE_DISPLAY:         { architecture: "TITLE_BLOCK",         openingPageImagePercent: 6,  openingPageTextPercent: 94 },
+  LAYOUT_FINE_PRINT:            { architecture: "FINE_PRINT_BOTTOM",   openingPageImagePercent: 6,  openingPageTextPercent: 94 },
 };
 
 const PUBLISHING_STANDARD_PRESETS = {
@@ -283,6 +284,7 @@ const SIMPLIFIED_FAMILY_LABELS = {
   LAYOUT_C_CORNER_BOTTOM_RIGHT: "Layout C — 25% Accent (bottom-right corner)",
   LAYOUT_D_PURE_TEXT: "Layout D — Pure Text / Back Matter",
   LAYOUT_TITLE_DISPLAY: "Layout Title Display — Centered Short Text (title / dedication / epigraph)",
+  LAYOUT_FINE_PRINT: "Layout Fine Print — Small Low Block (copyright / colophon / edition notice)",
 };
 
 function simplifiedFamilyLabel(template) {
@@ -1211,6 +1213,16 @@ function zonePreviewLayers(source) {
       { id: "image-priority-ornament-top", kind: "image-priority", label: "Image-priority", xPct: 18, yPct: 0.5, widthPct: 64, heightPct: 3, instruction: "Thin decorative top-edge ornament only." },
       { id: "image-priority-ornament-bottom", kind: "image-priority", label: "Image-priority", xPct: 18, yPct: 96, widthPct: 64, heightPct: 3, instruction: "Thin decorative bottom-edge ornament only." },
       { id: "text-safe-display-block", kind: "text-safe", label: "Text-safe", xPct: 14, yPct: 35, widthPct: 72, heightPct: 26, instruction: "Compact centered text block (title / dedication / epigraph) with generous negative space." },
+    ];
+  }
+  if (architecture === "FINE_PRINT_BOTTOM") {
+    // Fine-print composition (LAYOUT_FINE_PRINT: copyright / colophon): thin
+    // top/bottom edge ornaments + a small fine-print block anchored low over a
+    // calm illustrated field. Mirrors zonePlanFor('FINE_PRINT_BOTTOM').
+    return [
+      { id: "image-priority-ornament-top", kind: "image-priority", label: "Image-priority", xPct: 12, yPct: 0.5, widthPct: 76, heightPct: 3, instruction: "Thin decorative top-edge ornament only." },
+      { id: "image-priority-ornament-bottom", kind: "image-priority", label: "Image-priority", xPct: 12, yPct: 96, widthPct: 76, heightPct: 3, instruction: "Thin decorative bottom-edge ornament only." },
+      { id: "text-safe-fine-print", kind: "text-safe", label: "Text-safe", xPct: 16, yPct: 72, widthPct: 68, heightPct: 18, instruction: "Small fine-print block (copyright / edition notice) anchored low; calm illustrated field fills the space above." },
     ];
   }
   if (architecture.startsWith("CORNER_")) {

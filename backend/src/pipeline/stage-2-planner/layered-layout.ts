@@ -206,6 +206,9 @@ export const LAYOUT_TEMPLATE_COMPOSITION: Record<LayoutTemplateId, LayoutComposi
   LAYOUT_C_CORNER_BOTTOM_RIGHT: { contentType: 'SPECIES_PROFILE', coverage: 25, architecture: 'CORNER_BOTTOM_RIGHT' },
   LAYOUT_D_PURE_TEXT: { contentType: 'REFERENCE_PAGE', coverage: 0, architecture: 'FULL_PAGE' },
   LAYOUT_TITLE_DISPLAY: { contentType: 'TITLE_DISPLAY', coverage: 5, architecture: 'TITLE_BLOCK' },
+  // Fine print shares the display/short-text content family; its arrangement is
+  // the low-anchored fine-print block.
+  LAYOUT_FINE_PRINT: { contentType: 'TITLE_DISPLAY', coverage: 5, architecture: 'FINE_PRINT_BOTTOM' },
 };
 
 export function decomposeTemplate(template: LayoutTemplateId): LayoutComposition {

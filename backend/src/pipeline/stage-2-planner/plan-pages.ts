@@ -162,6 +162,9 @@ const DEFAULT_LAYOUT_CAPACITY: Record<LayoutTemplateId, { minWords: number; targ
   // quote). A few short lines only, never paragraphs — lowest capacity in the
   // catalog so the planner reserves it for very-short non-illustration pages.
   LAYOUT_TITLE_DISPLAY: { minWords: 0, targetWords: 12, maxWords: 60 },
+  // Fine print — a small legal/credits block (copyright, colophon). A bit more
+  // capacity than a title block (full copyright notice), still small by design.
+  LAYOUT_FINE_PRINT: { minWords: 0, targetWords: 45, maxWords: 140 },
 };
 
 const REQUIRED_LAYOUT_TEMPLATES = Object.keys(DEFAULT_LAYOUT_CAPACITY) as LayoutTemplateId[];

@@ -115,6 +115,10 @@ function textPanelDims(
       // centered block (≈72% wide × ≈26% tall) surrounded by large negative
       // space. Capacity is intentionally tiny: a few short lines, not paragraphs.
       return { widthPt: W * 0.72, heightPt: H * 0.26 };
+    case 'FINE_PRINT_BOTTOM':
+      // Fine-print page — a small low-anchored block (≈68% wide × ≈18% tall);
+      // capacity is small by design (a few lines of legal/credits print).
+      return { widthPt: W * 0.68, heightPt: H * 0.18 };
   }
 }
 

@@ -123,6 +123,10 @@ export const LayoutTemplateIdSchema = z.enum([
   // epigraph, quote, special notes. Fills the "little text, not a full
   // illustration" gap no other layout covers.
   'LAYOUT_TITLE_DISPLAY',
+  // Fine Print — a small text block anchored low on the page (copyright/edition
+  // notice, colophon, "printed in" lines). A calm illustrated field fills the
+  // space above; the legal/credits fine print sits quietly at the bottom.
+  'LAYOUT_FINE_PRINT',
 ]);
 
 // â”€â”€ Layered layout model (Phase 1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -186,6 +190,9 @@ export const ArchitectureSchema = z.enum([
   // A compact centered text block framed by thin top/bottom edge ornaments,
   // with large surrounding negative space (display/ceremonial pages).
   'TITLE_BLOCK',
+  // A small text block anchored LOW on the page over a calm illustrated field
+  // (fine-print pages: copyright, colophon, edition notice).
+  'FINE_PRINT_BOTTOM',
 ]);
 
 export type ContentType = z.infer<typeof ContentTypeSchema>;

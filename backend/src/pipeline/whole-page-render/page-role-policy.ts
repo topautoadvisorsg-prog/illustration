@@ -73,11 +73,14 @@ export function defaultLayoutForRole(pageType: WholePageRole): LayoutTemplateId 
     // reading-field LAYOUT_D used by glossary/index/copyright/contents.
     case 'TITLE_PAGE':
       return 'LAYOUT_TITLE_DISPLAY';
+    // The copyright page is fine print, not a full reading page: a small block
+    // anchored low on a calm illustrated field (LAYOUT_FINE_PRINT).
+    case 'COPYRIGHT_PAGE':
+      return 'LAYOUT_FINE_PRINT';
     case 'AUTHOR_PAGE':
     case 'SERIES_PAGE':
     case 'GLOSSARY_ORNAMENT':
     case 'INDEX_ORNAMENT':
-    case 'COPYRIGHT_PAGE':
     case 'CONTENTS':
       return 'LAYOUT_D_PURE_TEXT';
     case 'INTRO_OPENER':
@@ -112,6 +115,9 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
   // (large reading field + edge ornaments) regardless of the stored template,
   // which also retires the legacy LAYOUT_2_TEXT_HEAVY it used to inherit.
   if (pageType === 'CONTINUATION') layoutTemplate = 'LAYOUT_D_PURE_TEXT';
+  // Copyright is fine print regardless of any layout stored on the row by an
+  // earlier breakdown — force the low fine-print block layout.
+  if (pageType === 'COPYRIGHT_PAGE') layoutTemplate = 'LAYOUT_FINE_PRINT';
   const title = resolvedTitle(config);
   const subtitle = resolvedSubtitle(config);
   const author = resolvedAuthor(config);
@@ -194,7 +200,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         layoutTemplate,
         title: { kicker: '', number: '', name: '' },
         entryTitle: 'Copyright',
-        imageSubject: 'Copyright-page edge ornament only: thin engraved botanical corner details framing a calm centered text block; quiet, restrained',
+        imageSubject: 'Subtle full-page illustrated field for a copyright/edition-notice page — calm low-contrast parchment with faint botanical atmosphere and naturalist texture — framed by thin engraved edge ornaments, with a small quiet fine-print block low on the page; restrained and atmospheric',
         allowsEmptyBody: false,
         renderBodyText: true,
       };

@@ -37,7 +37,11 @@ export type ArtSlot =
   // Display/ceremonial composition: a compact centered text block with generous
   // negative space + thin edge ornaments. The image-priority edge of the
   // LAYOUT_TITLE_DISPLAY catalog layout (title page, dedication, epigraph, etc.).
-  | 'TITLE_BLOCK';
+  | 'TITLE_BLOCK'
+  // Fine-print composition: a small text block anchored LOW on the page over a
+  // calm illustrated field + thin edge ornaments (LAYOUT_FINE_PRINT — copyright,
+  // colophon, edition notice).
+  | 'FINE_PRINT_BOTTOM';
 
 export interface LayoutProfile {
   /** Fraction of the page available to body copy in the text-safe zone (0-1). */
@@ -88,6 +92,9 @@ export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
   // SUBTLE full-page illustrated field (the whole page is illustration, not
   // blank paper). Very low text capacity by design (a few lines, not paragraphs).
   LAYOUT_TITLE_DISPLAY: { textAreaFactor: 0.15, artSlot: 'TITLE_BLOCK', artAreaFraction: 0.9, textLight: true },
+  // Fine Print — small low-anchored text block over a calm full-page illustrated
+  // field. Very low text capacity by design (a few lines of legal/credits print).
+  LAYOUT_FINE_PRINT: { textAreaFactor: 0.18, artSlot: 'FINE_PRINT_BOTTOM', artAreaFraction: 0.9, textLight: true },
 };
 
 export function getLayoutProfile(template: LayoutTemplateId): LayoutProfile {
@@ -126,6 +133,7 @@ const ART_SLOT_LABELS: Record<ArtSlot, string> = {
   CORNER_BOTTOM_LEFT: 'bottom-left corner',
   CORNER_BOTTOM_RIGHT: 'bottom-right corner',
   TITLE_BLOCK: 'centered title block',
+  FINE_PRINT_BOTTOM: 'bottom fine-print block',
 };
 
 /**

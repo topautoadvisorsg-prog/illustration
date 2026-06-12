@@ -43,6 +43,7 @@ const FAMILY_LABEL: Partial<Record<LayoutTemplateId, string>> = {
   LAYOUT_C_CORNER_BOTTOM_RIGHT: 'Layout C — 25% Accent (bottom-right corner)',
   LAYOUT_D_PURE_TEXT: 'Layout D — Pure Text / Back Matter',
   LAYOUT_TITLE_DISPLAY: 'Layout Title Display — Centered Short Text (title / dedication / epigraph)',
+  LAYOUT_FINE_PRINT: 'Layout Fine Print — Small Low Block (copyright / colophon / edition notice)',
 };
 
 function layoutFamilyLabel(t: LayoutTemplateId | string): string {
