@@ -34,6 +34,7 @@ import { computePageGeometry } from './page-geometry.js';
 import { buildBookHtml, buildCoverHtml, buildPageHtml, computeCoverDimensions, type ChapterPageRender, type BookChapter } from './render-html.js';
 import { directLayout } from './layout-director.js';
 import { isChromiumAvailable, loadPagedPolyfill, renderHtmlToPdf } from './render-pdf.js';
+import { composeCoverPrint } from '../print-prep/cover-print.js';
 import { preflightBook, stitchPdfs, type PreflightReport } from '../stage-7-pdf-compile/stitch-book.js';
 import { assembleCoverPrompt } from '../whole-page-render/assemble-page-prompt.js';
 import { PAGE_TYPOGRAPHY_DNA } from '../whole-page-render/typography-dna.js';
@@ -457,7 +458,6 @@ export interface RenderCoverOptions {
 }
 
 export async function renderCoverPdf(projectId: string, options: RenderCoverOptions = {}): Promise<CoverRenderResult> {
-  if (!isChromiumAvailable()) throw new RenderBlockedError('Chromium is not available on this host.', 'no_chromium');
   const project = await getProject(projectId);
   if (!project) throw new RenderBlockedError('Project not found.', 'not_found');
   const config = ProjectConfigSchema.parse(project.config);
@@ -473,15 +473,16 @@ export async function renderCoverPdf(projectId: string, options: RenderCoverOpti
     (p) => p.section !== 'BODY' || !scopeChapters || scopeChapters.includes(p.chapterNumber),
   ).length;
   if (pageCount === 0) throw new RenderBlockedError('No planned pages found; run pagination/front matter before rendering the cover.', 'no_pages');
-  const polyfillJs = await loadPagedPolyfill();
   const dims = computeCoverDimensions(config, pageCount);
   const validation = validateCoverInputs(config, pageCount, dims);
   const coverArtPrompt = buildCoverWrapPrompt(config, pageCount, dims);
-  let coverArtDataUri: string | undefined;
+
+  // Load the AI wrap art (the production cover). Present → take the print-grade
+  // path; absent/unreadable → fall back to the typographic HTML cover.
+  let coverArtBuf: Buffer | null = null;
   if (config.publishing.coverAssetPath) {
     try {
-      const coverBuf = await getProjectStorage().readProjectFile(config.publishing.coverAssetPath);
-      coverArtDataUri = `data:image/png;base64,${coverBuf.toString('base64')}`;
+      coverArtBuf = await getProjectStorage().readProjectFile(config.publishing.coverAssetPath);
     } catch {
       validation.checks.push({
         key: 'cover_art_file',
@@ -491,11 +492,26 @@ export async function renderCoverPdf(projectId: string, options: RenderCoverOpti
       validation.ready = false;
     }
   }
-  const html = buildCoverHtml(config, pageCount, { polyfillJs, coverArtDataUri });
-  const { buffer } = await renderHtmlToPdf(html, {
-    pageWidthIn: dims.fullWidthIn,
-    pageHeightIn: dims.fullHeightIn,
-  } as unknown as ReturnType<typeof computePageGeometry>);
+
+  let buffer: Buffer;
+  if (coverArtBuf) {
+    // PRINT-GRADE PATH: compose the wrap art onto the 300-DPI full-wrap canvas
+    // and embed it losslessly (sharp + pdf-lib). This replaces the Chromium
+    // page.pdf() path, which downsampled the cover to ~100 DPI. No Chromium
+    // needed when art is present; composition (art + barcode reserve) unchanged.
+    const composed = await composeCoverPrint(coverArtBuf, config, dims);
+    buffer = composed.pdfBuffer;
+  } else {
+    // FALLBACK: typographic cover (no AI art) still renders via Paged.js/Chromium.
+    if (!isChromiumAvailable()) throw new RenderBlockedError('Chromium is not available on this host.', 'no_chromium');
+    const polyfillJs = await loadPagedPolyfill();
+    const html = buildCoverHtml(config, pageCount, { polyfillJs });
+    const rendered = await renderHtmlToPdf(html, {
+      pageWidthIn: dims.fullWidthIn,
+      pageHeightIn: dims.fullHeightIn,
+    } as unknown as ReturnType<typeof computePageGeometry>);
+    buffer = rendered.buffer;
+  }
 
   const storage = getProjectStorage();
   const coverPrompt = await storage.writeProjectFile(projectId, ['cover', 'cover-art-direction.txt'], coverArtPrompt);
