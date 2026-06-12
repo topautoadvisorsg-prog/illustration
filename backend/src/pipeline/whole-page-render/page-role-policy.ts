@@ -152,7 +152,8 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         layoutTemplate,
         title: { kicker: '', number: '', name: 'INTRODUCTION' },
         entryTitle: 'Introduction',
-        imageSubject: 'Quiet threshold into New England wilderness: morning mist, spruce forest, granite stones, trail edge, distant mountains, river or lake light',
+        // Region is data-driven from the book's subtitle/region — never hardcoded.
+        imageSubject: `Quiet threshold into the wilderness${subtitle ? ` of ${subtitle}` : ''}: morning mist, forest, rock and trail edge, distant mountains, river or lake light`,
         allowsEmptyBody: false,
         renderBodyText: true,
       };
@@ -162,7 +163,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         layoutTemplate,
         title: { kicker: '', number: '', name: 'ABOUT THE AUTHOR' },
         entryTitle: 'About the Author',
-        imageSubject: 'Restrained naturalist author-page ornament: notebook, compass, pressed fern, pine sprig, New England field-journal atmosphere',
+        imageSubject: `Restrained naturalist author-page ornament: notebook, compass, pressed fern, field-journal atmosphere${subtitle ? ` evoking ${subtitle}` : ''}`,
         allowsEmptyBody: false,
         renderBodyText: true,
       };

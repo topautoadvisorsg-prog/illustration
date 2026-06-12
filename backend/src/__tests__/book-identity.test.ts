@@ -83,3 +83,18 @@ describe('series page heading is data-driven', () => {
     expect(policy.title.name).not.toBe('THE WILD LANDS SERIES');
   });
 });
+
+describe('front-matter page region is data-driven (no hardcoded "New England")', () => {
+  const region = cfg({ subtitle: 'Pacific Northwest', publishing: { subtitle: 'Pacific Northwest' } });
+  const introRow = { section: 'FM', frontMatterType: 'INTRODUCTION', pageKey: 'FM_INTRO', layoutTemplate: null, pageRole: null, plannedPageNumber: 1, chapterNumber: 0 } as unknown as PageRow;
+  const authorRow = { section: 'BM', frontMatterType: 'ABOUT_AUTHOR', pageKey: 'BM_AUTHOR', layoutTemplate: null, pageRole: null, plannedPageNumber: 1, chapterNumber: 0 } as unknown as PageRow;
+
+  it('intro + author pages use the book region, not New England', () => {
+    const intro = buildPageRolePolicy(introRow, region);
+    expect(intro.imageSubject).toContain('Pacific Northwest');
+    expect(intro.imageSubject).not.toContain('New England');
+    const author = buildPageRolePolicy(authorRow, region);
+    expect(author.imageSubject).toContain('Pacific Northwest');
+    expect(author.imageSubject).not.toContain('New England');
+  });
+});
