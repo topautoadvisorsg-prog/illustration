@@ -74,7 +74,9 @@ export function assembleCoverPrompt(spec: WholePageSpec): string {
 }
 
 function rendersBodyText(spec: WholePageSpec): boolean {
-  return !['COVER_WRAP', 'TITLE_PAGE', 'GLOSSARY_ORNAMENT', 'INDEX_ORNAMENT'].includes(spec.pageType);
+  // All-AI model: every page bakes its own text into the image. The cover is
+  // the only exception here, and it uses the dedicated assembleCoverPrompt.
+  return spec.pageType !== 'COVER_WRAP';
 }
 
 function promptHeader(spec: WholePageSpec): string {
@@ -103,6 +105,12 @@ function hardConstraints(spec: WholePageSpec): string {
         `- The first paragraph of the body begins with an illuminated drop-cap "${spec.pageText.dropCap}", engraved botanical surround (leaves / vines / pinecone), warm sepia ink, ~3 lines tall, refined and restrained.`,
       );
     }
+  }
+  if (spec.pageType === 'TITLE_PAGE') {
+    const stacked = spec.typographyDNA.titleHierarchy.filter(Boolean);
+    lines.push(
+      `- TITLE-PAGE typography, baked INTO the artwork as the engraved title block — stacked and centered on calm parchment: ${stacked.map((s) => `"${s}"`).join(' / ')}. The title set largest in stately serif caps, then the subtitle, then the author/imprint line, all in warm sepia ink and framed by a refined botanical ornament. Never a pasted label, never modern type.`,
+    );
   }
   lines.push(
     // F-8 — the Chapter 1 production run proved the attached blueprint alone

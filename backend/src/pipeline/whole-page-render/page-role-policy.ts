@@ -167,9 +167,9 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         layoutTemplate,
         title: { kicker: '', number: '', name: 'GLOSSARY' },
         entryTitle: 'Glossary',
-        imageSubject: 'Glossary reference-page edge ornament only: pine needles, fern tips, acorns, tiny naturalist linework outside the two-column reading field',
+        imageSubject: 'Glossary reference-page edge ornament only: pine needles, fern tips, acorns, tiny naturalist linework framing the two-column glossary entries',
         allowsEmptyBody: false,
-        renderBodyText: false,
+        renderBodyText: true,
       };
     case 'INDEX_ORNAMENT':
       return {
@@ -177,9 +177,9 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         layoutTemplate,
         title: { kicker: '', number: '', name: 'INDEX' },
         entryTitle: 'Index',
-        imageSubject: 'Index reference-page edge ornament only: restrained botanical corner details outside the index entries and page numbers',
+        imageSubject: 'Index reference-page edge ornament only: restrained botanical corner details framing the index entries and page numbers',
         allowsEmptyBody: false,
-        renderBodyText: false,
+        renderBodyText: true,
       };
     case 'COPYRIGHT_PAGE':
       // Text-first page: the AI renders the copyright text (from readingFieldText)

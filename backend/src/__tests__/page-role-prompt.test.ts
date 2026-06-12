@@ -46,22 +46,27 @@ describe('PageRole prompt text policy', () => {
     expect(prompt).toContain('PAGE BODY');
   });
 
-  it('keeps critical typography out of title-page image generation', () => {
-    const prompt = assemblePagePrompt(makeSpec('TITLE_PAGE'));
-    expect(prompt).toContain('TEXT POLICY');
-    expect(prompt).toContain('publishing engine will add title');
-    expect(prompt).toContain('Do not render body copy');
-    expect(prompt).not.toContain('Body text appears VERBATIM');
-    expect(prompt).not.toContain('PAGE BODY');
+  it('bakes the title block INTO the title-page image (all-AI model)', () => {
+    const spec = makeSpec('TITLE_PAGE');
+    spec.typographyDNA.titleHierarchy = ['THE WILDLANDS FIELD GUIDE', 'New England Volume', 'J. R. Munoz'];
+    const prompt = assemblePagePrompt(spec);
+    expect(prompt).toContain('TITLE-PAGE typography');
+    expect(prompt).toContain('THE WILDLANDS FIELD GUIDE');
+    expect(prompt).toContain('J. R. Munoz');
+    // No engine-typeset path remains.
+    expect(prompt).not.toContain('TEXT POLICY');
+    expect(prompt).not.toContain('publishing engine will add title');
   });
 
-  it('keeps glossary and index ornament renders text-free', () => {
+  it('renders glossary and index entries — the AI bakes their text', () => {
     for (const role of ['GLOSSARY_ORNAMENT', 'INDEX_ORNAMENT'] as const) {
-      const prompt = assemblePagePrompt(makeSpec(role));
-      expect(prompt).toContain('TEXT POLICY');
-      expect(prompt).toContain('glossary/index entries');
-      expect(prompt).toContain('Do not render body copy');
-      expect(prompt).not.toContain('PAGE BODY');
+      const spec = makeSpec(role);
+      spec.pageText.body = 'coyote, 12';
+      spec.pageText.bodyBlocks = [{ type: 'paragraph', text: 'coyote, 12' }];
+      const prompt = assemblePagePrompt(spec);
+      expect(prompt).toContain('PAGE BODY');
+      expect(prompt).toContain('Body text appears VERBATIM');
+      expect(prompt).not.toContain('TEXT POLICY');
     }
   });
 });

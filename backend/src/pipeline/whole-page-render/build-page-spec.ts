@@ -146,7 +146,13 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
     pageType === 'CHAPTER_OPENER'
       ? ['CHAPTER', toRoman(pageRow.chapterNumber), entryTitle.toUpperCase()]
       : pageType === 'TITLE_PAGE'
-        ? [policy.title.name, policy.title.kicker].filter(Boolean)
+        ? [
+            policy.title.name,
+            policy.title.kicker,
+            input.config.publishing.authors?.length
+              ? input.config.publishing.authors.join(', ')
+              : input.config.authorName,
+          ].filter(Boolean)
         : pageType === 'INTRO_OPENER'
           ? [policy.title.name]
           : [];
