@@ -18,7 +18,7 @@ describe('layout director — four region types', () => {
   });
 
   it('tags every region with one of the four RegionTypes', () => {
-    const valid: RegionType[] = ['image-priority', 'reading-field', 'overlay-typography', 'supporting-study'];
+    const valid: RegionType[] = ['image-priority', 'background-field', 'reading-field', 'overlay-typography', 'supporting-study'];
     for (const template of LAYOUT_TEMPLATE_IDS) {
       const a = alloc(template);
       expect(a.regions.length).toBeGreaterThan(0);
@@ -50,11 +50,17 @@ describe('layout director — LAYOUT_C true 25 % accent', () => {
     ['LAYOUT_C_CORNER_BOTTOM_RIGHT', { top: false, left: false }],
   ];
 
+  // The accent assertions concern the FOCAL study only; the subtle full-page
+  // background illustration field (regionType 'background-field') is a separate
+  // calm layer and is intentionally excluded here.
+  const focalZones = (template: LayoutTemplateId) =>
+    alloc(template).imagePriorityZones.filter((z) => z.regionType === 'image-priority');
+
   it('accent zone is a true accent (≤ 30 % of the page), never full-page', () => {
     for (const [template] of corners) {
-      const a = alloc(template);
-      expect(a.imagePriorityZones).toHaveLength(1);
-      const img = a.imagePriorityZones[0]!;
+      const focal = focalZones(template);
+      expect(focal).toHaveLength(1);
+      const img = focal[0]!;
       const areaPct = (img.widthPct * img.heightPct) / 100; // % of page
       expect(areaPct, `${template} accent area`).toBeLessThanOrEqual(30);
       expect(areaPct, `${template} accent area`).toBeGreaterThanOrEqual(10);
@@ -63,7 +69,7 @@ describe('layout director — LAYOUT_C true 25 % accent', () => {
 
   it('accent sits in its named corner', () => {
     for (const [template, pos] of corners) {
-      const img = alloc(template).imagePriorityZones[0]!;
+      const img = focalZones(template)[0]!;
       const centerX = img.xPct + img.widthPct / 2;
       const centerY = img.yPct + img.heightPct / 2;
       expect(pos.left ? centerX < 50 : centerX > 50, `${template} horizontal`).toBe(true);
@@ -76,7 +82,7 @@ describe('layout director — LAYOUT_C true 25 % accent', () => {
       const a = alloc(template);
       expect(a.textSafeZones.length).toBe(2);
       const textArea = a.textSafeZones.reduce((s, z) => s + z.widthPct * z.heightPct, 0);
-      const imgArea = a.imagePriorityZones.reduce((s, z) => s + z.widthPct * z.heightPct, 0);
+      const imgArea = focalZones(template).reduce((s, z) => s + z.widthPct * z.heightPct, 0);
       expect(textArea, `${template} text:image ratio`).toBeGreaterThan(imgArea * 2);
     }
   });

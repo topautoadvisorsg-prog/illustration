@@ -20,11 +20,19 @@ import type { BadgeSafeZone } from '../publishing-standard/badge-zones.js';
 // orange) so the model never sees overlapping instructions.
 const COLORS = {
   bg: '#ECE4CF', // parchment field
-  image: '#2E6FB0', // BLUE — PRIMARY_IMAGE_ZONE
+  image: '#2E6FB0', // STRONG BLUE — PRIMARY_IMAGE_ZONE (concentrate focal detail)
+  field: '#9DBBD6', // LIGHT BLUE — BACKGROUND_ILLUSTRATION_FIELD (calm, whole-page)
   support: '#E08A2E', // ORANGE — SUPPORTING_IMAGE_ZONE
   text: '#C0392B', // RED — TEXT_SAFE_ZONE (title folds in)
   reserved: '#F1C40F', // YELLOW — L-7 BADGE_SAFE_ZONE (reserved empty parchment)
 } as const;
+
+/** Blueprint fill for an image-priority-array zone, by its role. */
+function imageZoneFill(role: PlanningZone['role']): string {
+  if (role === 'supporting-art') return COLORS.support;
+  if (role === 'background-art') return COLORS.field;
+  return COLORS.image;
+}
 
 function rectSvg(z: PlanningZone, fill: string, opacity = 0.85): string {
   return `<rect x="${z.xPct}%" y="${z.yPct}%" width="${z.widthPct}%" height="${z.heightPct}%" fill="${fill}" fill-opacity="${opacity}" rx="8" />`;
@@ -51,9 +59,12 @@ export function buildBlueprintSvg(
   options: { badgeSafeZones?: BadgeSafeZone[]; canvasIn?: { w: number; h: number } } = {},
 ): string {
   const parts: string[] = [`<rect width="100%" height="100%" fill="${COLORS.bg}"/>`];
-  // BLUE = primary image, ORANGE = supporting image, RED = text-safe + title.
+  // STRONG BLUE = focal image, LIGHT BLUE = background illustrated field,
+  // ORANGE = supporting image, RED = text-safe + title. The array is ordered
+  // back-to-front, so the full-page background field (pushed first) sits under
+  // the focal art and ornaments.
   for (const z of alloc.imagePriorityZones) {
-    parts.push(rectSvg(z, z.role === 'supporting-art' ? COLORS.support : COLORS.image));
+    parts.push(rectSvg(z, imageZoneFill(z.role)));
   }
   for (const z of alloc.textSafeZones) parts.push(rectSvg(z, COLORS.text));
   for (const z of alloc.typographyZones) parts.push(rectSvg(z, COLORS.text)); // title folds into RED
@@ -95,8 +106,9 @@ export async function renderBlueprintPng(
  */
 export const BLUEPRINT_COMPOSITION_INSTRUCTION = [
   'A layout blueprint image is attached as the composition map. The whole page is ONE continuous illustrated page.',
-  'BLUE regions = PRIMARY_IMAGE_ZONE — the primary subject and the environmental scene; concentrate the strongest detail here.',
-  'ORANGE regions = SUPPORTING_IMAGE_ZONE — small naturalist specimen studies placed directly on the page (no cards, sticky notes, boxes, frames, or colored/yellow backgrounds).',
+  'STRONG BLUE regions = PRIMARY_IMAGE_ZONE — the primary subject and the environmental scene; concentrate the strongest detail here.',
+  'LIGHT BLUE regions = BACKGROUND_ILLUSTRATION_FIELD — the rest of the page is STILL illustration, but calm and low-detail (soft paper grain, gentle atmosphere, faint texture). It is never blank paper; just keep it quiet so the focal art and text stay dominant.',
+  'ORANGE regions = SUPPORTING_IMAGE_ZONE — small naturalist specimen studies or thin decorative ornament bands placed directly on the page (no cards, sticky notes, boxes, frames, or colored/yellow backgrounds).',
   'RED regions = READING_FIELD_ZONE (and title) — a calm, open, low-detail parchment area for later typography; keep it clear of important subject matter. It is not a box.',
   'YELLOW regions = BADGE_SAFE_ZONE — reserved empty parchment. Render NOTHING here: no body text, no titles, no ornament, no swag, no tendrils, no hairlines, no artwork. The page background paper must show through cleanly. The renderer stamps badges and the page number into these regions later.',
   'The illustration must open organically into the Reading Field: let the artwork dissolve into it through mist, light sky, pale terrain, calm water, paper tone, or atmospheric fade — no hard edge, seam, or rectangle.',

@@ -37,7 +37,7 @@ export interface ImagePriorityZone {
   overlaySafeArea: string;
 }
 
-export type PlanningZoneRole = 'body' | 'caption' | 'title' | 'section-title' | 'primary-art' | 'supporting-art';
+export type PlanningZoneRole = 'body' | 'caption' | 'title' | 'section-title' | 'primary-art' | 'supporting-art' | 'background-art';
 export type PlanningZoneShape = 'rect' | 'organic' | 'path';
 
 /**
@@ -46,6 +46,11 @@ export type PlanningZoneShape = 'rect' | 'organic' | 'path';
  * and must not be treated as one generic "text-safe" area.
  *
  * - image-priority      Strong focal artwork. The primary subject lives here.
+ * - background-field    The calm, low-detail illustrated field covering the WHOLE page.
+ *                       It is what makes the page read as one continuous illustration
+ *                       (paper grain, soft atmosphere, faint texture) rather than blank
+ *                       paper. Strong detail belongs in image-priority; this stays quiet,
+ *                       so reading-field text MAY sit over it (it never competes).
  * - reading-field       Long-form body text. Lives on a calm parchment field that the
  *                       artwork OPENS INTO (organic transition, never a pasted block).
  *                       Coordinates with image-priority but never competes/overlaps it.
@@ -54,12 +59,14 @@ export type PlanningZoneShape = 'rect' | 'organic' | 'path';
  * - supporting-study    Small natural-history specimen studies. Rendered directly on
  *                       the page like a museum plate — never as cards/tiles/colored blocks.
  */
-export type RegionType = 'image-priority' | 'reading-field' | 'overlay-typography' | 'supporting-study';
+export type RegionType = 'image-priority' | 'background-field' | 'reading-field' | 'overlay-typography' | 'supporting-study';
 
 function regionTypeForRole(role: PlanningZoneRole): RegionType {
   switch (role) {
     case 'primary-art':
       return 'image-priority';
+    case 'background-art':
+      return 'background-field';
     case 'supporting-art':
       return 'supporting-study';
     case 'body':
@@ -288,6 +295,40 @@ function titleBand(): PlanningZone {
   );
 }
 
+/** The subtle, low-detail illustrated field that covers the WHOLE page so no
+ *  area reads as blank paper. Drawn UNDER the focal art / ornaments / text in the
+ *  blueprint, and (being calm) exempt from the reading-field vs image-priority
+ *  invariant. Used by illustration-bearing layouts; pure-text/reference pages
+ *  stay clean paper. */
+function backgroundField(): PlanningZone {
+  return zone(
+    'illustration-field',
+    'background-art',
+    0,
+    0,
+    100,
+    100,
+    'SUBTLE FULL-PAGE ILLUSTRATED FIELD — the ENTIRE page is one continuous, low-contrast illustration (soft paper grain, gentle atmosphere, faint naturalist texture) so no region reads as blank. Concentrate STRONG detail only in the focal image zones; keep this field quiet everywhere else, especially beneath the reading field so the text stays legible.',
+  );
+}
+
+/** Slots whose composition is a focal subject + reading field — these read as
+ *  one continuous illustrated page, so they carry a background illustration
+ *  field. Pure-text (LAYOUT_D) and full-canvas plates are handled separately. */
+const BACKGROUND_FIELD_SLOTS = new Set<ArtSlot>([
+  'TOP_BAND',
+  'BOTTOM_BAND',
+  'FLOAT_LEFT',
+  'FLOAT_RIGHT',
+  'SIDEBAR_RIGHT',
+  'SCATTERED',
+  'CENTER_WRAP',
+  'CORNER_TOP_LEFT',
+  'CORNER_TOP_RIGHT',
+  'CORNER_BOTTOM_LEFT',
+  'CORNER_BOTTOM_RIGHT',
+]);
+
 function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation, 'textSafeZones' | 'typographyZones' | 'imagePriorityZones'> {
   const title = titleBand();
   switch (slot) {
@@ -401,9 +442,9 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation
           zone('display-text-block', 'caption', 14, 35, 72, 26, 'COMPACT CENTERED TITLE BLOCK (display typography, NOT a paragraph reading field): a few short lines — title largest in engraved serif caps, then any subordinate lines — stacked and VERTICALLY CENTERED over the calm centre of the field. Keep that centre low-contrast so the text stays legible.', 'organic'),
         ],
         imagePriorityZones: [
-          // BLUE primary field: the whole page is a subtle illustrated environment,
-          // NOT blank paper. Drawn first so the ornaments and title block sit on top.
-          zone('display-illustration-field', 'primary-art', 0, 0, 100, 100, 'SUBTLE FULL-PAGE ILLUSTRATED FIELD — the entire page is a soft, low-contrast illustrated environment: aged parchment, delicate botanical atmosphere, faint pressed-leaf / fern / pine textures, gentle vintage paper grain. Keep it quiet and atmospheric so the centered title block stays the focal point; never busy, never a hard subject scene.'),
+          // Background illustrated field: the whole page is a subtle illustrated
+          // environment, NOT blank paper. Drawn first; ornaments + title sit on top.
+          zone('illustration-field', 'background-art', 0, 0, 100, 100, 'SUBTLE FULL-PAGE ILLUSTRATED FIELD — the entire page is a soft, low-contrast illustrated environment: aged parchment, delicate botanical atmosphere, faint pressed-leaf / fern / pine textures, gentle vintage paper grain. Keep it quiet and atmospheric so the centered title block stays the focal point; never busy, never a hard subject scene.'),
           zone('ornament-top', 'supporting-art', 18, 0.5, 64, 3, 'Extremely thin decorative top-EDGE ornament ONLY (a hairline engraved botanical band hugging the top edge). Never overlap the centered text block.'),
           zone('ornament-bottom', 'supporting-art', 18, 96, 64, 3, 'Extremely thin decorative bottom-EDGE ornament ONLY (a hairline engraved botanical band hugging the bottom edge). Never overlap the centered text block.'),
         ],
@@ -522,6 +563,16 @@ export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
   const placement = refinedPlacement(profile.artSlot, imagePercent);
   const imagePriorityZone = imagePriorityZoneFor(profile.artSlot, profile.artAreaFraction, input.geometry);
   const zonePlan = zonePlanFor(profile.artSlot, imagePercent);
+  // Illustration layouts read as one continuous page: lay a subtle background
+  // illustration field UNDER the focal art so no region looks blank. Pure-text
+  // (LAYOUT_D / FULL_PAGE ~0 image), the full-canvas plate (already 100% art),
+  // and TITLE_BLOCK (builds its own field) are excluded.
+  const wantsBackgroundField =
+    BACKGROUND_FIELD_SLOTS.has(profile.artSlot) ||
+    (profile.artSlot === 'FULL_PAGE' && imagePercent > 8 && imagePercent < 90);
+  if (wantsBackgroundField) {
+    zonePlan.imagePriorityZones = [backgroundField(), ...zonePlan.imagePriorityZones];
+  }
   const notes: string[] = [];
 
   if (estimatedRenderedPages > 1) {
