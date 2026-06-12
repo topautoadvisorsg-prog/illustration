@@ -1,120 +1,145 @@
 # The Wildlands Publishing Platform
 
-Turns a finished manuscript into a print-ready, fully illustrated KDP book:
+Turns a finished manuscript into a print-ready, fully illustrated KDP book through
+a single guided **Operator Console** — no terminal required.
 
 ```text
-manuscript.md -> breakdown (chapters/entries) -> page plan (layout + image prompt)
-  -> text-fit -> page quality review -> layout approval
-  -> image generation -> proof render -> book + cover -> KDP
+Operator Console (9 steps):
+  Project → Manuscript → Book Setup → Breakdown → Paginate →
+  Front & Back Matter → Render Pages → Cover → Assemble & Export
 ```
 
-Live backend: `https://wildlandsbackend-production.up.railway.app`
-Live frontend: `https://frontend-production-f65d.up.railway.app`
+- Live frontend (Operator Console): `https://frontend-production-f65d.up.railway.app`
+- Live backend: `https://wildlandsbackend-production.up.railway.app`
+- Health check: `GET /` and `GET /health` → `{ "storage": "supabase", "storageDurable": true, "db": "connected" }`
 
 ---
 
-## Read these first (authoritative, current)
-
-| Doc | What it covers |
-|---|---|
-| `docs/RENDER_MODEL.md` | How pages render — **full-page artwork + text-safe zones** (the model that matters most) |
-| `docs/HANDOFF_CODY.md` | Current checkpoint: Phase 1/2 complete, prompt/renderer migration paused for operator visual approval |
-| `docs/AGENT_LAYER.md` | What actually runs in the agent/LLM layer + the **metadata-not-pixels** rule |
-| `docs/PUBLISHING_DIRECTION.md` | Illustration density / page-design guidance (three layers, controlled variety) |
-| `docs/runbook.md` | Operations — including the **production durable-storage requirement** + `/health` check |
-| `docs/TYPOGRAPHY_SPEC.md` | Cormorant Garamond + EB Garamond, role-based, default 7×10 |
-| `docs/LAYERED_LAYOUT.md` / `docs/LAYOUT_ALLOCATION_MAP.md` | Content type → coverage → architecture; per-layout coverage map |
-
 ## The render model (the thing to understand)
 
-The generated image **IS the page** — full-bleed artwork painted on the Paged.js
-sheet, not a boxed `<img>`. Layout coverage describes **where the text-safe zone
-is**, not how big the image is.
+This platform is **AI-first and whole-page**. The generated image **IS the finished
+page** — illustration **and all of its text baked in by the image model** (`gpt-image-2`),
+rendered as one full-bleed image. There is no separate typesetting pass and no
+boxed `<img>`. Only the barcode (on the cover) is engine-stamped.
 
-- **Title** sits on the artwork, bold, with a paper halo so it stays readable.
-- **Body** sits **directly on the artwork** in the reserved text-safe zone, kept
-  legible by a soft, edgeless scrim + light glyph halo — **no opaque paper card**.
-- Text on the image is allowed **when it's readable** — not a ban, a readability rule.
-- Continuation pages reuse the same entry artwork (visually unified).
-- The **planning preview** (no image yet) shows a three-zone overlay —
-  Image-Priority Zone, Typography Zone, Text-Safe Zone — outlines only on a
-  clean paper page. It teaches the model; it is never the image's frame.
+- **Interior pages** are rendered one finished image per page, then prepared for
+  print at **300 DPI** (sharp Lanczos upscale onto the 7×10 + bleed canvas, badge/
+  folio stamp, lossless PNG → single-page PDF). Code: `pipeline/whole-page-render/`
+  and `pipeline/print-prep/`.
+- **The cover** is a separate full-wrap asset (back · spine · front), its spine
+  sized from the interior page count, composed at **300 DPI** and embedded
+  losslessly. Code: `pipeline/stage-6-layout/render-chapter.ts` +
+  `pipeline/print-prep/cover-print.ts`.
+- **Assembly** merges the approved per-page print PDFs into one interior PDF in
+  spine order (lossless, `pdf-lib`). Code: `pipeline/book-assembly/`.
 
-Code: `backend/src/pipeline/stage-6-layout/render-html.ts` (`buildEntryArticle`,
-`artworkSheetCss`, `fullPageArtworkCss`). Render via Paged.js + Chromium
-(`Dockerfile.backend`).
+The legacy layered / Paged.js "text-safe zone + scrim" renderer (Stage 2–6, the
+CLI `scripts/`, the `images` review table, Replicate Real-ESRGAN upscale) is
+**retired from the production path** and reachable only behind the console's
+"Legacy tools" toggle. Do not use it for new books.
 
-The image model is taught the same model via the **PAGE COMPOSITION BRIEF** in
-every prompt (`artBriefText` in `stage-2-planner/plan-pages.ts`) — three explicit
-zones, no boxes. `LayoutAllocation` exposes `priorityEdge` + `imagePriorityZone`
-(new names) alongside `architecture` + `artBox` (deprecated aliases). The legacy
-`art slot` / `image slot` vocabulary has been swept out of code, docs, and UI;
-any remaining occurrence is an explicit reference to the retired term so Cody
-recognizes legacy material.
+## The Operator Console workflow
 
-**Display/ceremonial pages** (title, dedication, epigraph, quote, special notes)
-use the `LAYOUT_TITLE_DISPLAY` family — a compact centered text block with large
-negative space framed by thin top/bottom edge ornaments (`TITLE_BLOCK`
-architecture / `TITLE_DISPLAY` content type). It is a first-class catalog layout
-the planner can select for very-short non-illustration pages, not a per-page
-override. The Title Page is its first use case. See `docs/LAYERED_LAYOUT.md`.
+Top-to-bottom, one book at a time. A ✓ on a step means it's done. Previewing is
+free; only **Render** (step 7) and **Cover** (step 8) spend.
 
-## Workflow state safety (don't regress these)
+1. **Project** — create a book (title, subtitle, author, trim) or open/delete one.
+2. **Manuscript** — paste/drop the Markdown manuscript (keep Glossary, Index,
+   Sources as top-level sections).
+3. **Book Setup** — confirm title/subtitle/author/trim (form loads the saved
+   config; visual style is fixed by the Wildlands Standard).
+4. **Breakdown** — deterministic split into chapters + entries (no AI, no spend);
+   shows the chapter list.
+5. **Paginate** — flows text onto pages and shows a **fit blueprint** per page
+   (red = text, blue/light-blue = illustration, orange = ornament; "% full" + a
+   FITS/UNDERFILLED/OVERFLOW chip) so the operator confirms fit before any spend.
+6. **Front & Back Matter** — builds title, copyright, contents (from real page
+   numbers), glossary, index, sources, about-the-author.
+7. **Render Pages** — one finished, text-baked image per page (paid). Per page:
+   **Preview** (free; shows the exact text the AI will print), **Render** (paid;
+   re-click to retry a FAILED page), **Approve for book** / **Reject**.
+8. **Cover** — generate the full-wrap cover artwork (paid); spine sized to the
+   current page count.
+9. **Assemble & Export** — merges the interior PDF and produces the print-ready
+   cover PDF. Blocks if any page isn't book-ready **or** if the cover is out of
+   sync with the interior (see below). On success: interior PDF + cover PDF + an
+   in-page preview of the finished book.
 
-- **Plan staleness:** Page Plan stamps a `planMeta` snapshot; the UI shows a banner
-  when the publishing standard / trim / typography changed since planning.
-- **Approval protection:** re-planning refuses to silently reset approved pages/
-  images — operator chooses *skip approved*, *re-plan all*, or *cancel*.
-- **Manuscript iteration:** re-upload → **Re-run Breakdown (replace)** clears the old
-  breakdown/plan/approvals/images and rebuilds. (Plain re-run is still blocked.)
+Operator SOP with screen-by-screen detail: `WILDLANDS_OPERATOR_MANUAL.md` (repo root).
 
-## Durable storage (production requirement)
+## Cover / interior synchronization (production gate)
 
-Generated images and rendered PDFs **must** use Supabase Storage. In production the
-backend **fails loud** rather than silently falling back to ephemeral local disk
-(which Railway wipes on redeploy). Confirm any deploy with one call:
+The cover spine width is baked into the AI cover art for a specific interior page
+count. When the cover artwork is generated, the platform records
+`config.publishing.coverSync = { builtForPageCount, spineIn, generatedAt }`.
 
-```
-GET /health  =>  { "storage": "supabase", "storageDurable": true, "db": "connected" }
-```
+**Final (full-book) export compares the recorded cover page count to the live
+interior page count and BLOCKS the export on a mismatch**, with:
 
-## What's implemented
+> "Cover is out of date. The interior page count changed and the spine width may
+> be incorrect. Regenerate the cover before exporting."
 
-- Fastify backend; Supabase Postgres + Drizzle migrations; durable Supabase Storage.
-- Project setup with **publishing standards** (Hardcover 7×10 / Paperback 6×9 /
-  Large 8.5×11 / Kindle) + first-chapter format calibration.
-- Manuscript upload (md/txt/docx/pdf) → **deterministic** breakdown (no LLM) →
-  deterministic Stage-2 page plan (layout + locked, hashed image prompt).
-- Text-Fit + advisory **Page Quality Review** (rhythm, continuations, balance).
-- Per-chapter layout approval gate.
-- Stage-3 image generation via OpenAI **`gpt-image-2`** (spend-gated, layout-aware
-  aspect, dependency-injected so tests never call the paid API).
-- Stage-4 image review (approve / reject / regenerate / set-active / reuse), plus
-  **repeating shared assets** (one border image reused across a layout's pages).
-- Stage-5 upscale + 300 DPI print gate (Replicate Real-ESRGAN).
-- Stage-6/7 full-page-artwork chapter/page proof render + book stitch + KDP
-  preflight + full-wrap cover (spine from page count).
-- Operator console: guided next-step engine, per-stage review (advisory agent),
-  image library with coverage metadata, proof preview, Book Parts panel.
+Regenerating the cover (step 8) refreshes `coverSync` and clears the block. Chapter
+proofs and pre-existing covers without a recorded count are exempt. Code:
+`coverSyncStatus()` in `pipeline/book-assembly/assemble-book.ts`. No cover
+versioning, no separate cover project.
+
+## Project lifecycle
+
+A project is a **temporary production workspace**. The intended lifecycle:
+
+1. Create the book project.
+2. Render and approve all pages.
+3. Generate and approve the cover.
+4. Export the KDP package (the cover sync gate must pass).
+5. **Archive approved images to the permanent Image Library.**  *(planned — not
+   yet implemented)*
+6. Download the external backup.
+7. **Delete the temporary project** (project data removed; library preserved).
+   *(safe deletion — planned; see warning below)*
+8. Start the next book.
+
+> ⚠ **Image Library and safe deletion are not implemented yet.** Today,
+> `DELETE /api/projects/:id` cascade-deletes the render records and leaves the
+> image files orphaned in storage — **deleting a project loses its AI artwork.**
+> This is safe for the disposable *test* projects, but **do not delete a real
+> book project** until the Image Library + project-scoped storage cleanup ship.
+
+## What's implemented (production path)
+
+- Operator Console driving the whole-page AI pipeline end to end (the default and
+  only operator path; legacy tools isolated behind a toggle).
+- Manuscript upload → deterministic breakdown → pagination (body flow engine +
+  unified reference model for glossary/index/sources) → front/back matter.
+- Whole-page render via OpenAI **`gpt-image-2`** (text baked into the image;
+  spend-gated; dependency-injected so tests never call the paid API), with
+  preview / render / approve / reject / print-prep per page.
+- **300 DPI** interior print-prep (sharp Lanczos) and **300 DPI** full-wrap cover
+  (direct lossless embed); KDP-shaped interior + cover PDFs.
+- Cover/interior synchronization export gate.
+- Fastify backend; Supabase Postgres + Drizzle migrations (auto-applied on
+  deploy); durable Supabase Storage.
 
 ## Not implemented yet
 
-- Kindle EPUB export (button hidden/disabled).
-- Batch image generation (one-by-one today).
-- BullMQ background workers (pipeline runs synchronously per request).
+- **Permanent Image Library** (project-independent archive of approved AI masters).
+- **Safe project deletion** (purge project storage files; preserve library).
+- Kindle EPUB export.
+- BullMQ background workers (rendering runs synchronously per request).
 - Single-user auth enforcement.
 
-## The two live LLM agents (everything else is deterministic)
+## Durable storage (production requirement)
 
-Only **OPERATOR_ADVISER** (chat) and **STAGE_REVIEWER** (per-stage verdict) call
-Claude — both text-only, read-only, capped. No agent reads image pixels (see
-`docs/AGENT_LAYER.md`). The 8 design contracts in `agent-contracts.ts` are enforced
-by deterministic code, not running agents.
+Generated images and PDFs **must** use Supabase Storage. In production the backend
+**fails loud** rather than falling back to ephemeral local disk (Railway wipes it
+on redeploy). Confirm any deploy: `GET /health` → `storageDurable: true`.
 
 ## Tech stack
 
-Node + TypeScript + Fastify · React · Zod · Supabase Postgres + Drizzle · Anthropic
-Claude · OpenAI gpt-image-2 · Replicate Real-ESRGAN · Puppeteer + Paged.js · Pino.
+Node + TypeScript + Fastify · React (CRA/craco) · Zod · Supabase Postgres +
+Drizzle · sharp + pdf-lib (print-prep & assembly) · OpenAI `gpt-image-2` ·
+Anthropic Claude (operator chat / stage review only) · Puppeteer + Paged.js
+(legacy renderer only) · Pino.
 
 ## Commands
 
@@ -122,44 +147,22 @@ Claude · OpenAI gpt-image-2 · Replicate Real-ESRGAN · Puppeteer + Paged.js ·
 yarn install
 yarn workspace @wildlands/shared build
 yarn workspace @wildlands/backend run typecheck
-yarn workspace @wildlands/backend run test
+yarn workspace @wildlands/backend run test     # vitest
 yarn workspace frontend build
 ```
 
 Run locally: `yarn workspace @wildlands/backend dev` · `yarn workspace frontend dev`.
 
-## Whole-book production path
+## Deploy / Railway notes
 
-Use this when the book is planned and the operator has authorized image spend.
-The two scripts are deliberately split so paid rendering and no-spend finalizing
-cannot be confused.
-
-```powershell
-$env:PROJECT_ID="e51e5b4c-05c7-4d6e-8c00-60aa15de8992"
-$env:BACKEND_URL="https://wildlandsbackend-production.up.railway.app"
-
-# Paid: render only pages that do not already have a RENDERED/APPROVED row.
-corepack yarn workspace @wildlands/backend tsx scripts/render-batch.ts --chapter 2
-
-# No spend: approve existing renders if needed, print-prep, select-for-book.
-corepack yarn workspace @wildlands/backend tsx scripts/finalize-book-renders.ts --chapter 2
-
-# No spend: once every page is rendered/finalized, merge the interior PDF.
-corepack yarn workspace @wildlands/backend tsx scripts/finalize-book-renders.ts --all --assemble
+- Two services: **frontend** (Nixpacks/`Dockerfile.frontend`, serves the static
+  console) and **@wildlands/backend** (`Dockerfile.backend`, node:20 + chromium;
+  runs `drizzle-kit migrate` on boot, so schema changes ship via a committed
+  migration). ~5–6 min builds.
+- **Watch-path quirk:** a service only auto-builds when a pushed commit touches its
+  watched paths; an empty/unrelated commit shows up as `SKIPPED`. Force a build by
+  editing a file under that service's tree. Verify a deploy by diffing the live
+  bundle hash (`curl <frontend>/ | grep main.<hash>.js`).
+- API POSTs need a JSON body — send `{}` for bodyless actions.
+- `whole-page-render/:pageId` takes the page **UUID**, not the page key.
 ```
-
-`render-batch.ts` always verifies against the database before retrying, so a bad
-HTTP response cannot cause a duplicate paid render. `finalize-book-renders.ts`
-never calls the paid render route; if a page is missing art, it reports the page
-key and exits with code `2`.
-
-## Deploy / Railway gotchas
-
-- Backend builds via `Dockerfile.backend` (node:20 + chromium); ~5–6 min deploys.
-- Each push restarts the build — the latest push wins.
-- API POSTs need a JSON body or send `{}` — bodyless POST + `content-type:
-  application/json` is rejected by Fastify. `/plan` and `/manifests` accept a
-  bodyless POST (no body schema) by design.
-- `generate-image` takes the page **UUID**, not the page key.
-- PowerShell: `$pid` is reserved — never use it as a variable. Commit with separate
-  `git add` / `git commit` / `if ($?) { git push }` (not chained `| Out-Null`).
