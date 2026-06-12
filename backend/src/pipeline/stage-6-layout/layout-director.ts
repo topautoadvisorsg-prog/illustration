@@ -421,9 +421,11 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number): Pick<LayoutAllocation
         // the top and bottom edges — visual continuity, NOT a subject plate.
         return {
           typographyZones: [title],
+          // Ornaments sit at the very top/bottom edges, EXTREMELY THIN — they may
+          // touch the text zones but must never overlap them (operator fix).
           imagePriorityZones: [
-            zone('ornament-top', 'supporting-art', 12, 2, 76, 6, 'Small decorative top-edge ornament ONLY (a thin engraved botanical band) — visual continuity, never a subject illustration.'),
-            zone('ornament-bottom', 'supporting-art', 12, 92, 76, 6, 'Small decorative bottom-edge ornament ONLY (a thin engraved botanical band) — visual continuity, never a subject illustration.'),
+            zone('ornament-top', 'supporting-art', 12, 0.5, 76, 3, 'Extremely thin decorative top-EDGE ornament ONLY (a hairline engraved botanical band hugging the top edge) — visual continuity, never a subject illustration. Keep it a thin strip; never overlap the title or the reading field.'),
+            zone('ornament-bottom', 'supporting-art', 12, 96, 76, 3, 'Extremely thin decorative bottom-EDGE ornament ONLY (a hairline engraved botanical band hugging the bottom edge) — visual continuity, never a subject illustration. Keep it a thin strip; never overlap the reading field.'),
           ],
           textSafeZones: [zone('reading-field-full', 'body', 6, 18, 88, 72, 'Large uninterrupted reading field: a calm parchment text column filling the page between the edge ornaments. Text-first page — no subject illustration, no panels, no cards.', 'organic')],
         };

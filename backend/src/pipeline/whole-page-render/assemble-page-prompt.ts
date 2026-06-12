@@ -112,29 +112,25 @@ function hardConstraints(spec: WholePageSpec): string {
       `- TITLE-PAGE typography, baked INTO the artwork as the engraved title block — stacked and centered on calm parchment: ${stacked.map((s) => `"${s}"`).join(' / ')}. The title set largest in stately serif caps, then the subtitle, then the author/imprint line, all in warm sepia ink and framed by a refined botanical ornament. Never a pasted label, never modern type.`,
     );
   }
+  const hasBody = spec.pageText.bodyBlocks.length > 0;
   lines.push(
     // F-8 — the Chapter 1 production run proved the attached blueprint alone
     // is loosely followed: corner-accent layouts rendered as full-width bands
     // and a 50/50 page mirrored. State the placement contract in prose and
     // forbid the three observed failure modes (move / mirror / enlarge).
     `- COMPOSITION CONTRACT — image placement: ${spec.composition.imagePlacement}. Text placement: ${spec.composition.textPlacement}. Respect this placement EXACTLY: do not move the artwork to a different region, do not mirror left/right or top/bottom, do not enlarge a small accent into a band or a band into a full page. The attached layout reference image shows the same plan — follow it.`,
-    rendersBodyText(spec)
-      ? '- Body text appears VERBATIM, every word, in order. Do not paraphrase, summarize, abbreviate, truncate, or invent.'
-      : '- Do not render body copy, title copy, author text, spine text, barcode, ISBN, glossary terms, index entries, or any other readable text. The publishing engine adds all critical typography.',
-    rendersBodyText(spec)
-      ? `- Body typography: ${spec.typographyDNA.bodyFamily}. Set at approximately ${spec.typographyDNA.bodyPt}pt with ${spec.typographyDNA.bodyLineHeight} line height, reading measure approximately ${spec.typographyDNA.bodyMeasureChars} characters wide - generous and confident, never cramped.`
-      : '- Preserve calm, readable text-safe regions for the publishing engine. These zones must feel naturally integrated into the illustration, not like blank boxes, cards, labels, or cutouts.',
+    // Body-text lines only when the page actually has body (a title page has none).
+    ...(hasBody
+      ? [
+          '- Body text appears VERBATIM, every word, in order. Do not paraphrase, summarize, abbreviate, truncate, or invent.',
+          `- Body typography: ${spec.typographyDNA.bodyFamily} Set at approximately ${spec.typographyDNA.bodyPt}pt with ${spec.typographyDNA.bodyLineHeight} line height, reading measure approximately ${spec.typographyDNA.bodyMeasureChars} characters wide — generous and confident, never cramped.`,
+        ]
+      : []),
     '- The reading field sits at the supplied coordinates. Do not move it. Do not shrink it. Do not change its proportions.',
-    '- Ornamentation: engraved botanical swags top and bottom, with centered pinecone medallions, drawn in the same warm sepia ink. Hairline decorative rules around the CHAPTER kicker and the title. Period-correct, line-engraving feel — never clip art, never digital flourish.',
+    '- Ornamentation: engraved botanical swags top and bottom, with centered pinecone medallions, drawn in the same warm sepia ink, plus hairline decorative rules around the title where appropriate. Period-correct, line-engraving feel — never clip art, never digital flourish.',
     '- The whole page must read as ONE integrated composition. The illustration, the typography, and the ornamentation share the same paper, the same ink palette, the same period. The page should look like it was printed from a single plate, not assembled in software.',
     '- Vintage natural-history monograph aesthetic. No modern UI. No infographic styling. No flat icons. No drop-shadows that look digital. No gradients. No sans-serif anywhere on the page.',
     '- Do not add page numbers, captions, watermarks, signatures, copyright text, folios, or running heads unless explicitly listed in `decorativeElements`.',
-    // L-7.2 — the only remaining badge rule. No reserved zones, no spatial
-    // band, no clipped composition: artwork and ornaments flow naturally
-    // to the page edges. Print-prep stamps a small bottom-right cartouche
-    // with a soft parchment backing that covers whatever the model places
-    // underneath, so the model never needs to know about it.
-    '- Do NOT draw any badges, hazard symbols, warning icons, region/category icons, source seals, page numbers, or any other metadata marks. The hazard/region/source values in BADGE CONTEXT are mood-setting context only — never reproduce them as marks on the page. The renderer adds the publisher\'s mark in print-prep.',
     '- Output a finished, publishable page. If the result would not pass as a real spread in a collector-edition hardcover, it is wrong.',
   );
   return lines.join('\n');
@@ -189,13 +185,9 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
     '',
     block('DECORATIVE ELEMENTS', spec.decorativeElements),
     '',
-    block('BADGE CONTEXT (mood only — do NOT draw these; the renderer stamps them)', spec.badgeContext),
-    '',
-    // L-7.2 — BADGE-SAFE ZONES block REMOVED. The model no longer receives
-    // any reserved-rect geometry. Print-prep handles all metadata stamping
-    // via a small bottom-right cartouche; the model gets back full
-    // composition freedom. badgeSafeZones is still on the spec (empty
-    // array) for backward compatibility with the proof package.
+    // Badge context + badge-safe zones are NOT sent to the model (operator
+    // decision): badges are stamped deterministically by print-prep in a fixed
+    // bottom-right corner, so the model never needs to know about them.
     hardConstraints(spec),
   ].join('\n');
 }
