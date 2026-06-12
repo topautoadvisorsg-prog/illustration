@@ -40,7 +40,7 @@ export function assembleCoverPrompt(spec: WholePageSpec): string {
   const subj = spec.illustrationDNA.subject;
   return [
     // 1. MISSION
-    `MISSION — create a complete, FINISHED, publishable collector-edition FULL-WRAP HARDCOVER COVER under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version}: one continuous illustration spanning back cover, spine, and front cover. A museum-grade collector's natural-history volume — an object that feels rare, archival, and worthy of preservation. The entire wrap must appear as a SINGLE printed plate where illustration, typography, and ornamentation are inseparable — never artwork with text pasted on top. You render the typography INTO the artwork; the only element you do NOT draw is the barcode.`,
+    `MISSION — create a complete, FINISHED, publishable collector-edition FULL-WRAP HARDCOVER COVER under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version}: one continuous illustration spanning back cover, spine, and front cover. A museum-grade collector's natural-history volume — an object that feels rare, archival, and worthy of preservation. The entire wrap must appear as a SINGLE printed plate where illustration, typography, and ornamentation are inseparable — never artwork with text pasted on top. You render the complete cover — illustration and typography — as one finished image.`,
     '',
     // 2. EXACT TEXT
     'TEXT TO RENDER — these exact words, engraved into the artwork; do not alter, translate, abbreviate, or reorder:',
@@ -54,7 +54,6 @@ export function assembleCoverPrompt(spec: WholePageSpec): string {
     '- FRONT COVER: the title block — title, then subtitle, then author — as the engraved focal typography over the strongest part of the scene.',
     '- SPINE: the title and author as vertical spine typography in the same ink.',
     '- BACK COVER: the back-cover lines as readable engraved typesetting over calm landscape negative space.',
-    '- BARCODE ZONE: leave a clean, empty rectangle (~2 × 1.2 in) in the LOWER-RIGHT of the BACK cover — render NOTHING there (no barcode, ISBN, or price). The publisher stamps the barcode.',
     '',
     // 4. VISUAL DNA — the heart of the style
     'WILD LANDS VISUAL DNA:',
@@ -70,7 +69,6 @@ export function assembleCoverPrompt(spec: WholePageSpec): string {
     '- No photography, photorealism, 3D render, flat vector, low-poly, anime/cartoon, modern UI, infographic styling, gradients, or digital drop-shadows.',
     '- No chapter kicker, Roman numerals, chapter ornaments, page numbers, folios, running heads, or badges — this is a cover, not an interior page.',
     '- Do not invent any text beyond the words specified above.',
-    '- Do not draw the barcode; leave its zone clean.',
     '- If the result would not pass as a real collector-edition hardcover wrap on a bookstore shelf, it is wrong.',
   ].join('\n');
 }
