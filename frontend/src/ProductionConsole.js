@@ -143,6 +143,30 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
   useEffect(() => { if (project?.id) loadStatus(project.id).catch(() => {}); else setStatus({}); }, [project?.id, loadStatus]);
 
+  // Sync the Setup form with the OPEN project's real config. The project-list
+  // endpoint omits `config`, so without this, visiting Setup on an existing book
+  // shows stale defaults — and Save would overwrite the real title/author/trim.
+  // Fetch the full project and populate the form from it whenever the active
+  // project changes.
+  useEffect(() => {
+    if (!project?.id) return undefined;
+    let cancelled = false;
+    api(`/api/projects/${project.id}/config`).then((d) => {
+      const cfg = d?.config;
+      if (cancelled || !cfg) return;
+      const w = cfg.trimSize?.widthIn, h = cfg.trimSize?.heightIn;
+      const trim = w === 6 && h === 9 ? "6x9" : w === 8.5 && h === 11 ? "8.5x11" : "7x10";
+      const authors = cfg.publishing?.authors;
+      setForm({
+        title: cfg.publishing?.title ?? cfg.title ?? "",
+        subtitle: cfg.publishing?.subtitle ?? cfg.subtitle ?? "",
+        author: (authors && authors.length ? authors.join(", ") : cfg.authorName) ?? "",
+        trim,
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [project?.id, api]);
+
   function trimSize(t) {
     if (t === "6x9") return { widthIn: 6, heightIn: 9, bleedIn: 0.125 };
     if (t === "8.5x11") return { widthIn: 8.5, heightIn: 11, bleedIn: 0.125 };
@@ -170,6 +194,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
     const d = await api("/api/projects", { method: "POST", body: JSON.stringify({ config: cleanConfig() }) });
     setProject(d.project); setProjects((c) => [d.project, ...c.filter((p) => p.id !== d.project.id)]);
     return { notice: `Created “${d.project.title}”.` };
+  });
+
+  const deleteProject = (p) => run("Deleting project", async () => {
+    await api(`/api/projects/${p.id}`, { method: "DELETE" });
+    setProjects((c) => c.filter((x) => x.id !== p.id));
+    if (project?.id === p.id) setProject(null);
+    return { notice: `Deleted “${p.title}”.` };
   });
 
   const saveSetup = () => run("Saving setup", async () => {
@@ -368,9 +399,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
               <div style={{ marginTop: 8 }}>
                 {projects.length === 0 && <span style={{ color: C.muted }}>No projects yet.</span>}
                 {projects.map((p) => (
-                  <button key={p.id} style={project?.id === p.id ? S.btn("ok") : S.ghost} onClick={() => { setProject(p); setNotice(`Opened “${p.title}”.`); }}>
-                    {p.title} <span style={{ color: project?.id === p.id ? "#fff" : C.muted, fontSize: 11 }}>· {p.status}</span>
-                  </button>
+                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                    <button style={{ ...(project?.id === p.id ? S.btn("ok") : S.ghost), margin: 0, flex: 1, textAlign: "left" }} onClick={() => { setProject(p); setNotice(`Opened “${p.title}”.`); }}>
+                      {p.title} <span style={{ color: project?.id === p.id ? "#fff" : C.muted, fontSize: 11 }}>· {p.status}</span>
+                    </button>
+                    <button title={`Delete “${p.title}”`} style={{ ...S.ghost, margin: 0, color: C.red, borderColor: C.red, padding: "6px 10px", fontSize: 11 }}
+                      onClick={() => { if (window.confirm(`Permanently delete “${p.title}” and ALL its pages, renders, and cover? This cannot be undone.`)) deleteProject(p).catch(() => {}); }}>✕</button>
+                  </div>
                 ))}
               </div>
               <button style={S.ghost} onClick={() => loadProjects().catch(() => {})}>↻ Refresh</button>
