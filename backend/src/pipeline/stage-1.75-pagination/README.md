@@ -1,8 +1,9 @@
 # Stage 1.75 — Pagination (Reading Block flow)
 
-**Status:** v1 implemented behind `PAGINATION_V1_ENABLED=false`. No API
-endpoint exposes this yet — the modules are unit-testable and the
-orchestrator returns `PaginatedPage[]` ready for persistence.
+**Status:** v1 in production. The Operator Console drives it at Step 5
+(Paginate); `POST /api/projects/:id/pagination-preview` returns the truthful
+fit blueprint per REAL paginated page (the same records the renderer uses).
+Fully deterministic — no LLM, no image spend.
 
 See `SPEC_PAGINATION_V1.md` at the repo root for the full SPEC.
 
@@ -60,9 +61,28 @@ Maintain one open `WorkingBlock`. For each token:
   `compactedEntryKeys`.
 - Body token (paragraph / heading / atomic): if it fits the current block,
   pour it in. If not, close the block, open a continuation for the current
-  entry (uses `LAYOUT_2_TEXT_HEAVY` capacity), and pour the token there.
+  entry (uses `LAYOUT_2_TEXT_HEAVY` capacity), and pour the token there. The
+  fit check counts the `\n\n` join separators `joinMarkdown` inserts between
+  chunks (one char each after stripMarkdown), so a page can't pass the pour
+  check and then finalize a few chars over capacity.
 - Atomic body token that alone exceeds the continuation's capacity: place it
-  whole and mark `fit_status = OVERFLOW`.
+  whole and mark `fit_status = OVERFLOW` (a real, operator-visible overflow —
+  the manuscript paragraph is genuinely too big and must be split).
+
+### Invariants (don't regress)
+
+- **Compaction is an optimization only.** A soft break merges two entries onto
+  one page ONLY if the would-be merged page fits under the final capacity model
+  (`computePaginationCapacity`). If it would overflow, the second entry hard-
+  breaks to its own page. A `compacted` page therefore never finalizes as
+  `OVERFLOW`.
+- **The pour matches the finalized text.** `charsUsed` during the pour equals
+  `countChars(joinMarkdown(chunks))` (join separators counted), so a page that
+  passes the pour check finalizes within capacity. The only `OVERFLOW` left is
+  an atomic token bigger than a whole page — a manuscript issue, not a paginator
+  bug. (Sub-1% boundary flags from the line-packing/heading-line model are a
+  conservative estimate and render fine; the core `analyzeTextFit` model is left
+  untouched.)
 
 After the stream is exhausted, flush the final block and compute `totalParts`
 for each entry's chain.
