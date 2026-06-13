@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { getProjectStorage, type ProjectStorage, type StoredFile } from '../../services/storage/project-storage.js';
 import { assertUsableManuscriptOutline, parseManuscriptOutline, type ManuscriptOutline } from './parse-manuscript-outline.js';
 import { extractManuscript } from './extract-manuscript.js';
+import { sanitizeManuscript } from './sanitize-manuscript.js';
 
 export const IngestManuscriptInputSchema = z
   .object({
@@ -36,14 +37,20 @@ export async function ingestManuscript(
     base64: parsed.fileBase64,
   });
 
-  const outline = parseManuscriptOutline(extracted.markdown);
+  // Production safety guard: sanitize ONCE here so breakdown, pagination,
+  // prompts, and paid renders all read clean text (no mojibake, no emoji/ICON
+  // markers). Everything downstream reads the stored file, so this is the
+  // single chokepoint.
+  const cleanMarkdown = sanitizeManuscript(extracted.markdown);
+
+  const outline = parseManuscriptOutline(cleanMarkdown);
   assertUsableManuscriptOutline(outline);
 
-  // Store the extracted markdown (normalized to .md) so downstream stages read one format.
+  // Store the sanitized markdown (normalized to .md) so downstream stages read one format.
   const manuscript = await storage.writeProjectFile(
     parsed.projectId,
     ['manuscripts', extracted.storedFilename],
-    extracted.markdown,
+    cleanMarkdown,
   );
   return { manuscript, outline, sourceType: extracted.sourceType };
 }
