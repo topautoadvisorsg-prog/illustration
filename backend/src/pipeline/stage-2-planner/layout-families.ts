@@ -91,10 +91,11 @@ function familyForContentType(ct: ContentType | undefined): LayoutFamily {
     // Pure back-matter and dense reference flow into Layout D (no image at all).
     case 'REFERENCE_PAGE':
       return 'D';
-    // Long encyclopedic entries are essentially text pages — Layout C carries
-    // a small supporting image in the corner so the eye has something to land on.
+    // Premium field-guide model: encyclopedic entries ARE flagship subjects, so
+    // their opener leads with a strong illustration (Layout B, ~50/50) rather
+    // than a small corner accent. Overflow text flows to text-heavy continuations.
     case 'ENCYCLOPEDIA_ENTRY':
-      return 'C';
+      return 'B';
     // Plates and atmospheric chapter openers are showcase pages — Layout A's
     // facing-illustration page exists for exactly this.
     case 'BOTANICAL_PLATE':
@@ -112,42 +113,39 @@ function familyForContentType(ct: ContentType | undefined): LayoutFamily {
   }
 }
 
-/**
- * P2a — entries at or above this word count route to the 25 % accent family:
- * the entry will spill to continuations anyway, so the opener's job is to
- * carry as much text as possible while the small accent keeps the page
- * visually alive. Shorter entries keep Layout B (the illustration is the
- * star and the text fits beside it). Tuned against the Wildlands Field
- * Guide corpus; re-measure in the P3 distribution audit before changing.
- */
-export const ACCENT_MIN_WORDS = 380;
-
-/** The four 25 % accent corner variants, in rotation order. */
-const ACCENT_CORNERS: readonly LayoutTemplateId[] = [
-  'LAYOUT_C_CORNER_TOP_RIGHT',
-  'LAYOUT_C_CORNER_BOTTOM_LEFT',
-  'LAYOUT_C_CORNER_TOP_LEFT',
-  'LAYOUT_C_CORNER_BOTTOM_RIGHT',
+/** Strong-illustration opener variants (Layout B, ~50/50), in rotation order.
+ *  Premium field-guide model (P2b): EVERY major entry opener leads with one of
+ *  these so each subject gets a strong first impression. The 25 % corner-accent
+ *  family (C) is no longer auto-selected for openers (still reachable via
+ *  operator override). The bottom-image variant is intentionally omitted so the
+ *  illustration always sits at or above the reading line on an opener. */
+const STRONG_IMAGE_VARIANTS: readonly LayoutTemplateId[] = [
+  'LAYOUT_B_IMAGE_TOP',
+  'LAYOUT_B_IMAGE_RIGHT',
+  'LAYOUT_B_IMAGE_LEFT',
 ];
 
-/** Deterministic corner rotation — stable across re-paginations of the same
- *  book (keyed on chapter + page number, not array order), varied enough that
- *  consecutive accent pages don't repeat a corner. */
-function accentCornerFor(entry: PageManifest): LayoutTemplateId {
-  return ACCENT_CORNERS[(entry.chapterNumber * 3 + entry.pageNumber) % ACCENT_CORNERS.length]!;
+/** Deterministic variant rotation — stable across re-paginations of the same
+ *  book (keyed on chapter + page number), varied enough that consecutive
+ *  openers don't repeat the same image placement. */
+function strongImageVariantFor(entry: PageManifest): LayoutTemplateId {
+  return STRONG_IMAGE_VARIANTS[(entry.chapterNumber * 3 + entry.pageNumber) % STRONG_IMAGE_VARIANTS.length]!;
 }
 
 /**
- * Choose a simplified layout for an entry. Pure — no I/O. Operator-forced
- * templates short-circuit this entirely (handled upstream).
+ * Choose a simplified layout for an entry OPENER. Pure — no I/O. Operator-forced
+ * templates short-circuit this entirely (handled upstream). Continuation pages
+ * do NOT come through here — they are always LAYOUT_2_TEXT_HEAVY.
  *
- * Decision ladder (highest priority first):
+ * Premium field-guide model (P2b). Decision ladder (highest priority first):
  *   1. Danger / warning → Layout B image-top (warning unmissable)
- *   2. Content-type routing (reference → D, encyclopedia → C accent,
- *      plates / chapter openers → A)
- *   3. Length routing for everything else:
- *        ≥ ACCENT_MIN_WORDS → Layout C 25 % accent (text capacity wins)
- *        <  ACCENT_MIN_WORDS → Layout B 50/50 (illustration carries the page)
+ *   2. Reference / back matter → Layout D (no image)
+ *   3. Plates / chapter openers → Layout A (full showcase)
+ *   4. Every other entry opener → Layout B strong illustration (~50/50),
+ *      REGARDLESS of length. Long entries spill their extra text into
+ *      text-heavy continuations rather than shrinking the opener to a corner
+ *      accent. This favors a strong first impression for each subject while
+ *      preserving the practical survival-guide density on continuation pages.
  */
 export function chooseSimplifiedLayout(
   entry: PageManifest,
@@ -163,15 +161,7 @@ export function chooseSimplifiedLayout(
   }
 
   const ctFamily = familyForContentType(entry.contentType);
-  if (ctFamily === 'C') {
-    const template = accentCornerFor(entry);
-    return {
-      family: 'C',
-      template,
-      reason: `Content type ${entry.contentType} — long encyclopedic text; 25 % accent layout (${template}) preserves text density with a small supporting study.`,
-    };
-  }
-  if (ctFamily !== 'B') {
+  if (ctFamily === 'D' || ctFamily === 'A') {
     return {
       family: ctFamily,
       template: FAMILY_DEFAULT_TEMPLATE[ctFamily],
@@ -179,19 +169,13 @@ export function chooseSimplifiedLayout(
     };
   }
 
-  // Length routing for the mixed-content default.
+  // Every other entry opener leads with a strong illustration, regardless of
+  // length. Overflow text flows to text-heavy continuation pages.
+  const template = strongImageVariantFor(entry);
   const words = countWords(entry.bodyMarkdown);
-  if (words >= ACCENT_MIN_WORDS) {
-    const template = accentCornerFor(entry);
-    return {
-      family: 'C',
-      template,
-      reason: `${words} words — long entry will spill to continuations; 25 % accent layout (${template}) maximizes opener text while a small corner study keeps the page visually alive.`,
-    };
-  }
   return {
     family: 'B',
-    template: FAMILY_DEFAULT_TEMPLATE.B,
-    reason: `${words} words — compact entry; 50/50 layout lets the illustration carry the page with text comfortably beside it.`,
+    template,
+    reason: `Entry opener (${entry.contentType ?? 'subject'}, ${words} words) — strong illustration layout (${template}); overflow text flows to text-heavy continuations.`,
   };
 }

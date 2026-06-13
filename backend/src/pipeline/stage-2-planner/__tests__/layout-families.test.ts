@@ -96,9 +96,11 @@ describe('chooseSimplifiedLayout — content-type routing', () => {
     expect(r.template).toBe('LAYOUT_D_PURE_TEXT');
   });
 
-  it('routes ENCYCLOPEDIA_ENTRY to Layout C (text + corner support)', () => {
+  it('routes ENCYCLOPEDIA_ENTRY to a strong illustration opener (Layout B)', () => {
     const r = chooseSimplifiedLayout(makeEntry({ contentType: 'ENCYCLOPEDIA_ENTRY' }), cfg);
-    expect(r.family).toBe('C');
+    expect(r.family).toBe('B');
+    expect(r.template).toMatch(/^LAYOUT_B_IMAGE_/);
+    expect(r.template).not.toMatch(/CORNER/);
   });
 
   it('routes BOTANICAL_PLATE and CHAPTER_OPENER to Layout A (showcase pair)', () => {
@@ -137,39 +139,46 @@ describe('FAMILY_BY_TEMPLATE is internally consistent with FAMILY_DEFAULT_TEMPLA
   });
 });
 
-// ─── P2a — 25 % accent selection (word-count routing + corner rotation) ────
+// ─── P2b — every entry opener leads with a strong illustration ─────────────
 
-describe('chooseSimplifiedLayout — P2a length routing', () => {
+describe('chooseSimplifiedLayout — entry openers lead with a strong illustration', () => {
   const config = makeConfig();
   const longBody = Array.from({ length: 450 }, (_, i) => `word${i}`).join(' ');
   const shortBody = Array.from({ length: 120 }, (_, i) => `word${i}`).join(' ');
 
-  it('long default-content entry routes to a 25 % accent corner', () => {
+  it('a LONG entry opener leads with a strong illustration, not a corner accent', () => {
     const pick = chooseSimplifiedLayout(makeEntry({ bodyMarkdown: longBody }), config);
-    expect(pick.family).toBe('C');
-    expect(pick.template).toMatch(/^LAYOUT_C_CORNER_/);
-    expect(pick.reason).toContain('accent');
+    expect(pick.family).toBe('B');
+    expect(pick.template).toMatch(/^LAYOUT_B_IMAGE_/);
+    expect(pick.template).not.toMatch(/CORNER/);
   });
 
-  it('short default-content entry keeps the 50/50 layout', () => {
+  it('a SHORT entry opener also leads with a strong illustration', () => {
     const pick = chooseSimplifiedLayout(makeEntry({ bodyMarkdown: shortBody }), config);
     expect(pick.family).toBe('B');
-    expect(pick.template).toBe('LAYOUT_B_IMAGE_RIGHT');
+    expect(pick.template).toMatch(/^LAYOUT_B_IMAGE_/);
   });
 
-  it('corner rotation is deterministic per chapter+page and varies across pages', () => {
+  it('never auto-selects a 25 % corner accent for an opener', () => {
+    for (const p of [1, 2, 3, 4, 5, 6]) {
+      const pick = chooseSimplifiedLayout(makeEntry({ bodyMarkdown: longBody, pageNumber: p }), config);
+      expect(pick.template).not.toMatch(/CORNER/);
+    }
+  });
+
+  it('strong-image variant rotation is deterministic per chapter+page and varies', () => {
     const a1 = chooseSimplifiedLayout(makeEntry({ bodyMarkdown: longBody, chapterNumber: 2, pageNumber: 3 }), config);
     const a2 = chooseSimplifiedLayout(makeEntry({ bodyMarkdown: longBody, chapterNumber: 2, pageNumber: 3 }), config);
     expect(a1.template).toBe(a2.template); // stable across re-pagination
-    const corners = new Set(
-      [1, 2, 3, 4].map(
+    const variants = new Set(
+      [1, 2, 3].map(
         (p) => chooseSimplifiedLayout(makeEntry({ bodyMarkdown: longBody, pageNumber: p }), config).template,
       ),
     );
-    expect(corners.size).toBeGreaterThan(1); // rotation actually rotates
+    expect(variants.size).toBeGreaterThan(1); // rotation actually rotates
   });
 
-  it('danger override beats length routing', () => {
+  it('danger override beats opener routing', () => {
     const pick = chooseSimplifiedLayout(
       makeEntry({ bodyMarkdown: longBody, contentType: 'WARNING_PAGE' }),
       config,
@@ -177,12 +186,12 @@ describe('chooseSimplifiedLayout — P2a length routing', () => {
     expect(pick.template).toBe('LAYOUT_B_IMAGE_TOP');
   });
 
-  it('encyclopedia entries route to accent corners with rotation', () => {
+  it('encyclopedia entries also lead with a strong illustration', () => {
     const pick = chooseSimplifiedLayout(
       makeEntry({ bodyMarkdown: shortBody, contentType: 'ENCYCLOPEDIA_ENTRY' }),
       config,
     );
-    expect(pick.family).toBe('C');
-    expect(pick.template).toMatch(/^LAYOUT_C_CORNER_/);
+    expect(pick.family).toBe('B');
+    expect(pick.template).toMatch(/^LAYOUT_B_IMAGE_/);
   });
 });
