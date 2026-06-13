@@ -162,12 +162,13 @@ export const ORNAMENTS = {
 // This is the reconciled Master Style Block (see STANDARD_V1_2_RECONCILIATION.md).
 export const ILLUSTRATION_DNA = {
   medium:
-    "19th-century naturalist's expedition-journal illustration — pen-and-ink linework with a warm watercolor wash.",
-  referenceArtists: 'John James Audubon, Ernest Thompson Seton, Royal Geographical Society expedition artists.',
+    "19th-century naturalist field-guide illustration in the tradition of hand-colored botanical and zoological plates — confident pen-and-ink linework finished with rich watercolor and gouache, like a finely printed vintage chromolithograph plate.",
+  referenceArtists:
+    "John James Audubon, Ernest Thompson Seton, Pierre-Joseph Redouté's botanical plates, and hand-colored 19th-century chromolithograph field-guide plates.",
   lineWork:
     'Confident, expressive, organic pen-and-ink linework — sometimes precise and diagnostic, sometimes loose and gestural. Hand-drawn, never mechanical, never traced, never vector.',
   colorDiscipline:
-    'Muted, atmospheric watercolor wash applied sparingly. Restrained vintage saturation — never neon, never digital, never over-processed.',
+    'Rich, saturated vintage pigment — full-bodied watercolor and gouache washes with deep, luminous, confident color, like a freshly hand-colored chromolithograph plate. Strong and vivid, NEVER faded, washed-out, muted, or pale. The saturation is that of historic printed pigment — bold but warm and natural, never neon, never digital RGB glow, never over-processed.',
   mood: 'Contemplative, reverent, grounded in the natural world; collected, hand-bound, kept in a leather satchel.',
   naturalistPrecision:
     'Anatomically accurate to field-guide standard — habitat, gill structure, bark texture, leaf venation, track patterns, and proportional scale rendered correctly. Naturalist precision is the foundation; the painterly handling is the surface.',
