@@ -83,7 +83,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
   const [projects, setProjects] = useState([]);
   const [project, setProject] = useState(null); // active project object
-  const [form, setForm] = useState({ title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10" });
+  const [form, setForm] = useState({ title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10", backBlurb: "", backFeatures: "", backAuthorBio: "" });
   const [manuscript, setManuscript] = useState("");
   const [manuscriptName, setManuscriptName] = useState("");
 
@@ -166,6 +166,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
       const w = cfg.trimSize?.widthIn, h = cfg.trimSize?.heightIn;
       const trim = w === 6 && h === 9 ? "6x9" : w === 8.5 && h === 11 ? "8.5x11" : "7x10";
       const authors = cfg.publishing?.authors;
+      const bd = cfg.publishing?.bookDescription ?? {};
       setForm({
         title: cfg.publishing?.title ?? cfg.title ?? "",
         subtitle: cfg.publishing?.subtitle ?? cfg.subtitle ?? "",
@@ -174,6 +175,10 @@ export default function ProductionConsole({ onExitToLegacy }) {
         series: cfg.publishing?.series?.name ?? "",
         volume: cfg.volume ?? cfg.publishing?.series?.volumeNumber ?? 1,
         trim,
+        // Back-cover copy: blurb (paragraph), features (one per line), author note.
+        backBlurb: bd.blurb ?? (bd.hooks?.length ? bd.hooks.join("\n") : ""),
+        backFeatures: (bd.features ?? []).join("\n"),
+        backAuthorBio: bd.authorBio ?? "",
       });
     }).catch(() => {});
     return () => { cancelled = true; };
@@ -193,6 +198,14 @@ export default function ProductionConsole({ onExitToLegacy }) {
     const vol = Math.max(1, parseInt(form.volume, 10) || 1);
     const series = (form.series || "").trim();
     const coverDescription = (form.coverDescription || "").trim();
+    // Back cover — three distinct pieces (data-driven, optional). Features is a
+    // newline-per-item textarea → array. Omit the whole block when all empty.
+    const blurb = (form.backBlurb || "").trim();
+    const features = (form.backFeatures || "").split("\n").map((f) => f.trim()).filter(Boolean);
+    const authorBio = (form.backAuthorBio || "").trim();
+    const bookDescription = blurb || features.length || authorBio
+      ? { blurb: blurb || undefined, features: features.length ? features : undefined, authorBio: authorBio || undefined }
+      : undefined;
     return {
       volume: vol,
       title: form.title,
@@ -205,6 +218,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
         authors: form.author.split(",").map((a) => a.trim()).filter(Boolean),
         coverDescription: coverDescription || undefined,
         series: series ? { name: series, volumeNumber: vol } : undefined,
+        bookDescription,
       },
     };
   }
@@ -475,6 +489,23 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     <option value="8.5x11">Large 8.5 × 11</option>
                   </select>
                 </label>
+
+                <div style={{ marginTop: 22, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>Back Cover</div>
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: 2, marginBottom: 4 }}>
+                    Three separate pieces the AI bakes onto the back of the full wrap. The front cover and spine come from the fields above. Leave blank to use a placeholder.
+                  </div>
+                  <LabeledTextarea label="Hook / main description" rows={5}
+                    hint="The lead sales paragraph — what this volume is about."
+                    value={form.backBlurb} onChange={(v) => setForm({ ...form, backBlurb: v })} />
+                  <LabeledTextarea label="“Inside This Volume” features — one per line" rows={7}
+                    hint="Major topics (e.g. Animals — identification and encounters). Each line becomes its own feature entry."
+                    value={form.backFeatures} onChange={(v) => setForm({ ...form, backFeatures: v })} />
+                  <LabeledTextarea label="Author bio / note" rows={4}
+                    hint="Short author biography for the back cover."
+                    value={form.backAuthorBio} onChange={(v) => setForm({ ...form, backAuthorBio: v })} />
+                </div>
+
                 <button style={S.btn()} onClick={() => saveSetup().then(() => setStep("breakdown")).catch(() => {})}>Save setup →</button>
               </div>
             )}
@@ -787,6 +818,14 @@ function StepRun({ title, sub, project, setStep, actionLabel, onRun, result }) {
 }
 function LabeledInput({ label, value, onChange }) {
   return (<label style={{ display: "block", marginTop: 10, fontSize: 13, fontWeight: 600 }}>{label}<input style={S.input} value={value} onChange={(e) => onChange(e.target.value)} /></label>);
+}
+function LabeledTextarea({ label, value, onChange, rows = 4, hint }) {
+  return (
+    <label style={{ display: "block", marginTop: 10, fontSize: 13, fontWeight: 600 }}>{label}
+      <textarea style={{ ...S.input, minHeight: rows * 22, fontFamily: "inherit", resize: "vertical" }} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} />
+      {hint ? <span style={{ display: "block", fontWeight: 400, color: C.muted, fontSize: 12, marginTop: -2 }}>{hint}</span> : null}
+    </label>
+  );
 }
 function Json({ data }) {
   return <pre style={{ whiteSpace: "pre-wrap", fontSize: 11.5, background: "#fff", padding: 10, borderRadius: 6, marginTop: 10, maxHeight: 300, overflow: "auto", border: `1px solid ${C.line}` }}>{JSON.stringify(data, null, 2)}</pre>;

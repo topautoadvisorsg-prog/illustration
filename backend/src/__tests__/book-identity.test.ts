@@ -124,6 +124,37 @@ describe('cover prompt is data-driven', () => {
     expect(prompt).not.toContain('New England');
   });
 
+  it('bakes the structured back cover as three distinct pieces', () => {
+    const withBack = cfg({
+      volume: 1,
+      title: 'The Wildlands',
+      subtitle: 'New England',
+      publishing: {
+        bookDescription: {
+          blurb: 'Everything the New England backcountry can teach you.',
+          features: ['Animals — identification and encounters', 'Plants & Foraging — edible and deadly look-alikes'],
+          authorBio: 'Wade Brannock built the guide he wished existed.',
+        },
+      },
+    });
+    const dims = computeCoverDimensions(withBack, 200);
+    const prompt = buildCoverWrapPrompt(withBack, 200, dims);
+    // the three pieces reach the prompt under distinct keys (the model gets the hierarchy)
+    expect(prompt).toContain('mainDescription');
+    expect(prompt).toContain('insideThisVolume');
+    expect(prompt).toContain('authorBio');
+    expect(prompt).toContain('Everything the New England backcountry can teach you.');
+    expect(prompt).toContain('Animals — identification and encounters');
+    expect(prompt).toContain('Wade Brannock built the guide he wished existed.');
+  });
+
+  it('legacy hooks still feed the back-cover main description', () => {
+    const legacy = cfg({ volume: 1, title: 'T', publishing: { bookDescription: { hooks: ['Old hook line one.', 'Old hook line two.'] } } });
+    const dims = computeCoverDimensions(legacy, 100);
+    const prompt = buildCoverWrapPrompt(legacy, 100, dims);
+    expect(prompt).toContain('Old hook line one. Old hook line two.');
+  });
+
   it('a different publisher produces a different cover from the SAME code', () => {
     const ocean = cfg({
       volume: 1,

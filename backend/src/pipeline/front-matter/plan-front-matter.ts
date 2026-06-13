@@ -17,7 +17,7 @@
  * and their renders are never touched.
  */
 
-import { ProjectConfigSchema, stripLeadingOrdinal, type ProjectConfig, type PublishingMetadata } from '@wildlands/shared';
+import { ProjectConfigSchema, stripLeadingOrdinal, backCoverLines, type ProjectConfig, type PublishingMetadata } from '@wildlands/shared';
 import { getProject } from '../../db/repositories/projects.repo.js';
 import { listManifests } from '../../db/repositories/manifests.repo.js';
 import { listPaginatedPagesForProject } from '../../db/repositories/pagination.repo.js';
@@ -504,14 +504,16 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     back.push({ pageKey: '', section: 'BACK_MATTER', kind: 'BLANK', frontMatterType: 'BLANK', pageLabel: null, compose: {}, auditText: null });
   }
 
-  // ── Back-cover copy ASSET (not a page). Deterministic v1: hooks template. ──
+  // ── Back-cover copy ASSET (not a page). Composed from the structured back-
+  // cover fields (description + features + author note), legacy hooks honoured. ──
   let backCoverCopyAsset: string | null = null;
-  if (meta.bookDescription?.hooks?.length) {
-    const copy = [`${meta.resolvedTitle}${meta.resolvedSubtitle ? ' — ' + meta.resolvedSubtitle : ''}`, '', ...meta.bookDescription.hooks].join('\n');
+  const backLines = backCoverLines(meta.bookDescription);
+  if (backLines.length) {
+    const copy = [`${meta.resolvedTitle}${meta.resolvedSubtitle ? ' — ' + meta.resolvedSubtitle : ''}`, '', ...backLines].join('\n');
     const stored = await storage.writeProjectFile(projectId, ['front-matter', 'back-cover-copy.txt'], copy);
     backCoverCopyAsset = stored.relativePath;
   } else {
-    omitted.push({ page: 'BACK_COVER_COPY', reason: 'no bookDescription.hooks supplied' });
+    omitted.push({ page: 'BACK_COVER_COPY', reason: 'no back-cover copy supplied (Book Setup → Back Cover)' });
   }
 
   // ── Assign pageKeys + spineOrder, persist rows, compose + store files ──

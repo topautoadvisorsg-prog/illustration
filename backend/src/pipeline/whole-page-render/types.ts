@@ -118,7 +118,13 @@ export interface CoverCopyDTO {
   author?: string;
   /** "[SERIES NAME] — VOLUME [Roman]", from buildSeriesLine(). Null when no series. */
   seriesLine?: string;
-  backCover?: string[];
+  /** Back-cover copy as three distinct pieces so the model renders the cover
+   *  hierarchy correctly (sales paragraph, feature list, author note). */
+  backCover?: {
+    mainDescription?: string;
+    insideThisVolume?: string[];
+    authorBio?: string;
+  };
 }
 
 export interface WholePageSpec {

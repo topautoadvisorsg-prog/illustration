@@ -11,6 +11,7 @@
  */
 
 import type { LayoutTemplateId, PageManifest, ProjectConfig } from '@wildlands/shared';
+import { backCoverLines } from '@wildlands/shared';
 import type { PageGeometry } from './page-geometry.js';
 import { LAYOUT_PROFILES, getLayoutProfile, type ArtSlot } from './layout-profiles.js';
 import { directLayout } from './layout-director.js';
@@ -752,10 +753,8 @@ export function buildCoverHtml(config: ProjectConfig, pageCount: number, opts: C
   const subtitle = config.subtitle ? escapeHtml(config.subtitle) : '';
   const author = escapeHtml(config.authorName);
   const polyfill = opts.polyfillJs ? `<script>${opts.polyfillJs}</script>` : '';
-  const backHooks = config.publishing.bookDescription?.hooks?.length
-    ? config.publishing.bookDescription.hooks
-    : [config.subtitle || config.title];
-  const backBlurb = backHooks
+  const backLines = backCoverLines(config.publishing.bookDescription);
+  const backBlurb = (backLines.length ? backLines : [config.subtitle || config.title])
     .map((line) => `<p>${escapeHtml(line)}</p>`)
     .join('');
   const coverArtCss = opts.coverArtDataUri

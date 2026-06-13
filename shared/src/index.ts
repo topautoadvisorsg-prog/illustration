@@ -510,7 +510,18 @@ export const PublishingMetadataSchema = z.object({
   authorBio: z
     .object({ verbatim: z.string().optional(), facts: z.array(z.string()).optional() })
     .optional(),
-  bookDescription: z.object({ hooks: z.array(z.string()).optional() }).optional(),
+  // Back-cover copy for the full-wrap cover. Three SEPARATE pieces so the cover
+  // hierarchy reaches the AI as distinct information: the main sales paragraph,
+  // the "Inside This Volume" feature list, and a short author note. `hooks` is
+  // the legacy flat form, still honoured for older projects.
+  bookDescription: z
+    .object({
+      hooks: z.array(z.string()).optional(),
+      blurb: z.string().optional(),
+      features: z.array(z.string()).optional(),
+      authorBio: z.string().optional(),
+    })
+    .optional(),
   aiIntroduction: z.object({ enabled: z.boolean().default(false) }).default({ enabled: false }),
   /** Front-cover descriptive line (e.g. "A Field Guide to ..."). Data-driven, per book. */
   coverDescription: z.string().optional(),
@@ -566,6 +577,47 @@ export function buildSeriesLine(seriesName?: string | null, volume?: number | nu
  */
 export function stripLeadingOrdinal(title: string): string {
   return title.replace(/^\s*\d{1,3}[.)]\s+/, '').trim();
+}
+
+/** The structured back-cover copy as the AI cover wrap consumes it: three
+ *  distinct pieces (main description, "Inside This Volume" feature list, author
+ *  note). Falls back to legacy `hooks` as the main description. Returns null
+ *  when no copy of any kind is set. */
+export interface BackCoverCopy {
+  mainDescription?: string;
+  insideThisVolume?: string[];
+  authorBio?: string;
+}
+type BookDescription = {
+  hooks?: string[];
+  blurb?: string;
+  features?: string[];
+  authorBio?: string;
+};
+export function buildBackCoverCopy(bd?: BookDescription | null): BackCoverCopy | null {
+  if (!bd) return null;
+  const mainDescription = (bd.blurb ?? '').trim() || (bd.hooks?.length ? bd.hooks.join(' ').trim() : '');
+  const insideThisVolume = (bd.features ?? []).map((f) => f.trim()).filter(Boolean);
+  const authorBio = (bd.authorBio ?? '').trim();
+  if (!mainDescription && insideThisVolume.length === 0 && !authorBio) return null;
+  const out: BackCoverCopy = {};
+  if (mainDescription) out.mainDescription = mainDescription;
+  if (insideThisVolume.length) out.insideThisVolume = insideThisVolume;
+  if (authorBio) out.authorBio = authorBio;
+  return out;
+}
+
+/** Flatten back-cover copy into display lines — for the interior back-cover
+ *  copy asset and the legacy HTML cover. The AI wrap uses buildBackCoverCopy()
+ *  directly so it understands the hierarchy. */
+export function backCoverLines(bd?: BookDescription | null): string[] {
+  const c = buildBackCoverCopy(bd);
+  if (!c) return [];
+  const lines: string[] = [];
+  if (c.mainDescription) lines.push(c.mainDescription);
+  if (c.insideThisVolume?.length) lines.push('Inside this volume:', ...c.insideThisVolume.map((f) => `• ${f}`));
+  if (c.authorBio) lines.push(c.authorBio);
+  return lines;
 }
 
 export const ProjectConfigSchema = z.object({

@@ -66,7 +66,7 @@ export function assembleCoverPrompt(spec: WholePageSpec): string {
     `- ${spec.composition.imagePlacement}.`,
     '- FRONT COVER: the title block — title, then subtitle, then the cover-description line — as the engraved focal typography over the strongest part of the scene; the author line lower on the front cover; and, ONLY if a series line is provided in the text, that series line as small engraved caps along the very bottom edge of the front cover.',
     '- SPINE: the title and author as vertical spine typography in the same ink.',
-    '- BACK COVER: the back-cover lines as readable engraved typesetting over calm landscape negative space.',
+    '- BACK COVER: set the back-cover copy as readable engraved typesetting over calm landscape negative space, in this top-to-bottom hierarchy — first "backCover.mainDescription" as the lead sales paragraph; then, if present, "backCover.insideThisVolume" as a titled "INSIDE THIS VOLUME" feature list (each entry its own line); then, if present, "backCover.authorBio" as a smaller author note near the bottom. Keep the lower-right barcode zone clear.',
     '- Render ONLY the words provided in the text block above; if a field is absent, omit it (do not invent a subtitle, description, author, or series line).',
     '',
     // 4. VISUAL DNA — the heart of the style

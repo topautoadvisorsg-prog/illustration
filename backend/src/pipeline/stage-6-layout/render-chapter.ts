@@ -20,6 +20,7 @@ import {
   ProofArtifactSchema,
   ProjectConfigSchema,
   buildSeriesLine,
+  buildBackCoverCopy,
   type PageManifest,
   type ProofArtifact,
   type ProjectConfig,
@@ -421,7 +422,10 @@ export interface CoverValidation {
 }
 
 function validateCoverInputs(config: ProjectConfig, pageCount: number, dimensions: ReturnType<typeof computeCoverDimensions>): CoverValidation {
-  const hooks = config.publishing.bookDescription?.hooks ?? [];
+  const backCover = buildBackCoverCopy(config.publishing.bookDescription);
+  const backParts = backCover
+    ? [backCover.mainDescription ? 'description' : null, backCover.insideThisVolume?.length ? 'features' : null, backCover.authorBio ? 'author bio' : null].filter(Boolean)
+    : [];
   const checks = [
     {
       key: 'page_count',
@@ -435,8 +439,8 @@ function validateCoverInputs(config: ProjectConfig, pageCount: number, dimension
     },
     {
       key: 'back_cover_copy',
-      ok: hooks.length > 0,
-      message: hooks.length > 0 ? `${hooks.length} back-cover hook(s) supplied.` : 'No publishing.bookDescription.hooks supplied; using title/subtitle placeholder.',
+      ok: backParts.length > 0,
+      message: backParts.length > 0 ? `Back-cover copy supplied (${backParts.join(', ')}).` : 'No back-cover copy supplied (Book Setup → Back Cover); the back cover will use a title/subtitle placeholder.',
     },
     {
       key: 'cover_art',
@@ -597,7 +601,7 @@ export function buildCoverWrapPrompt(
   pageCount: number,
   dims: ReturnType<typeof computeCoverDimensions>,
 ): string {
-  const hooks = config.publishing.bookDescription?.hooks ?? [];
+  const backCover = buildBackCoverCopy(config.publishing.bookDescription);
   const title = config.publishing.title ?? config.title;
   const subtitle = config.publishing.subtitle ?? config.subtitle ?? '';
   const authors = config.publishing.authors?.length ? config.publishing.authors.join(', ') : config.authorName;
@@ -647,7 +651,7 @@ export function buildCoverWrapPrompt(
           `front cover: cinematic establishing view of the setting evoked by "${sceneSubject}", with depth and atmosphere`,
           'spine: quiet continuous texture with low visual contrast',
           'back cover: restrained atmosphere of the same setting that supports readable copy',
-          hooks.length ? `back-cover copy context: ${hooks.join(' ')}` : 'back-cover copy context: no hook copy supplied yet',
+          backCover?.mainDescription ? `back-cover copy context: ${backCover.mainDescription}` : 'back-cover copy context: no back-cover copy supplied yet',
         ],
         environment: `setting evoked by "${sceneSubject}"${coverDescription ? `: ${coverDescription}` : ''}; archival painterly naturalist atmosphere; continuous wrap composition`,
         mood: 'premium, cinematic, atmospheric, calm enough for system typography',
@@ -667,7 +671,7 @@ export function buildCoverWrapPrompt(
       coverDescription: coverDescription || undefined,
       author: authors || undefined,
       seriesLine,
-      backCover: hooks.length ? hooks : undefined,
+      backCover: backCover ?? undefined,
     },
     decorativeElements: {
       topRule: null,
