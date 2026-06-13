@@ -325,9 +325,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
     const byPage = new Map();
     for (const r of rd.renders || []) { if (!byPage.has(r.pageId) || r.active) byPage.set(r.pageId, r); }
     const section = (k) => (k.startsWith("FM_") ? "Front" : k.startsWith("BM_") ? "Back" : "Body");
+    // Render list follows the assembled-book order: front matter (title page first),
+    // then body in reading order, then back matter (glossary/index) last. Sorting by
+    // pageKey alone put "BM_" before "CH_" before "FM_" — glossary first, title last.
+    const sectionRank = (k) => (k.startsWith("FM_") ? 0 : k.startsWith("BM_") ? 2 : 1);
     const merged = rosterPages
-      .map((p) => { const r = byPage.get(p.id) || null; return { pageId: p.id, pageKey: p.pageKey, section: section(p.pageKey), entryTitle: p.entryTitle, status: r ? r.status : "NOT RENDERED", imagePath: r ? r.imagePath : null, renderId: r ? r.id : null }; })
-      .sort((a, b) => a.pageKey.localeCompare(b.pageKey));
+      .map((p) => { const r = byPage.get(p.id) || null; return { pageId: p.id, pageKey: p.pageKey, plannedPageNumber: p.plannedPageNumber ?? 0, section: section(p.pageKey), entryTitle: p.entryTitle, status: r ? r.status : "NOT RENDERED", imagePath: r ? r.imagePath : null, renderId: r ? r.id : null }; })
+      .sort((a, b) => sectionRank(a.pageKey) - sectionRank(b.pageKey) || a.plannedPageNumber - b.plannedPageNumber || a.pageKey.localeCompare(b.pageKey));
     setRenders({ ...rd, merged });
     const pending = merged.filter((m) => m.status === "NOT RENDERED").length;
     return { notice: `${merged.length} pages · ${rd.bookReady || 0} book-ready · ${pending} not rendered.` };
