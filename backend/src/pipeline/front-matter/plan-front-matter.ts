@@ -392,13 +392,13 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     split.forEach((paras, i) => {
       push({
         kind: 'TEXT_PAGE',
-        frontMatterType: 'INTRODUCTION',
+        // First intro page = cinematic opener plate; pages 2..n = text with a
+        // subtle naturalist field (body-continuation treatment). Both AI-rendered.
+        frontMatterType: i === 0 ? 'INTRODUCTION' : 'INTRODUCTION_CONT',
         pageLabel: toRoman(nextIndex()).toLowerCase(),
         compose: { heading: i === 0 ? 'Introduction' : undefined, paragraphs: paras },
         auditText: paras.join('\n\n'),
-        // The first introduction page is a cinematic chapter-opener plate (AI);
-        // the remaining intro pages stay deterministic text.
-        aiRendered: i === 0,
+        aiRendered: true,
       });
     });
   }

@@ -40,6 +40,11 @@ export function inferWholePageRole(row: PageRow, layoutTemplate: LayoutTemplateI
         return 'TITLE_PAGE';
       case 'INTRODUCTION':
         return 'INTRO_OPENER';
+      // Introduction CONTINUATION pages (2..n) are text-first like a body
+      // continuation — a subtle naturalist field behind the reading text, never
+      // a hero plate. Only the first intro page (INTRODUCTION) is the plate.
+      case 'INTRODUCTION_CONT':
+        return 'CONTINUATION';
       case 'ABOUT_AUTHOR':
         return 'AUTHOR_PAGE';
       case 'ABOUT_SERIES':
@@ -134,6 +139,22 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
   const title = resolvedTitle(config);
   const subtitle = resolvedSubtitle(config);
   const author = resolvedAuthor(config);
+
+  // Introduction continuation page — a body-style text page with a SUBTLE
+  // naturalist field behind the reading text (no entry meta exists for front
+  // matter, so the subject is supplied here). Readability is the priority; the
+  // illustration stays subdued so the reader never leaves the book's world.
+  if (pageType === 'CONTINUATION' && frontMatterType(row) === 'INTRODUCTION_CONT') {
+    return {
+      pageType,
+      layoutTemplate: 'LAYOUT_D_PURE_TEXT',
+      title: { kicker: '', number: '', name: '' },
+      entryTitle: 'Introduction',
+      imageSubject: `Subtle full-page illustrated naturalist FIELD behind the introduction text — faint, low-contrast wilderness atmosphere${subtitle ? ` of ${subtitle}` : ''}: soft forest textures, pine and spruce studies, moss and fern margins, bark texture, a distant mountain silhouette, light watercolor washes and expedition-journal details on aged parchment. Keep it quiet and subdued behind the reading field — never a hero scene — so the body text stays the priority and clearly legible.`,
+      allowsEmptyBody: false,
+      renderBodyText: true,
+    };
+  }
 
   switch (pageType) {
     case 'TITLE_PAGE': {
@@ -275,6 +296,7 @@ export function isWholePageAiAllowedForRow(row: PageRow): boolean {
     'HALF_TITLE',
     'TITLE_PAGE',
     'INTRODUCTION',
+    'INTRODUCTION_CONT',
     'ABOUT_AUTHOR',
     'ABOUT_SERIES',
     'RESOURCES',
