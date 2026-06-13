@@ -40,6 +40,40 @@ describe('layout director — four region types', () => {
   });
 });
 
+// ─── Empty space → illustration: underfilled openers go image-dominant ──────
+
+describe('layout director — underfilled opener becomes illustration-dominant', () => {
+  const SHORT = 'A short entry opener with only a couple of sentences of text.'; // ~60 chars
+  const LONG = 'x'.repeat(1500);
+  const run = (body: string, hasTitle = true) =>
+    directLayout({ bodyMarkdown: body, layoutTemplate: 'LAYOUT_B_IMAGE_LEFT', geometry, bodyPt: 11, lineHeight: 1.4, hasTitle });
+
+  it('a short TITLED opener hands the empty column to the artwork (image-dominant, no blank)', () => {
+    const a = run(SHORT);
+    // Image now dominates (well above the ~50% the B template would give)...
+    expect(a.openingPageImagePercent ?? Math.round(a.imagePriorityZones[0]!.widthPct)).toBeGreaterThan(60);
+    // ...but the short text still has a real reading field (not baked, not gone).
+    const reading = a.textSafeZones.filter((z) => z.role === 'body');
+    expect(reading.length).toBeGreaterThan(0);
+    // whole page is one illustration — a background field is present, no blank.
+    expect(a.regions.some((r) => r.regionType === 'background-field')).toBe(true);
+    // and nothing overlaps.
+    expect(readingFieldImageConflicts(a)).toEqual([]);
+  });
+
+  it('a FULL-text opener keeps the normal ~50/50 layout (rule does not fire)', () => {
+    const a = run(LONG);
+    expect(Math.round(a.imagePriorityZones.find((z) => z.regionType === 'image-priority')!.widthPct)).toBeLessThanOrEqual(60);
+  });
+
+  it('a short TITLELESS page (continuation) is NOT affected', () => {
+    const a = run(SHORT, false);
+    // Continuation keeps the text-led treatment, not the image-dominant opener path.
+    const focal = a.imagePriorityZones.find((z) => z.regionType === 'image-priority');
+    expect(focal ? Math.round(focal.widthPct) : 0).toBeLessThanOrEqual(60);
+  });
+});
+
 // ─── P2a — 25 % accent corner geometry (LAYOUT_C rebuilt) ───────────────────
 
 describe('layout director — LAYOUT_C true 25 % accent', () => {

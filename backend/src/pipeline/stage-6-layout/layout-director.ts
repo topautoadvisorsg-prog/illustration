@@ -556,13 +556,16 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick
           textSafeZones: [zone('reading-field-full', 'body', 6, 6, 88, 84, 'Single calm reading field with NO title band: the body text begins near the top edge and flows down one calm parchment column between the thin edge ornaments. Text-first page — no heading, no subject illustration, no panels, no cards.', 'organic')],
         };
       }
+      // IMAGE-DOMINANT OPENER (the "empty space becomes illustration" path, used
+      // for an underfilled entry opener at ~78% art): the whole page is one
+      // illustration — strong focal art fills the upper page and dissolves into a
+      // COMPACT calm reading field in the lower page that holds the short entry
+      // text. No blank paper, no baked-in body text. (The ≥90% branch above is the
+      // separate full-canvas plate; ≤8% is pure text.)
       return {
-        typographyZones: [
-          title,
-          zone('caption-lower', 'caption', 12, 82, 76, 10, 'Small calm caption/notes overlay only (Type-B overlay text); no large reading field on this plate.', 'organic'),
-        ],
-        imagePriorityZones: [zone('image-priority-full', 'primary-art', 0, FOCAL_TOP, 100, 100 - FOCAL_TOP, 'Full-page plate: focal detail fills the composition below the calm title band; respect the small overlay zones.')],
-        textSafeZones: [],
+        typographyZones: [title],
+        imagePriorityZones: [zone('image-priority-hero', 'primary-art', 0, FOCAL_TOP, 100, Math.max(34, 70 - FOCAL_TOP), 'Strong focal illustration filling the upper page; it opens and dissolves into a calm reading field below. The entire page is one continuous illustration — never leave blank paper.')],
+        textSafeZones: [zone('reading-field-hero', 'body', 8, 72, 84, 22, 'Compact calm reading field the artwork dissolves into across the lower page; comfortably holds the short entry text at body size. Organic transition into the art — never a panel, box, card, or pasted block.', 'organic')],
       };
     }
   }
@@ -616,22 +619,43 @@ export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
   const remainingChars = Math.max(0, plainCharCount - openingCapacityChars);
   const continuationPages = remainingChars === 0 ? 0 : Math.ceil(remainingChars / continuationCapacityChars);
   const estimatedRenderedPages = Math.max(1, 1 + continuationPages);
-  const imagePercent = Math.round(profile.artAreaFraction * 100);
-  const textPercent = Math.max(0, 100 - imagePercent);
-  const placement = refinedPlacement(profile.artSlot, imagePercent);
-  const imagePriorityZone = imagePriorityZoneFor(profile.artSlot, profile.artAreaFraction, input.geometry);
   // A titleless page (copyright/continuation/compacted) drops the empty title
   // band and raises its reading field; titled pages keep their heading band.
   const hasTitle = input.hasTitle !== false;
-  const zonePlan = zonePlanFor(profile.artSlot, imagePercent, hasTitle);
+
+  // ── Wild Lands design principle: empty space becomes illustration, not dead
+  // paper. ── A titled entry OPENER whose text barely fills the page must NOT
+  // reserve a half-page text column that ends up blank. When the opener page is
+  // underfilled, hand the unused real estate back to the artwork: the whole page
+  // becomes one continuous illustration with the short text in a compact,
+  // integrated reading field. Titleless pages (continuation/compacted) are never
+  // affected; pure-text (D) and full plates are excluded by the fraction guard.
+  // Permanent across every Wild Lands volume — not a per-book exception.
+  const OPENER_LOW_FILL = 0.55;
+  const OPENER_SHORT_CHARS = 1100; // ~180 words — genuinely short copy in absolute terms
+  const isUnderfilledOpener =
+    hasTitle &&
+    profile.artAreaFraction > 0.08 &&
+    profile.artAreaFraction < 0.9 &&
+    plainCharCount > 0 &&
+    plainCharCount < OPENER_SHORT_CHARS &&
+    plainCharCount < openingCapacityChars * OPENER_LOW_FILL;
+  const artSlotEff: ArtSlot = isUnderfilledOpener ? 'FULL_PAGE' : profile.artSlot;
+  const artCoverage = isUnderfilledOpener ? 0.78 : profile.artAreaFraction;
+
+  const imagePercent = Math.round(artCoverage * 100);
+  const textPercent = Math.max(0, 100 - imagePercent);
+  const placement = refinedPlacement(artSlotEff, imagePercent);
+  const imagePriorityZone = imagePriorityZoneFor(artSlotEff, artCoverage, input.geometry);
+  const zonePlan = zonePlanFor(artSlotEff, imagePercent, hasTitle);
   // Every page is one continuous illustration: lay a subtle background field
   // UNDER the focal art / text so no region looks blank — including the
   // pure-text pages (a quiet parchment/atmosphere field behind the reading
   // field). Only the full-canvas plate (already 100% art) and TITLE_BLOCK
   // (builds its own field) are excluded.
   const wantsBackgroundField =
-    BACKGROUND_FIELD_SLOTS.has(profile.artSlot) ||
-    (profile.artSlot === 'FULL_PAGE' && imagePercent < 90);
+    BACKGROUND_FIELD_SLOTS.has(artSlotEff) ||
+    (artSlotEff === 'FULL_PAGE' && imagePercent < 90);
   if (wantsBackgroundField) {
     zonePlan.imagePriorityZones = [backgroundField(), ...zonePlan.imagePriorityZones];
   }
