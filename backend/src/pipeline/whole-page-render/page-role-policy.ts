@@ -145,10 +145,12 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
       if (isHalfTitle) {
         return {
           pageType,
-          layoutTemplate: 'LAYOUT_TITLE_DISPLAY',
+          // Title-only page → give the artwork the page. A prominent but INTIMATE
+          // close-up plate, distinct from the title page's grand landscape.
+          layoutTemplate: 'LAYOUT_A_ILLUSTRATION',
           title: { kicker: '', number: '', name: title.toUpperCase() },
           entryTitle: title,
-          imageSubject: `Half-title vignette: a single tasteful naturalist motif — a sprig of spruce or balsam, a fern frond, a feather, or a small quiet wilderness study${subtitle ? ` evoking ${subtitle}` : ''} — centered on aged parchment with generous calm space, the book title set small and refined above it. Restrained and elegant, the same naturalist world as the cover.`,
+          imageSubject: `Half-title plate — an intimate, atmospheric CLOSE-UP naturalist moment, NOT a grand landscape and NOT the title-page scene. Something quiet and restrained such as a bull moose silhouette in morning mist, a spruce branch hung with old-man's-beard lichen, forest-floor ferns and moss with pine cones, or a small wildlife study${subtitle ? ` from the ${subtitle} wilderness` : ''}. Like opening an old expedition journal before the journey begins — premium museum-quality vintage naturalist illustration, cinematic light, generous calm negative space with ONLY the book title set small and refined within it. It should complement the title page, never repeat it.`,
           allowsEmptyBody: true,
           renderBodyText: false,
         };

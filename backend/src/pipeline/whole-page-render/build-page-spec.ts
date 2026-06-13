@@ -144,11 +144,18 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
     pageType === 'CHAPTER_OPENER' && bodyBlocks.length > 0
       ? (bodyBlocks.find((b) => b.type === 'paragraph')?.text.charAt(0).toUpperCase() ?? null) || null
       : null;
+  // The half-title carries ONLY the book title (no subtitle/description/author/
+  // series line) — a sparse, intimate page distinct from the full title page.
+  const isHalfTitle =
+    pageType === 'TITLE_PAGE' &&
+    ((pageRow as { frontMatterType?: string | null }).frontMatterType ?? '').toUpperCase() === 'HALF_TITLE';
   const titleHierarchy =
     pageType === 'CHAPTER_OPENER'
       ? ['CHAPTER', toRoman(pageRow.chapterNumber), entryTitle.toUpperCase()]
       : pageType === 'TITLE_PAGE'
-        ? [
+        ? isHalfTitle
+          ? [policy.title.name].filter((x): x is string => Boolean(x))
+          : [
             policy.title.name,
             policy.title.kicker,
             input.config.publishing.coverDescription,
