@@ -160,7 +160,13 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
           ].filter((x): x is string => Boolean(x))
         : pageType === 'INTRO_OPENER'
           ? [policy.title.name]
-          : [];
+          : // Entry opener (INTERIOR = a body entry's first page): its section
+            // title is the page's identity and renders in the title band. The
+            // heading was stripped from the body at breakdown, so this does not
+            // duplicate body text. Continuation/compacted pages stay titleless.
+            pageType === 'INTERIOR'
+            ? [entryTitle.toUpperCase()]
+            : [];
   const pageTitle =
     pageType === 'CHAPTER_OPENER'
       ? {
@@ -179,7 +185,9 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
           pageType === 'GLOSSARY_ORNAMENT' ||
           pageType === 'INDEX_ORNAMENT'
         ? policy.title
-        : { kicker: '', number: '', name: '' };
+        : pageType === 'INTERIOR'
+          ? { kicker: '', number: '', name: entryTitle.toUpperCase() }
+          : { kicker: '', number: '', name: '' };
 
   // Reference pages (glossary/index) use smaller, two-column reference type so
   // dense entries fit comfortably without overflowing — same serif family, just

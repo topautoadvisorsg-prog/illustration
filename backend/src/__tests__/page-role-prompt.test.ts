@@ -58,6 +58,24 @@ describe('PageRole prompt text policy', () => {
     expect(prompt).not.toContain('publishing engine will add title');
   });
 
+  it('renders the entry title in the title band for an interior opener, not inside the body', () => {
+    const spec = makeSpec('INTERIOR');
+    spec.pageText.title = { kicker: '', number: '', name: 'THE THREE WILDERNESS ZONES' };
+    spec.pageText.body = 'Every entry in this book is tagged to one of three zones.';
+    spec.pageText.bodyBlocks = [{ type: 'paragraph', text: 'Every entry in this book is tagged to one of three zones.' }];
+    const prompt = assemblePagePrompt(spec);
+    expect(prompt).toContain('ENTRY TITLE');
+    expect(prompt).toContain('THE THREE WILDERNESS ZONES');
+    expect(prompt).toContain('Do NOT repeat this title');
+    expect(prompt).toContain('Every entry in this book is tagged'); // body still renders
+  });
+
+  it('adds no ENTRY TITLE instruction when an interior page has no title (e.g. continuation-style)', () => {
+    const spec = makeSpec('INTERIOR');
+    spec.pageText.title = { kicker: '', number: '', name: '' };
+    expect(assemblePagePrompt(spec)).not.toContain('ENTRY TITLE');
+  });
+
   it('renders glossary and index entries — the AI bakes their text', () => {
     for (const role of ['GLOSSARY_ORNAMENT', 'INDEX_ORNAMENT'] as const) {
       const spec = makeSpec(role);

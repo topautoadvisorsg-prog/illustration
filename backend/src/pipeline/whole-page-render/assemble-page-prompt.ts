@@ -126,6 +126,11 @@ function hardConstraints(spec: WholePageSpec): string {
       `- TITLE-PAGE typography, baked INTO the artwork as the engraved title block — stacked and centered on calm parchment, in this exact order top to bottom: ${stacked.map((s) => `"${s}"`).join(' / ')}. The title set largest in stately serif caps; the subtitle and description beneath it; the author/imprint line lower; and the final series "VOLUME" line, when present, as small tracked caps at the bottom. All in warm sepia ink, framed by a refined ornament. Render only these lines, in this order; never a pasted label, never modern type.`,
     );
   }
+  if (spec.pageType === 'INTERIOR' && spec.pageText.title.name) {
+    lines.push(
+      `- ENTRY TITLE — render "${spec.pageText.title.name}" as the page's engraved section heading across the calm upper title band: stately serif caps in warm sepia ink, paired with a thin engraved rule. The body text begins BELOW it, inside the reading field. Do NOT repeat this title anywhere inside the body.`,
+    );
+  }
   lines.push(
     // F-8 — the Chapter 1 production run proved the attached blueprint alone
     // is loosely followed: corner-accent layouts rendered as full-width bands
