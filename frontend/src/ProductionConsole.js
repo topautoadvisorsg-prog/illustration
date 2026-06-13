@@ -256,11 +256,12 @@ export default function ProductionConsole({ onExitToLegacy }) {
   // that flows into the reading field, so the operator can SEE the pages (where
   // text goes, whether it fits and reads well) before any render spend.
   const loadPreview = useCallback(async () => {
-    // text-fit-preview is the system's planning preview: per body page it returns
-    // the layout zones (allocation) + a precise fit analysis (chars vs capacity,
-    // fill ratio, FITS/TIGHT/OVERFLOW). That's the "where text goes / does it fit
-    // and read well" signal — no render, no spend.
-    const tf = await api(`/api/projects/${project.id}/text-fit-preview`, { method: "POST", body: "{}" });
+    // pagination-preview reflects the REAL flow-engine pages the renderer will use:
+    // opener + continuation pages, each with its own allotted Reading-Field text
+    // measured against its own layout (chars vs capacity, FITS/TIGHT/OVERFLOW/
+    // UNDERFILL). NOT the legacy text-fit-preview, which re-planned the un-split
+    // per-entry manifests and reported false overflow. No render, no spend.
+    const tf = await api(`/api/projects/${project.id}/pagination-preview`, { method: "POST", body: "{}" });
     const list = (tf.pages || []).map((p) => ({
       pageKey: p.pageKey,
       entryTitle: p.entryTitle,

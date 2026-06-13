@@ -33,6 +33,7 @@ import { UnsupportedManuscriptError } from '../pipeline/stage-1-ingestion/extrac
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
+import { previewProjectPagination } from '../pipeline/stage-6-layout/pagination-preview.js';
 import {
   RenderBlockedError,
   generateCoverWrapArtwork,
@@ -1574,6 +1575,21 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         });
       }
       return previewProjectTextFit(id);
+    },
+  );
+
+  // Step-5 planning preview that reflects the REAL Stage-1.75 flow-engine pages
+  // (opener + continuation pages), each with its own allotted text + layout —
+  // unlike text-fit-preview, which re-plans the un-split per-entry manifests and
+  // reports false overflow. This is what the operator console shows at Paginate.
+  app.post(
+    '/api/projects/:id/pagination-preview',
+    { schema: { params: ProjectParamsSchema } },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      return previewProjectPagination(id);
     },
   );
 
