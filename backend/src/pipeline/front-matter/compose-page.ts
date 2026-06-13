@@ -19,6 +19,14 @@ const SERIF = TYPOGRAPHY.renderFontFamily;
 const INK = PALETTE.ink.hex;
 const PARCHMENT = PALETTE.parchment.hex;
 
+// Front-matter PROSE density (introduction, disclaimer, about-author/series).
+// TYPOGRAPHY.body is the large display body size used elsewhere; running prose
+// at that size leaves the page sparse (~170 words). Real trade books set
+// running text at ~11pt / ~1.4 leading, which fills a page like a normal
+// premium book (~350 words). Used by BOTH textPageLineCapacity (the splitter)
+// AND the TEXT_PAGE renderer so the two never disagree and prose never clips.
+const FM_PROSE = { pt: 11, lineHeight: 1.4, paragraphGapLines: 0.6 };
+
 export type FrontMatterPageKind =
   | 'BLANK'
   | 'HALF_TITLE'
@@ -354,8 +362,8 @@ function buildBody(input: ComposeInput, f: Frame): string {
         parts.push(hairline(cx - 0.8 * f.dpi, cx + 0.8 * f.dpi, y));
         y += 0.45 * f.dpi;
       }
-      const pt = TYPOGRAPHY.body.pt; // same body size as the rest of the book
-      const lineH = (pt / 72) * f.dpi * TYPOGRAPHY.body.lineHeight;
+      const pt = FM_PROSE.pt; // normal trade-book prose density (see FM_PROSE)
+      const lineH = (pt / 72) * f.dpi * FM_PROSE.lineHeight;
       const frameWidthIn = (f.right - f.left) / f.dpi;
       const maxChars = Math.floor(frameWidthIn / ((pt / 72) * 0.5));
       for (const para of input.paragraphs ?? []) {
@@ -363,7 +371,7 @@ function buildBody(input: ComposeInput, f: Frame): string {
           parts.push(text(f.left, y, line, pt, { anchor: 'start' }));
           y += lineH;
         }
-        y += lineH * 0.5; // paragraph gap
+        y += lineH * FM_PROSE.paragraphGapLines; // paragraph gap — matches the splitter
       }
       break;
     }
@@ -443,15 +451,20 @@ export function joinAuthors(authors: string[]): string {
 export function textPageLineCapacity(canvasIn: { w: number; h: number }, withHeading: boolean): {
   linesPerPage: number;
   maxCharsPerLine: number;
+  paragraphGapLines: number;
 } {
   const f = frame(canvasIn);
-  const pt = TYPOGRAPHY.body.pt;
-  const lineH = (pt / 72) * f.dpi * TYPOGRAPHY.body.lineHeight;
-  const usable = (f.bottom - f.top) - (withHeading ? 0.85 * f.dpi : 0.2 * f.dpi);
+  const pt = FM_PROSE.pt;
+  const lineH = (pt / 72) * f.dpi * FM_PROSE.lineHeight;
+  // Heading block (title + rule + spacing) consumes ~1.0in on the first page;
+  // continuation pages keep a 0.3in bottom breathing margin. Deductions are
+  // generous so the splitter stays just inside what the renderer draws.
+  const usable = (f.bottom - f.top) - (withHeading ? 1.0 * f.dpi : 0.3 * f.dpi);
   const frameWidthIn = (f.right - f.left) / f.dpi;
   return {
     linesPerPage: Math.max(8, Math.floor(usable / lineH)),
     maxCharsPerLine: Math.floor(frameWidthIn / ((pt / 72) * 0.5)),
+    paragraphGapLines: FM_PROSE.paragraphGapLines,
   };
 }
 

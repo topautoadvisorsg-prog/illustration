@@ -284,6 +284,35 @@ describe('composeFrontMatterPage — ink stays inside the trim-safe area', () =>
     expect(b.left).toBeGreaterThanOrEqual(safePx - 1);
     expect(b.right).toBeLessThanOrEqual(b.w - safePx + 1);
   }, 30000);
+
+  // Full ink box including TOP/BOTTOM — the prose-density change packs more lines
+  // per page, so vertical overflow (running past the bottom margin) is the risk.
+  async function inkBox(png: Buffer): Promise<{ top: number; bottom: number; h: number }> {
+    const meta = await sharp(png).metadata();
+    const { info } = await sharp(png).trim({ threshold: 12 }).toBuffer({ resolveWithObject: true });
+    const top = -(info.trimOffsetTop ?? 0);
+    return { top, bottom: top + info.height, h: meta.height! };
+  }
+
+  it('a text page packed to the splitter capacity stays inside the vertical frame', async () => {
+    // Mirror the splitter: fill a continuation page (no heading) to capacity.
+    const cap = textPageLineCapacity(canvasIn, false);
+    const para =
+      'New England wilderness rewards steady attention and sound judgment, especially when the weather turns on the ridge and the trail grows faint underfoot.';
+    const linesPer = wrapText(para, cap.maxCharsPerLine).length + cap.paragraphGapLines;
+    const count = Math.floor(cap.linesPerPage / linesPer);
+    expect(count).toBeGreaterThan(4); // proves real density, not a sparse page
+    const page = await composeFrontMatterPage({
+      kind: 'TEXT_PAGE',
+      canvasIn,
+      pageLabel: '5',
+      paragraphs: Array.from({ length: count }, () => para),
+    });
+    const b = await inkBox(page.pngBuffer);
+    const safePx = SAFE_IN * 300;
+    expect(b.top).toBeGreaterThanOrEqual(safePx - 1);
+    expect(b.bottom).toBeLessThanOrEqual(b.h - safePx + 1); // no bottom-edge clip
+  }, 30000);
 });
 
 describe('fitTitle', () => {

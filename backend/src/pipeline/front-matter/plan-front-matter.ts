@@ -207,7 +207,9 @@ function splitTextPages(
   let used = 0;
   let cap = textPageLineCapacity(canvasIn, true); // first page carries heading
   for (const para of paragraphs) {
-    const lines = wrapText(para, cap.maxCharsPerLine).length + 1; // + paragraph gap
+    // Paragraph cost = wrapped lines + the SAME fractional gap the renderer draws,
+    // so the splitter packs pages to real capacity without over- or under-filling.
+    const lines = wrapText(para, cap.maxCharsPerLine).length + cap.paragraphGapLines;
     if (used + lines > cap.linesPerPage && current.length > 0) {
       pages.push(current);
       current = [];
