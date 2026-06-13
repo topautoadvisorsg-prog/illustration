@@ -263,13 +263,13 @@ describe('flowEngine — section heading overhead is charged during pouring', ()
   });
 });
 
-describe('flowEngine — soft-break continuation parts (totalParts ownership)', () => {
-  it('B\'s standalone continuation page reports totalParts that includes the shared compacted opener', () => {
-    // Alpha is very short — fits in its opener with plenty of room left over.
-    // Beta soft-breaks into Alpha's opener, then overflows into a continuation
-    // of Beta. The continuation's `entryKey` is Beta, `partN` should be 2
-    // (Beta's page 1 was the shared compacted opener), and `totalParts` for
-    // Beta should be 2 because the compacted opener counts toward Beta's chain.
+describe('flowEngine — a long second entry is not compacted (Option 1, self-contained chain)', () => {
+  it('keeps a long second entry on its OWN opener + continuations, never a shared compacted opener', () => {
+    // Alpha is very short; Beta is long. Old behaviour soft-broke Beta onto
+    // Alpha's opener and continued it — an aggressive compaction that could
+    // finalize the merged page as OVERFLOW. Under the Option-1 guard, since
+    // Alpha + Beta cannot fully fit one page, they are NOT compacted: Beta gets
+    // its own opener + continuations, and its part chain is self-contained.
     const alpha = makeEntry({
       pageId: 'CH01_P001',
       bodyMarkdown: 'Alpha is brief.',
@@ -287,18 +287,24 @@ describe('flowEngine — soft-break continuation parts (totalParts ownership)', 
     });
     const { pages } = runFlow([alpha, beta]);
 
-    const compactedOpener = pages.find((p) => p.pageRole === 'compacted');
+    // No compaction, and no page overflows.
+    expect(pages.some((p) => p.pageRole === 'compacted')).toBe(false);
+    expect(pages.some((p) => p.compactedEntryKeys != null)).toBe(false);
+    expect(pages.some((p) => p.fitStatus === 'OVERFLOW')).toBe(false);
+
+    // Alpha keeps its own opener.
+    expect(pages.find((p) => p.entryKey === 'CH01_P001' && p.pageRole === 'opener')).toBeDefined();
+
+    // Beta is its own opener (partN 1) + continuations; the chain counts only Beta's pages.
+    const betaOpener = pages.find((p) => p.entryKey === 'CH01_P002' && p.pageRole === 'opener');
     const betaContinuations = pages.filter((p) => p.entryKey === 'CH01_P002' && p.pageRole === 'continuation');
-
-    expect(compactedOpener).toBeDefined();
-    expect(compactedOpener!.compactedEntryKeys).toEqual(['CH01_P001', 'CH01_P002']);
+    expect(betaOpener).toBeDefined();
+    expect(betaOpener!.partN).toBe(1);
     expect(betaContinuations.length).toBeGreaterThanOrEqual(1);
-
-    const firstBetaCont = betaContinuations[0]!;
-    expect(firstBetaCont.partN).toBe(2); // Beta's page 1 was the compacted opener
-    // Beta's totalParts = compacted-opener + all of Beta's continuations.
-    const expectedBetaChainLen = 1 + betaContinuations.length;
-    expect(firstBetaCont.totalParts).toBe(expectedBetaChainLen);
+    const expectedChain = 1 + betaContinuations.length;
+    for (const p of [betaOpener!, ...betaContinuations]) {
+      expect(p.totalParts).toBe(expectedChain);
+    }
   });
 });
 
@@ -334,5 +340,48 @@ describe('flowEngine — atomic token overflow', () => {
     expect(overflowPage).toBeDefined();
     expect(overflowPage!.warnings.some((w) => w.startsWith('atomic_token_exceeds_capacity'))).toBe(true);
     expect(overflowPage!.readingFieldText).toContain('XXXXX'); // the giant block landed
+  });
+});
+
+describe('flowEngine — compaction never overflows (Option 1 guard)', () => {
+  it('refuses to compact two same-chapter entries that overflow together; the second gets its own page', () => {
+    // Alpha is short enough that room remains after it (soft break is attempted),
+    // but Alpha + Beta together far exceed any page — old behaviour merged them
+    // onto one page that could finalize as OVERFLOW. The guard must hard-break.
+    const alpha = makeEntry({
+      pageId: 'CH01_P001',
+      entryTitle: 'Alpha',
+      imageSubject: 'alpha',
+      bodyMarkdown: bodyOf(7, 20),
+      contentType: 'SPECIES_PROFILE',
+    });
+    const beta = makeEntry({
+      pageId: 'CH01_P002',
+      entryTitle: 'Beta',
+      imageSubject: 'beta',
+      bodyMarkdown: bodyOf(28, 30),
+      contentType: 'SPECIES_PROFILE',
+    });
+    const { pages } = runFlow([alpha, beta]);
+
+    // The guarantee: no compacted/merged page, and none of them overflow.
+    expect(pages.some((p) => p.pageRole === 'compacted')).toBe(false);
+    expect(pages.some((p) => p.compactedEntryKeys != null)).toBe(false);
+    expect(pages.some((p) => p.fitStatus === 'OVERFLOW')).toBe(false);
+
+    // Beta is paginated as its OWN entry, starting with its own opener (image).
+    const betaOpener = pages.find((p) => p.entryKey === 'CH01_P002' && p.pageRole === 'opener');
+    expect(betaOpener).toBeDefined();
+    expect(betaOpener!.carriesSubject).toBe(true);
+    expect(betaOpener!.imageSubject).toBe('beta');
+  });
+
+  it('still compacts two short entries that DO fit together', () => {
+    const a = makeEntry({ pageId: 'CH01_P001', entryTitle: 'A', imageSubject: 'a', bodyMarkdown: bodyOf(1, 15), contentType: 'SPECIES_PROFILE' });
+    const b = makeEntry({ pageId: 'CH01_P002', entryTitle: 'B', imageSubject: 'b', bodyMarkdown: bodyOf(1, 15), contentType: 'SPECIES_PROFILE' });
+    const { pages } = runFlow([a, b]);
+    const compacted = pages.find((p) => p.pageRole === 'compacted');
+    expect(compacted).toBeDefined();
+    expect(compacted!.fitStatus).not.toBe('OVERFLOW');
   });
 });

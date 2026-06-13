@@ -260,6 +260,22 @@ export function flowEngine(input: FlowEngineInput, entryMeta: EntryMetaMap): Flo
   /** Tracks the next partN to assign for an entry that has produced pages so far. */
   const partCounterByEntry = new Map<string, number>();
 
+  // Pre-index each entry's source body markdown so the compaction guard can
+  // validate a would-be merged page against the FINAL capacity model before
+  // committing — compaction is an optimization, never allowed to overflow.
+  const entryBodyChunks = new Map<string, string[]>();
+  {
+    let cur: string | null = null;
+    for (const tk of stream) {
+      if (tk.kind === 'entry-start') {
+        cur = tk.entryKey;
+        if (!entryBodyChunks.has(cur)) entryBodyChunks.set(cur, []);
+      } else if (cur) {
+        entryBodyChunks.get(cur)!.push(tk.markdown);
+      }
+    }
+  }
+
   function closeAndPushBlock(): void {
     if (!state.currentBlock) return;
     pages.push(finalizeBlock(state.currentBlock, trimSize, bodyPt, lineHeight));
@@ -340,13 +356,34 @@ export function flowEngine(input: FlowEngineInput, entryMeta: EntryMetaMap): Flo
       const crossesChapter =
         open !== null
         && entryMeta.get(token.entryKey)?.chapterNumber !== open.primaryChapterNumber;
-      const needHard =
+      let needHard =
         open === null
         || token.breakBehavior === 'hard'
         || !softAllowed
         || compactionCapReached
         || crossesChapter
         || linesRemaining(open) < policy.softBreakMinLinesRemaining;
+
+      // Option 1 — compaction is an optimization only. If merging this entry onto
+      // the current page would push it to OVERFLOW under the FINAL capacity model
+      // (the same computePaginationCapacity finalize uses), do NOT compact: hard
+      // break so the entry gets its own page. Guarantees no compacted/merged page
+      // ever finalizes as OVERFLOW, without touching the per-token heading math.
+      if (!needHard && open) {
+        const candidate = joinMarkdown([
+          ...open.textChunks,
+          `## ${token.entryTitle}`,
+          ...(entryBodyChunks.get(token.entryKey) ?? []),
+        ]);
+        const merged = computePaginationCapacity({
+          readingFieldText: candidate,
+          layoutTemplate: open.layoutTemplate,
+          trimSize,
+          bodyPt,
+          lineHeight,
+        });
+        if (merged.status === 'OVERFLOW') needHard = true;
+      }
 
       if (needHard) {
         closeAndPushBlock();
