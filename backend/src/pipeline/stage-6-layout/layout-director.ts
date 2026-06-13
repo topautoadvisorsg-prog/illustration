@@ -24,6 +24,11 @@ export interface LayoutDirectorInput {
    *  pure-text layout drops the empty title band and raises its reading field
    *  (copyright / continuation / compacted pages have no title). */
   hasTitle?: boolean;
+  /** True only for an ENTRY OPENER (the first page of a body entry). Drives the
+   *  "empty space becomes illustration" rule — an underfilled opener hands its
+   *  unused text column to the artwork. NOT keyed on hasTitle, because body
+   *  openers carry their title via the page spec, not the role policy. */
+  isEntryOpener?: boolean;
 }
 
 /** Position of the image-priority zone on the page (where focal visual content lives). */
@@ -631,10 +636,10 @@ export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
   // integrated reading field. Titleless pages (continuation/compacted) are never
   // affected; pure-text (D) and full plates are excluded by the fraction guard.
   // Permanent across every Wild Lands volume — not a per-book exception.
-  const OPENER_LOW_FILL = 0.55;
+  const OPENER_LOW_FILL = 0.7; // text fills < 70% of its column → a visible blank the art should claim
   const OPENER_SHORT_CHARS = 1100; // ~180 words — genuinely short copy in absolute terms
   const isUnderfilledOpener =
-    hasTitle &&
+    input.isEntryOpener === true &&
     profile.artAreaFraction > 0.08 &&
     profile.artAreaFraction < 0.9 &&
     plainCharCount > 0 &&

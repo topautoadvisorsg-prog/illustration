@@ -45,10 +45,10 @@ describe('layout director — four region types', () => {
 describe('layout director — underfilled opener becomes illustration-dominant', () => {
   const SHORT = 'A short entry opener with only a couple of sentences of text.'; // ~60 chars
   const LONG = 'x'.repeat(1500);
-  const run = (body: string, hasTitle = true) =>
-    directLayout({ bodyMarkdown: body, layoutTemplate: 'LAYOUT_B_IMAGE_LEFT', geometry, bodyPt: 11, lineHeight: 1.4, hasTitle });
+  const run = (body: string, isEntryOpener = true) =>
+    directLayout({ bodyMarkdown: body, layoutTemplate: 'LAYOUT_B_IMAGE_LEFT', geometry, bodyPt: 11, lineHeight: 1.4, hasTitle: isEntryOpener, isEntryOpener });
 
-  it('a short TITLED opener hands the empty column to the artwork (image-dominant, no blank)', () => {
+  it('a short ENTRY OPENER hands the empty column to the artwork (image-dominant, no blank)', () => {
     const a = run(SHORT);
     // Image now dominates (well above the ~50% the B template would give)...
     expect(a.openingPageImagePercent ?? Math.round(a.imagePriorityZones[0]!.widthPct)).toBeGreaterThan(60);
@@ -66,7 +66,7 @@ describe('layout director — underfilled opener becomes illustration-dominant',
     expect(Math.round(a.imagePriorityZones.find((z) => z.regionType === 'image-priority')!.widthPct)).toBeLessThanOrEqual(60);
   });
 
-  it('a short TITLELESS page (continuation) is NOT affected', () => {
+  it('a short CONTINUATION (not an entry opener) is NOT affected', () => {
     const a = run(SHORT, false);
     // Continuation keeps the text-led treatment, not the image-dominant opener path.
     const focal = a.imagePriorityZones.find((z) => z.regionType === 'image-priority');

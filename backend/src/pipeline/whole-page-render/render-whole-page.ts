@@ -112,6 +112,9 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
     // Titleless pages (copyright/continuation/compacted) drop the empty title
     // band so the reading field can use the full height.
     hasTitle: Boolean(pageRolePolicy.title?.name?.trim()),
+    // Entry openers drive the "empty space becomes illustration" rule. Keyed on
+    // the page ROLE (not the policy title, which body openers leave empty here).
+    isEntryOpener: pageRow.pageRole === 'opener',
   });
 
   const spec = buildPageSpec({
