@@ -556,6 +556,18 @@ export function buildSeriesLine(seriesName?: string | null, volume?: number | nu
   return roman ? `${name.toUpperCase()} — VOLUME ${roman}` : name.toUpperCase();
 }
 
+/**
+ * Strip a leading manuscript ordinal from a reader-facing title. The manuscript
+ * may number its entries ("1. Black Bear", "10) Eastern White Pine") for the
+ * author's own organization; the printed book shows clean names. Conservative:
+ * only a leading "<digits><.|)><space>" run is removed, so "Hazard 3 — Moose"
+ * or "1080p" pass through untouched. Used everywhere a title is PRESENTED
+ * (entry opener bands, index, contents) — never mutates stored manifest data.
+ */
+export function stripLeadingOrdinal(title: string): string {
+  return title.replace(/^\s*\d{1,3}[.)]\s+/, '').trim();
+}
+
 export const ProjectConfigSchema = z.object({
   brand: BrandSchema.default('THE_WILDLANDS'),
   audience: AudienceSchema.default('ADULT'),

@@ -87,21 +87,12 @@ export function assembleCoverPrompt(spec: WholePageSpec): string {
   ].join('\n');
 }
 
-function rendersBodyText(spec: WholePageSpec): boolean {
-  // All-AI model: every page bakes its own text into the image. The cover is
-  // the only exception here, and it uses the dedicated assembleCoverPrompt.
-  return spec.pageType !== 'COVER_WRAP';
-}
 
-function promptHeader(spec: WholePageSpec): string {
-  // Cover uses assembleCoverPrompt (a dedicated lean prompt), never this path.
-  if (rendersBodyText(spec)) return HEADER;
-  return [
-    `You are rendering a complete, FINISHED, publishable collector-edition book page under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version}.`,
-    'The target quality is a museum-grade, vintage natural-history monograph.',
-    'Render the artwork, ornament, paper character, composition, and reserved zones only.',
-    'Do not invent readable text. Critical typography and reference copy are added by the publishing engine.',
-  ].join(' ');
+function promptHeader(_spec: WholePageSpec): string {
+  // Every page on this path bakes its own text (the cover is the sole exception
+  // and uses assembleCoverPrompt — it never reaches here), so the standard
+  // text-rendering header always applies.
+  return HEADER;
 }
 
 function block(title: string, payload: unknown): string {
@@ -175,20 +166,16 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
     ...(emitTitleFamily ? { titleFamily } : {}),
     ...(decorativeInitial != null ? { decorativeInitial } : {}),
   };
-  const bodySection = rendersBodyText(spec)
-    ? [
-        // The single, strongest text-fidelity statement lives HERE and nowhere else.
-        'PAGE BODY — render every block below IN ORDER, as its type ("heading" = bold serif section heading, "subheading" = smaller bold heading, "paragraph" = body prose).',
-        'Render the provided text EXACTLY: do not add, remove, translate, summarize, or reorder any words. The text is already plain — never print the block labels, the words "type"/"text", braces, or any markdown (#/*/_).',
-        '```json',
-        JSON.stringify(spec.pageText.bodyBlocks, null, 2),
-        '```',
-      ]
-    : [
-          'TEXT POLICY - the image model must not render critical text for this role.',
-          'Create artwork, ornament, paper texture, and calm text-safe/typography zones only.',
-          'The publishing engine will add title, author, spine, barcode, ISBN, glossary/index entries, and any other readable copy.',
-        ];
+  // Every page in this path bakes its own text into the image (the cover is the
+  // sole exception and uses the dedicated assembleCoverPrompt — it never reaches
+  // here). The single, strongest text-fidelity statement lives HERE and nowhere else.
+  const bodySection = [
+    'PAGE BODY — render every block below IN ORDER, as its type ("heading" = bold serif section heading, "subheading" = smaller bold heading, "paragraph" = body prose).',
+    'Render the provided text EXACTLY: do not add, remove, translate, summarize, or reorder any words. The text is already plain — never print the block labels, the words "type"/"text", braces, or any markdown (#/*/_).',
+    '```json',
+    JSON.stringify(spec.pageText.bodyBlocks, null, 2),
+    '```',
+  ];
 
   return [
     promptHeader(spec),

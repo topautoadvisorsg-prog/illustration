@@ -9,10 +9,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { ProjectConfigSchema, buildSeriesLine, toRoman } from '@wildlands/shared';
+import { ProjectConfigSchema, buildSeriesLine, toRoman, stripLeadingOrdinal } from '@wildlands/shared';
 import { buildCoverWrapPrompt } from '../pipeline/stage-6-layout/render-chapter.js';
 import { computeCoverDimensions } from '../pipeline/stage-6-layout/render-html.js';
-import { buildPageRolePolicy } from '../pipeline/whole-page-render/page-role-policy.js';
+import { buildPageRolePolicy, type PageRolePolicy } from '../pipeline/whole-page-render/page-role-policy.js';
+import { buildPageSpec } from '../pipeline/whole-page-render/build-page-spec.js';
+import { computePageGeometry } from '../pipeline/stage-6-layout/page-geometry.js';
+import type { LayoutAllocation } from '../pipeline/stage-6-layout/layout-director.js';
 import type { PageRow } from '../db/repositories/pagination.repo.js';
 
 function cfg(over: Record<string, unknown>) {
@@ -37,6 +40,67 @@ describe('buildSeriesLine / toRoman (shared)', () => {
   it('returns null when no series name (nothing hardcoded)', () => {
     expect(buildSeriesLine('', 3)).toBeNull();
     expect(buildSeriesLine(undefined, undefined)).toBeNull();
+  });
+});
+
+describe('stripLeadingOrdinal — clean reader-facing titles', () => {
+  it('drops a leading manuscript ordinal', () => {
+    expect(stripLeadingOrdinal('1. Black Bear')).toBe('Black Bear');
+    expect(stripLeadingOrdinal('2. Moose')).toBe('Moose');
+    expect(stripLeadingOrdinal('10) Eastern White Pine')).toBe('Eastern White Pine');
+    expect(stripLeadingOrdinal('  3.  White-Tailed Deer')).toBe('White-Tailed Deer');
+  });
+  it('leaves real titles untouched (conservative)', () => {
+    expect(stripLeadingOrdinal('Hazard 3 — Moose')).toBe('Hazard 3 — Moose');
+    expect(stripLeadingOrdinal('Black Bear')).toBe('Black Bear');
+    expect(stripLeadingOrdinal('1080p Trail Cameras')).toBe('1080p Trail Cameras');
+    expect(stripLeadingOrdinal('THE THREE WILDERNESS ZONES')).toBe('THE THREE WILDERNESS ZONES');
+  });
+  it('a cleaned set sorts as a proper alphabetical index (no "10" before "2")', () => {
+    const titles = ['10. Fisher', '2. Moose', '1. Black Bear'].map(stripLeadingOrdinal);
+    titles.sort((a, b) => a.localeCompare(b));
+    expect(titles).toEqual(['Black Bear', 'Fisher', 'Moose']);
+  });
+});
+
+describe('buildPageSpec — entry opener title band is clean (production builder)', () => {
+  const geometry = computePageGeometry({ widthIn: 7, heightIn: 10, bleedIn: 0.125 });
+  const allocation = {
+    textSafeZones: [],
+    imagePlacement: 'full-page artwork',
+    textPlacement: 'calm reading field',
+  } as unknown as LayoutAllocation;
+  const interiorPolicy: PageRolePolicy = {
+    pageType: 'INTERIOR',
+    layoutTemplate: 'LAYOUT_D_PURE_TEXT',
+    title: { kicker: '', number: '', name: '' },
+    entryTitle: '',
+    imageSubject: 'Black Bear in a New England forest',
+    allowsEmptyBody: false,
+    renderBodyText: true,
+  };
+  const pageRow = {
+    pageKey: 'CH02_P001',
+    chapterNumber: 2,
+    plannedPageNumber: 23,
+    pageRole: 'opener',
+    readingFieldText: 'The black bear is the largest land predator in the region.',
+  } as unknown as PageRow;
+
+  it('strips the manuscript ordinal from the title band and hierarchy', () => {
+    const spec = buildPageSpec({
+      pageRow,
+      config: cfg({ subtitle: 'New England' }),
+      geometry,
+      allocation,
+      entryTitle: '1. Black Bear',
+      imageSubject: 'Black Bear in a New England forest',
+      pageRolePolicy: interiorPolicy,
+    });
+    expect(spec.pageText.title.name).toBe('BLACK BEAR');
+    expect(spec.typographyDNA.titleHierarchy).toEqual(['BLACK BEAR']);
+    // ordinal must not leak anywhere into the title band
+    expect(spec.pageText.title.name).not.toMatch(/^\d/);
   });
 });
 

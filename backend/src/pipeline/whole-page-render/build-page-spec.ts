@@ -10,7 +10,7 @@
  */
 
 import type { PageManifest, ProjectConfig } from '@wildlands/shared';
-import { buildSeriesLine } from '@wildlands/shared';
+import { buildSeriesLine, stripLeadingOrdinal } from '@wildlands/shared';
 import type { PageRow } from '../../db/repositories/pagination.repo.js';
 import type { LayoutAllocation, PlanningZone } from '../stage-6-layout/layout-director.js';
 import { REFERENCE_TYPOGRAPHY } from '../stage-6-layout/layout-profiles.js';
@@ -103,7 +103,7 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
   const policy = input.pageRolePolicy ?? buildPageRolePolicy(pageRow, input.config);
   const layout = policy.layoutTemplate;
   const pageType = policy.pageType;
-  const entryTitle = input.entryTitle || policy.entryTitle;
+  const entryTitle = stripLeadingOrdinal(input.entryTitle || policy.entryTitle);
   const imageSubject = input.imageSubject || policy.imageSubject;
 
   // Reading-field geometry — convert the textSafeZone (percent of trim) to inches.

@@ -17,7 +17,7 @@
  * and their renders are never touched.
  */
 
-import { ProjectConfigSchema, type ProjectConfig, type PublishingMetadata } from '@wildlands/shared';
+import { ProjectConfigSchema, stripLeadingOrdinal, type ProjectConfig, type PublishingMetadata } from '@wildlands/shared';
 import { getProject } from '../../db/repositories/projects.repo.js';
 import { listManifests } from '../../db/repositories/manifests.repo.js';
 import { listPaginatedPagesForProject } from '../../db/repositories/pagination.repo.js';
@@ -291,15 +291,18 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     const first = bodyPages
       .filter((p) => p.chapterNumber === c.chapterNumber)
       .reduce((min, p) => Math.min(min, p.plannedPageNumber), Number.MAX_SAFE_INTEGER);
-    // Generic prefix strip: "CHAPTER 3 — PLANTS" → "PLANTS"; unknown shapes pass through.
-    const title = c.chapterTitle.replace(/^chapter\s+\d+\s*[—–:-]\s*/i, '').trim() || c.chapterTitle;
+    // Generic prefix strip: "CHAPTER 3 — PLANTS" → "PLANTS"; unknown shapes pass
+    // through. Then drop any leading manuscript ordinal ("3. Plants" → "Plants").
+    const title =
+      stripLeadingOrdinal(c.chapterTitle.replace(/^chapter\s+\d+\s*[—–:-]\s*/i, '').trim()) ||
+      c.chapterTitle;
     return { label: toRoman(c.chapterNumber), title, pageNumber: first === Number.MAX_SAFE_INTEGER ? 1 : first };
   });
 
   const entryTitleByKey = new Map<string, string>();
   for (const row of await listManifests(projectId, 'PAGE')) {
     const content = row.content as { entryTitle?: string } | null;
-    const title = content?.entryTitle?.trim();
+    const title = content?.entryTitle ? stripLeadingOrdinal(content.entryTitle) : '';
     if (title) entryTitleByKey.set(row.externalId, title);
   }
   const firstBodyPageByEntry = new Map<string, number>();
