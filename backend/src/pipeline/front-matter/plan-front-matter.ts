@@ -138,6 +138,10 @@ interface PlannedPage {
   pageLabel: string | null;
   compose: Omit<ComposeInput, 'canvasIn' | 'pageLabel' | 'kind'>;
   auditText: string | null;
+  /** When true, this page is rendered by the whole-page AI illustrator (same DNA
+   *  as the body), NOT composed deterministically — title/half-title/contents +
+   *  the introduction opener. The planner skips deterministic compose for it. */
+  aiRendered?: boolean;
 }
 
 /** Resolve publishing metadata with generic fallbacks to project config. */
@@ -329,27 +333,18 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     }))
     .sort((a, b) => a.title.localeCompare(b.title));
 
-  // ── FRONT sequence with recto/verso parity (index 1 = recto) ──
+  // ── FRONT sequence. Operator rule: NO traditional blank pages — every printed
+  // page must earn its place. Recto/verso convention blanks are not inserted.
+  // Half-title (vignette), title page (cinematic), contents (wilderness header),
+  // and the introduction opener are AI-illustrated in the same naturalist DNA.
   const front: PlannedPage[] = [];
-  const blank = (): PlannedPage => ({
-    pageKey: '',
-    section: 'FRONT_MATTER',
-    kind: 'BLANK',
-    frontMatterType: 'BLANK',
-    pageLabel: null,
-    compose: {},
-    auditText: null,
-  });
   const push = (p: Omit<PlannedPage, 'pageKey' | 'section'>): void => {
     front.push({ ...p, pageKey: '', section: 'FRONT_MATTER' });
   };
   const nextIndex = (): number => front.length + 1;
-  const ensureRecto = (): void => {
-    if (nextIndex() % 2 === 0) front.push(blank());
-  };
+  const ensureRecto = (): void => { /* no blank pages — recto/verso convention dropped */ };
 
-  push({ kind: 'HALF_TITLE', frontMatterType: 'HALF_TITLE', pageLabel: null, compose: { title: meta.resolvedTitle }, auditText: null });
-  front.push(blank());
+  push({ kind: 'HALF_TITLE', frontMatterType: 'HALF_TITLE', pageLabel: null, compose: { title: meta.resolvedTitle }, auditText: null, aiRendered: true });
   push({
     kind: 'TITLE_PAGE',
     frontMatterType: 'TITLE_PAGE',
@@ -361,6 +356,7 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
       imprint: meta.publisher?.imprint,
     },
     auditText: null,
+    aiRendered: true,
   });
   const copyrightLines = buildCopyrightLines(meta);
   push({ kind: 'COPYRIGHT_PAGE', frontMatterType: 'COPYRIGHT_PAGE', pageLabel: null, compose: { copyrightLines }, auditText: copyrightLines.join('\n') });
@@ -388,6 +384,7 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     pageLabel: toRoman(nextIndex()).toLowerCase(),
     compose: { tocHeading: 'Contents', tocEntries },
     auditText: tocEntries.map((e) => `${e.label}. ${e.title} … ${e.pageNumber}`).join('\n'),
+    aiRendered: true,
   });
   if (introParagraphs.length > 0) {
     ensureRecto();
@@ -399,11 +396,13 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
         pageLabel: toRoman(nextIndex()).toLowerCase(),
         compose: { heading: i === 0 ? 'Introduction' : undefined, paragraphs: paras },
         auditText: paras.join('\n\n'),
+        // The first introduction page is a cinematic chapter-opener plate (AI);
+        // the remaining intro pages stay deterministic text.
+        aiRendered: i === 0,
       });
     });
   }
-  // Even front count ⇒ Chapter 1 (arabic 1) opens on a recto.
-  if (front.length % 2 === 1) front.push(blank());
+  // No parity blank — recto/verso convention dropped (operator rule: no blanks).
 
   // ── BACK sequence ──
   const bodyCount = bodyPages.length;
@@ -501,10 +500,9 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     omitted.push({ page: 'RESOURCES', reason: 'no additionalResources metadata' });
   }
 
-  // Even TOTAL page count (print requirement): front + body + back.
-  if ((front.length + bodyCount + back.length) % 2 === 1) {
-    back.push({ pageKey: '', section: 'BACK_MATTER', kind: 'BLANK', frontMatterType: 'BLANK', pageLabel: null, compose: {}, auditText: null });
-  }
+  // Operator rule: NO paid blank pages, even for parity. If a printer later
+  // requires an even total, the parity page is added as a deliberate, reviewed
+  // naturalist plate at export — never a silent blank here.
 
   // ── Back-cover copy ASSET (not a page). Composed from the structured back-
   // cover fields (description + features + author note), legacy hooks honoured. ──
@@ -546,11 +544,11 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   let filesWritten = 0;
   const compositionPrompts: FrontMatterPlanReport['compositionPrompts'] = [];
   for (const p of [...front, ...back]) {
-    // Reference pages (Glossary/Index/Sources) are NOT deterministically
-    // composed — the LAYOUT_REFERENCE AI render is their single source of truth.
-    // The planner still created their rows (with readingFieldText above); the
-    // whole-page render path renders them by role.
-    if (isReferenceSection(p.frontMatterType)) continue;
+    // AI-rendered pages (reference sections + title/half-title/contents + the
+    // introduction opener) are NOT deterministically composed — the whole-page
+    // AI illustrator is their source of truth. The planner still created their
+    // rows (with readingFieldText above); the render path renders them by role.
+    if (isReferenceSection(p.frontMatterType) || p.aiRendered) continue;
     const composeSpec = {
       kind: p.kind,
       canvasIn,

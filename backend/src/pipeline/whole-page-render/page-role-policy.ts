@@ -136,16 +136,33 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
   const author = resolvedAuthor(config);
 
   switch (pageType) {
-    case 'TITLE_PAGE':
+    case 'TITLE_PAGE': {
+      // Half-title and the full title page share this role but are NOT the same
+      // page. Half-title = a sparse, elegant naturalist VIGNETTE with the title
+      // set small. Title page = a premium full-bleed CINEMATIC plate (same DNA
+      // and world as the cover) with the full title block set into the scene.
+      const isHalfTitle = frontMatterType(row) === 'HALF_TITLE';
+      if (isHalfTitle) {
+        return {
+          pageType,
+          layoutTemplate: 'LAYOUT_TITLE_DISPLAY',
+          title: { kicker: '', number: '', name: title.toUpperCase() },
+          entryTitle: title,
+          imageSubject: `Half-title vignette: a single tasteful naturalist motif — a sprig of spruce or balsam, a fern frond, a feather, or a small quiet wilderness study${subtitle ? ` evoking ${subtitle}` : ''} — centered on aged parchment with generous calm space, the book title set small and refined above it. Restrained and elegant, the same naturalist world as the cover.`,
+          allowsEmptyBody: true,
+          renderBodyText: false,
+        };
+      }
       return {
         pageType,
-        layoutTemplate,
+        layoutTemplate: 'LAYOUT_A_ILLUSTRATION',
         title: { kicker: subtitle, number: '', name: title.toUpperCase() },
         entryTitle: title,
-        imageSubject: `Refined title-page ornament for ${title}${subtitle ? `, ${subtitle}` : ''}; author/imprint line: ${author}`,
+        imageSubject: `Premium full-page CINEMATIC title illustration: an atmospheric establishing wilderness scene${subtitle ? ` evoking ${subtitle}` : ''} — the same painterly naturalist world as the cover — with the title block set cleanly into a calm area of the scene. The reader is entering the wilderness before Chapter 1.`,
         allowsEmptyBody: true,
         renderBodyText: false,
       };
+    }
     case 'INTRO_OPENER':
       return {
         pageType,
@@ -232,7 +249,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         layoutTemplate,
         title: { kicker: '', number: '', name: 'CONTENTS' },
         entryTitle: 'Contents',
-        imageSubject: 'Table-of-contents edge ornament only: thin engraved botanical corner details outside the contents listing and its page numbers',
+        imageSubject: 'Table of contents with a subtle decorative wilderness header across the top — a quiet naturalist band (a low distant ridgeline, pines, or a botanical motif) above the listing — and thin engraved edge ornaments; the chapter titles and their page numbers stay clearly legible in a calm reading field below the header. Readability first.',
         allowsEmptyBody: false,
         renderBodyText: true,
       };
