@@ -172,6 +172,10 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
   const bodySection = [
     'PAGE BODY — render every block below IN ORDER, as its type ("heading" = bold serif section heading, "subheading" = smaller bold heading, "paragraph" = body prose).',
     'Render the provided text EXACTLY: do not add, remove, translate, summarize, or reorder any words. The text is already plain — never print the block labels, the words "type"/"text", braces, or any markdown (#/*/_).',
+    // Legibility floor: pagination already fit this exact amount of text to the
+    // reading field at the body size below, so the model must NOT shrink the type
+    // to cram — that is what produced cramped pages. The size is the floor.
+    `TEXT SIZE — set the body at a comfortable, consistent printed-book reading size (about ${spec.typographyDNA.bodyPt}pt at this trim, roughly ${spec.typographyDNA.bodyMeasureChars ?? 70} characters per line). This exact amount of text was already fit to the reading field at that size — render it at that size and let it fill the field naturally. NEVER shrink the body type below a clearly legible book size to fit more in; the amount of text is correct for the space.`,
     '```json',
     JSON.stringify(spec.pageText.bodyBlocks, null, 2),
     '```',

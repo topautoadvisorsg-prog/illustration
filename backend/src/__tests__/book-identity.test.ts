@@ -102,6 +102,18 @@ describe('buildPageSpec — entry opener title band is clean (production builder
     // ordinal must not leak anywhere into the title band
     expect(spec.pageText.title.name).not.toMatch(/^\d/);
   });
+
+  it('body text size matches the pagination size (no prompt/pagination drift → no shrink-to-fit)', () => {
+    const config = cfg({ typography: { bodyPt: 11, lineHeight: 1.4 } });
+    const spec = buildPageSpec({
+      pageRow, config, geometry, allocation,
+      entryTitle: 'Black Bear', imageSubject: 'Black Bear', pageRolePolicy: interiorPolicy,
+    });
+    // The prompt must state the SAME body size the flow engine paginated for,
+    // so the model is never handed too much text for the size it's told to use.
+    expect(spec.typographyDNA.bodyPt).toBe(config.typography.bodyPt);
+    expect(spec.typographyDNA.bodyLineHeight).toBe(config.typography.lineHeight);
+  });
 });
 
 describe('cover prompt is data-driven', () => {

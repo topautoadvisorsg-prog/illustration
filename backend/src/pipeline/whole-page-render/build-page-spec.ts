@@ -201,6 +201,16 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
         }
       : null;
 
+  // Body text size MUST match what pagination filled the page for, or the model
+  // is handed N chars sized for one point size and told to render at another —
+  // it then shrinks the type to cram it in (the "why is the text small" trap).
+  // The flow engine paginates at config.typography.bodyPt, so the prompt states
+  // the SAME size. Reference pages keep their compact two-column type.
+  const bodyTypography = referenceType ?? {
+    bodyPt: input.config.typography.bodyPt,
+    bodyLineHeight: input.config.typography.lineHeight,
+  };
+
   return {
     pageType,
     layoutFamily: layout,
@@ -225,7 +235,7 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
     readingFieldGeometry: rfGeometry,
     typographyDNA: {
       ...PAGE_TYPOGRAPHY_DNA,
-      ...(referenceType ?? {}),
+      ...bodyTypography,
       // Drop-cap governance (SPEC_GEOMETRY_RECONCILIATION §3): the drop-cap
       // surround is authoritative on `dropCap`. When there is no drop-cap
       // (every interior/continuation page), emit NOTHING about it — otherwise
