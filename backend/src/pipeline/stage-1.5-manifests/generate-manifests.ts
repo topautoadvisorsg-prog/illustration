@@ -128,7 +128,13 @@ function inferContentType(
   if (/(compare|comparison|look-alike|look alike| vs |versus|similar species)/.test(text)) return 'COMPARISON';
   if (/(life cycle|growth stage|seasonal sequence|progression|development over time)/.test(text)) return 'PROGRESSION_STUDY';
   if (/(cutaway|cut away|cross-section|cross section|strata|glacial inheritance|layered)/.test(text)) return 'CUTAWAY_ILLUSTRATION';
-  if (/(tracks & sign|tracks and sign|track|scat|signs)/.test(text)) return 'FIELD_NOTES_PAGE';
+  // FIELD_NOTES_PAGE is for a DEDICATED tracks-and-sign page, recognized by its
+  // TITLE — not for any species entry that merely mentions tracks/scat/sign in
+  // its body. Matching bare body words swept every animal profile in here and
+  // gave flagship species an accent "field signs" image subject on a strong
+  // illustration layout. A real species entry falls through to ANIMAL_PROFILE /
+  // SPECIES_PROFILE below and gets a strong portrait subject.
+  if (/(tracks?\s*(?:&|and)\s*signs?|field signs?|reading (?:tracks?|sign))/.test(title)) return 'FIELD_NOTES_PAGE';
   if (/(diagram|diagnostic|identify|identification|how to identify|major features)/.test(title)) return 'DIAGNOSTIC_DIAGRAM';
   if (chapter.chapterNumber === 1 || chapter.chapterNumber === 6) {
     if (/(zone|habitat|forest|wetland|boreal|alpine|hardwood)/.test(text)) return 'HABITAT_OVERVIEW';
