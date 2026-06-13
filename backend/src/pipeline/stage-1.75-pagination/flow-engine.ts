@@ -229,8 +229,19 @@ function sectionHeadingExtraChars(block: WorkingBlock): number {
   return LINES_PER_SECTION_HEADER * block.charsPerLine;
 }
 
+/**
+ * joinMarkdown joins chunks with '\n\n'; stripMarkdown (which the char model
+ * uses) then collapses that whitespace to a SINGLE space. So the finalized page
+ * text is exactly ONE char longer per chunk boundary than the per-token char
+ * sum. Count that separator while pouring so a page can't pass the pour check
+ * and then finalize a few chars over capacity (the CH08_P010_c1 boundary bug).
+ * This is a narrow accounting correction — the analyzeTextFit model is untouched.
+ */
+const JOIN_SEPARATOR_CHARS = 1;
+
 function pushToken(block: WorkingBlock, token: StreamToken): void {
   if (token.kind === 'entry-start') return; // titles never enter the body text
+  if (block.textChunks.length > 0) block.charsUsed += JOIN_SEPARATOR_CHARS;
   block.textChunks.push(token.markdown);
   block.charsUsed += token.chars;
   if (token.kind === 'section-heading') block.charsUsed += sectionHeadingExtraChars(block);
@@ -427,7 +438,10 @@ export function flowEngine(input: FlowEngineInput, entryMeta: EntryMetaMap): Flo
     // heading near the end of a block doesn't squeak past the fit check
     // only to be discovered as TIGHT/OVERFLOW at finalize time.
     const overhead = token.kind === 'section-heading' ? sectionHeadingExtraChars(open) : 0;
-    if (open.charsUsed + token.chars + overhead <= open.capacityChars) {
+    // The '\n\n' separator joinMarkdown will insert before this chunk (every
+    // chunk after the first) — counted so the page never finalizes over capacity.
+    const joinCost = open.textChunks.length > 0 ? JOIN_SEPARATOR_CHARS : 0;
+    if (open.charsUsed + joinCost + token.chars + overhead <= open.capacityChars) {
       pushToken(open, token);
       continue;
     }

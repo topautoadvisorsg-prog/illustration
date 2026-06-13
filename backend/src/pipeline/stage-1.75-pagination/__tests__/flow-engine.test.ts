@@ -385,3 +385,25 @@ describe('flowEngine — compaction never overflows (Option 1 guard)', () => {
     expect(compacted!.fitStatus).not.toBe('OVERFLOW');
   });
 });
+
+describe('flowEngine — join-separator accounting (no boundary overflow)', () => {
+  it('counts the inter-chunk \n\n separators so a multi-paragraph page never finalizes a few chars over capacity', () => {
+    // Many small paragraphs => many chunk boundaries. Each joinMarkdown '\n\n'
+    // adds one char to the finalized text that the per-token sum omits. Without
+    // counting them, a page passes the pour check then finalizes 1-9 chars over
+    // (the CH08_P010_c1 boundary bug). The body spans several continuations, so
+    // the pour crosses many boundaries — none may finalize as OVERFLOW.
+    const entry = makeEntry({
+      pageId: 'CH01_P001',
+      bodyMarkdown: bodyOf(120, 8),
+      contentType: 'ENCYCLOPEDIA_ENTRY',
+    });
+    const { pages } = runFlow([entry]);
+    expect(pages.length).toBeGreaterThan(1); // genuinely spans continuations
+    for (const page of pages) {
+      // A non-atomic page's finalized text must never exceed its capacity.
+      expect(page.warnings.some((w) => w.startsWith('atomic_token_exceeds_capacity'))).toBe(false);
+      expect(page.fitStatus).not.toBe('OVERFLOW');
+    }
+  });
+});
