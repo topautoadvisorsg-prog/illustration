@@ -467,11 +467,14 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   }
 
   if (meta.series?.name) {
+    // Series names often already include the leading article (e.g. "The Wildlands").
+    // Strip it before prepending "the" so the heading/body never read "the The …".
+    const bareSeries = meta.series.name.replace(/^the\s+/i, '');
     const desc = meta.series.description
       ? sectionParagraphs(meta.series.description)
-      : [`${meta.resolvedTitle} is part of the ${meta.series.name} series.`];
+      : [`${meta.resolvedTitle} is part of the ${bareSeries} series.`];
     pushBack(
-      { kind: 'TEXT_PAGE', frontMatterType: 'ABOUT_SERIES', pageLabel: null, compose: { heading: `About the ${meta.series.name} Series`, paragraphs: desc }, auditText: desc.join('\n\n') },
+      { kind: 'TEXT_PAGE', frontMatterType: 'ABOUT_SERIES', pageLabel: null, compose: { heading: `About the ${bareSeries} Series`, paragraphs: desc }, auditText: desc.join('\n\n') },
       true,
     );
   } else {

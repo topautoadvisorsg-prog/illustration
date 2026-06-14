@@ -248,7 +248,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         entryTitle: isSources ? 'Sources & Further Reading' : (seriesName || 'About the Series'),
         imageSubject: isSources
           ? 'Sources / further-reading page edge ornament only: thin engraved corner details framing a calm citations/references text block; quiet and scholarly'
-          : 'Series-page edge ornament only: refined engraved corner details on aged parchment that brand the book as part of the series; restrained and atmospheric',
+          : 'Atmospheric Cinematic Naturalist FIELD framing the About-the-Series text — a quiet emblematic New England wilderness vignette (distant layered ridgelines, spruce and white pine, ferns and a calm naturalist motif) enveloping the page margins and background as a premium series brand page that ties the volume to the wider series. CRITICAL READABILITY: keep the central reading column clean, light, and high-contrast so the series text stays clearly legible at about 11pt — the illustration envelops and frames the text, never a busy hero scene over it. Match the weight and finish of the book\'s introduction continuation pages — never a plain text placeholder.',
         allowsEmptyBody: false,
         renderBodyText: true,
       };
