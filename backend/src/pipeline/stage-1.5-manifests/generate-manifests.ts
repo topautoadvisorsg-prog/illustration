@@ -86,14 +86,24 @@ function extractScientificName(entry: ManuscriptEntryOutline): string | undefine
   return match?.[1];
 }
 
+// Danger is a property of the entry's PURPOSE, recognized from its TITLE — where the
+// author marks a hazard entry explicitly ("... DEADLY", "Jimsonweed DEADLY —
+// HALLUCINOGENIC", "Hypothermia", "Lyme Disease"). It must NOT key off body text: a
+// normal species profile that merely DISCUSSES toxicity — Eastern Hemlock the tree
+// noting it is NOT poison hemlock, or Black Cherry cautioning about wilted leaves —
+// would otherwise be promoted to a WARNING_PAGE and lose its botanical portrait. The
+// hazard note belongs in the content, not the image subject. (Mirrors the first-aid
+// fix: classify on title, not body.)
+const DANGER_TITLE_RE =
+  /(deadly|toxic|poisonous|venomous|danger|hazard|lyme disease|tick-borne|tick borne|rabies|anaphylaxis|hypothermia|river crossing|extreme weather|spruce trap)/;
+function dangerTitleText(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline): string {
+  return `${chapter.title}\n${entry.title}`.toLowerCase();
+}
+
 function inferCategory(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline): string | undefined {
   const text = signalText(chapter, entry);
 
-  if (
-    /(deadly|toxic|poisonous|venomous|danger level|lyme disease|tick-borne|tick borne|rabies|anaphylaxis|hypothermia|river crossing|extreme weather|spruce trap)/.test(
-      text,
-    )
-  ) {
+  if (DANGER_TITLE_RE.test(dangerTitleText(chapter, entry))) {
     return 'DANGER';
   }
   if (/\bedible\b/.test(text)) return 'EDIBLE';
@@ -105,10 +115,7 @@ function inferCategory(chapter: ManuscriptChapterOutline, entry: ManuscriptEntry
 
 function isDangerEntry(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline, category?: string): boolean {
   if (category === 'DANGER') return true;
-  const text = signalText(chapter, entry);
-  return /(deadly|toxic|poisonous|venomous|lyme disease|tick-borne|tick borne|hypothermia|river crossing|extreme weather|spruce trap|rabies|anaphylaxis)/.test(
-    text,
-  );
+  return DANGER_TITLE_RE.test(dangerTitleText(chapter, entry));
 }
 
 function inferContentType(
@@ -300,6 +307,15 @@ function deriveVisualSubject(
   // The title also already carries a concrete term (e.g. "White Pine Stands").
   const titleSubjects = extractConcreteSubjects(title, 1);
   if (titleSubjects.length > 0) {
+    return title;
+  }
+  // A NUMBERED catalogue entry ("7. Morel", "14. False Morel TOXIC / DEADLY") names a
+  // species — the title IS the subject. Without this, a species whose scientific name
+  // could not be extracted falls through to body extraction and gets a HABITAT phrase
+  // ("flowing river and boreal spruce-fir forest") instead of the organism itself.
+  // Section headers (no leading ordinal, e.g. "THE MYCOLOGIST'S PROTOCOL") are
+  // unaffected and still fall back to page/chapter context below.
+  if (/^\s*\d+\.\s/.test(entry.title)) {
     return title;
   }
   // 1. PAGE CONTEXT — derive from what the page body actually describes.

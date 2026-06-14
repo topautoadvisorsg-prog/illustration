@@ -76,4 +76,63 @@ describe('content-type — a species entry that mentions tracks is NOT a field-n
     );
     expect(res.chapters[0]!.entries[0]!.contentType).toBe('REFERENCE_PAGE');
   });
+
+  it('a TREE that merely discusses toxicity in its body stays a botanical SPECIES_PROFILE', () => {
+    const res = buildDeterministicManifestResult(
+      outline([
+        chapter(4, 'CHAPTER 4 — TREES', [
+          entry(
+            'Eastern Hemlock (Tsuga canadensis)',
+            'This tree shares a common name with poison hemlock, one of the most toxic plants in North America. Eastern hemlock the tree is not the same as poison hemlock or water hemlock and bears no resemblance.',
+          ),
+          entry(
+            'Black Cherry (Prunus serotina)',
+            'The leaves, bark, and seeds are toxic — they contain cyanogenic glycosides that release hydrogen cyanide when metabolized.',
+          ),
+        ]),
+      ]),
+      cfg,
+    );
+    const [hemlock, cherry] = res.chapters[0]!.entries;
+    expect(hemlock!.contentType).toBe('SPECIES_PROFILE');
+    expect(hemlock!.imageSubject).toContain('Eastern Hemlock');
+    expect(hemlock!.imageSubject).not.toContain('safety illustration');
+    expect(cherry!.contentType).toBe('SPECIES_PROFILE');
+    expect(cherry!.imageSubject).not.toContain('safety illustration');
+  });
+
+  it('a NUMBERED species entry uses its title as the subject, not a habitat phrase from the body', () => {
+    const res = buildDeterministicManifestResult(
+      outline([
+        chapter(5, 'CHAPTER 5 — MUSHROOMS', [
+          entry(
+            '7. Morel',
+            'The morel fruits in spring along flowing rivers and in boreal spruce-fir forest, near dead elms and old apple orchards.',
+          ),
+        ]),
+      ]),
+      cfg,
+    );
+    const e = res.chapters[0]!.entries[0]!;
+    expect(e.imageSubject).toContain('Morel');
+    expect(e.imageSubject).not.toContain('flowing river');
+    expect(e.imageSubject).not.toContain('boreal spruce-fir forest');
+  });
+
+  it('a genuinely DEADLY plant (marked in its title) still routes to WARNING_PAGE', () => {
+    const res = buildDeterministicManifestResult(
+      outline([
+        chapter(3, 'CHAPTER 3 — PLANTS', [
+          entry(
+            'False Hellebore / Indian Poke DEADLY (Veratrum viride)',
+            'One of the most toxic plants in New England. The entire plant is toxic — root, stem, and leaves.',
+          ),
+        ]),
+      ]),
+      cfg,
+    );
+    const e = res.chapters[0]!.entries[0]!;
+    expect(e.contentType).toBe('WARNING_PAGE');
+    expect(e.imageSubject).toContain('safety illustration');
+  });
 });
