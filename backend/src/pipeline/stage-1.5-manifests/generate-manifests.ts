@@ -124,7 +124,12 @@ function inferContentType(
     if (/(geography|geology|climate|season|first peoples|terrain|navigation|technology)/.test(title)) return 'TERRAIN_ANALYSIS';
   }
   if (isDangerEntry(chapter, entry, category)) return 'WARNING_PAGE';
-  if (/(glossary|index|reference|protocol|code|first aid|survival priorities|decision framework)/.test(text)) return 'REFERENCE_PAGE';
+  // REFERENCE is a dedicated reference SECTION (recognized by its TITLE), not any
+  // entry that merely mentions these words. Matching the body mislabeled botanical
+  // entries — e.g. a first-aid PLANT like yarrow or plantain became a reference
+  // page and lost its botanical subject. First-aid USAGE belongs in the content,
+  // not the subject: a plant titled "Yarrow" falls through to a botanical profile.
+  if (/(glossary|index|reference|protocol|code|first aid|survival priorities|decision framework)/.test(title)) return 'REFERENCE_PAGE';
   if (/(compare|comparison|look-alike|look alike| vs |versus|similar species)/.test(text)) return 'COMPARISON';
   if (/(life cycle|growth stage|seasonal sequence|progression|development over time)/.test(text)) return 'PROGRESSION_STUDY';
   if (/(cutaway|cut away|cross-section|cross section|strata|glacial inheritance|layered)/.test(text)) return 'CUTAWAY_ILLUSTRATION';

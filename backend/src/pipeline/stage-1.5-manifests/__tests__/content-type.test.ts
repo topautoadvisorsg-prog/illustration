@@ -49,4 +49,31 @@ describe('content-type — a species entry that mentions tracks is NOT a field-n
     );
     expect(res.chapters[0]!.entries[0]!.contentType).toBe('FIELD_NOTES_PAGE');
   });
+
+  it('a first-aid PLANT (mentions "first aid" in body) stays a botanical SPECIES_PROFILE', () => {
+    const res = buildDeterministicManifestResult(
+      outline([
+        chapter(3, 'CHAPTER 3 — PLANTS', [
+          entry('Yarrow (Achillea millefolium)', 'Yarrow is a classic first aid plant — crushed leaves slow bleeding on a wound.'),
+        ]),
+      ]),
+      cfg,
+    );
+    const e = res.chapters[0]!.entries[0]!;
+    expect(e.contentType).toBe('SPECIES_PROFILE');
+    expect(e.imageSubject).toContain('Yarrow');
+    expect(e.imageSubject).not.toContain('small supporting');
+  });
+
+  it('a dedicated First Aid reference SECTION (by title) still routes to REFERENCE_PAGE', () => {
+    const res = buildDeterministicManifestResult(
+      outline([
+        chapter(7, 'CHAPTER 7 — SURVIVAL', [
+          entry('First Aid From the Land', 'Improvised wilderness first aid using native plants and materials.'),
+        ]),
+      ]),
+      cfg,
+    );
+    expect(res.chapters[0]!.entries[0]!.contentType).toBe('REFERENCE_PAGE');
+  });
 });
