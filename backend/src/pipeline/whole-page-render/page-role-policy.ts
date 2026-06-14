@@ -31,6 +31,28 @@ function frontMatterType(row: PageRow): string {
   return ((row as { frontMatterType?: string | null }).frontMatterType ?? '').toUpperCase();
 }
 
+// The Introduction welcomes the reader into the WHOLE New England wilderness, so its
+// continuation pages rotate through foundational ecosystem themes (one per page,
+// distinct) rather than repeating a single forest texture. Indexed by the page's
+// numeric key so each intro continuation gets its own theme deterministically.
+const INTRO_FIELD_THEMES = [
+  'a mature bull moose standing in a misty New England wetland at dawn — reeds, still dark water, spruce-lined shore',
+  'an old-growth stand of towering white pine and red spruce, shafts of light through the high canopy, deep mossy forest floor',
+  'a close naturalist study of native New England plants and fungi — ferns, mosses, trilliums, and woodland mushrooms on the forest floor',
+  'New England mountain terrain and bare granite ridgelines under a wide sky, layered blue ridges receding into haze',
+  'a New England river, lake, and beaver wetland alive with wildlife — a wading heron, still reflections, a spruce-and-birch shoreline',
+  'seasonal New England wilderness atmosphere — autumn hardwoods giving way to the first snow, low transitional light through bare and evergreen trees',
+];
+
+function introContinuationSubject(row: PageRow, subtitle: string): string {
+  const digits = row.pageKey.match(/(\d+)/);
+  const n = digits ? Number.parseInt(digits[1]!, 10) : 0;
+  const theme = INTRO_FIELD_THEMES[n % INTRO_FIELD_THEMES.length]!;
+  return `Atmospheric Cinematic Naturalist FIELD framing the introduction reading text — ${theme}${
+    subtitle ? `, in the ${subtitle} wilderness` : ''
+  }. Painterly museum-quality vintage-naturalist illustration with rich but calm pigment, set into the page margins and behind the reading area as an enveloping environmental setting that draws the reader into the world of the book before Chapter 1. CRITICAL READABILITY: keep the central reading column clean, light, and high-contrast so the body text stays clearly legible at about 11pt — the illustration envelops and frames the text, it is NEVER a busy hero scene laid over the words. Match the weight and finish of the book's body continuation pages.`;
+}
+
 export function inferWholePageRole(row: PageRow, layoutTemplate: LayoutTemplateId): WholePageRole {
   const section = (row as { section?: string | null }).section ?? 'BODY';
   if (section !== 'BODY') {
@@ -150,7 +172,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
       layoutTemplate: 'LAYOUT_D_PURE_TEXT',
       title: { kicker: '', number: '', name: '' },
       entryTitle: 'Introduction',
-      imageSubject: `Subtle full-page illustrated naturalist FIELD behind the introduction text — faint, low-contrast wilderness atmosphere${subtitle ? ` of ${subtitle}` : ''}: soft forest textures, pine and spruce studies, moss and fern margins, bark texture, a distant mountain silhouette, light watercolor washes and expedition-journal details on aged parchment. Keep it quiet and subdued behind the reading field — never a hero scene — so the body text stays the priority and clearly legible.`,
+      imageSubject: introContinuationSubject(row, subtitle),
       allowsEmptyBody: false,
       renderBodyText: true,
     };
