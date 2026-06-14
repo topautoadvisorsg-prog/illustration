@@ -181,6 +181,16 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
     '```',
   ];
 
+  // Continuation/compacted pages carry the SAME subject as the entry opener, but
+  // must not reprint the opener's portrait — each page should teach something new.
+  const continuationStudy =
+    spec.pageType === 'CONTINUATION' || spec.pageType === 'COMPACTED'
+      ? [
+          'CONTINUATION STUDY — this page continues an entry whose subject already received its main field-guide portrait on the opening page. Do NOT repeat that portrait\'s pose, angle, or composition. Instead depict the SAME subject from a DIFFERENT, complementary perspective that adds new understanding: a different behavior, a habitat or environmental context, a life stage, movement, an anatomical or structural detail, track/sign, or an interaction with its ecosystem. Keep the exact same Cinematic Naturalist style, palette, and scientific accuracy — only the chosen study and viewpoint change, so a reader turning the page learns something new rather than seeing the same picture twice.',
+          '',
+        ]
+      : [];
+
   return [
     promptHeader(spec),
     '',
@@ -188,6 +198,7 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
     '',
     block('ILLUSTRATION DNA — subject', spec.illustrationDNA.subject),
     '',
+    ...continuationStudy,
     'ILLUSTRATION DNA — master style:',
     spec.illustrationDNA.masterStyleBlock.trim(),
     '',

@@ -76,6 +76,17 @@ describe('PageRole prompt text policy', () => {
     expect(assemblePagePrompt(spec)).not.toContain('ENTRY TITLE');
   });
 
+  it('a continuation page asks for a DIFFERENT study of the subject, not a reprint of the opener', () => {
+    const prompt = assemblePagePrompt(makeSpec('CONTINUATION'));
+    expect(prompt).toContain('CONTINUATION STUDY');
+    expect(prompt).toContain('Do NOT repeat');
+    expect(prompt).toContain('learns something new');
+  });
+
+  it('an interior opener does NOT get the continuation-study directive', () => {
+    expect(assemblePagePrompt(makeSpec('INTERIOR'))).not.toContain('CONTINUATION STUDY');
+  });
+
   it('renders glossary and index entries — the AI bakes their text', () => {
     for (const role of ['GLOSSARY_ORNAMENT', 'INDEX_ORNAMENT'] as const) {
       const spec = makeSpec(role);
