@@ -188,12 +188,14 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
       if (isHalfTitle) {
         return {
           pageType,
-          // Title-only page → give the artwork the page. A prominent but INTIMATE
-          // close-up plate, distinct from the title page's grand landscape.
+          // The half-title is NOT a title page — it is a full cinematic ENTRANCE
+          // PLATE: the reader's first step into the wilderness before the formal
+          // title page. No typography at all (empty title name → empty hierarchy →
+          // nothing baked); the page is pure illustration.
           layoutTemplate: 'LAYOUT_A_ILLUSTRATION',
-          title: { kicker: '', number: '', name: title.toUpperCase() },
+          title: { kicker: '', number: '', name: '' },
           entryTitle: title,
-          imageSubject: `Half-title plate — an intimate, atmospheric CLOSE-UP naturalist moment, NOT a grand landscape and NOT the title-page scene. Something quiet and restrained such as a bull moose silhouette in morning mist, a spruce branch hung with old-man's-beard lichen, forest-floor ferns and moss with pine cones, or a small wildlife study${subtitle ? ` from the ${subtitle} wilderness` : ''}. Like opening an old expedition journal before the journey begins — premium museum-quality vintage naturalist illustration, cinematic light, generous calm negative space with ONLY the book title set small and refined within it. It should complement the title page, never repeat it.`,
+          imageSubject: `Full-bleed cinematic naturalist ENTRANCE PLATE — the reader's first step into the New England wilderness, before the title page. A complete, immersive scene in the book's Cinematic Naturalist DNA: New England boreal forest atmosphere, ancient white pine and spruce, ferns, moss, and fungi across the forest floor, subtle animal tracks or other signs of wildlife, atmospheric mist and natural light, museum-quality field-guide realism${subtitle ? ` of the ${subtitle} wilderness` : ''}. NO text, NO title, NO labels, NO typography anywhere on the page — pure illustration only. A distinct scene from the title page, not a repeat.`,
           allowsEmptyBody: true,
           renderBodyText: false,
         };
