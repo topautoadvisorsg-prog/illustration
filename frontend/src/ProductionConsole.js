@@ -591,7 +591,9 @@ export default function ProductionConsole({ onExitToLegacy }) {
                         // full-res page images undecoded, so a large book (hundreds of pages)
                         // stays responsive instead of stalling on accumulated image memory.
                         <div key={m.pageId} style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: 8, background: "#fff", contentVisibility: "auto", containIntrinsicSize: "180px 340px" }}>
-                          {m.imagePath ? <img alt={m.pageKey} src={fileUrl(m.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", borderRadius: 4, display: "block" }} /> :<div style={{ height: 110, background: "#f0ead6", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: 11 }}>not rendered</div>}
+                          {m.imagePath
+                            ? <img alt={m.pageKey} src={fileUrl(m.imagePath)} loading="lazy" decoding="async" onClick={() => previewPage(m.pageId, m.imagePath).catch(() => {})} title="Tap to preview" style={{ width: "100%", borderRadius: 4, display: "block", cursor: "pointer" }} />
+                            : <div onClick={() => previewPage(m.pageId, null).catch(() => {})} title="Tap to preview" style={{ height: 110, background: "#f0ead6", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: 11, cursor: "pointer" }}>not rendered</div>}
                           <div style={{ fontSize: 11, marginTop: 6, fontWeight: 700, wordBreak: "break-all" }}>{m.pageKey}</div>
                           <div style={{ marginTop: 4, display: "flex", gap: 5, alignItems: "center" }}>
                             <span style={S.pill(statusColor(m.status))}>{m.status}</span>
@@ -613,14 +615,15 @@ export default function ProductionConsole({ onExitToLegacy }) {
                   // Floating modal overlay — pops up centered over the page regardless
                   // of how far the operator has scrolled the (hundreds-long) page grid.
                   // Click the backdrop or Close to dismiss.
-                  <div onClick={() => setPreview(null)} style={{ position: "fixed", inset: 0, background: "rgba(20,16,8,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9000, padding: 24 }}>
-                    <div onClick={(e) => e.stopPropagation()} style={{ ...S.card, background: C.panel || "#faf6ec", maxWidth: 900, width: "100%", maxHeight: "90vh", overflow: "auto", margin: 0 }}>
+                  <div onClick={() => setPreview(null)} style={{ position: "fixed", inset: 0, background: "rgba(20,16,8,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9000, padding: 10 }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ ...S.card, background: C.panel || "#faf6ec", maxWidth: 760, width: "100%", maxHeight: "94vh", overflow: "auto", margin: 0, padding: 14 }}>
                       <button style={{ ...S.ghost, float: "right", margin: 0 }} onClick={() => setPreview(null)}>Close ✕</button>
                       <b>{preview.authority?.entryTitle}</b> <span style={{ color: C.muted, fontSize: 13 }}>· {preview.authority?.layoutFamilyLabel}</span>
                       {preview._imagePath ? (
                         <div style={{ marginTop: 10 }}>
-                          <div style={{ color: C.muted, fontSize: 13, marginBottom: 6 }}>Rendered page (the version currently on this card):</div>
-                          <img alt={preview.authority?.entryTitle || "page"} src={fileUrl(preview._imagePath)} style={{ width: "100%", maxWidth: 560, border: `1px solid ${C.line}`, borderRadius: 8, display: "block" }} />
+                          {/* Full page image — fills the modal width and tap-to-close, so the
+                              operator can review the whole rendered page on phone or desktop. */}
+                          <img alt={preview.authority?.entryTitle || "page"} src={fileUrl(preview._imagePath)} onClick={() => setPreview(null)} title="Tap to close" style={{ width: "100%", maxWidth: "100%", border: `1px solid ${C.line}`, borderRadius: 8, display: "block", cursor: "zoom-out" }} />
                         </div>
                       ) : null}
                       <div style={{ marginTop: 12, color: C.muted, fontSize: 13 }}>What this page will contain — rendered word-for-word by the AI (no spend yet):</div>
