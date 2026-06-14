@@ -344,9 +344,11 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return { notice: `Rendered ${pending.length} page(s).` };
   });
 
-  const previewPage = (pageId) => run("Building no-spend preview", async () => {
+  const previewPage = (pageId, imagePath) => run("Building no-spend preview", async () => {
     const d = await api(`/api/whole-page-render/page/${pageId}/preview-package`);
-    setPreview(d);
+    // Carry the rendered image (if any) so the modal shows the actual page, not just
+    // the text package — lets the operator SEE a rendered page (e.g. the index) large.
+    setPreview({ ...d, _imagePath: imagePath || null });
     return { notice: `Preview ready for ${d.authority?.entryTitle || pageId} (no spend).` };
   });
 
@@ -596,7 +598,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
                             <span style={{ fontSize: 10, color: C.muted }}>{m.section}</span>
                           </div>
                           <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                            <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => previewPage(m.pageId).catch(() => {})}>Preview</button>
+                            <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => previewPage(m.pageId, m.imagePath).catch(() => {})}>Preview</button>
                             <button style={{ ...S.btn("spend"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderPage(m.pageId).catch(() => {})}>Render</button>
                             {m.status === "RENDERED" && m.renderId && <button style={{ ...S.btn("ok"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => approveForBook(m.renderId).catch(() => {})}>Approve for book</button>}
                             {m.status === "RENDERED" && m.renderId && <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => rejectRender(m.renderId).catch(() => {})}>Reject</button>}
@@ -608,12 +610,23 @@ export default function ProductionConsole({ onExitToLegacy }) {
                   </>
                 )}
                 {preview && (
-                  <div style={S.card}>
-                    <button style={{ ...S.ghost, float: "right", margin: 0 }} onClick={() => setPreview(null)}>Close ✕</button>
-                    <b>{preview.authority?.entryTitle}</b> <span style={{ color: C.muted, fontSize: 13 }}>· {preview.authority?.layoutFamilyLabel}</span>
-                    <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>What this page will contain — rendered word-for-word by the AI (no spend yet):</div>
-                    <div style={{ marginTop: 6, background: "#fff", border: `1px solid ${C.line}`, borderRadius: 6, padding: 14, maxHeight: 320, overflow: "auto", whiteSpace: "pre-wrap", fontFamily: "Georgia,'Times New Roman',serif", fontSize: 13.5, lineHeight: 1.5 }}>
-                      {preview.authority?.sourceText || "(No body text — this page bakes only its title / heading.)"}
+                  // Floating modal overlay — pops up centered over the page regardless
+                  // of how far the operator has scrolled the (hundreds-long) page grid.
+                  // Click the backdrop or Close to dismiss.
+                  <div onClick={() => setPreview(null)} style={{ position: "fixed", inset: 0, background: "rgba(20,16,8,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9000, padding: 24 }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ ...S.card, background: C.panel || "#faf6ec", maxWidth: 900, width: "100%", maxHeight: "90vh", overflow: "auto", margin: 0 }}>
+                      <button style={{ ...S.ghost, float: "right", margin: 0 }} onClick={() => setPreview(null)}>Close ✕</button>
+                      <b>{preview.authority?.entryTitle}</b> <span style={{ color: C.muted, fontSize: 13 }}>· {preview.authority?.layoutFamilyLabel}</span>
+                      {preview._imagePath ? (
+                        <div style={{ marginTop: 10 }}>
+                          <div style={{ color: C.muted, fontSize: 13, marginBottom: 6 }}>Rendered page (the version currently on this card):</div>
+                          <img alt={preview.authority?.entryTitle || "page"} src={fileUrl(preview._imagePath)} style={{ width: "100%", maxWidth: 560, border: `1px solid ${C.line}`, borderRadius: 8, display: "block" }} />
+                        </div>
+                      ) : null}
+                      <div style={{ marginTop: 12, color: C.muted, fontSize: 13 }}>What this page will contain — rendered word-for-word by the AI (no spend yet):</div>
+                      <div style={{ marginTop: 6, background: "#fff", border: `1px solid ${C.line}`, borderRadius: 6, padding: 14, maxHeight: 320, overflow: "auto", whiteSpace: "pre-wrap", fontFamily: "Georgia,'Times New Roman',serif", fontSize: 13.5, lineHeight: 1.5 }}>
+                        {preview.authority?.sourceText || "(No body text — this page bakes only its title / heading.)"}
+                      </div>
                     </div>
                   </div>
                 )}
