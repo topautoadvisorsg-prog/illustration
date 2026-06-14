@@ -85,11 +85,21 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
   const pageRolePolicy = buildPageRolePolicy(pageRow, config);
 
   const entryKey = pageRow.entryKey ?? pageRow.pageKey;
-  const entryMeta = await getEntryMetaByKeys(pageRow.projectId, [entryKey]);
+  const entryMeta = await getEntryMetaByKeys(pageRow.projectId, [entryKey, pageRow.pageKey]);
   const meta = entryMeta.get(entryKey);
+  // A PAGE-specific manifest (keyed by the page's own key, distinct from the shared
+  // entry/opener key) lets a SINGLE continuation carry a distinct study subject — a
+  // different behavioral/anatomical angle — without altering the opener or sibling
+  // continuations. Absent for almost every page, so the shared entry subject is used.
+  const pageOverride = pageRow.pageKey !== entryKey ? entryMeta.get(pageRow.pageKey) : undefined;
   const entryTitle = meta?.entryTitle || pageRolePolicy.entryTitle;
   // Standard v1.1: prefer the clean subject. Warnings live in badges, never here.
-  const imageSubject = meta?.cleanSubject || meta?.imageSubject || pageRolePolicy.imageSubject;
+  const imageSubject =
+    pageOverride?.cleanSubject ||
+    pageOverride?.imageSubject ||
+    meta?.cleanSubject ||
+    meta?.imageSubject ||
+    pageRolePolicy.imageSubject;
   const badgeContext = {
     hazard: meta?.hazard ?? [],
     region: meta?.region ?? 'GENERAL',
