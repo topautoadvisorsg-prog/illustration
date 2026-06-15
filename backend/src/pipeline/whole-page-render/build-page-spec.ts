@@ -17,7 +17,7 @@ import { REFERENCE_TYPOGRAPHY } from '../stage-6-layout/layout-profiles.js';
 import type { PageGeometry } from '../stage-6-layout/page-geometry.js';
 import { deriveSubjectPackage } from '../stage-2-planner/plan-pages.js';
 import { assembleIllustrationDna, toRoman, WILDLANDS_STANDARD } from '../publishing-standard/index.js';
-import { stripReadingFieldMetadata } from '../subject-badges/extract-badges.js';
+import { stripReadingFieldMetadata, extractBinomial } from '../subject-badges/extract-badges.js';
 import { markdownToBlocks, blocksToPlainText } from './markdown-blocks.js';
 import { buildPageRolePolicy, type PageRolePolicy } from './page-role-policy.js';
 import {
@@ -174,6 +174,23 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
             pageType === 'INTERIOR'
             ? [entryTitle.toUpperCase()]
             : [];
+  // Scientific name (binomial) for a species/plant/tree/fungi ENTRY opener. The
+  // manuscript's authoritative `*Genus species* |` HEADER line is stripped from
+  // the body (so the markup never bleeds into prose) and otherwise only survives
+  // as the illustration subject — so the opener title is the one place it must be
+  // re-emitted as visible page text: an italic subtitle under the common name
+  // (R1). Gate on the header line specifically (the leading `*…* |` with a pipe,
+  // the same line stripReadingFieldMetadata removes): a topic page that merely
+  // mentions a binomial in PROSE (e.g. "*Giardia lamblia* is a protozoan…") keeps
+  // it in the body and must NOT get a duplicate subtitle. Concept/section/topic
+  // openers have no header binomial → no subtitle.
+  const firstBodyLine = (pageRow.readingFieldText ?? '').split('\n')[0]?.trim() ?? '';
+  const hasBinomialHeader = /^\*[^*\n]+\*[^|\n]*\|/.test(firstBodyLine);
+  const entryBinomial =
+    pageType === 'INTERIOR' && hasBinomialHeader
+      ? extractBinomial(pageRow.readingFieldText ?? '') ?? undefined
+      : undefined;
+
   const pageTitle =
     pageType === 'CHAPTER_OPENER'
       ? {
@@ -193,7 +210,7 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
           pageType === 'INDEX_ORNAMENT'
         ? policy.title
         : pageType === 'INTERIOR'
-          ? { kicker: '', number: '', name: entryTitle.toUpperCase() }
+          ? { kicker: '', number: '', name: entryTitle.toUpperCase(), scientificName: entryBinomial }
           : { kicker: '', number: '', name: '' };
 
   // Reference pages (glossary/index) use smaller, two-column reference type so

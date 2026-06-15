@@ -132,6 +132,51 @@ describe('stripReadingFieldMetadata — header never renders as prose', () => {
     const body = 'The **White Mountains** are the highest range in the Northeast.';
     expect(stripReadingFieldMetadata(body)).toBe(body);
   });
+
+  // R4 — a deadly look-alike block whose first line is a bold SPECIES NAME that
+  // merely contains a hazard word must NOT be stripped (the Wild Ramps bug).
+  it('keeps a bold look-alike warning paragraph (False Hellebore — R4)', () => {
+    const body =
+      '**False Hellebore / Indian Poke** *(Veratrum viride)* — **DEADLY.** This is the look-alike that kills foragers.\n**Lily of the Valley** *(Convallaria majalis)* — Toxic.\n\n**Edible Parts & Preparation**\nBoth the leaves and the bulb are edible.';
+    const out = stripReadingFieldMetadata(body);
+    expect(out.startsWith('**False Hellebore')).toBe(true);
+    expect(out).toContain('Veratrum viride');
+    expect(out).toContain('Edible Parts & Preparation');
+  });
+
+  // R5 — a fully-bold lead WARNING SENTENCE that contains hazard words must NOT
+  // be stripped (the Hemlock + Black Cherry bug).
+  it('keeps a bold lead-warning sentence (Hemlock — R5)', () => {
+    const body =
+      '**This tree shares a common name with two of the most toxic plants in North America. Eastern hemlock the tree is not poison hemlock or water hemlock.**\n\nThe hemlock grove is the coolest place in the forest.';
+    const out = stripReadingFieldMetadata(body);
+    expect(out.startsWith('**This tree shares')).toBe(true);
+  });
+
+  it('keeps a bold lead-warning sentence (Black Cherry — R5)', () => {
+    const body =
+      '**Read the full entry before handling this tree. The fruit is edible. The leaves, bark, and seeds are toxic.**\n\nThe black cherry rewards complete knowledge.';
+    const out = stripReadingFieldMetadata(body);
+    expect(out.startsWith('**Read the full entry')).toBe(true);
+  });
+
+  // The real badge header (markers only) MUST still be stripped.
+  it('still strips a pure EDIBLE badge line', () => {
+    const out = stripReadingFieldMetadata('**EDIBLE** *(leaves and bulb — with harvest restraint)*\n\nThe first warm week of April.');
+    expect(out.startsWith('The first warm week')).toBe(true);
+  });
+  it('still strips a dual EDIBLE/TOXIC badge line (elderberry)', () => {
+    const out = stripReadingFieldMetadata('**EDIBLE** *(ripe berries only, cooked) / TOXIC (unripe berries, all other parts)*\n\nThe elderberry grows along forest edges.');
+    expect(out.startsWith('The elderberry grows')).toBe(true);
+  });
+  it('still strips an EDIBLE — USE CAUTION badge line (honey mushroom)', () => {
+    const out = stripReadingFieldMetadata('**EDIBLE — USE CAUTION** *(toxic look-alikes; must be fully cooked)*\n\nThe honey mushroom is the most widely distributed.');
+    expect(out.startsWith('The honey mushroom')).toBe(true);
+  });
+  it('still strips a MEDICINAL badge line', () => {
+    const out = stripReadingFieldMetadata('**MEDICINAL** *(field first aid — wound treatment)*\n\nI once watched a hiking companion cut her hand.');
+    expect(out.startsWith('I once watched')).toBe(true);
+  });
 });
 
 describe('extractBadgeMetadata — the five flagged offenders resolve', () => {

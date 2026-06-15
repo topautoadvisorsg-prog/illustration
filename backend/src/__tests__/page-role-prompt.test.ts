@@ -70,6 +70,24 @@ describe('PageRole prompt text policy', () => {
     expect(prompt).toContain('Every entry in this book is tagged'); // body still renders
   });
 
+  it('renders the scientific name as an italic byline under a species opener title (R1)', () => {
+    const spec = makeSpec('INTERIOR');
+    spec.pageText.title = { kicker: '', number: '', name: 'BLACK BEAR', scientificName: 'Ursus americanus' };
+    const prompt = assemblePagePrompt(spec);
+    expect(prompt).toContain('BLACK BEAR');
+    expect(prompt).toContain('Ursus americanus');
+    expect(prompt).toContain('ITALIC');
+    expect(prompt).toContain('scientific name');
+  });
+
+  it('adds no scientific-name byline when the opener has no binomial (concept/section opener)', () => {
+    const spec = makeSpec('INTERIOR');
+    spec.pageText.title = { kicker: '', number: '', name: 'THE FORAGER’S CODE' };
+    const prompt = assemblePagePrompt(spec);
+    expect(prompt).toContain('ENTRY TITLE');
+    expect(prompt).not.toContain('scientific name');
+  });
+
   it('adds no ENTRY TITLE instruction when an interior page has no title (e.g. continuation-style)', () => {
     const spec = makeSpec('INTERIOR');
     spec.pageText.title = { kicker: '', number: '', name: '' };

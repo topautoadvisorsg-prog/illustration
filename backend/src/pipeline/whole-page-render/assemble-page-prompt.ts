@@ -118,8 +118,13 @@ function hardConstraints(spec: WholePageSpec): string {
     );
   }
   if (spec.pageType === 'INTERIOR' && spec.pageText.title.name) {
+    const sci = spec.pageText.title.scientificName;
     lines.push(
-      `- ENTRY TITLE — render "${spec.pageText.title.name}" as the page's engraved section heading across the calm upper title band: stately serif caps in warm sepia ink, paired with a thin engraved rule. The body text begins BELOW it, inside the reading field. Do NOT repeat this title anywhere inside the body.`,
+      `- ENTRY TITLE — render "${spec.pageText.title.name}" as the page's engraved section heading across the calm upper title band: stately serif caps in warm sepia ink, paired with a thin engraved rule.` +
+        (sci
+          ? ` Directly BENEATH the heading (above the engraved rule), render the scientific name "${sci}" as the species byline: a smaller, centered, ITALIC old-style serif line in the same warm sepia ink — clearly subordinate to the heading (roughly half its size), the classic field-guide binomial subtitle. Render it EXACTLY as given, italic, with no asterisks or markup, and do not uppercase it. Do NOT repeat the scientific name anywhere inside the body.`
+          : '') +
+        ` The body text begins BELOW it, inside the reading field. Do NOT repeat this title anywhere inside the body.`,
     );
   }
   lines.push(

@@ -64,7 +64,7 @@ export interface BodyBlockDTO {
 }
 
 export interface PageTextDTO {
-  title: { kicker: string; number: string; name: string };
+  title: { kicker: string; number: string; name: string; scientificName?: string };
   /** Clean plain-text body (markdown stripped) — for source-review + QC. */
   body: string;
   /** Structured blocks the model renders by type — no markdown chars. */

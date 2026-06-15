@@ -50,7 +50,7 @@ Harvest restraint and safety are the first rules of foraging. A field guide shou
 
 Wild ramps are edible spring plants, but harvest pressure matters.
 
-### 2. Water Hemlock
+### 2. Water Hemlock DEADLY
 *Cicuta maculata*
 **TOXIC - DEADLY**
 
@@ -74,7 +74,12 @@ Water hemlock is a deadly plant that resembles edible wetland species.`);
 
     expect(zones?.contentType).toBe('HABITAT_OVERVIEW');
     expect(weather?.contentType).toBe('WARNING_PAGE');
-    expect(moose?.contentType).toBe('WARNING_PAGE');
+    // Title-scoped danger classifier: a numbered ANIMAL entry ("1. Moose") with a
+    // "Danger Level" SECTION is an ANIMAL_PROFILE, not a dedicated WARNING_PAGE —
+    // only DANGER-titled entries (e.g. "Hazard 1 - Extreme Weather", "TOXIC -
+    // DEADLY") become warning pages. This is the same fix that stopped body-keyword
+    // hijacks (Hemlock/Black Cherry). Moose ships as an animal profile.
+    expect(moose?.contentType).toBe('ANIMAL_PROFILE');
     expect(moose?.scientificName).toBe('Alces alces');
     expect(foragersCode?.contentType).toBe('REFERENCE_PAGE');
     expect(ramps?.contentType).toBe('SPECIES_PROFILE');

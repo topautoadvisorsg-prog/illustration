@@ -68,6 +68,25 @@ function referenceCapacityChars(trimSize: { widthIn: number; heightIn: number; b
   return fit.capacityChars;
 }
 
+/**
+ * Column-LINE capacity of a two-column reference page — the real limiter for the
+ * INDEX, where each short entry consumes a whole column line. `usableLines` is
+ * the row count; a reference page renders TWO columns, so the line budget is
+ * `usableLines * 2`. (Char capacity overcounts index entries because each entry
+ * is far shorter than a full prose line — that is what dropped ~26% of the index
+ * off BM_003, R6.)
+ */
+function referenceColumnLineCapacity(trimSize: { widthIn: number; heightIn: number; bleedIn: number }): number {
+  const fit = analyzeTextFit({
+    bodyMarkdown: '',
+    layoutTemplate: 'LAYOUT_REFERENCE',
+    geometry: computePageGeometry(trimSize),
+    bodyPt: REFERENCE_TYPOGRAPHY.bodyPt,
+    lineHeight: REFERENCE_TYPOGRAPHY.lineHeight,
+  });
+  return Math.max(2, fit.usableLines * 2);
+}
+
 /** Pack paragraph strings into reference pages by the shared capacity. Targets
  *  ~95% fill — dense like a real field-guide glossary, with just enough margin
  *  that the render never overflows. We do NOT inflate page count with slack. */
@@ -90,14 +109,24 @@ function splitReferenceParagraphs(paragraphs: string[], capacityChars: number): 
   return pages.length > 0 ? pages : [[]];
 }
 
-/** Same packing for structured index entries (cost = "Title … 12" line). */
-function splitReferenceIndex(entries: TocEntry[], capacityChars: number): TocEntry[][] {
-  const budget = Math.max(1, Math.floor(capacityChars * 0.95));
+/**
+ * LINE-AWARE packing for structured index entries. An index entry occupies a
+ * whole COLUMN line (it wraps to more lines only if its title exceeds the column
+ * measure), so the limiter is column-LINES, not characters. Costing entries by
+ * raw character length (as prose) overpacked a two-column reference page and
+ * silently dropped ~26% of the index off the rendered BM_003 page (R6). We pack
+ * by column lines against `maxColumnLines` (= usableLines × 2) with a small
+ * safety margin — add a page rather than cram.
+ */
+function splitReferenceIndex(entries: TocEntry[], maxColumnLines: number): TocEntry[][] {
+  const budget = Math.max(1, Math.floor(maxColumnLines * 0.95));
+  const measure = REFERENCE_TYPOGRAPHY.measureChars; // chars per column line
   const pages: TocEntry[][] = [];
   let current: TocEntry[] = [];
   let used = 0;
   for (const entry of entries) {
-    const cost = entry.title.length + String(entry.pageNumber).length + 6;
+    const rawLen = entry.title.length + String(entry.pageNumber).length + 6;
+    const cost = Math.max(1, Math.ceil(rawLen / measure)); // column lines this entry needs
     if (used + cost > budget && current.length > 0) {
       pages.push(current);
       current = [];
@@ -432,7 +461,8 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   }
 
   if (indexEntries.length > 0) {
-    const indexPages = splitReferenceIndex(indexEntries, refCapacityChars);
+    // The index is limited by column LINES, not characters (each entry is a line).
+    const indexPages = splitReferenceIndex(indexEntries, referenceColumnLineCapacity(geometry.trimSize));
     indexPages.forEach((entries, i) => {
       pushBack(
         {
