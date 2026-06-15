@@ -99,12 +99,16 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [cover, setCover] = useState(null);
   const [assembly, setAssembly] = useState(null);
   const [status, setStatus] = useState({}); // real backend progress for the step checkmarks
+  const [authed, setAuthed] = useState(false); // shared-password gate
+  const [authReady, setAuthReady] = useState(false); // initial stored-password check done
 
   const api = useCallback(async (path, options = {}) => {
+    const pw = sessionStorage.getItem("wl_pw") || "";
     const res = await fetch(`${BACKEND}${path}`, {
       ...options,
-      headers: { ...(options.body != null ? { "Content-Type": "application/json" } : {}), ...(options.headers || {}) },
+      headers: { ...(options.body != null ? { "Content-Type": "application/json" } : {}), ...(pw ? { Authorization: `Bearer ${pw}` } : {}), ...(options.headers || {}) },
     });
+    if (res.status === 401) { sessionStorage.removeItem("wl_pw"); setAuthed(false); throw new Error("Login required."); }
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
@@ -112,7 +116,34 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return data;
   }, []);
 
-  const fileUrl = useCallback((p) => `${BACKEND}/api/whole-page-render/file?path=${encodeURIComponent(p)}`, []);
+  // Append the shared key as a query param so <img>/<iframe>/PDF loads (which
+  // can't send an Authorization header) pass the gate too.
+  const fileUrl = useCallback((p) => { const pw = sessionStorage.getItem("wl_pw") || ""; return `${BACKEND}/api/whole-page-render/file?path=${encodeURIComponent(p)}${pw ? `&k=${encodeURIComponent(pw)}` : ""}`; }, []);
+
+  // Validate a candidate password against a protected endpoint (any non-401 = ok).
+  const checkAuth = useCallback(async (candidate) => {
+    try {
+      const res = await fetch(`${BACKEND}/api/projects`, { headers: { Authorization: `Bearer ${candidate}` } });
+      return res.status !== 401;
+    } catch { return false; }
+  }, []);
+
+  const doLogin = useCallback(async (candidate) => {
+    const ok = await checkAuth(candidate);
+    if (!ok) throw new Error("Wrong password.");
+    sessionStorage.setItem("wl_pw", candidate);
+    setAuthed(true);
+  }, [checkAuth]);
+
+  // On load, accept a previously-entered password from this browser session.
+  useEffect(() => {
+    const stored = sessionStorage.getItem("wl_pw");
+    if (!stored) { setAuthReady(true); return; }
+    checkAuth(stored).then((ok) => {
+      if (ok) setAuthed(true); else sessionStorage.removeItem("wl_pw");
+      setAuthReady(true);
+    });
+  }, [checkAuth]);
 
   const run = useCallback(async (label, fn) => {
     setBusy(label); setError(""); setNotice("");
@@ -128,7 +159,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return { notice: `${list.length} project(s).` };
   }), [api, run]);
 
-  useEffect(() => { loadProjects().catch(() => {}); }, [loadProjects]);
+  useEffect(() => { if (authed) loadProjects().catch(() => {}); }, [authed, loadProjects]);
 
   // Step checkmarks reflect the project's REAL state (not just what was clicked
   // this session): manifests => breakdown, CH pages => paginate, FM/BM pages =>
@@ -409,6 +440,9 @@ export default function ProductionConsole({ onExitToLegacy }) {
     cover: !!cover,
     assemble: !!assembly && !assembly.blocked,
   }), [project, status, breakdown, pagination, matter, renders, cover, assembly]);
+
+  if (!authReady) return null; // brief: checking a stored password
+  if (!authed) return <LoginScreen onLogin={doLogin} />;
 
   return (
     <div style={S.shell}>
@@ -865,6 +899,27 @@ function ZoomModal({ page, trim, onClose }) {
   );
 }
 
+function LoginScreen({ onLogin }) {
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setErr(""); setBusy(true);
+    try { await onLogin(pw.trim()); } catch (e2) { setErr(e2.message || "Login failed."); } finally { setBusy(false); }
+  };
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f0ead6", padding: 20 }}>
+      <form onSubmit={submit} style={{ ...S.card, maxWidth: 360, width: "100%", textAlign: "center", margin: 0 }}>
+        <div style={{ fontWeight: 800, fontSize: 19 }}>Wild Lands</div>
+        <div style={{ color: C.muted, fontSize: 13, marginTop: 4, marginBottom: 16 }}>Operator Production Console — enter the access password.</div>
+        <input type="password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Password" style={{ ...S.input, textAlign: "center" }} />
+        {err && <div style={{ color: C.red, fontSize: 13, marginTop: 8 }}>{err}</div>}
+        <button type="submit" disabled={busy || !pw.trim()} style={{ ...S.btn(), marginTop: 14, width: "100%", opacity: busy || !pw.trim() ? 0.6 : 1 }}>{busy ? "Checking…" : "Enter"}</button>
+      </form>
+    </div>
+  );
+}
 function Panel({ title, sub, children }) {
   return (<div><h1 style={S.h1}>{title}</h1><p style={S.sub}>{sub}</p>{children}</div>);
 }

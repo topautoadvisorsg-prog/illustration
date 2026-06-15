@@ -35,9 +35,35 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   await app.register(cors, {
     origin: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
     // Expose render headers so the browser can read page counts on the PDF responses.
     exposedHeaders: ['x-total-pages', 'x-page-count', 'x-preflight-passed'],
   });
+
+  // Simple single-shared-password gate. When CONSOLE_PASSWORD is set, every
+  // request must present it — either as `Authorization: Bearer <pw>` (API/fetch)
+  // or as a `?k=<pw>` query param (so <img>/<iframe>/PDF loads work without
+  // custom headers). `/health` and the API docs stay open. CORS preflight
+  // (OPTIONS) is never blocked. When the env var is unset the gate is disabled
+  // (local/dev), and we log a clear warning so production never runs open by
+  // accident. No user accounts — the goal is only to keep casual visitors out.
+  const consolePassword = (process.env.CONSOLE_PASSWORD || '').trim();
+  if (consolePassword) {
+    app.addHook('onRequest', async (req, reply) => {
+      if (req.method === 'OPTIONS') return; // let CORS preflight through
+      const path = req.url.split('?')[0] ?? '';
+      if (path === '/health' || path === '/' || path.startsWith('/api/docs')) return;
+      const auth = req.headers['authorization'];
+      const headerKey = typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
+      const q = req.query as Record<string, unknown> | undefined;
+      const queryKey = typeof q?.k === 'string' ? q.k : undefined;
+      if (headerKey === consolePassword || queryKey === consolePassword) return;
+      reply.code(401).send({ error: 'unauthorized' });
+    });
+  } else {
+    app.log.warn('CONSOLE_PASSWORD is not set — the API is OPEN (no access gate).');
+  }
+
   await app.register(sensible);
   await app.register(swagger, {
     openapi: {
