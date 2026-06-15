@@ -52,10 +52,12 @@ const STEPS = [
   { key: "setup", label: "3 · Book Setup", purpose: "Title, author, edition, trim." },
   { key: "breakdown", label: "4 · Breakdown", purpose: "Split into chapters & entries." },
   { key: "paginate", label: "5 · Paginate", purpose: "Flow the body into pages." },
-  { key: "matter", label: "6 · Front & Back Matter", purpose: "Title, copyright, TOC, glossary, index." },
-  { key: "render", label: "7 · Render Pages", purpose: "Whole-page AI render + review." },
-  { key: "cover", label: "8 · Cover", purpose: "Generate the full-wrap cover." },
-  { key: "assemble", label: "9 · Assemble & Export", purpose: "Build the interior PDF." },
+  // STRUCTURAL build step — re-running rebuilds FM/BM rows and discards their
+  // renders. The panel marks it clearly and requires confirmation. Reviewing &
+  // rendering the resulting pages happens in Step 7.
+  { key: "matter", label: "6 · Build Front/Back Matter", purpose: "BUILD step: makes title, copyright, TOC, glossary, index. Review & render them in Step 7." },
+  { key: "render", label: "7 · Render & Review", purpose: "Front cover, every interior page, then back cover + spine — render & approve, front to back." },
+  { key: "assemble", label: "8 · Build Book", purpose: "Assemble approved pages + cover into print-ready files (300+ DPI)." },
 ];
 
 function statusColor(s) {
@@ -383,7 +385,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
   const assemble = () => run("Assembling the finished book", async () => {
     const d = await api(`/api/whole-page-render/project/${project.id}/assemble`, { method: "POST", body: "{}" });
-    if (d.blocked) { setAssembly(d); return { notice: d.coverStale ? "Export blocked — the cover is out of date for the current page count. Regenerate it in Step 8." : "Assembly blocked — finish the pages listed below, then assemble again." }; }
+    if (d.blocked) { setAssembly(d); return { notice: d.coverStale ? "Export blocked — the cover is out of date for the current page count. Regenerate it in Step 7 · Render & Review (Back Cover + Spine)." : "Assembly blocked — finish the pages listed below, then build again." }; }
     // A printer-complete export is interior PDF + the separate full-wrap cover PDF
     // (spine sized to the final page count). Produce both here so the operator
     // leaves this step with everything the printer needs.
@@ -391,9 +393,9 @@ export default function ProductionConsole({ onExitToLegacy }) {
     try {
       const c = await api(`/api/projects/${project.id}/render-cover?format=json`, { method: "POST", body: "{}" });
       coverPdfPath = c.storedPath || null;
-    } catch { /* cover PDF needs the cover artwork (step 8); interior is still valid without it */ }
+    } catch { /* cover PDF needs the cover artwork (Step 7 · Render & Review); interior is still valid without it */ }
     setAssembly({ ...d, coverPdfPath });
-    return { notice: coverPdfPath ? `Book assembled: ${d.assembledPages} pages + print cover.` : `Interior assembled: ${d.assembledPages} pages. Generate the cover (step 8) for a complete print package.` };
+    return { notice: coverPdfPath ? `Book built: ${d.assembledPages} pages + print cover.` : `Interior built: ${d.assembledPages} pages. Generate the cover in Step 7 · Render & Review for a complete print package.` };
   });
 
   const doneFlags = useMemo(() => ({
@@ -415,8 +417,11 @@ export default function ProductionConsole({ onExitToLegacy }) {
         <div style={{ color: C.muted, fontSize: 12, marginBottom: 16 }}>Operator Production Console</div>
         {STEPS.map((st) => (
           <div key={st.key} style={S.step(step === st.key, doneFlags[st.key])} onClick={() => setStep(st.key)}>
-            <span style={S.dot(doneFlags[st.key])}>{doneFlags[st.key] ? "✓" : ""}</span>
-            <span>{st.label}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={S.dot(doneFlags[st.key])}>{doneFlags[st.key] ? "✓" : ""}</span>
+              <span>{st.label}</span>
+            </div>
+            {st.purpose && <div style={{ fontSize: 11, color: C.muted, marginLeft: 24, marginTop: 3, lineHeight: 1.3 }}>{st.purpose}</div>}
           </div>
         ))}
         <div style={{ marginTop: 22, paddingTop: 14, borderTop: `1px solid ${C.line}`, fontSize: 12, color: C.muted }}>
@@ -563,18 +568,50 @@ export default function ProductionConsole({ onExitToLegacy }) {
         )}
 
         {step === "matter" && (
-          <StepRun title="Front & Back Matter" sub="Generate title, copyright, contents (TOC from real page numbers), glossary, index, sources, about-author. Reference sections are AI-rendered; others composed deterministically. No spend here."
-            project={project} setStep={setStep} actionLabel="Generate front & back matter" onRun={() => doMatter()} result={matter && (
-              <div>
-                <div><b>Front:</b> {(matter.frontPages || []).map((p) => p.kind).join(", ")}</div>
-                <div style={{ marginTop: 6 }}><b>Back:</b> {(matter.backPages || []).map((p) => p.kind).join(", ")}</div>
-                {(matter.omitted || []).length > 0 && <div style={{ marginTop: 6, color: C.muted }}>Omitted: {matter.omitted.map((o) => o.page).join(", ")}</div>}
-              </div>
-            )} />
+          <Panel title="Build Front / Back Matter" sub="This BUILDS the structural pages — title, copyright, contents (TOC), glossary, index, sources, about. No render spend here.">
+            <Guard project={project} setStep={setStep} />
+            {project && (
+              <>
+                {/* REVIEW — the safe, non-destructive place to look at FM/BM. */}
+                <div style={S.card}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Review front &amp; back matter</div>
+                  <div style={{ color: C.muted, fontSize: 13 }}>
+                    Once built, the title, copyright, contents, glossary, index and about pages are rendered and reviewed alongside the body in <b>Step 7 · Render &amp; Review</b>. That is the safe place to view and approve them — opening this step does nothing to them.
+                  </div>
+                  <button style={{ ...S.btn(), marginTop: 10 }} onClick={() => setStep("render")}>Go to Step 7 · Render &amp; Review →</button>
+                  {matter && (
+                    <div style={{ marginTop: 12, fontSize: 13 }}>
+                      <div><b>Front:</b> {(matter.frontPages || []).map((p) => p.kind).join(", ")}</div>
+                      <div style={{ marginTop: 6 }}><b>Back:</b> {(matter.backPages || []).map((p) => p.kind).join(", ")}</div>
+                      {(matter.omitted || []).length > 0 && <div style={{ marginTop: 6, color: C.muted }}>Omitted: {matter.omitted.map((o) => o.page).join(", ")}</div>}
+                    </div>
+                  )}
+                </div>
+                {/* BUILD / REBUILD — structural + destructive, behind a confirm. */}
+                <div style={{ ...S.card, borderColor: C.red }}>
+                  <div style={{ fontWeight: 700, color: C.red }}>⚠ Build / Rebuild (structural — discards FM/BM renders)</div>
+                  <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>
+                    This regenerates every front &amp; back-matter page from the manuscript + book setup. It <b>deletes and recreates those page rows</b>, so any front/back-matter pages you already rendered or approved are <b>discarded and must be re-rendered</b>. Body chapter pages are never affected. Use it for the first build, or after you change the manuscript or book setup.
+                  </div>
+                  <button
+                    style={{ ...S.btn(), marginTop: 10, background: C.red, color: "#fff", borderColor: C.red }}
+                    onClick={() => {
+                      const ok = window.confirm(
+                        "Build / rebuild front & back matter?\n\nThis DELETES and recreates all front/back-matter pages (title, copyright, contents, glossary, index, about). Any FM/BM renders you've already made will be DISCARDED and must be re-rendered. Body chapter pages are NOT affected.\n\nOK = rebuild   ·   Cancel = keep current pages."
+                      );
+                      if (ok) doMatter().catch(() => {});
+                    }}
+                  >
+                    Build / Rebuild front &amp; back matter…
+                  </button>
+                </div>
+              </>
+            )}
+          </Panel>
         )}
 
         {step === "render" && (
-          <Panel title="Render Pages" sub="Each page is rendered as one finished, text-baked image by the whole-page AI pipeline. Preview is free; rendering costs spend.">
+          <Panel title="Render & Review" sub="The whole book front-to-back: the FRONT COVER first, then every interior page (front matter → body → back matter), then the BACK COVER + SPINE. Preview is free; rendering costs spend.">
             <Guard project={project} setStep={setStep} />
             {project && (
               <>
@@ -582,6 +619,19 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 {renders?.merged && (
                   <button style={{ ...S.btn("spend"), fontSize: 13 }} onClick={() => { if (window.confirm(`Render all ${renders.merged.filter((m) => m.status === "NOT RENDERED").length} not-yet-rendered page(s)? This costs spend.`)) renderAll(() => true).catch(() => {}); }}>Render all pending →</button>
                 )}
+                {/* FRONT COVER — first item in the front-to-back review roster. */}
+                <div style={{ ...S.card, marginTop: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                    <div style={{ fontWeight: 800, fontSize: 15 }}>Front Cover</div>
+                    <button style={{ ...S.btn("spend"), margin: 0, fontSize: 12 }} onClick={() => genCover().catch(() => {})}>{cover ? "Regenerate cover →" : "Generate cover →"}</button>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>The front of the full-wrap cover (right side of the printed wrap). Front cover, spine and back cover are one continuous image — generating updates all three.</div>
+                  {cover?.imagePath
+                    ? <div style={{ marginTop: 10, width: "100%", maxWidth: 300, aspectRatio: "7 / 10", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 8, background: "#000" }}>
+                        <img alt="Front cover" src={fileUrl(cover.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "100% 50%", display: "block" }} />
+                      </div>
+                    : <div style={{ marginTop: 10, color: C.muted, fontSize: 12 }}>No cover generated yet.</div>}
+                </div>
                 {renders?.merged && (
                   <>
                     <div style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{renders.merged.length} pages · {renders.merged.filter((m) => m.status !== "NOT RENDERED").length} rendered · {renders.bookReady || 0} book-ready</div>
@@ -611,6 +661,19 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     </div>
                   </>
                 )}
+                {/* BACK COVER + SPINE — last item in the front-to-back review roster. */}
+                <div style={{ ...S.card, marginTop: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                    <div style={{ fontWeight: 800, fontSize: 15 }}>Back Cover + Spine</div>
+                    <button style={{ ...S.btn("spend"), margin: 0, fontSize: 12 }} onClick={() => genCover().catch(() => {})}>{cover ? "Regenerate cover →" : "Generate cover →"}</button>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>The back cover and spine (left side of the full-wrap){cover?.pageCount ? ` — spine sized for ${cover.pageCount} interior pages` : ""}. Generated together with the front cover as one continuous wrap.</div>
+                  {cover?.imagePath
+                    ? <div style={{ marginTop: 10, width: "100%", maxWidth: 460, aspectRatio: "13 / 10", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 8, background: "#000" }}>
+                        <img alt="Back cover and spine" src={fileUrl(cover.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "0% 50%", display: "block" }} />
+                      </div>
+                    : <div style={{ marginTop: 10, color: C.muted, fontSize: 12 }}>No cover generated yet.</div>}
+                </div>
                 {preview && (
                   // Floating modal overlay — pops up centered over the page regardless
                   // of how far the operator has scrolled the (hundreds-long) page grid.
@@ -638,31 +701,12 @@ export default function ProductionConsole({ onExitToLegacy }) {
           </Panel>
         )}
 
-        {step === "cover" && (
-          <Panel title="Cover" sub="The cover is a SEPARATE full-wrap file (back + spine + front), not an interior page. It gets its own dedicated prompt.">
-            <Guard project={project} setStep={setStep} />
-            {project && (
-              <div style={S.card}>
-                <button style={S.btn("spend")} onClick={() => genCover().catch(() => {})}>Generate cover artwork →</button>
-                {cover && (
-                  <div style={{ marginTop: 12 }}>
-                    {cover.imagePath && <img alt="cover" src={fileUrl(cover.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", maxWidth: 540, border: `1px solid ${C.line}`, borderRadius: 8, display: "block" }} />}
-                    <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>
-                      Full-wrap cover (back · spine · front){cover.pageCount ? ` — spine sized for ${cover.pageCount} interior pages` : ""}.
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </Panel>
-        )}
-
         {step === "assemble" && (
-          <Panel title="Assemble & Export" sub="Merge every book-ready (approved + print-prepped) page into the interior PDF in spine order. Assembly blocks if anything is missing or fails preflight.">
+          <Panel title="Build Book" sub="Merge every book-ready (approved + print-prepped) page into the interior PDF in spine order, and produce the full-wrap cover PDF (spine sized to the final page count). Blocks if anything is missing or fails preflight.">
             <Guard project={project} setStep={setStep} />
             {project && (
               <div style={S.card}>
-                <button style={S.btn()} onClick={() => assemble().catch(() => {})}>Assemble interior PDF →</button>
+                <button style={S.btn()} onClick={() => assemble().catch(() => {})}>Build book →</button>
                 {assembly && (
                   <div style={{ marginTop: 12 }}>
                     <span style={S.pill(assembly.blocked ? C.red : C.green)}>{assembly.blocked ? "NOT READY" : "ASSEMBLED"}</span>
@@ -672,7 +716,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
                         <div style={{ marginTop: 8, marginBottom: 4, color: assembly.coverPdfPath ? C.muted : C.red, fontSize: 13 }}>
                           {assembly.coverPdfPath
                             ? "Print package ready: interior PDF + full-wrap cover PDF — both files below are what the printer needs."
-                            : "Interior is ready, but there's no cover PDF yet. Generate the cover in step 8, then assemble again for the complete print package."}
+                            : "Interior is ready, but there's no cover PDF yet. Generate the cover in Step 7 · Render & Review, then build again for the complete print package."}
                         </div>
                         {assembly.interiorPdfPath && (
                           <>
@@ -692,7 +736,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
                             <div style={{ marginTop: 4 }}>
                               The interior page count changed{assembly.coverBuiltForPageCount != null ? ` (the cover spine was built for ${assembly.coverBuiltForPageCount} pages; the interior is now ${assembly.finalPageCount})` : ""} and the spine width may be incorrect. Regenerate the cover before exporting.
                             </div>
-                            <button style={{ ...S.btn(), marginTop: 8 }} onClick={() => setStep("cover")}>Go to Cover (Step 8) →</button>
+                            <button style={{ ...S.btn(), marginTop: 8 }} onClick={() => setStep("render")}>Go to the cover (Step 7 · Render &amp; Review) →</button>
                           </div>
                         )}
                         {((assembly.missing || []).length > 0 || (assembly.preflightFailures || []).length > 0 || (assembly.noPrintOutput || []).length > 0) && (
