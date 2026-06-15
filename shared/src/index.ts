@@ -525,6 +525,14 @@ export const PublishingMetadataSchema = z.object({
   aiIntroduction: z.object({ enabled: z.boolean().default(false) }).default({ enabled: false }),
   /** Front-cover descriptive line (e.g. "A Field Guide to ..."). Data-driven, per book. */
   coverDescription: z.string().optional(),
+  /**
+   * Operator art-direction for the full-wrap cover SCENE (back · spine · front).
+   * When set, it replaces the generic "establishing scene evoked by the title"
+   * so the cover can be a specific, premium, curated wrap (e.g. a hero animal on
+   * the front, a secondary animal on the back, a panorama between). Typography is
+   * still driven by the title/author/series fields, not this text.
+   */
+  coverArtDirection: z.string().optional(),
   coverAssetPath: z.string().optional(),
   // Cover/interior synchronization record (Phase 0 production gate). Captured
   // when the cover ARTWORK is generated — the spine width is baked into the art

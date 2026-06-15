@@ -609,6 +609,7 @@ export function buildCoverWrapPrompt(
   // book's subtitle/region + cover description; the series line is the single
   // source of truth from buildSeriesLine().
   const coverDescription = config.publishing.coverDescription ?? '';
+  const coverArtDirection = (config.publishing.coverArtDirection ?? '').trim();
   const seriesLine = buildSeriesLine(config.publishing.series?.name, config.volume) ?? undefined;
   const sceneSubject = subtitle || title;
   const frontPanelXIn = config.trimSize.bleedIn + config.trimSize.widthIn + dims.spineIn;
@@ -645,17 +646,33 @@ export function buildCoverWrapPrompt(
     },
     illustrationDNA: {
       masterStyleBlock: assembleIllustrationDna(),
-      subject: {
-        primary: `Full-wrap cover artwork: a cinematic establishing scene evoking ${sceneSubject}${coverDescription ? ` (${coverDescription})` : ''}, as one continuous full-bleed composition across back cover, spine, and front cover.`,
-        supporting: [
-          `front cover: cinematic establishing view of the setting evoked by "${sceneSubject}", with depth and atmosphere`,
-          'spine: quiet continuous texture with low visual contrast',
-          'back cover: restrained atmosphere of the same setting that supports readable copy',
-          backCover?.mainDescription ? `back-cover copy context: ${backCover.mainDescription}` : 'back-cover copy context: no back-cover copy supplied yet',
-        ],
-        environment: `setting evoked by "${sceneSubject}"${coverDescription ? `: ${coverDescription}` : ''}; archival painterly naturalist atmosphere; continuous wrap composition`,
-        mood: 'premium, cinematic, atmospheric, calm enough for system typography',
-      },
+      // Operator cover art-direction (when supplied) drives a specific, curated
+      // wrap scene; otherwise fall back to a generic establishing scene evoked by
+      // the title. Either way it stays ONE continuous full-bleed wrap with calm
+      // zones for the system-set typography + barcode.
+      subject: coverArtDirection
+        ? {
+            primary: `Full-wrap cover artwork as ONE continuous full-bleed composition across back cover, spine, and front cover. ${coverArtDirection}`,
+            supporting: [
+              'front cover (right panel): the hero/focal subject of the art-direction, with depth and atmosphere; calm sky/space above for the title',
+              'spine: the scene continues unbroken as a quiet vertical strip with low visual contrast',
+              'back cover (left panel): the same scene continuing, calmer, with restrained negative space for back-cover copy and a clean lower-right barcode zone',
+              backCover?.mainDescription ? `back-cover copy context: ${backCover.mainDescription}` : 'back-cover copy context: no back-cover copy supplied yet',
+            ],
+            environment: 'a single continuous New England wilderness panorama wrapping back-to-front; archival painterly naturalist atmosphere; the Cinematic Naturalist DNA of the interior plates, scaled up to a premium collector cover — never a flat poster or graphic design',
+            mood: 'premium, cinematic, atmospheric, cohesive, calm enough for system typography',
+          }
+        : {
+            primary: `Full-wrap cover artwork: a cinematic establishing scene evoking ${sceneSubject}${coverDescription ? ` (${coverDescription})` : ''}, as one continuous full-bleed composition across back cover, spine, and front cover.`,
+            supporting: [
+              `front cover: cinematic establishing view of the setting evoked by "${sceneSubject}", with depth and atmosphere`,
+              'spine: quiet continuous texture with low visual contrast',
+              'back cover: restrained atmosphere of the same setting that supports readable copy',
+              backCover?.mainDescription ? `back-cover copy context: ${backCover.mainDescription}` : 'back-cover copy context: no back-cover copy supplied yet',
+            ],
+            environment: `setting evoked by "${sceneSubject}"${coverDescription ? `: ${coverDescription}` : ''}; archival painterly naturalist atmosphere; continuous wrap composition`,
+            mood: 'premium, cinematic, atmospheric, calm enough for system typography',
+          },
     },
     pageText: {
       title: { kicker: subtitle, number: '', name: title.toUpperCase() },

@@ -56,7 +56,7 @@ const STEPS = [
   // renders. The panel marks it clearly and requires confirmation. Reviewing &
   // rendering the resulting pages happens in Step 7.
   { key: "matter", label: "6 · Build Front/Back Matter", purpose: "BUILD step: makes title, copyright, TOC, glossary, index. Review & render them in Step 7." },
-  { key: "render", label: "7 · Render & Review", purpose: "Front cover, every interior page, then back cover + spine — render & approve, front to back." },
+  { key: "render", label: "7 · Render & Review", purpose: "The cover (one full wrap) plus every interior page: render, review and approve." },
   { key: "assemble", label: "8 · Build Book", purpose: "Assemble approved pages + cover into print-ready files (300+ DPI)." },
 ];
 
@@ -416,7 +416,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
   const assemble = () => run("Assembling the finished book", async () => {
     const d = await api(`/api/whole-page-render/project/${project.id}/assemble`, { method: "POST", body: "{}" });
-    if (d.blocked) { setAssembly(d); return { notice: d.coverStale ? "Export blocked — the cover is out of date for the current page count. Regenerate it in Step 7 · Render & Review (Back Cover + Spine)." : "Assembly blocked — finish the pages listed below, then build again." }; }
+    if (d.blocked) { setAssembly(d); return { notice: d.coverStale ? "Export blocked — the cover is out of date for the current page count. Regenerate it in Step 7 · Render & Review (the Cover card at the top)." : "Assembly blocked — finish the pages listed below, then build again." }; }
     // A printer-complete export is interior PDF + the separate full-wrap cover PDF
     // (spine sized to the final page count). Produce both here so the operator
     // leaves this step with everything the printer needs.
@@ -645,7 +645,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
         )}
 
         {step === "render" && (
-          <Panel title="Render & Review" sub="The whole book front-to-back: the FRONT COVER first, then every interior page (front matter → body → back matter), then the BACK COVER + SPINE. Preview is free; rendering costs spend.">
+          <Panel title="Render & Review" sub="The cover sits at the top as one full wrap (back, spine, front), then every interior page (front matter, body, back matter) below. Preview is free; rendering costs spend.">
             <Guard project={project} setStep={setStep} />
             {project && (
               <>
@@ -653,17 +653,35 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 {renders?.merged && (
                   <button style={{ ...S.btn("spend"), fontSize: 13 }} onClick={() => { if (window.confirm(`Render all ${renders.merged.filter((m) => m.status === "NOT RENDERED").length} not-yet-rendered page(s)? This costs spend.`)) renderAll(() => true).catch(() => {}); }}>Render all pending →</button>
                 )}
-                {/* FRONT COVER — first item in the front-to-back review roster. */}
+                {/* COVER — ONE full-wrap file (back | spine | front). One generate action, at the top. */}
                 <div style={{ ...S.card, marginTop: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                    <div style={{ fontWeight: 800, fontSize: 15 }}>Front Cover</div>
-                    <button style={{ ...S.btn("spend"), margin: 0, fontSize: 12 }} onClick={() => genCover().catch(() => {})}>{cover ? "Regenerate cover →" : "Generate cover →"}</button>
+                    <div style={{ fontWeight: 800, fontSize: 15 }}>Cover (full wrap: back | spine | front)</div>
+                    <button style={{ ...S.btn("spend"), margin: 0, fontSize: 12 }} onClick={() => genCover().catch(() => {})}>{cover ? "Regenerate cover" : "Generate cover"}</button>
                   </div>
-                  <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>The front of the full-wrap cover (right side of the printed wrap). Front cover, spine and back cover are one continuous image — generating updates all three.</div>
+                  <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>One continuous full-bleed image: back cover, spine, and front cover together{cover?.pageCount ? `; spine sized for ${cover.pageCount} interior pages` : ""}. It is a single file, so there is just one generate.</div>
                   {cover?.imagePath
-                    ? <div style={{ marginTop: 10, width: "100%", maxWidth: 300, aspectRatio: "7 / 10", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 8, background: "#000" }}>
-                        <img alt="Front cover" src={fileUrl(cover.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "100% 50%", display: "block" }} />
-                      </div>
+                    ? (
+                      <>
+                        <div style={{ marginTop: 10, width: "100%", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 8, background: "#000" }}>
+                          <img alt="Full wrap cover" src={fileUrl(cover.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", display: "block" }} />
+                        </div>
+                        <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+                          <div>
+                            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Front cover</div>
+                            <div style={{ width: 150, aspectRatio: "7 / 10", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 6, background: "#000" }}>
+                              <img alt="Front cover" src={fileUrl(cover.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "100% 50%", display: "block" }} />
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Back cover + spine</div>
+                            <div style={{ width: 230, aspectRatio: "13 / 10", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 6, background: "#000" }}>
+                              <img alt="Back cover and spine" src={fileUrl(cover.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "0% 50%", display: "block" }} />
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )
                     : <div style={{ marginTop: 10, color: C.muted, fontSize: 12 }}>No cover generated yet.</div>}
                 </div>
                 {renders?.merged && (
@@ -695,19 +713,6 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     </div>
                   </>
                 )}
-                {/* BACK COVER + SPINE — last item in the front-to-back review roster. */}
-                <div style={{ ...S.card, marginTop: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                    <div style={{ fontWeight: 800, fontSize: 15 }}>Back Cover + Spine</div>
-                    <button style={{ ...S.btn("spend"), margin: 0, fontSize: 12 }} onClick={() => genCover().catch(() => {})}>{cover ? "Regenerate cover →" : "Generate cover →"}</button>
-                  </div>
-                  <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>The back cover and spine (left side of the full-wrap){cover?.pageCount ? ` — spine sized for ${cover.pageCount} interior pages` : ""}. Generated together with the front cover as one continuous wrap.</div>
-                  {cover?.imagePath
-                    ? <div style={{ marginTop: 10, width: "100%", maxWidth: 460, aspectRatio: "13 / 10", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 8, background: "#000" }}>
-                        <img alt="Back cover and spine" src={fileUrl(cover.imagePath)} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "0% 50%", display: "block" }} />
-                      </div>
-                    : <div style={{ marginTop: 10, color: C.muted, fontSize: 12 }}>No cover generated yet.</div>}
-                </div>
                 {preview && (
                   // Floating modal overlay — pops up centered over the page regardless
                   // of how far the operator has scrolled the (hundreds-long) page grid.
