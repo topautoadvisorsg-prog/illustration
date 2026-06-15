@@ -372,7 +372,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
     // pageKey alone put "BM_" before "CH_" before "FM_" — glossary first, title last.
     const sectionRank = (k) => (k.startsWith("FM_") ? 0 : k.startsWith("BM_") ? 2 : 1);
     const merged = rosterPages
-      .map((p) => { const r = byPage.get(p.id) || null; return { pageId: p.id, pageKey: p.pageKey, plannedPageNumber: p.plannedPageNumber ?? 0, section: section(p.pageKey), entryTitle: p.entryTitle, status: r ? r.status : "NOT RENDERED", imagePath: r ? r.imagePath : null, renderId: r ? r.id : null }; })
+      .map((p) => { const r = byPage.get(p.id) || null; return { pageId: p.id, pageKey: p.pageKey, plannedPageNumber: p.plannedPageNumber ?? 0, section: section(p.pageKey), entryTitle: p.entryTitle, status: r ? r.status : "NOT RENDERED", imagePath: r ? r.imagePath : null, renderId: r ? r.id : null, version: r ? r.version : 0 }; })
       .sort((a, b) => sectionRank(a.pageKey) - sectionRank(b.pageKey) || a.plannedPageNumber - b.plannedPageNumber || a.pageKey.localeCompare(b.pageKey));
     setRenders({ ...rd, merged });
     const pending = merged.filter((m) => m.status === "NOT RENDERED").length;
@@ -390,7 +390,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
     const d = await api(`/api/whole-page-render/page/${pageId}/preview-package`);
     // Carry the rendered image (if any) so the modal shows the actual page, not just
     // the text package — lets the operator SEE a rendered page (e.g. the index) large.
-    setPreview({ ...d, _imagePath: imagePath || null });
+    setPreview({ ...d, _imagePath: imagePath || null, _cb: Date.now() });
     return { notice: `Preview ready for ${d.authority?.entryTitle || pageId} (no spend).` };
   });
 
@@ -704,7 +704,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
                         // stays responsive instead of stalling on accumulated image memory.
                         <div key={m.pageId} style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: 8, background: "#fff", contentVisibility: "auto", containIntrinsicSize: "180px 340px" }}>
                           {m.imagePath
-                            ? <img alt={m.pageKey} src={fileUrl(m.imagePath)} loading="lazy" decoding="async" onClick={() => previewPage(m.pageId, m.imagePath).catch(() => {})} title="Tap to preview" style={{ width: "100%", borderRadius: 4, display: "block", cursor: "pointer" }} />
+                            ? <img alt={m.pageKey} src={`${fileUrl(m.imagePath)}&v=${m.version || 0}`} loading="lazy" decoding="async" onClick={() => previewPage(m.pageId, m.imagePath).catch(() => {})} title="Tap to preview" style={{ width: "100%", borderRadius: 4, display: "block", cursor: "pointer" }} />
                             : <div onClick={() => previewPage(m.pageId, null).catch(() => {})} title="Tap to preview" style={{ height: 110, background: "#f0ead6", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: 11, cursor: "pointer" }}>not rendered</div>}
                           <div style={{ fontSize: 11, marginTop: 6, fontWeight: 700, wordBreak: "break-all" }}>{m.pageKey}</div>
                           <div style={{ marginTop: 4, display: "flex", gap: 5, alignItems: "center" }}>
@@ -735,7 +735,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
                         <div style={{ marginTop: 10 }}>
                           {/* Full page image — fills the modal width and tap-to-close, so the
                               operator can review the whole rendered page on phone or desktop. */}
-                          <img alt={preview.authority?.entryTitle || "page"} src={fileUrl(preview._imagePath)} onClick={() => setPreview(null)} title="Tap to close" style={{ width: "100%", maxWidth: "100%", border: `1px solid ${C.line}`, borderRadius: 8, display: "block", cursor: "zoom-out" }} />
+                          <img alt={preview.authority?.entryTitle || "page"} src={`${fileUrl(preview._imagePath)}&v=${preview._cb || 0}`} onClick={() => setPreview(null)} title="Tap to close" style={{ width: "100%", maxWidth: "100%", border: `1px solid ${C.line}`, borderRadius: 8, display: "block", cursor: "zoom-out" }} />
                         </div>
                       ) : null}
                       <div style={{ marginTop: 12, color: C.muted, fontSize: 13 }}>What this page will contain — rendered word-for-word by the AI (no spend yet):</div>
