@@ -146,6 +146,17 @@ export async function listPaginatedPagesForProject(projectId: string): Promise<P
     .orderBy(pages.plannedPageNumber);
 }
 
+/** Highest BODY page number — the last visibly-numbered page. Back-matter folios
+ *  continue from here so the printed numbering is one unbroken sequence. */
+export async function getMaxBodyPlannedPageNumber(projectId: string): Promise<number> {
+  const db = getDb();
+  const [row] = await db
+    .select({ max: sql<number>`max(${pages.plannedPageNumber})` })
+    .from(pages)
+    .where(and(eq(pages.projectId, projectId), eq(pages.section, 'BODY')));
+  return Number(row?.max ?? 0);
+}
+
 /** Read one page by primary id. */
 export async function getPaginatedPageById(pageId: string): Promise<PageRow | undefined> {
   const db = getDb();

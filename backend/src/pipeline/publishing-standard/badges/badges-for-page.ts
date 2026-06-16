@@ -42,9 +42,11 @@ export function badgesForPage(badgeSet: Badge[] | null | undefined): StampableBa
   const set = badgeSet ?? [];
   const out: StampableBadge[] = [];
 
-  // Region — single, bottom-left.
+  // Region — single, bottom-left. GENERAL is the non-informative fallback the
+  // render spec uses when no real region metadata is wired; suppress it so the
+  // corners stay clean (a real region value still stamps).
   const region = set.find((b) => b.family === 'region');
-  if (region) {
+  if (region && region.value !== 'GENERAL') {
     out.push({ family: 'region', value: region.value, svg: renderBadgeSvg('region', region.value), corner: 'bottom-left', order: 0 });
   }
 
@@ -58,9 +60,10 @@ export function badgesForPage(badgeSet: Badge[] | null | undefined): StampableBa
     out.push({ family: 'hazard', value, svg: renderBadgeSvg('hazard', value), corner: 'bottom-right', order: i });
   });
 
-  // Source — bottom-right, after the hazards.
+  // Source — bottom-right, after the hazards. GENERAL_REFERENCE is the
+  // non-informative fallback; suppress it so only a real source seal stamps.
   const source = set.find((b) => b.family === 'source');
-  if (source) {
+  if (source && source.value !== 'GENERAL_REFERENCE') {
     out.push({ family: 'source', value: source.value, svg: renderBadgeSvg('source', source.value), corner: 'bottom-right', order: hazards.length });
   }
 

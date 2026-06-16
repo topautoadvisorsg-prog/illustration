@@ -32,7 +32,7 @@ import {
   getRenderById,
   persistPrintPrep,
 } from '../../db/repositories/whole-page-render.repo.js';
-import { getPaginatedPageById } from '../../db/repositories/pagination.repo.js';
+import { getPaginatedPageById, getMaxBodyPlannedPageNumber } from '../../db/repositories/pagination.repo.js';
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace('#', '');
@@ -172,6 +172,23 @@ export interface PrintPrepResult {
 }
 
 /** Orchestrator: print-prep one RENDERED render. */
+/** Volume I folio policy — see printPrepRender. Returns the page-number string
+ *  to stamp, or null for pages that carry no visible folio. */
+async function computeFolioLabel(
+  page: { section?: string | null; frontMatterType?: string | null; spineOrder?: number | null; plannedPageNumber?: number | null } | undefined,
+  projectId: string,
+): Promise<string | null> {
+  if (!page) return null;
+  const section = (page.section ?? 'BODY').toUpperCase();
+  if (section === 'FRONT_MATTER') return null; // half-title, title, copyright, contents, introduction
+  if (section === 'BODY') return page.plannedPageNumber != null ? String(page.plannedPageNumber) : null;
+  // BACK_MATTER:
+  if ((page.frontMatterType ?? '').toUpperCase() === 'ABOUT_SERIES') return null; // closing brand page
+  const bodyMax = await getMaxBodyPlannedPageNumber(projectId);
+  const order = page.spineOrder ?? 0;
+  return order > 0 ? String(bodyMax + order) : null; // glossary/index continue the body sequence
+}
+
 export async function printPrepRender(renderId: string): Promise<PrintPrepResult> {
   const row = await getRenderById(renderId);
   if (!row) throw new Error(`render_not_found:${renderId}`);
@@ -197,10 +214,13 @@ export async function printPrepRender(renderId: string): Promise<PrintPrepResult
       ]
     : [];
 
-  // Folio: the page's planned number (arabic). Front-matter roman/blank folios
-  // arrive with the Front Matter build; here Print-Prep stamps what it's given.
+  // Folio policy (Volume I): front matter and the About-the-Series brand page
+  // carry NO visible page number (clean display pages). Body keeps its arabic
+  // number — the TOC and index already reference those. Back-matter reference
+  // pages (glossary/index) CONTINUE the body's numbering rather than restarting
+  // at 1, so the printed sequence is unbroken (258 → 259, 260 …).
   const page = await getPaginatedPageById(row.pageId);
-  const folioLabel = page ? String(page.plannedPageNumber) : null;
+  const folioLabel = await computeFolioLabel(page, row.projectId);
 
   const composed = await composePrintPage(renderPng, badgeSet, folioLabel, canvasIn);
 

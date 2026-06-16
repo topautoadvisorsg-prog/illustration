@@ -98,9 +98,16 @@ describe('badgesForPage — contract (corners, order, cap)', () => {
   ];
 
   it('region → bottom-left; source → bottom-right', () => {
-    const out = badgesForPage(mk('FOREST', ['NONE'], 'GENERAL_REFERENCE'));
+    const out = badgesForPage(mk('FOREST', ['NONE'], 'SCIENTIFIC_LITERATURE'));
     expect(out.find((b) => b.family === 'region')?.corner).toBe('bottom-left');
     expect(out.find((b) => b.family === 'source')?.corner).toBe('bottom-right');
+  });
+
+  it('fallback GENERAL region and GENERAL_REFERENCE source are suppressed (clean corners)', () => {
+    const out = badgesForPage(mk('GENERAL', ['NONE'], 'GENERAL_REFERENCE'));
+    expect(out.some((b) => b.family === 'region')).toBe(false);
+    expect(out.some((b) => b.family === 'source')).toBe(false);
+    expect(out.length).toBe(0);
   });
 
   it('NONE hazard is omitted (clean corner)', () => {
