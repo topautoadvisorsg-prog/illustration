@@ -190,7 +190,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   // without re-spending. If the image 404s (no cover yet), the <img> onError
   // clears it back to "No cover generated yet."
   useEffect(() => {
-    if (project?.id) setCover({ imagePath: `${project.id}/cover/cover-wrap-art.png`, _probe: true });
+    if (project?.id) setCover({ imagePath: `${project.id}/cover/cover-wrap-art.png`, _probe: true, _cb: Date.now() });
     else setCover(null);
   }, [project?.id]);
 
@@ -424,7 +424,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
   const genCover = () => run("Generating cover (paid)", async () => {
     const d = await api(`/api/projects/${project.id}/generate-cover-artwork`, { method: "POST", body: "{}" });
-    setCover(d);
+    setCover({ ...d, _cb: Date.now() });
     return { notice: "Cover artwork generated." };
   });
 
@@ -677,21 +677,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
                   {cover?.imagePath
                     ? (
                       <>
-                        <a href={fileUrl(cover.imagePath)} target="_blank" rel="noreferrer" title="Click to open the full-resolution cover in a new tab" style={{ display: "block", marginTop: 10, width: "100%", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 8, background: "#000", cursor: "zoom-in" }}>
-                          <img alt="Full wrap cover" src={fileUrl(cover.imagePath)} decoding="async" onError={() => { if (cover._probe) setCover(null); }} style={{ width: "100%", display: "block" }} />
+                        <a href={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} target="_blank" rel="noreferrer" title="Click to open the full-resolution cover in a new tab" style={{ display: "block", marginTop: 10, width: "100%", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 8, background: "#000", cursor: "zoom-in" }}>
+                          <img alt="Full wrap cover" src={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} decoding="async" onError={() => { if (cover._probe) setCover(null); }} style={{ width: "100%", display: "block" }} />
                         </a>
                         <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Click the wrap to open it full-size and read every word. Back cover (left) · spine (center) · front cover (right).</div>
                         <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
                           <div>
                             <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 700 }}>Front cover</div>
-                            <a href={fileUrl(cover.imagePath)} target="_blank" rel="noreferrer" title="Open full-size" style={{ display: "block", width: 300, aspectRatio: "7 / 10", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 6, background: "#000", cursor: "zoom-in" }}>
-                              <img alt="Front cover" src={fileUrl(cover.imagePath)} decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "100% 50%", display: "block" }} />
+                            <a href={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} target="_blank" rel="noreferrer" title="Open full-size" style={{ display: "block", width: 300, aspectRatio: "7 / 10", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 6, background: "#000", cursor: "zoom-in" }}>
+                              <img alt="Front cover" src={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "100% 50%", display: "block" }} />
                             </a>
                           </div>
                           <div>
                             <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 700 }}>Back cover + spine</div>
-                            <a href={fileUrl(cover.imagePath)} target="_blank" rel="noreferrer" title="Open full-size" style={{ display: "block", width: 460, aspectRatio: "13 / 10", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 6, background: "#000", cursor: "zoom-in" }}>
-                              <img alt="Back cover and spine" src={fileUrl(cover.imagePath)} decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "0% 50%", display: "block" }} />
+                            <a href={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} target="_blank" rel="noreferrer" title="Open full-size" style={{ display: "block", width: 460, aspectRatio: "13 / 10", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 6, background: "#000", cursor: "zoom-in" }}>
+                              <img alt="Back cover and spine" src={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "0% 50%", display: "block" }} />
                             </a>
                           </div>
                         </div>
