@@ -149,7 +149,7 @@ export async function composePrintPage(
   // detail crisp at q92 — visually near-lossless and standard for printed color.
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([canvasIn.w * 72, canvasIn.h * 72]);
-  const jpgBuffer = await sharp(pngBuffer).jpeg({ quality: 92, chromaSubsampling: '4:4:4' }).toBuffer();
+  const jpgBuffer = await sharp(pngBuffer).jpeg({ quality: 88, chromaSubsampling: '4:4:4' }).toBuffer();
   const img = await pdf.embedJpg(jpgBuffer);
   page.drawImage(img, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() });
   const pdfBuffer = Buffer.from(await pdf.save());
