@@ -240,9 +240,11 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
       // Data-driven series page — heading comes from the project's series field,
       // never a hardcoded brand. (RESOURCES rides this role but is Sources copy.)
       const seriesName = (config.publishing.series?.name ?? '').trim();
-      // The operator enters the full series name (e.g. "THE WILDLANDS SERIES");
-      // use it verbatim as the heading — never append/prepend brand words.
-      const seriesHeading = seriesName ? seriesName.toUpperCase() : 'ABOUT THE SERIES';
+      // The series brand page reads "ABOUT THE <series> SERIES" — strip a leading
+      // article from the project's series name and frame it so the heading matches
+      // the classic collector convention (and the deterministic composer's wording).
+      const bareSeries = seriesName.replace(/^the\s+/i, '').trim();
+      const seriesHeading = bareSeries ? `ABOUT THE ${bareSeries.toUpperCase()} SERIES` : 'ABOUT THE SERIES';
       return {
         pageType,
         layoutTemplate,
