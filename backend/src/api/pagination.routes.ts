@@ -418,6 +418,10 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
           entryTitle: primary?.entryTitle ?? row.pageKey,
           chapterNumber: row.chapterNumber,
           plannedPageNumber: row.plannedPageNumber,
+          // Canonical book sequence for front/back matter (body pages use
+          // plannedPageNumber). The console sorts the grid by this so the
+          // displayed order always matches the assembled book.
+          spineOrder: row.spineOrder,
           layoutTemplate: row.layoutTemplate,
           partN: row.partN,
           totalParts: row.totalParts,

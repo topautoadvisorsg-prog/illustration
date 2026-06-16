@@ -372,8 +372,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
     // pageKey alone put "BM_" before "CH_" before "FM_" — glossary first, title last.
     const sectionRank = (k) => (k.startsWith("FM_") ? 0 : k.startsWith("BM_") ? 2 : 1);
     const merged = rosterPages
-      .map((p) => { const r = byPage.get(p.id) || null; return { pageId: p.id, pageKey: p.pageKey, plannedPageNumber: p.plannedPageNumber ?? 0, section: section(p.pageKey), entryTitle: p.entryTitle, status: r ? r.status : "NOT RENDERED", imagePath: r ? r.imagePath : null, renderId: r ? r.id : null, version: r ? r.version : 0 }; })
-      .sort((a, b) => sectionRank(a.pageKey) - sectionRank(b.pageKey) || a.plannedPageNumber - b.plannedPageNumber || a.pageKey.localeCompare(b.pageKey));
+      .map((p) => { const r = byPage.get(p.id) || null; return { pageId: p.id, pageKey: p.pageKey, plannedPageNumber: p.plannedPageNumber ?? 0, spineOrder: p.spineOrder ?? 0, section: section(p.pageKey), entryTitle: p.entryTitle, status: r ? r.status : "NOT RENDERED", imagePath: r ? r.imagePath : null, renderId: r ? r.id : null, version: r ? r.version : 0 }; })
+      // Order by the canonical book sequence: front/back matter carry a spineOrder
+      // (1..n within their section); body pages don't, so they fall back to the
+      // planned page number. This matches the assembled book and avoids ties that
+      // previously let an alphabetical pageKey tiebreaker mis-order back matter
+      // (e.g. About-the-Series wedged between Index pages).
+      .sort((a, b) => { const oa = a.spineOrder > 0 ? a.spineOrder : a.plannedPageNumber; const ob = b.spineOrder > 0 ? b.spineOrder : b.plannedPageNumber; return sectionRank(a.pageKey) - sectionRank(b.pageKey) || oa - ob || a.plannedPageNumber - b.plannedPageNumber || a.pageKey.localeCompare(b.pageKey); });
     setRenders({ ...rd, merged });
     const pending = merged.filter((m) => m.status === "NOT RENDERED").length;
     return { notice: `${merged.length} pages · ${rd.bookReady || 0} book-ready · ${pending} not rendered.` };
