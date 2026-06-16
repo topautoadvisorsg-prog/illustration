@@ -565,14 +565,14 @@ export function toRoman(n: number): string {
 
 /**
  * The single source of truth for the series line printed on the cover, title
- * page, and series page: "[SERIES NAME] — VOLUME [Roman]". Fully data-driven —
+ * page, and series page: "[SERIES NAME] — SERIES [Roman]". Fully data-driven —
  * returns null when no series name is set (nothing book-specific in code).
  */
 export function buildSeriesLine(seriesName?: string | null, volume?: number | null): string | null {
   const name = (seriesName ?? '').trim();
   if (!name) return null;
   const roman = volume != null ? toRoman(volume) : '';
-  return roman ? `${name.toUpperCase()} — VOLUME ${roman}` : name.toUpperCase();
+  return roman ? `${name.toUpperCase()} — SERIES ${roman}` : name.toUpperCase();
 }
 
 /**
