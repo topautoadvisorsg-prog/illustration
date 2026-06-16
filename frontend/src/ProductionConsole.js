@@ -372,7 +372,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
     // pageKey alone put "BM_" before "CH_" before "FM_" — glossary first, title last.
     const sectionRank = (k) => (k.startsWith("FM_") ? 0 : k.startsWith("BM_") ? 2 : 1);
     const merged = rosterPages
-      .map((p) => { const r = byPage.get(p.id) || null; return { pageId: p.id, pageKey: p.pageKey, plannedPageNumber: p.plannedPageNumber ?? 0, spineOrder: p.spineOrder ?? 0, section: section(p.pageKey), entryTitle: p.entryTitle, status: r ? r.status : "NOT RENDERED", imagePath: r ? r.imagePath : null, renderId: r ? r.id : null, version: r ? r.version : 0 }; })
+      .map((p) => { const r = byPage.get(p.id) || null; return { pageId: p.id, pageKey: p.pageKey, plannedPageNumber: p.plannedPageNumber ?? 0, spineOrder: p.spineOrder ?? 0, section: section(p.pageKey), entryTitle: p.entryTitle, status: r ? r.status : "NOT RENDERED", imagePath: r ? r.imagePath : null, renderId: r ? r.id : null, version: r ? r.version : 0, approvedForBook: r ? !!r.approvedForBook : false, printReady: r ? !!(r.printPdfPath && r.preflightPassed) : false }; })
       // Order by the canonical book sequence: front/back matter carry a spineOrder
       // (1..n within their section); body pages don't, so they fall back to the
       // planned page number. This matches the assembled book and avoids ties that
@@ -701,7 +701,8 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 </div>
                 {renders?.merged && (
                   <>
-                    <div style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{renders.merged.length} pages · {renders.merged.filter((m) => m.status !== "NOT RENDERED").length} rendered · {renders.bookReady || 0} book-ready</div>
+                    <div style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{renders.merged.length} pages · {renders.merged.filter((m) => m.status !== "NOT RENDERED").length} rendered · {renders.merged.filter((m) => m.approvedForBook).length} approved · {renders.merged.filter((m) => m.printReady).length} print-ready</div>
+                    <div style={{ marginTop: 2, fontSize: 11, color: C.muted }}>Approved = picked for the book. Print-ready = page numbers + badges stamped and preflight passed — required before Build Book. Approving a page does not print-prep it.</div>
                     <div style={S.grid}>
                       {renders.merged.map((m) => (
                         // content-visibility:auto keeps off-screen cards unpainted and their
@@ -721,7 +722,10 @@ export default function ProductionConsole({ onExitToLegacy }) {
                             <button style={{ ...S.btn("spend"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderPage(m.pageId).catch(() => {})}>Render</button>
                             {m.status === "RENDERED" && m.renderId && <button style={{ ...S.btn("ok"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => approveForBook(m.renderId).catch(() => {})}>Approve for book</button>}
                             {m.status === "RENDERED" && m.renderId && <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => rejectRender(m.renderId).catch(() => {})}>Reject</button>}
-                            {m.status === "APPROVED" && <span style={{ ...S.pill(C.green), alignSelf: "center" }}>✓ in book</span>}
+                            {m.approvedForBook && <span style={{ ...S.pill(C.green), alignSelf: "center" }}>✓ approved</span>}
+                            {m.approvedForBook && (m.printReady
+                              ? <span style={{ ...S.pill(C.green), alignSelf: "center" }}>✓ print-ready</span>
+                              : <span style={{ ...S.pill("#b8860b"), alignSelf: "center" }} title="Approved but not yet print-prepped — run print-prep before Build Book">⚠ needs print-prep</span>)}
                           </div>
                         </div>
                       ))}
