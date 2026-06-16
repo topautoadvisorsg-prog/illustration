@@ -142,9 +142,15 @@ export async function composePrintPage(
     .toBuffer();
 
   // 6. Single-page PDF at exact trim+bleed (pdf-lib, points = in × 72).
+  // Embed a high-quality 300-DPI JPEG rather than the lossless PNG: each print
+  // PDF drops from ~14 MB to ~2-3 MB, so the assembled 275-page interior stays
+  // within KDP's size limit AND the assembler doesn't exhaust memory holding the
+  // whole book. 4:4:4 chroma (no subsampling) keeps text edges and fine botanical
+  // detail crisp at q92 — visually near-lossless and standard for printed color.
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([canvasIn.w * 72, canvasIn.h * 72]);
-  const img = await pdf.embedPng(pngBuffer);
+  const jpgBuffer = await sharp(pngBuffer).jpeg({ quality: 92, chromaSubsampling: '4:4:4' }).toBuffer();
+  const img = await pdf.embedJpg(jpgBuffer);
   page.drawImage(img, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() });
   const pdfBuffer = Buffer.from(await pdf.save());
 
