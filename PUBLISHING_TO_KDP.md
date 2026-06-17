@@ -116,6 +116,15 @@ THE_WILDLANDS_NEW_ENGLAND_cover.pdf
 | Interior file size | **~527 MB** (KDP cap 650 MB) |
 | Cover wrap | **14.8693 × 10.25″** |
 | Spine | **0.6193″** = pages × **0.002252″/page (white paper)** |
+| TrimBox (per page) | **7.0000 × 10.0000″**, inset 0.125″ — declares KDP's exact trim |
+
+### Bleed & TrimBox
+Each page is **7.25 × 10.25″** (0.125″ bleed on all four sides). The build stamps a
+**TrimBox of 7 × 10″ centred** on every page (`build-local2.ts` → `mergeWithTrimBox`),
+so KDP trims to exactly 7 × 10 regardless of the symmetric bleed. This is geometry
+metadata only — artwork, folios, and print-prep output are untouched. (KDP's
+minimal stated full-bleed size is 7.125 × 10.25; we provide more bleed plus an
+explicit TrimBox, which is press-ready.)
 
 Validate the actual files before upload:
 ```

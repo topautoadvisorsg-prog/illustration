@@ -20,6 +20,12 @@ for (const [k, c] of sizes) console.log(`   ${k}  ×${c} pages`);
 const p0 = i.getPage(0).getSize(), pN = i.getPage(i.getPageCount() - 1).getSize();
 console.log('first page:', inch(p0.width), 'x', inch(p0.height));
 console.log('last  page:', inch(pN.width), 'x', inch(pN.height));
+// TrimBox audit (KDP trim declaration) — should be 7x10 centred, consistent on all pages
+const trims = new Map<string, number>();
+for (let n = 0; n < i.getPageCount(); n++) { const t = i.getPage(n).getTrimBox(); const k = `x=${inch(t.x)} y=${inch(t.y)} ${inch(t.width)}x${inch(t.height)}`; trims.set(k, (trims.get(k) ?? 0) + 1); }
+console.log('TrimBox (KDP trim):');
+for (const [k, c2] of trims) console.log(`   ${k}  ×${c2} pages`);
+console.log('expected TrimBox: x=0.1250" y=0.1250" 7.0000x10.0000 (7x10 trim, 0.125" bleed all sides)');
 
 console.log('\n================ COVER ================');
 const cStat = statSync(COV);
