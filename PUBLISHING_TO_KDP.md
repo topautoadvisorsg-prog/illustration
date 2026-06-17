@@ -162,5 +162,40 @@ bleed, page count, spine formula).
 | `badge-inventory.ts` | Report badge usage across the book. |
 | `scan-terms.ts` | Terminology audit (regional/British/archaic term scan). |
 
+| `diag-print-sizes.ts` | Per-page print-PDF size report (spot PNG/q-level bloat). |
+| `bodymax.ts` / `inspect-audit-sources.ts` | Back-matter folio map / TOC↔chapter check. |
+| `dl-one.ts` · `crop-img.ts` · `thumb.ts` | Download a storage file / crop / thumbnail for visual review. |
+
 > These live in `backend/scripts/` and run via `railway run` so they get the
 > production database, storage, and API credentials from the environment.
+> **One-off, per-book scripts (cover-text swaps, individual page-art edits) are
+> archived in `backend/scripts/_scratch/`** to keep the toolkit clean — reusable
+> templates if a future book needs the same kind of edit.
+
+---
+
+## 7. Starting a new volume (Volume II+)
+
+A new book runs the **same pipeline**. Once the manuscript is rendered and the
+operator has reviewed/approved pages in the console, the build runbook is:
+
+```
+1. (optional) scan-terms.ts <manuscript.txt>     # terminology audit → fix in text, re-render affected pages
+2. printprep-http.ts <projectId> 4 force          # print-prep all pages: 300-DPI q88 (page numbers + preflight)
+3. prebuild-audit.ts <projectId>                  # must print RESULT: PASS (275/275 etc.)
+4. diag-print-sizes.ts <projectId>                # confirm all pages ~q88 (no PNG stragglers) → interior < 650MB
+5. build-local2.ts <projectId> "<outDir>"         # assemble interior (+TrimBox) + cover → local disk
+6. validate-delivery.ts                           # page count, page size, TrimBox 7x10, cover dims, file sizes
+7. upload to KDP                                   # 7x10 trim, Bleed: Yes, Paper: White
+```
+
+**Per-book settings to change in the scripts for a new volume:**
+- The **project ID** is passed as an argument (no edit needed).
+- `build-local2.ts` / `validate-delivery.ts` currently **hardcode the output
+  filename + cover dimensions for Volume I** (`THE_WILDLANDS_NEW_ENGLAND_*`,
+  `14.8693 × 10.25`). Update those for the new title + its page-count spine, or
+  parameterize them.
+- The TrimBox in `build-local2.ts` assumes a **7×10 trim**; change `mergeWithTrimBox(ordered, 7, 10)` if the new book uses a different trim.
+
+Everything else — folio policy, badge suppression, q88/300-DPI, the local-assemble
++ local-disk workaround — carries over unchanged.
