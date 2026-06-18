@@ -96,6 +96,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [matter, setMatter] = useState(null);
   const [renders, setRenders] = useState(null); // { total, byStatus, bookReady, renders:[] }
   const [preview, setPreview] = useState(null); // active preview package
+  const [showGuides, setShowGuides] = useState(true); // KDP-style trim/safe overlay on the page preview
   const [cover, setCover] = useState(null);
   const [assembly, setAssembly] = useState(null);
   const [status, setStatus] = useState({}); // real backend progress for the step checkmarks
@@ -677,9 +678,16 @@ export default function ProductionConsole({ onExitToLegacy }) {
                   {cover?.imagePath
                     ? (
                       <>
-                        <a href={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} target="_blank" rel="noreferrer" title="Click to open the full-resolution cover in a new tab" style={{ display: "block", marginTop: 10, width: "100%", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 8, background: "#000", cursor: "zoom-in" }}>
+                        <a href={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} target="_blank" rel="noreferrer" title="Click to open the full-resolution cover in a new tab" style={{ position: "relative", display: "block", marginTop: 10, width: "100%", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 8, background: "#000", cursor: "zoom-in" }}>
                           <img alt="Full wrap cover" src={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} decoding="async" onError={() => { if (cover._probe) setCover(null); }} style={{ width: "100%", display: "block" }} />
+                          {/* Hardcover wrap safe-zone (outer text-safe inset ~0.72in). Spine/hinge
+                              zones aren't drawn here — this is the outer text boundary only. */}
+                          {showGuides && <div style={{ position: "absolute", top: "6.31%", bottom: "6.31%", left: "4.39%", right: "4.39%", border: "1.5px dashed #2f8a3f", pointerEvents: "none", boxSizing: "border-box" }} />}
                         </a>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.muted, marginTop: 6, cursor: "pointer" }}>
+                          <input type="checkbox" checked={showGuides} onChange={(e) => setShowGuides(e.target.checked)} />
+                          Show safe-zone guide (green = keep all cover text inside; spine/hinge not shown)
+                        </label>
                         <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Click the wrap to open it full-size and read every word. Back cover (left) · spine (center) · front cover (right).</div>
                         <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
                           <div>
@@ -742,9 +750,22 @@ export default function ProductionConsole({ onExitToLegacy }) {
                       <b>{preview.authority?.entryTitle}</b> <span style={{ color: C.muted, fontSize: 13 }}>· {preview.authority?.layoutFamilyLabel}</span>
                       {preview._imagePath ? (
                         <div style={{ marginTop: 10 }}>
-                          {/* Full page image — fills the modal width and tap-to-close, so the
-                              operator can review the whole rendered page on phone or desktop. */}
-                          <img alt={preview.authority?.entryTitle || "page"} src={`${fileUrl(preview._imagePath)}&v=${preview._cb || 0}`} onClick={() => setPreview(null)} title="Tap to close" style={{ width: "100%", maxWidth: "100%", border: `1px solid ${C.line}`, borderRadius: 8, display: "block", cursor: "zoom-out" }} />
+                          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.muted, marginBottom: 6, cursor: "pointer" }}>
+                            <input type="checkbox" checked={showGuides} onChange={(e) => setShowGuides(e.target.checked)} />
+                            Show safe-zone guides — <span style={{ color: "#cc2222" }}>red = trim (KDP cut)</span> · <span style={{ color: "#2f8a3f" }}>green = safe zone (keep text &amp; main subject inside)</span>
+                          </label>
+                          {/* Full page image with KDP-style trim + safe overlays. The render is the
+                              full-bleed 7x10 canvas (0.125in bleed), so the guides are fixed %
+                              insets of the image: trim = bleed inset, safe = 0.5in inside trim. */}
+                          <div style={{ position: "relative", lineHeight: 0 }}>
+                            <img alt={preview.authority?.entryTitle || "page"} src={`${fileUrl(preview._imagePath)}&v=${preview._cb || 0}`} onClick={() => setPreview(null)} title="Tap to close" style={{ width: "100%", maxWidth: "100%", border: `1px solid ${C.line}`, borderRadius: 8, display: "block", cursor: "zoom-out" }} />
+                            {showGuides && (
+                              <>
+                                <div style={{ position: "absolute", top: "1.22%", bottom: "1.22%", left: "1.72%", right: "1.72%", border: "1.5px dashed #cc2222", pointerEvents: "none", boxSizing: "border-box" }} />
+                                <div style={{ position: "absolute", top: "6.10%", bottom: "6.10%", left: "8.62%", right: "8.62%", border: "1.5px dashed #2f8a3f", pointerEvents: "none", boxSizing: "border-box" }} />
+                              </>
+                            )}
+                          </div>
                         </div>
                       ) : null}
                       <div style={{ marginTop: 12, color: C.muted, fontSize: 13 }}>What this page will contain — rendered word-for-word by the AI (no spend yet):</div>
