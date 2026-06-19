@@ -139,7 +139,7 @@ export const ORNAMENTS = {
     topSwag:
       'Engraved botanical swag — pine branches with cones, oak leaves with acorns, fern fronds, symmetrical, centered pinecone medallion. Fine line-engraving in warm sepia ink. Period-correct, museum monograph feel.',
     bottomSwag:
-      'Mirror of the top swag — slightly slimmer, same components, centered pinecone medallion.',
+      'Same UPRIGHT orientation as the top swag (NOT mirrored, NOT flipped) — slightly slimmer, same components, centered pinecone medallion with the pinecone pointing UP.',
     hairlineRule:
       'Thin engraved single line in warm sepia ink, paired around a heading where appropriate.',
     dropCapSurround:

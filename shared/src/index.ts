@@ -118,6 +118,12 @@ export const LayoutTemplateIdSchema = z.enum([
   'LAYOUT_C_CORNER_BOTTOM_RIGHT',
   // Layout D — pure text / back matter. No illustration.
   'LAYOUT_D_PURE_TEXT',
+  // Layout E — BALANCED ~25%: a contained natural-history illustration band
+  // across the top, a clean centered reading field filling the rest below it.
+  // The middle ground between the 12% small-accent (LAYOUT_2_TEXT_HEAVY) and the
+  // 50% band (LAYOUT_B) — for pages that need a real, meaningful illustration
+  // without compressing the text or leaving dead parchment.
+  'LAYOUT_E_BAND_BALANCED',
   // Title Display — a centered, ceremonial text block with generous negative
   // space + thin edge ornaments. For very short text: title, dedication,
   // epigraph, quote, special notes. Fills the "little text, not a full

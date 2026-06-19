@@ -112,8 +112,11 @@ export function defaultLayoutForRole(pageType: WholePageRole): LayoutTemplateId 
     case 'SERIES_PAGE':
     case 'CONTENTS':
       return 'LAYOUT_D_PURE_TEXT';
+    // Operator QA: the intro opener's 55% top-band plate (LAYOUT_5) read as "top
+    // illustration too large". Use the text-dominant layout — a small supporting
+    // vignette + a large centered reading field — so the intro is text-forward.
     case 'INTRO_OPENER':
-      return 'LAYOUT_5_CHAPTER_OPENER';
+      return 'LAYOUT_2_TEXT_HEAVY';
     case 'COVER_WRAP':
       return 'LAYOUT_A_ILLUSTRATION';
     default:
@@ -216,8 +219,10 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         layoutTemplate,
         title: { kicker: '', number: '', name: 'INTRODUCTION' },
         entryTitle: 'Introduction',
-        // Region is data-driven from the book's subtitle/region — never hardcoded.
-        imageSubject: `Quiet threshold into the wilderness${subtitle ? ` of ${subtitle}` : ''}: morning mist, forest, rock and trail edge, distant mountains, river or lake light`,
+        // Operator QA (rebalance): a REAL, meaningful habitat study filling a
+        // contained top band — substantial enough to balance the page (no dead
+        // parchment), kept to the top band so it never crowds the reading text.
+        imageSubject: 'A meaningful New England wilderness habitat study filling a contained band across the TOP of the page — a naturalist scene of the northern woods (white pine and red spruce, ferns and moss, a distant ridgeline or quiet wetland), painted as a real field-guide illustration. Substantial enough to balance the page; kept to the top band so it never crowds the reading text. Never a tiny sprig, never an ornament.',
         allowsEmptyBody: false,
         renderBodyText: true,
       };
@@ -263,7 +268,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         layoutTemplate,
         title: { kicker: '', number: '', name: 'GLOSSARY' },
         entryTitle: 'Glossary',
-        imageSubject: 'Glossary reference-page edge ornament only: pine needles, fern tips, acorns, tiny naturalist linework framing the two-column glossary entries',
+        imageSubject: 'Subtle full-page illustrated field behind the two-column glossary entries — calm low-contrast aged parchment with faint botanical atmosphere and naturalist texture, with NO decorative edge ornaments, swags, corner devices, bands, or frames; the two columns of entries stay clearly legible.',
         allowsEmptyBody: false,
         renderBodyText: true,
       };
@@ -273,7 +278,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         layoutTemplate,
         title: { kicker: '', number: '', name: 'INDEX' },
         entryTitle: 'Index',
-        imageSubject: 'Index reference-page edge ornament only: restrained botanical corner details framing the index entries and page numbers',
+        imageSubject: 'Subtle full-page illustrated field behind the index entries — calm low-contrast aged parchment with faint botanical atmosphere and naturalist texture, with NO decorative edge ornaments, swags, corner devices, bands, or frames; the index entries and their page numbers stay clearly legible.',
         allowsEmptyBody: false,
         renderBodyText: true,
       };
@@ -298,7 +303,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         layoutTemplate,
         title: { kicker: '', number: '', name: 'CONTENTS' },
         entryTitle: 'Contents',
-        imageSubject: 'Table of contents with a subtle decorative wilderness header across the top — a quiet naturalist band (a low distant ridgeline, pines, or a botanical motif) above the listing — and thin engraved edge ornaments; the chapter titles and their page numbers stay clearly legible in a calm reading field below the header. Readability first.',
+        imageSubject: 'Table of contents over a subtle full-page illustrated field — calm low-contrast aged parchment with faint naturalist atmosphere, with NO decorative edge ornaments, swags, corner devices, bands, header bands, or frames; the chapter titles and their page numbers stay clearly legible in a calm reading field. Readability first.',
         allowsEmptyBody: false,
         renderBodyText: true,
       };

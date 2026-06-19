@@ -127,6 +127,7 @@ export interface PlanPageOptions {
 const DEFAULT_LAYOUT_CAPACITY: Record<LayoutTemplateId, { minWords: number; targetWords: number; maxWords: number }> = {
   LAYOUT_1_STANDARD: { minWords: 220, targetWords: 320, maxWords: 420 },
   LAYOUT_2_TEXT_HEAVY: { minWords: 420, targetWords: 560, maxWords: 720 },
+  LAYOUT_E_BAND_BALANCED: { minWords: 300, targetWords: 430, maxWords: 580 },
   LAYOUT_3_ILLUSTRATION_DOMINANT: { minWords: 90, targetWords: 160, maxWords: 240 },
   LAYOUT_4_DANGER_WARNING: { minWords: 240, targetWords: 340, maxWords: 460 },
   LAYOUT_5_CHAPTER_OPENER: { minWords: 40, targetWords: 90, maxWords: 150 },

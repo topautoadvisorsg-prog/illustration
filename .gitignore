@@ -107,6 +107,9 @@ backend/title-prompt.txt
 backend/titlepkg.json
 complete-test-book-*.pdf
 
+# Operator script scratch (regenerable PNGs/dumps)
+backend/scripts/_scratch/
+
 # Front-matter / chapter-run scratch reports (no-spend, regenerable)
 fm-report*.json
 fm-after-fix.json

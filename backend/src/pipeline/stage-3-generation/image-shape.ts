@@ -43,6 +43,10 @@ const SHAPE_BY_SLOT: Record<ArtSlot, ImageShape> = {
   SIDEBAR_RIGHT: 'portrait',
   SCATTERED: 'square',
   CENTER_WRAP: 'square',
+  // Text-dominant: a small supporting vignette over a portrait full-page field.
+  TEXT_DOMINANT: 'portrait',
+  // Balanced ~25% band over a portrait full-page field.
+  BALANCED_BAND: 'portrait',
   // Layout C 25% corner variants are small square vignettes.
   CORNER_TOP_LEFT: 'square',
   CORNER_TOP_RIGHT: 'square',
@@ -85,6 +89,7 @@ export const LAYOUT_IMAGE_SHAPES: Record<LayoutTemplateId, ImageShape> = {
   LAYOUT_C_CORNER_BOTTOM_LEFT: 'square',
   LAYOUT_C_CORNER_BOTTOM_RIGHT: 'square',
   LAYOUT_D_PURE_TEXT: 'square', // no image — placeholder for the Record completeness
+  LAYOUT_E_BAND_BALANCED: 'portrait', // balanced ~25% top band on a portrait page
   LAYOUT_TITLE_DISPLAY: 'portrait', // centered title block, thin top/bottom ornaments
   LAYOUT_FINE_PRINT: 'portrait', // low fine-print block over a calm illustrated field
   LAYOUT_REFERENCE: 'portrait', // two-column reference (glossary/index) over a calm field

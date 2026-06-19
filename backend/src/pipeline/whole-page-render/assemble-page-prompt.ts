@@ -107,14 +107,14 @@ function hardConstraints(spec: WholePageSpec): string {
     );
     if (spec.pageText.dropCap) {
       lines.push(
-        `- The first paragraph of the body begins with an illuminated drop-cap "${spec.pageText.dropCap}", engraved botanical surround (leaves / vines / pinecone), warm sepia ink, ~3 lines tall, refined and restrained.`,
+        `- The first paragraph of the body begins with a large engraved drop-cap "${spec.pageText.dropCap}" in warm sepia ink, ~3 lines tall — a plain raised/dropped initial letter only. NO botanical surround, wreath, leaves, vines, pinecone, or ornament around it; the letter is pure typography.`,
       );
     }
   }
   if (spec.pageType === 'TITLE_PAGE') {
     const stacked = spec.typographyDNA.titleHierarchy.filter(Boolean);
     lines.push(
-      `- TITLE-PAGE typography, baked INTO the artwork as the engraved title block — stacked and centered on calm parchment, in this exact order top to bottom: ${stacked.map((s) => `"${s}"`).join(' / ')}. The title set largest in stately serif caps; the subtitle and description beneath it; the author/imprint line lower; and the final series "VOLUME" line, when present, as small tracked caps at the bottom. All in warm sepia ink, framed by a refined ornament. Render only these lines, in this order; never a pasted label, never modern type.`,
+      `- TITLE-PAGE typography, baked INTO the artwork as the engraved title block — stacked and centered on calm parchment, in this exact order top to bottom: ${stacked.map((s) => `"${s}"`).join(' / ')}. The title set largest in stately serif caps; the subtitle and description beneath it; the author/imprint line lower; and the final series "VOLUME" line, when present, as small tracked caps at the bottom. All in warm sepia ink on calm parchment, with NO decorative frame, border, or ornament around the type. Render only these lines, in this order; never a pasted label, never modern type.`,
     );
   }
   if (spec.pageType === 'INTERIOR' && spec.pageText.title.name) {
@@ -136,6 +136,18 @@ function hardConstraints(spec: WholePageSpec): string {
     // repeated here — they live in the Typography DNA, Illustration DNA, the
     // consolidated HARD NEGATIVES, and the PAGE BODY section respectively.
     `- COMPOSITION CONTRACT — image placement: ${spec.composition.imagePlacement}. Text placement: ${spec.composition.textPlacement}. Respect this placement EXACTLY: do not move the artwork to a different region, do not mirror left/right or top/bottom, do not enlarge a small accent into a band or a band into a full page. The attached layout reference image shows the same plan — follow it.`,
+    // Architecture v1.3 — the LAYER / BLEED rule. Decorative botanical swags are
+    // removed entirely (they were protected content that kept getting trimmed).
+    // Two layers, two bleed rules: illustration bleeds, everything designed does not.
+    '- LAYER ARCHITECTURE (bleed rule — not negotiable): Layer 1, ENVIRONMENTAL ILLUSTRATION — the BACKGROUND and surroundings (mountains, water, sky, foliage, habitat) may and SHOULD bleed off all four trim edges; it is expected to be cut, and that is fine. BUT the MAIN SUBJECT / focal point of the artwork — the key species and ESPECIALLY its face, head, eyes, and defining features, or the single most important element of the page — must be kept comfortably INSIDE the trim-safe area so the trim NEVER cuts it. Compose so only the non-essential background fades off the edge; the important subject stays inside. Layer 2, TYPOGRAPHY (every heading and word), and Layer 3, IDENTITY / DECORATIVE DEVICES (any badge, marker, rule, frame, or decorative element), are PROTECTED CONTENT: they must sit ENTIRELY inside the trim-safe area, at least 0.5 inch in from every trim edge, and may NEVER enter the bleed. The outer trim strip is disposable — only non-essential environmental illustration belongs there.',
+    '- NO DECORATIVE BANDS OR FRAMES: do NOT add top or bottom botanical swags, ornament bands, pinecone garlands, decorative borders, corner flourishes, or framing devices anywhere on the page. The page identity is carried by the illustration, the parchment, the engraved typography, and the stamped badges — nothing else.',
+    '- ORANGE DASHED SAFE BOUNDARY (critical): the attached blueprint has an ORANGE DASHED rectangle just inside the page edges — the trim-safe line. EVERY heading, every line of body text, the page number, and every important subject (faces, key features) must stay fully INSIDE it. AIM the text a little INSIDE the line with a small comfortable margin — do not set it right up against the line; that buffer keeps any slight drift safely inside. Nothing readable or important may touch or cross the line. Only calm background illustration may extend past it and bleed off the page.',
+    // QA reinforcement (operator): text placement is the highest priority — never
+    // let an illustration crowd the copy toward the safe boundary; centre the text.
+    '- TEXT PLACEMENT PRIORITY (HIGHEST PRIORITY): keeping EVERY piece of text — body, headings, scientific names, captions, callouts, educational content — comfortably INSIDE the safe-content area outranks the illustration. Never let text approach the safe boundary just because there is illustration space elsewhere on the page. If the copy is dense or nearing the boundary, the TEXT wins: give it more room and keep the illustration smaller.',
+    '- TEXT CENTERING: visually CENTER the body-text block inside its reading field — do NOT anchor it to the top edge, do NOT anchor it to the bottom edge, and never let it drift toward any page edge. Keep comfortable whitespace on all sides; when in doubt, pull the text inward toward the centre of the reading area.',
+    '- SAFE-ZONE (hard constraint): treat the safe-content boundary as a hard line. Text must never touch, cross, or visually crowd it. Aim text slightly INSIDE the safe area with a comfortable buffer — never exactly on the line.',
+    '- LAYOUT DECISION: if the text is dense or nearing the safe boundary, the reading experience takes priority — the text fills more of the reading field and the supporting illustration stays small. Never preserve a large illustration at the expense of text safety; reduce the illustration and expand the text instead.',
     '- The reading field sits at the supplied coordinates. Do not move it, shrink it, or change its proportions.',
     // The copyright page legitimately renders copyright text as its body, so do
     // not forbid it there — only forbid the AI from INVENTING such furniture on

@@ -1,0 +1,10 @@
+import { getDb } from '../src/db/client.js';
+import { wholePageRenders } from '../src/db/schema/index.js';
+import { eq, and, isNotNull } from 'drizzle-orm';
+const db = getDb();
+const PROJECT = process.argv[2]!;
+const rs = await db.select().from(wholePageRenders).where(eq(wholePageRenders.projectId, PROJECT));
+const active = (rs as any[]).filter(r=>r.active);
+const printed = active.filter(r=>r.printPdfPath);
+console.log(`active renders: ${active.length} | print-prepped (printPdfPath set): ${printed.length}`);
+process.exit(0);

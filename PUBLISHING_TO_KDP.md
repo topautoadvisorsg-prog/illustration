@@ -10,6 +10,13 @@ It documents the real, working build used for **Volume I — THE WILDLANDS: NEW
 ENGLAND** (275 pages), including the two gotchas that aren't obvious (file size
 and assembly memory) and how they're handled.
 
+> **⚠ READ FIRST — Volume I shipped as HARDCOVER, not paperback.** The interior
+> below is correct and unchanged, but the **cover** is the hardcover full-wrap
+> built by the AI-baked blueprint flow in **§8**, not the paperback cover in §3/§4.
+> Current upload files and the locked cover decisions (no barcode, no bio,
+> full-bleed art, AI-baked text) are in **§8**. See the "where we left off" status
+> at the end of §8.
+
 ---
 
 ## 1. The pipeline
@@ -199,3 +206,79 @@ operator has reviewed/approved pages in the console, the build runbook is:
 
 Everything else — folio policy, badge suppression, q88/300-DPI, the local-assemble
 + local-disk workaround — carries over unchanged.
+
+---
+
+## 8. Hardcover cover (Volume I — the actual shipped cover)
+
+Volume I is published as a **HARDCOVER (Case Laminate)**. The interior is identical
+to the spec above (275 pages, 7×10 trim, 300 DPI, ISBN **9798181958814** on the
+copyright page). Only the **cover** differs from §3/§4 — it is a hardcover full
+wrap, and the text is **painted into the art by the AI (baked), NOT composited/
+stamped in code.**
+
+### KDP hardcover geometry (from KDP's cover calculator — NEVER change)
+| Item | Value |
+|------|-------|
+| Full wrap | **16.409 × 11.417 in** |
+| Spine | **0.834 in** (275 pages, premium color) |
+| Front/back panel | 7.197 in each |
+| Wrap / hinge / safe inset | 0.591 / 0.394 / ~0.5 in |
+| Page count the spine assumes | **275** (changing page count changes the spine → must rebuild cover) |
+
+### Locked decisions (the operator was emphatic — do not reintroduce)
+- **AI-baked text only.** Deterministic/code-stamped text was rejected ("looks
+  stamped, doesn't match the art"). The AI paints the engraved serif text into the
+  plate. Margin control comes from the blueprint + prompt, not from stamping.
+- **NO barcode. Anywhere.** Not drawn on the cover, not mentioned in the prompt,
+  not reserved as a zone. Amazon stamps the barcode itself over the art.
+- **NO author bio on the back cover** (redundant + crowded the space). Back cover =
+  **lead paragraph + "INSIDE THIS VOLUME" list only.** The bio is also **not** in
+  the interior (the about-series bio fold was a dry-run, never committed).
+- **Illustration is FULL-BLEED, edge to edge,** bleeding off all four sides. The
+  red safe zone constrains **TEXT ONLY** — never the artwork.
+- **Front margins:** ~0.5 in clear illustration above the title AND below the
+  series line (symmetric top/bottom). Back cover margins were approved as-is.
+
+### The flow (single source of truth) — FINAL / APPROVED
+The cover prompt is the operator-authored **`MASTER_COVER_PROMPT`**, assembled by **`buildMasterPrompt(backCover)`**. This replaced the older `buildCoverWrapPrompt` + `injectProductionRules` path — do not revert to it.
+
+| File | Purpose |
+|------|---------|
+| `backend/scripts/lib/cover-blueprint.ts` | **Source of truth.** `MASTER_COVER_PROMPT` (operator's verbatim cover prompt) + `buildMasterPrompt(backCover)` (appends the exact back-cover copy; neutralizes every "barcode" trigger so the model never paints a fake ISBN; appends the no-barcode, 1-inch-margin, title-top-margin, and horizontal-center overrides). `buildBlueprintSvg` (red text zones, full-bleed illustration, hinges, NO barcode). `stripAuthorBio`. (`BACKGROUND_SCENE_DIRECTION`, `PRODUCTION_LAYOUT_RULES`, `injectProductionRules` remain but are unused by the current cover flow.) |
+| `backend/scripts/show-blueprint.ts <projectId>` | **Free** preview — writes `hardcover_blueprint.png/.svg` + `hardcover_cover_PROMPT.txt` (the master prompt) to Downloads. No AI spend. Review/tune before generating. |
+| `backend/scripts/hardcover-blueprint.ts <projectId>` | **Paid** generation — feeds the blueprint + master prompt to `generateImageFromBlueprint` (gpt-image), composes the wrap PDF at 16.409×11.417, writes `THE_WILDLANDS_NEW_ENGLAND_HARDCOVER_cover.pdf` + `hardcover_cover_review.png` to Downloads, and pushes the art to the console preview path (`cover/cover-wrap-art.png`). |
+
+**The barcode in the KDP previewer is Amazon's own** (correct ISBN, placed in the lower-left we keep clean) — our file contains no barcode. That is correct, not a defect.
+
+Run via `railway run --service "@wildlands/backend" -- node ../node_modules/tsx/dist/cli.mjs scripts/<script>.ts <projectId>` (project ID `66c1c69c-2c81-409e-a4b5-bff3f3bb04ba`).
+
+### Showing the rendered cover to the operator
+The cover is a **raster painting** — the inline visual widget only renders vector
+diagrams (the blueprint), NOT the painting. To let the operator see the actual
+cover: have them **open `C:/Users/jovan/Downloads/hardcover_cover_review.png`**
+directly, or **hard-refresh the console (Ctrl+Shift+R)** — the console caches the
+old image and busts cache only on reload. Do **not** burn time trying to base64-embed
+the painting into the widget.
+
+### Upload files (current)
+| File (in Downloads) | What |
+|---------------------|------|
+| `THE_WILDLANDS_NEW_ENGLAND_HARDCOVER_cover.pdf` | Hardcover full wrap — **the cover to upload** (16.409×11.417, 1 page, ~5 MB). |
+| `THE_WILDLANDS_NEW_ENGLAND_interior OG.pdf` | Interior — **unchanged** (491 MB, 275 pp, ISBN on copyright). Re-upload only if KDP lost it. |
+
+KDP setup: **Hardcover → Case Laminate**, interior trim **7 × 10**, premium color,
+Bleed: Yes. ISBN: "I own the copyright" / use the assigned ISBN 9798181958814.
+
+### Where we left off (2026-06-17) — FINAL, APPROVED IN KDP PREVIEWER
+Cover **finalized and approved by the operator in the KDP previewer** ("this is it").
+Final layout: prominent bull moose front-and-center; secondary wildlife (bear, fox,
+loon, eagle, canoeist) clearly visible; title centered and brought DOWN with a clear
+sky band above it; author + series centered in the lower-middle; back copy = lead
+paragraph + INSIDE THIS VOLUME; full-bleed art; NO barcode/ISBN/ornaments/bio in the
+file. Amazon's own barcode renders in the previewer's clean lower-left. Cover PDF
+validates clean (1 page, 16.409×11.417, 300 DPI, 4 MB). Interior unchanged (275 pp,
+7×10 TrimBox, 300 DPI, ISBN 9798181958814 on copyright). Files in Downloads:
+`THE_WILDLANDS_NEW_ENGLAND_HARDCOVER_cover.pdf` (upload) + `..._interior OG.pdf`.
+Next: operator clicks **Approve** in KDP. This master-prompt flow is the locked
+template for future volumes.

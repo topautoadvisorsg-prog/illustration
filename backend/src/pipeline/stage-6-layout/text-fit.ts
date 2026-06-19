@@ -92,6 +92,7 @@ function textPanelDims(
   const a = profile.artAreaFraction;
   switch (profile.artSlot) {
     case 'TOP_BAND':
+    case 'BALANCED_BAND':
     case 'BOTTOM_BAND':
     case 'SCATTERED':
     case 'FULL_PAGE':
@@ -110,6 +111,11 @@ function textPanelDims(
       return a < FLOAT_PARALLEL_COLUMN_THRESHOLD
         ? { widthPt: W, heightPt: H * (1 - a) }      // small float → text wraps; line-loss
         : { widthPt: W * (1 - a), heightPt: H };     // large float / sidebar → parallel column
+    case 'TEXT_DOMINANT':
+      // Text-dominant page — a small supporting vignette near the top, then ONE
+      // large reading field (full width × ~60% height; the title + vignette take
+      // the top, and the text centres within the rest).
+      return { widthPt: W, heightPt: H * 0.6 };
     case 'TITLE_BLOCK':
       // Display/ceremonial page — text is NOT a reading field but a compact
       // centered block (≈72% wide × ≈26% tall) surrounded by large negative

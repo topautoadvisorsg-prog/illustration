@@ -19,7 +19,12 @@ function getClient(): OpenAI {
   if (isPlaceholder(env.OPENAI_API_KEY)) {
     throw new Error('OPENAI_API_KEY is not configured; image generation is disabled.');
   }
-  client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+  // Hard 4-min per-call cap so a stalled render fails fast and the batch moves on
+  // instead of hanging on the SDK's 10-min default (+2 retries ≈ up to 30 min).
+  // 4 min (not 2) because dense pages legitimately take 2–4 min to render — a 2-min
+  // cap killed valid pages and forced wasteful re-renders. maxRetries:0 keeps the
+  // ceiling honest; the batch's own retry pass re-runs anything that genuinely fails.
+  client = new OpenAI({ apiKey: env.OPENAI_API_KEY, timeout: 240_000, maxRetries: 0 });
   return client;
 }
 

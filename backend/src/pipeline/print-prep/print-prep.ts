@@ -72,6 +72,10 @@ export async function composePrintPage(
   const parchment = hexToRgb(PALETTE.parchment.hex);
 
   // 1. Lanczos upscale, height-fit (preserves the full composition; no crop).
+  //    REAL bleed: the environmental illustration fills the full bleed canvas and
+  //    runs off the trim — that is correct and expected. Protected content
+  //    (typography, badges, decorative devices) must be authored INSIDE the
+  //    trim-safe area at render time; it is NEVER protected here by faking bleed.
   const meta = await sharp(renderPng).metadata();
   const srcW = meta.width ?? 1024;
   const srcH = meta.height ?? 1536;
@@ -92,14 +96,19 @@ export async function composePrintPage(
   // backing hides whatever it placed in this small corner.
   const stack = computeBadgeStackLayout(badgesForPage(badgeSet), folioLabel, canvas);
 
-  // 3a. Parchment cartouche FIRST (sits behind every stamp).
-  const cartoucheSvg = buildCartoucheSvg(stack.cartoucheRect, PALETTE.parchment.hex);
-  const cartouchePng = await sharp(Buffer.from(cartoucheSvg)).png().toBuffer();
-  composites.push({
-    input: cartouchePng,
-    left: stack.cartoucheRect.left,
-    top: stack.cartoucheRect.top,
-  });
+  // 3a. Parchment cartouche FIRST (sits behind every stamp). Print-proof defect:
+  // with badges suppressed, the cartouche backed only the page number and read as
+  // a faint light stamp on the art. Draw it ONLY when there are badges to back;
+  // a lone folio stamps bare (no parchment patch).
+  if (stack.placedBadges.length > 0) {
+    const cartoucheSvg = buildCartoucheSvg(stack.cartoucheRect, PALETTE.parchment.hex);
+    const cartouchePng = await sharp(Buffer.from(cartoucheSvg)).png().toBuffer();
+    composites.push({
+      input: cartouchePng,
+      left: stack.cartoucheRect.left,
+      top: stack.cartoucheRect.top,
+    });
+  }
 
   // 3b. Badges stamped ON TOP of the cartouche. L-7.2.2 — 15% brightness
   // reduction (modulate preserves hue + alpha) makes the stamps read a touch
@@ -118,16 +127,34 @@ export async function composePrintPage(
     composites.push({ input: bpng, left: p.rect.left, top: p.rect.top });
   }
 
-  // 3c. Folio joins the corner stack (no longer a separate bottom-centre).
-  // Same 15% brightness reduction so the page number matches the badges.
+  // 3c. Folio (page number). With NO badges (this book), the lone folio sits
+  // BOTTOM-CENTRE with a clean margin above the trim — the standard book
+  // position — instead of floating in the empty bottom-right corner. With badges
+  // present it joins the corner stack (dimmed to match the badges).
   let stampedFolio = false;
   if (stack.folio) {
-    const r = stack.folio.rect;
     const fontPx = Math.round(0.16 * canvas.dpi);
+    const centred = stack.placedBadges.length === 0;
+    let r = stack.folio.rect;
+    if (centred) {
+      const bleedPx = Math.round(0.125 * canvas.dpi);
+      const w = Math.round(1.4 * canvas.dpi);
+      const h = Math.round(0.3 * canvas.dpi);
+      r = {
+        width: w,
+        height: h,
+        left: Math.round((canvas.width - w) / 2),
+        // baseline ~0.4in above the bottom trim
+        top: canvas.height - bleedPx - Math.round(0.4 * canvas.dpi) - h,
+      };
+    }
     const folioSvg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${r.width}" height="${r.height}" viewBox="0 0 ${r.width} ${r.height}">` +
-      `<text x="${r.width / 2}" y="${r.height * 0.75}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" fill="${PALETTE.ink.hex}">${stack.folio.label}</text></svg>`;
-    const fpng = await sharp(Buffer.from(folioSvg)).modulate({ brightness: 0.85 }).png().toBuffer();
+      `<text x="${r.width / 2}" y="${r.height * 0.72}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" fill="${PALETTE.ink.hex}">${stack.folio.label}</text></svg>`;
+    // Centred lone folio prints at full ink (most readable); the corner-stack
+    // folio stays dimmed to match the badges.
+    const base = sharp(Buffer.from(folioSvg));
+    const fpng = await (centred ? base : base.modulate({ brightness: 0.85 })).png().toBuffer();
     composites.push({ input: fpng, left: r.left, top: r.top });
     stampedFolio = true;
   }

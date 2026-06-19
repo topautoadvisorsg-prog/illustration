@@ -34,6 +34,12 @@ export type ArtSlot =
   | 'CORNER_TOP_RIGHT'
   | 'CORNER_BOTTOM_LEFT'
   | 'CORNER_BOTTOM_RIGHT'
+  // Text-dominant composition: ONE large reading field with the text block
+  // visually centered, plus a SMALL supporting illustration vignette (~10-12%).
+  // The fit-first target for pages where a bigger illustration was crowding the
+  // text toward the safe boundary. Deliberately NOT an L-shape (no column-beside-
+  // accent), so the reading field is one clean rectangle the text centers within.
+  | 'TEXT_DOMINANT'
   // Display/ceremonial composition: a compact centered text block with generous
   // negative space + thin edge ornaments. The image-priority edge of the
   // LAYOUT_TITLE_DISPLAY catalog layout (title page, dedication, epigraph, etc.).
@@ -45,7 +51,11 @@ export type ArtSlot =
   // Two-column reference composition: a heading + two dense reading columns over
   // the calm illustrated field + thin edge ornaments (LAYOUT_REFERENCE —
   // glossary, index).
-  | 'REFERENCE_COLUMNS';
+  | 'REFERENCE_COLUMNS'
+  // Balanced top band (~25%): a contained natural-history illustration band
+  // across the top, title + ONE clean centered reading field below it. The
+  // middle ground between the 12% small accent and the 50% band.
+  | 'BALANCED_BAND';
 
 export interface LayoutProfile {
   /** Fraction of the page available to body copy in the text-safe zone (0-1). */
@@ -60,7 +70,10 @@ export interface LayoutProfile {
 
 export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
   LAYOUT_1_STANDARD: { textAreaFactor: 0.8, artSlot: 'FLOAT_LEFT', artAreaFraction: 0.32, textLight: false },
-  LAYOUT_2_TEXT_HEAVY: { textAreaFactor: 0.92, artSlot: 'FLOAT_LEFT', artAreaFraction: 0.14, textLight: false },
+  // Repurposed as the TEXT-DOMINANT layout: one large centered reading field +
+  // a small supporting illustration vignette (~12%). Used as the reduce-illustration
+  // target for pages whose text was crowding the safe boundary.
+  LAYOUT_2_TEXT_HEAVY: { textAreaFactor: 0.88, artSlot: 'TEXT_DOMINANT', artAreaFraction: 0.12, textLight: false },
   LAYOUT_3_ILLUSTRATION_DOMINANT: { textAreaFactor: 0.55, artSlot: 'FLOAT_RIGHT', artAreaFraction: 0.5, textLight: false },
   LAYOUT_4_DANGER_WARNING: { textAreaFactor: 0.72, artSlot: 'FLOAT_LEFT', artAreaFraction: 0.34, textLight: false },
   LAYOUT_5_CHAPTER_OPENER: { textAreaFactor: 0.3, artSlot: 'TOP_BAND', artAreaFraction: 0.55, textLight: true },
@@ -92,6 +105,10 @@ export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
   LAYOUT_C_CORNER_BOTTOM_RIGHT: { textAreaFactor: 0.75, artSlot: 'CORNER_BOTTOM_RIGHT', artAreaFraction: 0.25, textLight: false },
   // Layout D — pure text / back matter (no illustration).
   LAYOUT_D_PURE_TEXT: { textAreaFactor: 1.0, artSlot: 'FULL_PAGE', artAreaFraction: 0, textLight: false },
+  // Layout E — BALANCED ~25%: a contained illustration band at the top + one
+  // clean centered reading field below. Real subject, not an accent; sized so the
+  // text stays comfortable and no dead parchment is left.
+  LAYOUT_E_BAND_BALANCED: { textAreaFactor: 0.72, artSlot: 'BALANCED_BAND', artAreaFraction: 0.25, textLight: false },
   // Title Display — centered short-text block + thin edge ornaments over a
   // SUBTLE full-page illustrated field (the whole page is illustration, not
   // blank paper). Very low text capacity by design (a few lines, not paragraphs).
@@ -148,9 +165,11 @@ const ART_SLOT_LABELS: Record<ArtSlot, string> = {
   CORNER_TOP_RIGHT: 'top-right corner',
   CORNER_BOTTOM_LEFT: 'bottom-left corner',
   CORNER_BOTTOM_RIGHT: 'bottom-right corner',
+  TEXT_DOMINANT: 'text-dominant (small supporting illustration)',
   TITLE_BLOCK: 'centered title block',
   FINE_PRINT_BOTTOM: 'bottom fine-print block',
   REFERENCE_COLUMNS: 'two-column reference',
+  BALANCED_BAND: 'balanced top band (~25%)',
 };
 
 /**

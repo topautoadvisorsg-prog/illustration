@@ -25,12 +25,16 @@ export const PAGE_TYPOGRAPHY_DNA: TypographyDNA = {
   // Filled per-page by the spec builder — the standard locks the SHAPE of the
   // hierarchy, the content comes from the page row.
   titleHierarchy: [],
-  ornaments: [
-    WILDLANDS_STANDARD.ornaments.components.topSwag,
-    WILDLANDS_STANDARD.ornaments.components.bottomSwag,
-    WILDLANDS_STANDARD.ornaments.components.hairlineRule,
-  ],
-  decorativeInitial: WILDLANDS_STANDARD.ornaments.components.dropCapSurround,
+  // Architecture v1.3: the top/bottom botanical SWAGS are removed. They are
+  // protected decorative content that kept getting clipped by the trim, and the
+  // book reads better on Identity A alone (illustration + parchment + type).
+  // Visual identity now lives in the badge system (stamped inside trim-safe by
+  // print-prep). Only the thin engraved heading rule (typography, not a swag)
+  // remains here.
+  ornaments: [WILDLANDS_STANDARD.ornaments.components.hairlineRule],
+  // Architecture v1.3: a plain engraved drop-cap initial only — NO botanical
+  // surround/wreath (that was a decorative device; only typography remains).
+  decorativeInitial: 'A large plain engraved initial letter (drop cap) in warm sepia ink — no surrounding wreath, leaves, vines, pinecone, or ornament.',
   noModernUi: true,
   noInfographic: true,
 };

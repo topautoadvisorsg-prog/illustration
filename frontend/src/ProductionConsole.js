@@ -97,6 +97,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [renders, setRenders] = useState(null); // { total, byStatus, bookReady, renders:[] }
   const [preview, setPreview] = useState(null); // active preview package
   const [showGuides, setShowGuides] = useState(true); // KDP-style trim/safe overlay on the page preview
+  const [coverAR, setCoverAR] = useState(null); // full-wrap image aspect ratio (w/h), for spine fold lines
   const [cover, setCover] = useState(null);
   const [assembly, setAssembly] = useState(null);
   const [status, setStatus] = useState({}); // real backend progress for the step checkmarks
@@ -679,14 +680,31 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     ? (
                       <>
                         <a href={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} target="_blank" rel="noreferrer" title="Click to open the full-resolution cover in a new tab" style={{ position: "relative", display: "block", marginTop: 10, width: "100%", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 8, background: "#000", cursor: "zoom-in" }}>
-                          <img alt="Full wrap cover" src={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} decoding="async" onError={() => { if (cover._probe) setCover(null); }} style={{ width: "100%", display: "block" }} />
-                          {/* Hardcover wrap safe-zone (outer text-safe inset ~0.72in). Spine/hinge
-                              zones aren't drawn here — this is the outer text boundary only. */}
+                          <img alt="Full wrap cover" src={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} decoding="async" onLoad={(e) => setCoverAR(e.target.naturalWidth && e.target.naturalHeight ? e.target.naturalWidth / e.target.naturalHeight : null)} onError={() => { if (cover._probe) setCover(null); }} style={{ width: "100%", display: "block" }} />
+                          {/* QA overlay: outer text-safe box (green) + SPINE FOLD LINES (orange).
+                              The spine is derived from the wrap image's real aspect ratio, so it is
+                              correct for whatever spine width / page count the cover was built with —
+                              no hardcoded constant. Review-only DOM lines, never baked into the export. */}
                           {showGuides && <div style={{ position: "absolute", top: "6.31%", bottom: "6.31%", left: "4.39%", right: "4.39%", border: "1.5px dashed #2f8a3f", pointerEvents: "none", boxSizing: "border-box" }} />}
+                          {showGuides && (() => {
+                            const td = trimSize(form.trim);
+                            const fullH = td.heightIn + 2 * td.bleedIn;
+                            const fullW = coverAR ? coverAR * fullH : null;
+                            const spineIn = fullW ? fullW - 2 * td.widthIn - 2 * td.bleedIn : null;
+                            if (!fullW || !spineIn || spineIn <= 0) return null;
+                            const leftPct = ((td.bleedIn + td.widthIn) / fullW) * 100;
+                            const rightPct = ((td.bleedIn + td.widthIn + spineIn) / fullW) * 100;
+                            return (
+                              <>
+                                <div style={{ position: "absolute", top: 0, bottom: 0, left: `${leftPct}%`, width: 0, borderLeft: "1.5px dashed #e08a2e", pointerEvents: "none" }} />
+                                <div style={{ position: "absolute", top: 0, bottom: 0, left: `${rightPct}%`, width: 0, borderLeft: "1.5px dashed #e08a2e", pointerEvents: "none" }} />
+                              </>
+                            );
+                          })()}
                         </a>
                         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.muted, marginTop: 6, cursor: "pointer" }}>
                           <input type="checkbox" checked={showGuides} onChange={(e) => setShowGuides(e.target.checked)} />
-                          Show safe-zone guide (green = keep all cover text inside; spine/hinge not shown)
+                          Show guides — <span style={{ color: "#2f8a3f" }}>green = text-safe</span> · <span style={{ color: "#e08a2e" }}>orange = spine folds</span>{coverAR ? ` (spine ≈ ${(coverAR * (trimSize(form.trim).heightIn + 0.25) - 2 * trimSize(form.trim).widthIn - 0.25).toFixed(3)}in)` : ""}
                         </label>
                         <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Click the wrap to open it full-size and read every word. Back cover (left) · spine (center) · front cover (right).</div>
                         <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
@@ -752,17 +770,20 @@ export default function ProductionConsole({ onExitToLegacy }) {
                         <div style={{ marginTop: 10 }}>
                           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.muted, marginBottom: 6, cursor: "pointer" }}>
                             <input type="checkbox" checked={showGuides} onChange={(e) => setShowGuides(e.target.checked)} />
-                            Show safe-zone guides — <span style={{ color: "#cc2222" }}>red = trim (KDP cut)</span> · <span style={{ color: "#2f8a3f" }}>green = safe zone (keep text &amp; main subject inside)</span>
+                            QA overlay — <span style={{ color: "#cc2222" }}>red = trim (KDP cut)</span> · <span style={{ color: "#2f8a3f" }}>green = safe-content</span> · <span style={{ color: "#e08a2e" }}>amber = buffer (aim text inside)</span>
                           </label>
-                          {/* Full page image with KDP-style trim + safe overlays. The render is the
-                              full-bleed 7x10 canvas (0.125in bleed), so the guides are fixed %
-                              insets of the image: trim = bleed inset, safe = 0.5in inside trim. */}
+                          {/* Permanent QA overlay (review-only — these are DOM lines, never baked into
+                              the render, so they can never appear in an export). The render is the
+                              full-bleed 7x10 canvas (0.125in bleed), so the guides are fixed % insets
+                              of the image: trim = bleed inset (0.125in), safe-content = 0.5in inside
+                              trim (0.625in from edge), buffer = a further ~0.15in inside safe. */}
                           <div style={{ position: "relative", lineHeight: 0 }}>
                             <img alt={preview.authority?.entryTitle || "page"} src={`${fileUrl(preview._imagePath)}&v=${preview._cb || 0}`} onClick={() => setPreview(null)} title="Tap to close" style={{ width: "100%", maxWidth: "100%", border: `1px solid ${C.line}`, borderRadius: 8, display: "block", cursor: "zoom-out" }} />
                             {showGuides && (
                               <>
                                 <div style={{ position: "absolute", top: "1.22%", bottom: "1.22%", left: "1.72%", right: "1.72%", border: "1.5px dashed #cc2222", pointerEvents: "none", boxSizing: "border-box" }} />
                                 <div style={{ position: "absolute", top: "6.10%", bottom: "6.10%", left: "8.62%", right: "8.62%", border: "1.5px dashed #2f8a3f", pointerEvents: "none", boxSizing: "border-box" }} />
+                                <div style={{ position: "absolute", top: "7.80%", bottom: "7.80%", left: "11.03%", right: "11.03%", border: "1px dotted #e08a2e", pointerEvents: "none", boxSizing: "border-box" }} />
                               </>
                             )}
                           </div>

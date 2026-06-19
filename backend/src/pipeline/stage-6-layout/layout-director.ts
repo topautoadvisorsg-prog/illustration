@@ -177,19 +177,29 @@ function placementFor(slot: ArtSlot): { imagePlacement: string; textPlacement: s
       return { imagePlacement: 'small bottom-left corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: the full upper block, then a column beside the accent' };
     case 'CORNER_BOTTOM_RIGHT':
       return { imagePlacement: 'small bottom-right corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: the full upper block, then a column beside the accent' };
+    case 'BALANCED_BAND':
+      return {
+        imagePlacement: 'a CONTAINED natural-history illustration BAND across the TOP of the page — roughly a quarter of the page — a real, meaningful subject (the page\'s wildlife, plant, tree, fungi, or habitat/landscape study), sitting high and allowed to graze the top and side trim edges. A genuine illustration, NOT a tiny icon and NOT an ornament; kept to the top band so it never crowds the text.',
+        textPlacement: 'the title sits on a calm band BELOW the top illustration, and ALL the body text fills ONE single large reading field beneath it — VISUALLY CENTERED, brought DOWN and fully inside the safe rail. Comfortable whitespace on all sides; one clean rectangle of text, never an L-shape around the illustration.',
+      };
+    case 'TEXT_DOMINANT':
+      return {
+        imagePlacement: 'a SMALL subject illustration at the TOP of the page — roughly 8-10% of the page — a single naturalist study of the page subject (the animal, tree, mushroom, or key detail), calm and centered, sitting high and allowed to graze the top trim edge. NOT a wide landscape band, NOT a frame, NOT an ornament — a real subject only. The title and all body text sit BELOW it.',
+        textPlacement: 'the title sits on a calm band BELOW the top illustration, and ALL the body text fills ONE single large reading field beneath it — the text block VISUALLY CENTERED, brought DOWN and fully inside the safe rail so no line ever rides the top edge. Comfortable whitespace on all sides; never anchor the text to any page edge. One clean rectangle of text, never an L-shape around the illustration.',
+      };
     case 'TITLE_BLOCK':
       return {
-        imagePlacement: 'a subtle full-page illustrated field — aged parchment, delicate botanical atmosphere, faint naturalist textures kept calm and low-contrast — with thin decorative ornament bands at the very top and bottom edges; the centered title block sits cleanly within this field',
+        imagePlacement: 'a subtle full-page illustrated field — aged parchment, delicate botanical atmosphere, faint naturalist textures kept calm and low-contrast, with NO decorative ornament bands or frames; the centered title block sits cleanly within this field',
         textPlacement: 'a compact, vertically-centered text block (a few short lines) over the calm centre of the illustrated field, with generous open space above and below',
       };
     case 'FINE_PRINT_BOTTOM':
       return {
-        imagePlacement: 'a subtle full-page illustrated field — calm, low-contrast aged parchment with delicate botanical atmosphere and faint naturalist textures — framed by thin decorative ornament bands at the very top and bottom edges; the field owns the open space above the fine print',
+        imagePlacement: 'a subtle full-page illustrated field — calm, low-contrast aged parchment with delicate botanical atmosphere and faint naturalist textures, with NO decorative ornament bands or frames; the field owns the open space above the fine print',
         textPlacement: 'a SMALL block of quiet fine print anchored LOW on the page (lower third), small restrained type centered horizontally, with the calm illustrated field filling all the space above it',
       };
     case 'REFERENCE_COLUMNS':
       return {
-        imagePlacement: 'a subtle full-page illustrated field — calm, low-contrast aged parchment with faint botanical atmosphere — framed by thin decorative ornament bands at the very top and bottom edges; it sits quietly BEHIND the two reference columns',
+        imagePlacement: 'a subtle full-page illustrated field — calm, low-contrast aged parchment with faint botanical atmosphere, with NO decorative ornament bands or frames; it sits quietly BEHIND the two reference columns',
         textPlacement: 'a heading at the top, then the entries flow in TWO balanced columns of smaller but comfortable reference type (read down the left column, then continue down the right). Dense and orderly, like a real field-guide glossary/index — never a single wide block, never cramped',
       };
     default:
@@ -207,8 +217,8 @@ function refinedPlacement(slot: ArtSlot, imagePercent: number): { imagePlacement
     }
     if (imagePercent <= 8) {
       return {
-        imagePlacement: 'a SUBTLE full-page illustrated field — calm, low-contrast aged parchment with soft atmosphere and faint naturalist texture across the whole page (never blank paper) — framed by thin decorative ornament bands at the very top and bottom edges. Keep it quiet: no bold subject illustration, this stays a restful text page',
-        textPlacement: 'a single calm reading field for the body text, sitting over the subtle field between the edge ornaments',
+        imagePlacement: 'a SUBTLE full-page illustrated field — calm, low-contrast aged parchment with soft atmosphere and faint naturalist texture across the whole page (never blank paper), with NO decorative ornament bands or frames. Keep it quiet: no bold subject illustration, this stays a restful text page',
+        textPlacement: 'a single calm reading field for the body text, sitting over the subtle field',
       };
     }
   }
@@ -298,7 +308,13 @@ function zone(id: string, role: PlanningZoneRole, xPct: number, yPct: number, wi
 const TITLE_BAND_Y = 4;
 const TITLE_BAND_H = 11;
 const FOCAL_TOP = 18; // image-priority + reading-field start here, under the title band
-const BOTTOM = 94; // leave a calm bottom margin
+// Bottom edge of the reading/text zones, as % of the full bleed canvas. The orange
+// trim-safe rail's bottom sits at 100 − (0.625/10.25)*100 ≈ 93.9%, so the text field
+// must end ABOVE it with a buffer — otherwise the AI fills the last lines down onto /
+// past the rail (the bottom-overflow bug). 90% leaves ~0.4in of clearance above the
+// rail. This only moves the blueprint zone; pagination is computed from page geometry,
+// so the page count and text-per-page are unchanged.
+const BOTTOM = 90;
 const GUTTER = 5; // hard separation between image-priority and reading-field — never share a strip
 const clampN = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
@@ -346,6 +362,8 @@ const BACKGROUND_FIELD_SLOTS = new Set<ArtSlot>([
   'CORNER_TOP_RIGHT',
   'CORNER_BOTTOM_LEFT',
   'CORNER_BOTTOM_RIGHT',
+  'TEXT_DOMINANT',
+  'BALANCED_BAND',
 ]);
 
 function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick<LayoutAllocation, 'textSafeZones' | 'typographyZones' | 'imagePriorityZones'> {
@@ -447,6 +465,28 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick
         ],
       };
     }
+    case 'BALANCED_BAND': {
+      // Balanced ~25% (operator 2026-06-18): a CONTAINED illustration band across
+      // the top (may graze top/side trim — illustration bleeds), then the title and
+      // ONE clean centered reading field brought down inside the safe rail. The
+      // middle ground — a real, meaningful illustration without compressing the text
+      // or leaving dead parchment. Background field is prepended by directLayout.
+      const band = zone('image-band-top', 'primary-art', 3, 3, 94, 24, 'A CONTAINED natural-history illustration band across the TOP of the page — a real, meaningful subject (the page subject: wildlife, plant, tree, fungi, or a habitat/landscape study) filling this top band. It may graze the top and side trim edges (illustration is allowed to bleed). A genuine illustration, never a tiny icon, never an ornament. Concentrate the strong detail here; below it the artwork opens into the calm reading field.');
+      const titleLow = zone('title-main', 'title', 8, 29, 84, 9, 'Title/heading on a CALM band BELOW the top illustration band, fully INSIDE the safe rail on all sides. Keep it low-detail and open so the heading reads.');
+      const reading = zone('reading-field-centered', 'body', 8, 40, 84, BOTTOM - 40, 'ONE single large reading field — CENTER the body-text block vertically AND horizontally, with comfortable whitespace on all sides, fully inside the safe rail. One clean rectangle of text, never an L-shape around the illustration, never anchored to a page edge.', 'organic');
+      return { typographyZones: [titleLow], imagePriorityZones: [band], textSafeZones: [reading] };
+    }
+    case 'TEXT_DOMINANT': {
+      // Text-dominant (operator 2026-06-18): the SMALL subject illustration sits at
+      // the TOP of the page and may ride up to the top trim — illustration is allowed
+      // to bleed/be cut. The title AND the reading field are brought DOWN below it,
+      // entirely inside the safe rail, so NO line of text ever rides the top edge and
+      // risks being cut. One clean centered reading rectangle (no L-shape).
+      const vignette = zone('image-supporting', 'primary-art', 25, 3, 50, 17, 'A SMALL subject illustration at the TOP of the page — a single naturalist study of the page subject (the animal, tree, mushroom, or key detail), calm and centered. It may sit high and graze the top trim edge (illustration is allowed to bleed). Keep it small and contained — NOT a wide landscape band, NOT a frame, NOT an ornament; a real subject only.');
+      const titleLow = zone('title-main', 'title', 8, 24, 84, 10, 'Title/heading on a CALM band BELOW the top illustration and fully INSIDE the safe rail on all sides — never at the very top edge, never out to the side edges. Keep it low-detail and open so the heading reads.');
+      const reading = zone('reading-field-centered', 'body', 8, 36, 84, BOTTOM - 36, 'ONE single large reading field — the dominant element of the page. CENTER the body-text block vertically AND horizontally within this field, with comfortable whitespace on all sides. Brought DOWN and fully inside the safe rail so no line rides the top edge. Do NOT anchor the text to any page edge. One clean rectangle of text — never an L-shape around the illustration.', 'organic');
+      return { typographyZones: [titleLow], imagePriorityZones: [vignette], textSafeZones: [reading] };
+    }
     case 'TITLE_BLOCK':
       // Display / ceremonial composition (LAYOUT_TITLE_DISPLAY): a compact,
       // vertically-centered text block with GENEROUS negative space, framed by
@@ -464,8 +504,7 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick
           // Background illustrated field: the whole page is a subtle illustrated
           // environment, NOT blank paper. Drawn first; ornaments + title sit on top.
           zone('illustration-field', 'background-art', 0, 0, 100, 100, 'SUBTLE FULL-PAGE ILLUSTRATED FIELD — the entire page is a soft, low-contrast illustrated environment: aged parchment, delicate botanical atmosphere, faint pressed-leaf / fern / pine textures, gentle vintage paper grain. Keep it quiet and atmospheric so the centered title block stays the focal point; never busy, never a hard subject scene.'),
-          zone('ornament-top', 'supporting-art', 18, 0.5, 64, 3, 'Extremely thin decorative top-EDGE ornament ONLY (a hairline engraved botanical band hugging the top edge). Never overlap the centered text block.'),
-          zone('ornament-bottom', 'supporting-art', 18, 96, 64, 3, 'Extremely thin decorative bottom-EDGE ornament ONLY (a hairline engraved botanical band hugging the bottom edge). Never overlap the centered text block.'),
+          // Architecture v1.3: edge ornament bands removed (ornaments are gone).
         ],
         textSafeZones: [],
       };
@@ -478,8 +517,7 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick
         typographyZones: [],
         imagePriorityZones: [
           backgroundField(),
-          zone('ornament-top', 'supporting-art', 12, 0.5, 76, 3, 'Extremely thin decorative top-EDGE ornament ONLY (a hairline engraved botanical band hugging the top edge). Never overlap the fine-print block.'),
-          zone('ornament-bottom', 'supporting-art', 12, 96, 76, 3, 'Extremely thin decorative bottom-EDGE ornament ONLY (a hairline engraved botanical band hugging the bottom edge). Never overlap the fine-print block.'),
+          // Architecture v1.3: edge ornament bands removed (ornaments are gone).
         ],
         textSafeZones: [
           zone('fine-print-block', 'body', 16, 72, 68, 18, 'SMALL FINE-PRINT BLOCK anchored low on the page (copyright / edition notice): a few lines of small, quiet legal/credits type, centered horizontally in the lower third. The calm illustrated field owns ALL the open space ABOVE it. Keep the type small and restrained — fine print, never a large reading field, never a heading.', 'organic'),
@@ -494,8 +532,7 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick
         typographyZones: [title],
         imagePriorityZones: [
           backgroundField(),
-          zone('ornament-top', 'supporting-art', 12, 0.5, 76, 3, 'Extremely thin decorative top-EDGE ornament ONLY (a hairline engraved botanical band hugging the top edge). Never overlap the heading or the columns.'),
-          zone('ornament-bottom', 'supporting-art', 12, 96, 76, 3, 'Extremely thin decorative bottom-EDGE ornament ONLY (a hairline engraved botanical band hugging the bottom edge). Never overlap the columns.'),
+          // Architecture v1.3: edge ornament bands removed (ornaments are gone).
         ],
         textSafeZones: [
           zone('reading-column-left', 'body', 6, 18, 42, 72, 'LEFT reading column of a TWO-COLUMN reference page (glossary / index): dense entries set in smaller but comfortable reference type, flowing top-to-bottom, then continuing in the right column. A calm parchment column over the subtle field — no panel, box, or card.', 'organic'),
@@ -537,14 +574,10 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick
       }
       if (imagePercent <= 8) {
         // PURE TEXT (LAYOUT_D_PURE_TEXT: continuation, compacted, copyright,
-        // glossary, index, contents…). A calm reading field with only thin
-        // decorative edge ornaments — visual continuity, NOT a subject plate.
-        // Ornaments sit at the very top/bottom edges, EXTREMELY THIN — they may
-        // touch the text zones but must never overlap them (operator fix).
-        const ornaments = [
-          zone('ornament-top', 'supporting-art', 12, 0.5, 76, 3, 'Extremely thin decorative top-EDGE ornament ONLY (a hairline engraved botanical band hugging the top edge) — visual continuity, never a subject illustration. Keep it a thin strip; never overlap the title or the reading field.'),
-          zone('ornament-bottom', 'supporting-art', 12, 96, 76, 3, 'Extremely thin decorative bottom-EDGE ornament ONLY (a hairline engraved botanical band hugging the bottom edge) — visual continuity, never a subject illustration. Keep it a thin strip; never overlap the reading field.'),
-        ];
+        // glossary, index, contents…). Architecture v1.3: edge ornament bands
+        // REMOVED (ornaments are gone). The page is a calm reading field over a
+        // SUBTLE illustrated parchment field — no decorative bands, no subject plate.
+        const ornaments = [backgroundField()];
         // Titled pages (glossary/index/contents) reserve a top title band.
         // Titleless pages (copyright/continuation/compacted) drop the empty band
         // and raise the reading field so the text starts near the top edge.
@@ -552,13 +585,13 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick
           return {
             typographyZones: [title],
             imagePriorityZones: ornaments,
-            textSafeZones: [zone('reading-field-full', 'body', 6, 18, 88, 72, 'Large uninterrupted reading field: a calm parchment text column filling the page between the edge ornaments. Text-first page — no subject illustration, no panels, no cards.', 'organic')],
+            textSafeZones: [zone('reading-field-full', 'body', 6, 18, 88, 72, 'Large uninterrupted reading field: a calm parchment text column filling the page. Text-first page — no subject illustration, no panels, no cards, no ornament bands or frames.', 'organic')],
           };
         }
         return {
           typographyZones: [],
           imagePriorityZones: ornaments,
-          textSafeZones: [zone('reading-field-full', 'body', 6, 6, 88, 84, 'Single calm reading field with NO title band: the body text begins near the top edge and flows down one calm parchment column between the thin edge ornaments. Text-first page — no heading, no subject illustration, no panels, no cards.', 'organic')],
+          textSafeZones: [zone('reading-field-full', 'body', 6, 6, 88, 84, 'Single calm reading field with NO title band: the body text begins near the top edge and flows down one calm parchment column. Text-first page — no heading, no subject illustration, no panels, no cards, no ornament bands or frames.', 'organic')],
         };
       }
       // IMAGE-DOMINANT OPENER (the "empty space becomes illustration" path, used
@@ -570,7 +603,7 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick
       return {
         typographyZones: [title],
         imagePriorityZones: [zone('image-priority-hero', 'primary-art', 0, FOCAL_TOP, 100, Math.max(34, 70 - FOCAL_TOP), 'Strong focal illustration filling the upper page; it opens and dissolves into a calm reading field below. The entire page is one continuous illustration — never leave blank paper.')],
-        textSafeZones: [zone('reading-field-hero', 'body', 8, 72, 84, 22, 'Compact calm reading field the artwork dissolves into across the lower page; comfortably holds the short entry text at body size. Organic transition into the art — never a panel, box, card, or pasted block.', 'organic')],
+        textSafeZones: [zone('reading-field-hero', 'body', 8, 72, 84, BOTTOM - 72, 'Compact calm reading field the artwork dissolves into across the lower page; comfortably holds the short entry text at body size. Organic transition into the art — never a panel, box, card, or pasted block.', 'organic')],
       };
     }
   }

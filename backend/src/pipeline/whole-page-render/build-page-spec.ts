@@ -16,7 +16,7 @@ import type { LayoutAllocation, PlanningZone } from '../stage-6-layout/layout-di
 import { REFERENCE_TYPOGRAPHY } from '../stage-6-layout/layout-profiles.js';
 import type { PageGeometry } from '../stage-6-layout/page-geometry.js';
 import { deriveSubjectPackage } from '../stage-2-planner/plan-pages.js';
-import { assembleIllustrationDna, toRoman, WILDLANDS_STANDARD } from '../publishing-standard/index.js';
+import { assembleIllustrationDna, toRoman } from '../publishing-standard/index.js';
 import { stripReadingFieldMetadata, extractBinomial } from '../subject-badges/extract-badges.js';
 import { markdownToBlocks, blocksToPlainText } from './markdown-blocks.js';
 import { buildPageRolePolicy, type PageRolePolicy } from './page-role-policy.js';
@@ -65,35 +65,18 @@ function inferReadingFieldAnchor(zone: PlanningZone | null): ReadingFieldGeometr
 
 
 /**
- * Decorative elements per the Wild Lands Publishing Standard. Family is always
- * Botanical Pinecone (`WILDLANDS_STANDARD.ornaments.family`). Chapter openers
- * get top+bottom swags; other page types get a bottom swag only.
+ * Decorative elements. Architecture v1.3: NO botanical swags or decorative rules
+ * are emitted on any page. The top/bottom pinecone swags were protected content
+ * that kept getting clipped by the trim and added production risk without
+ * carrying the book — identity now rests on illustration + parchment + engraved
+ * type + the stamped badge system. So every page returns empty decorative rules.
  *
- * Standard v1.1: `badges` is ALWAYS empty here — badges are deterministic
- * stamped overlays (print-prep), never model-drawn. The badge VALUES travel in
- * `spec.badgeContext` as mood-only context. Emitting badges here would
- * contradict the prompt's "do not draw badges" hard constraint.
+ * `badges` is ALWAYS empty here — badges are deterministic stamped overlays
+ * (print-prep), never model-drawn; their VALUES travel in `spec.badgeContext`.
  */
 function buildDecorativeElements(pageType: WholePageSpec['pageType']): DecorativeElementsDTO {
-  if (pageType === 'CHAPTER_OPENER' || pageType === 'INTRO_OPENER') {
-    return {
-      topRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':top_swag', position: 'above_illustration' },
-      bottomRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':bottom_swag', position: 'below_body' },
-      badges: [],
-    };
-  }
-  if (pageType === 'TITLE_PAGE') {
-    return {
-      topRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':hairline_top', position: 'above_title' },
-      bottomRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':restrained_bottom_swag', position: 'below_title' },
-      badges: [],
-    };
-  }
-  return {
-    topRule: null,
-    bottomRule: { kind: WILDLANDS_STANDARD.ornaments.family + ':bottom_swag', position: 'below_body' },
-    badges: [],
-  };
+  void pageType; // intentionally uniform — no swags/rules on any page type
+  return { topRule: null, bottomRule: null, badges: [] };
 }
 
 export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {

@@ -22,16 +22,17 @@ const COLORS = {
   bg: '#ECE4CF', // parchment field
   image: '#2E6FB0', // STRONG BLUE — PRIMARY_IMAGE_ZONE (concentrate focal detail)
   field: '#9DBBD6', // LIGHT BLUE — BACKGROUND_ILLUSTRATION_FIELD (calm, whole-page)
-  support: '#E08A2E', // ORANGE — SUPPORTING_IMAGE_ZONE
+  support: '#B5500A', // DEEP ORANGE — SAFE_BOUNDARY rail (bold/dark so it reads on parchment)
   text: '#C0392B', // RED — TEXT_SAFE_ZONE (title folds in)
   reserved: '#F1C40F', // YELLOW — L-7 BADGE_SAFE_ZONE (reserved empty parchment)
 } as const;
 
-/** Blueprint fill for an image-priority-array zone, by its role. */
+/** Blueprint fill for an image-priority-array zone, by its role. Architecture
+ *  v1.3: 'supporting-art' (specimen studies) is now illustration like any other —
+ *  rendered STRONG BLUE, not orange. Orange is freed for the safety rail. */
 function imageZoneFill(role: PlanningZone['role']): string {
-  if (role === 'supporting-art') return COLORS.support;
   if (role === 'background-art') return COLORS.field;
-  return COLORS.image;
+  return COLORS.image; // primary-art AND supporting specimen studies → strong blue
 }
 
 function rectSvg(z: PlanningZone, fill: string, opacity = 0.85): string {
@@ -83,6 +84,23 @@ export function buildBlueprintSvg(
       );
     }
   }
+  // KDP-STYLE SAFE BOUNDARY — an ORANGE DASHED rectangle marking the trim-safe
+  // edge (0.5in inside the trim). Orange (not red) so it never reads as a text
+  // zone. Drawn LAST, on top, as a hard "no text/heading/page-number/important
+  // subject crosses this line" guide, like the KDP previewer's dotted line. Inset
+  // from the full-bleed canvas edge = bleed (0.125) + text margin (0.5) = 0.625in.
+  {
+    const w = options.canvasIn?.w ?? 7.25;
+    const h = options.canvasIn?.h ?? 10.25;
+    const xPct = (0.625 / w) * 100;
+    const yPct = (0.625 / h) * 100;
+    const sw = Math.max(7, Math.round(widthPx * 0.009));
+    const dash = `${Math.round(widthPx * 0.022)} ${Math.round(widthPx * 0.012)}`;
+    parts.push(
+      `<rect x="${xPct.toFixed(2)}%" y="${yPct.toFixed(2)}%" width="${(100 - 2 * xPct).toFixed(2)}%" height="${(100 - 2 * yPct).toFixed(2)}%" ` +
+        `fill="none" stroke="${COLORS.support}" stroke-width="${sw}" stroke-dasharray="${dash}" />`,
+    );
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">${parts.join('')}</svg>`;
 }
 
@@ -108,7 +126,7 @@ export const BLUEPRINT_COMPOSITION_INSTRUCTION = [
   'A layout blueprint image is attached as the composition map. The whole page is ONE continuous illustrated page.',
   'STRONG BLUE regions = PRIMARY_IMAGE_ZONE — the primary subject and the environmental scene; concentrate the strongest detail here.',
   'LIGHT BLUE regions = BACKGROUND_ILLUSTRATION_FIELD — the rest of the page is STILL illustration, but calm and low-detail (soft paper grain, gentle atmosphere, faint texture). It is never blank paper; just keep it quiet so the focal art and text stay dominant.',
-  'ORANGE regions = SUPPORTING_IMAGE_ZONE — small naturalist specimen studies or thin decorative ornament bands placed directly on the page (no cards, sticky notes, boxes, frames, or colored/yellow backgrounds).',
+  'ORANGE DASHED LINE = SAFE BOUNDARY (the trim-safe edge, like the KDP previewer dotted line) — no text, heading, page number, or important subject may touch or cross it; keep ALL of those fully inside it. Only calm background illustration may extend past it and bleed off the page. (Supporting specimen studies are part of the BLUE illustration now — there are no orange fill regions.)',
   'RED regions = READING_FIELD_ZONE (and title) — a calm, open, low-detail parchment area for later typography; keep it clear of important subject matter. It is not a box.',
   'YELLOW regions = BADGE_SAFE_ZONE — reserved empty parchment. Render NOTHING here: no body text, no titles, no ornament, no swag, no tendrils, no hairlines, no artwork. The page background paper must show through cleanly. The renderer stamps badges and the page number into these regions later.',
   'The illustration must open organically into the Reading Field: let the artwork dissolve into it through mist, light sky, pale terrain, calm water, paper tone, or atmospheric fade — no hard edge, seam, or rectangle.',
