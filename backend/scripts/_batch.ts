@@ -5,8 +5,9 @@
  * Renders run through a concurrency pool (default 4, override with CONC=n) so a
  * chapter finishes in roughly 1/CONC of the wall-clock. Each render is independent
  * (its own pageId + prompt + blueprint), so parallelism changes throughput only,
- * not output. Per-call 2-min timeout lives in services/openai; a page that times
- * out or errors is reported FAILED here and re-run by a later retry pass.
+ * not output. Per-call 2-min timeout lives in services/openai. RENDER-ONCE RULE:
+ * each page is rendered exactly once; a page that times out or errors is reported
+ * FAILED and left for the OPERATOR to decide on — it is NOT auto-retried.
  * Usage: [CONC=4] _batch.ts <outName> <pageKey> [pageKey ...] */
 import { writeFileSync } from 'node:fs';
 import sharp from 'sharp';
@@ -21,6 +22,27 @@ const P = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
 const OUTNAME = process.argv[2] ?? 'batch';
 const KEYS = process.argv.slice(3);
 const CONC = Math.max(1, Number(process.env.CONC ?? '4'));
+
+// ── RENDER SAFETY (operator rule, 2026-06-19 — NON-NEGOTIABLE) ─────────────────
+// Render each page EXACTLY ONCE, then the OPERATOR looks at the actual image and
+// decides. NEVER auto-retry. NEVER re-render a page without the operator having
+// SEEN it and explicitly said "re-render this one". NEVER bulk-render the book
+// (that is how a 275-page book cost 390 render calls). This tool calls the
+// generator once per key and HARD-REFUSES a large batch unless the operator
+// explicitly overrides with RENDER_BULK=1.
+const MAX_KEYS = 5;
+if (KEYS.length === 0) {
+  console.error('No page keys given. Usage: [CONC=4] _batch.ts <outName> <pageKey> [pageKey ...]');
+  process.exit(1);
+}
+if (KEYS.length > MAX_KEYS && process.env.RENDER_BULK !== '1') {
+  console.error(
+    `REFUSING: ${KEYS.length} pages requested (cap ${MAX_KEYS}). Render small batches and let ` +
+      `the operator SEE each render before doing more. Re-render ONLY operator-flagged pages. ` +
+      `Operator-approved bulk override only: RENDER_BULK=1.`,
+  );
+  process.exit(1);
+}
 const db = getDb();
 const storage = getProjectStorage();
 const all = await listPaginatedPagesForProject(P);
@@ -90,4 +112,9 @@ if (rows.length) {
   writeFileSync(out, sheet);
   console.log('contact sheet →', out, `(${rows.length} pages)`);
 }
+console.log(
+  `\n*** RENDERED ONCE (${ok} ok, ${failed} failed). Now SHOW the operator the actual images ` +
+    `(_full.ts <keys>) and STOP. Do NOT re-render any page until the operator has seen it and ` +
+    `said which to redo. No auto-retry, no second pass. ***`,
+);
 process.exit(0);

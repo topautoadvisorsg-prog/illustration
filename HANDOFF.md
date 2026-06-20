@@ -1,5 +1,13 @@
 # Wildlands Interior — Agent Handoff
 
+## 🚫 RENDER SAFETY RULES (operator, NON-NEGOTIABLE — applies to EVERY agent/chat)
+Each page render costs money (~$0.09–$0.10) and a full-book re-render is ~$30. A prior session ran **390 render calls on a 275-page book** by re-rendering pages on its own. That must never recur. The rules:
+1. **Render each page EXACTLY ONCE per go.** No second pass, no auto-retry. A FAILED page is *reported*, not silently re-run.
+2. **The OPERATOR sees the actual rendered image and decides.** After any render, immediately show the real image (`_full.ts <keys>`) and STOP. An agent NEVER decides on its own that an image is "no good" and re-renders it.
+3. **Re-render ONLY the specific pages the operator flags, after they've seen the image, on an explicit "go".**
+4. **NEVER bulk-render the book.** `_batch.ts` hard-refuses > 5 keys unless the operator sets `RENDER_BULK=1`. Do not bypass it.
+5. **Show blueprint + prompt and get approval BEFORE the first render too** (no-spend review via `_inspect.ts` / `_prompt.ts` / `_layoutpreview.ts`).
+
 ## ⚠️ SESSION UPDATE 2026-06-19 — READ FIRST (cold restart after machine format)
 
 **Why the machine was formatted:** the operator's OpenAI billing was nearly maxed (~$99.75/$120 in June). Investigated it: the "Usage" dashboard showed **$0 under "Images" but ~$98 under "Responses & Chat Completions" + 3.85M tokens** — which looked alarming, but is **not theft and not Codex**. `gpt-image-2` (our image model, called via `openai.images.generate`/`.edit`) is **token-billed**, so its usage files under the *tokens / chat-completions* bucket, NOT the legacy per-image "Images" counter. The math matches: ~1,040 image renders × ~3,700 input tokens (our ~11K-char prompt + the attached blueprint image) = 3.85M tokens. **So ~$98 = the 275-page book render + this month's renders. Cost ≈ $0.09–$0.10 per page render.** The operator still chose to **rotate all keys and format the machine** out of caution (keys had been pasted in chat). **All old keys are burned — recreate `.env` with the new rotated ones (see "how to run").**
