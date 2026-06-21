@@ -18,7 +18,7 @@ const g = globalThis as { WebSocket?: unknown };
 if (typeof g.WebSocket === 'undefined') g.WebSocket = WebSocketImpl;
 
 const BUCKET = 'project-files';
-const P = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
+import { P } from './_project.js';
 
 export async function storageCanary(): Promise<{ ok: boolean; detail: string }> {
   const env = getEnv();

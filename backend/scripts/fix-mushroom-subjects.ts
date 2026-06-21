@@ -9,7 +9,7 @@ import { getDb } from '../src/db/client.js';
 import { manifests } from '../src/db/schema/index.js';
 import { and, eq, inArray } from 'drizzle-orm';
 
-const PROJECT = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
+import { P as PROJECT } from './_project.js';
 
 type Override = { subject: string; contentType?: string; category?: string | null };
 const FIXES: Record<string, Override> = {

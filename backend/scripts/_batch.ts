@@ -19,7 +19,7 @@ import { createAndRunRender } from '../src/pipeline/whole-page-render/render-who
 import { getProjectStorage } from '../src/services/storage/project-storage.js';
 import { preflight } from './_preflight.js';
 
-const P = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
+import { P } from './_project.js';
 const OUTNAME = process.argv[2] ?? 'batch';
 const KEYS = process.argv.slice(3);
 const CONC = Math.max(1, Number(process.env.CONC ?? '4'));

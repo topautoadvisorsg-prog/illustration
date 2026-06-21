@@ -9,7 +9,7 @@ import { pages } from '../src/db/schema/index.js';
 import { prepareRender } from '../src/pipeline/whole-page-render/render-whole-page.js';
 import { renderBlueprintPng } from '../src/pipeline/stage-3-generation/blueprint.js';
 
-const P = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
+import { P } from './_project.js';
 const KEY = process.argv[2] ?? 'CH03_P004';
 const db = getDb();
 const row = (await db.select().from(pages).where(and(eq(pages.projectId, P), eq(pages.pageKey, KEY))))[0];

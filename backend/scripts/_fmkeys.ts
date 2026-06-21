@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '../src/db/client.js';
 import { pages } from '../src/db/schema/index.js';
 
-const P = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
+import { P } from './_project.js';
 const db = getDb();
 const all = await db.select().from(pages).where(eq(pages.projectId, P));
 const fm = all

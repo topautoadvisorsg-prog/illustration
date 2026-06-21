@@ -9,7 +9,7 @@ import { computePageGeometry } from '../src/pipeline/stage-6-layout/page-geometr
 import { directLayout } from '../src/pipeline/stage-6-layout/layout-director.js';
 import { LAYOUT_PROFILES } from '../src/pipeline/stage-6-layout/layout-profiles.js';
 
-const P = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
+import { P } from './_project.js';
 const AVG_CHAR_WIDTH_EM = 0.45; // mirror layout-director
 
 const project = await getProject(P);

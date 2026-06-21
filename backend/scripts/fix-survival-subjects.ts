@@ -8,7 +8,7 @@ import { getDb } from '../src/db/client.js';
 import { manifests } from '../src/db/schema/index.js';
 import { and, eq, inArray } from 'drizzle-orm';
 
-const PROJECT = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
+import { P as PROJECT } from './_project.js';
 
 const SUBJECTS: Record<string, string> = {
   CH07_P001:

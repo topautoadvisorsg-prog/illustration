@@ -22,7 +22,7 @@ import { computePageGeometry } from '../src/pipeline/stage-6-layout/page-geometr
 import { directLayout } from '../src/pipeline/stage-6-layout/layout-director.js';
 import { planPage } from '../src/pipeline/stage-2-planner/plan-pages.js';
 
-const P = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
+import { P } from './_project.js';
 const AVG = 0.45;
 const args = process.argv.slice(2);
 const APPLY = args.includes('--apply');

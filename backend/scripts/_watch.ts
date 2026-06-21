@@ -7,7 +7,7 @@ import { getDb } from '../src/db/client.js';
 import { pages, wholePageRenders } from '../src/db/schema/index.js';
 import { listPaginatedPagesForProject } from '../src/db/repositories/pagination.repo.js';
 
-const P = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
+import { P } from './_project.js';
 const CH = process.argv[2] ?? 'CH02';
 const STALL_MS = 8 * 60_000;
 const cutoff = new Date(Date.now() - 90 * 60_000); // batch renders are recent

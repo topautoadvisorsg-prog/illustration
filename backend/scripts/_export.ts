@@ -19,7 +19,7 @@ import { getDb } from '../src/db/client.js';
 import { pages, wholePageRenders } from '../src/db/schema/index.js';
 import { getProjectStorage } from '../src/services/storage/project-storage.js';
 
-const P = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
+import { P } from './_project.js';
 const BOOK = 'THE_WILDLANDS_NEW_ENGLAND';
 const OUT = process.argv[2] ?? 'C:/Users/jovan/Downloads/wildlands-archive';
 const db = getDb();

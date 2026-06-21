@@ -37,7 +37,7 @@ AI-rendered book for Amazon KDP: **"THE WILDLANDS: NEW ENGLAND"** by Wade Branno
 
 ## Where the code is / how to run it
 - Repo: `C:\Users\jovan\Downloads\wildlands agents platform` (`backend/` + `frontend/`).
-- The book's project ID: **`66c1c69c-2c81-409e-a4b5-bff3f3bb04ba`**.
+- **`PROJECT_ID` (one-line setup per book):** every operator script reads the active project from `PROJECT_ID` in `.env` via `scripts/_project.ts` (NOT hardcoded anymore). It **fails loudly if unset** and prints `[project] active PROJECT_ID = …` on every run. For THIS book set `PROJECT_ID=66c1c69c-2c81-409e-a4b5-bff3f3bb04ba`; for a new book, just change that one line. Never reintroduce a hardcoded id in a script.
 - **DO NOT use `railway run` — the Railway CLI is blocked by Windows Smart App Control (`railway.exe` fails silently with exit 1).** Backend scripts read the Railway env from a **repo-root `.env`** (gitignored; `backend/src/env.ts` auto-loads `<repo-root>/.env`). Run scripts with plain node (which Smart App Control allows):
   ```
   cd backend && node "../node_modules/tsx/dist/cli.mjs" scripts/<SCRIPT>.ts <args>
