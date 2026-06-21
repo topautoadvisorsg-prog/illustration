@@ -179,6 +179,7 @@ export const LAYOUT_TEMPLATE_COMPOSITION: Record<LayoutTemplateId, LayoutComposi
   LAYOUT_2_TEXT_HEAVY: { contentType: 'ENCYCLOPEDIA_ENTRY', coverage: 15, architecture: 'FLOAT_LEFT' },
   LAYOUT_E_BAND_BALANCED: { contentType: 'SPECIES_PROFILE', coverage: 25, architecture: 'TOP_BAND' },
   LAYOUT_F_FULL_PAGE_CENTERED: { contentType: 'HABITAT_OVERVIEW', coverage: 100, architecture: 'FULL_PAGE' },
+  LAYOUT_G_FRAMED_BANDS: { contentType: 'HABITAT_OVERVIEW', coverage: 40, architecture: 'TOP_BAND' },
   LAYOUT_3_ILLUSTRATION_DOMINANT: { contentType: 'SPECIES_PROFILE', coverage: 50, architecture: 'FLOAT_RIGHT' },
   LAYOUT_4_DANGER_WARNING: { contentType: 'WARNING_PAGE', coverage: 40, architecture: 'FLOAT_LEFT' },
   LAYOUT_5_CHAPTER_OPENER: { contentType: 'CHAPTER_OPENER', coverage: 60, architecture: 'TOP_BAND' },

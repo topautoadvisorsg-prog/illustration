@@ -128,6 +128,10 @@ export const LayoutTemplateIdSchema = z.enum([
   // body text in a centered contained panel (text sizes down to fit; art never
   // shrinks). The reusable "full page with readable centered text" standard.
   'LAYOUT_F_FULL_PAGE_CENTERED',
+  // Layout G — FRAMED BANDS: a mandatory illustration band at the TOP and another
+  // at the BOTTOM (the model fails top/bottom on its own), text boxed in the middle
+  // sized down to fit. Forces illustration all around dense text pages.
+  'LAYOUT_G_FRAMED_BANDS',
   // Title Display — a centered, ceremonial text block with generous negative
   // space + thin edge ornaments. For very short text: title, dedication,
   // epigraph, quote, special notes. Fills the "little text, not a full

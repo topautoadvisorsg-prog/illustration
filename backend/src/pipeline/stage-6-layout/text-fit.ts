@@ -121,6 +121,10 @@ function textPanelDims(
       // a full-bleed illustration. Capacity at the standard size; text sizes DOWN
       // to fit if there is more (the art is never reduced).
       return { widthPt: W * 0.68, heightPt: H * 0.44 };
+    case 'FRAMED_BANDS':
+      // Framed bands — text boxed in the middle (~70% wide × ~60% tall) between a
+      // top and a bottom illustration band. Text sizes DOWN to fit if denser.
+      return { widthPt: W * 0.7, heightPt: H * 0.6 };
     case 'TITLE_BLOCK':
       // Display/ceremonial page — text is NOT a reading field but a compact
       // centered block (≈72% wide × ≈26% tall) surrounded by large negative

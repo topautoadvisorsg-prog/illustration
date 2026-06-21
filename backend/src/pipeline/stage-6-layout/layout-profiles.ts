@@ -59,7 +59,11 @@ export type ArtSlot =
   // Full-page standard: the illustration FULL-BLEEDS the entire page (strong at
   // the top band + the corners), and the body text sits in ONE CENTERED panel
   // that stays contained inside the safety guide (text may size down to fit).
-  | 'FULL_PAGE_CENTERED';
+  | 'FULL_PAGE_CENTERED'
+  // Framed bands: a MANDATORY illustration band at the top AND at the bottom, with
+  // the text boxed in the middle (sized down to fit). Forces the top/bottom anchors
+  // the model otherwise skips.
+  | 'FRAMED_BANDS';
 
 export interface LayoutProfile {
   /** Fraction of the page available to body copy in the text-safe zone (0-1). */
@@ -116,6 +120,10 @@ export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
   // Layout F — FULL-PAGE STANDARD: full-bleed illustration over the whole page, body
   // text in a centered contained panel (text sizes down to fit, art never shrinks).
   LAYOUT_F_FULL_PAGE_CENTERED: { textAreaFactor: 0.55, artSlot: 'FULL_PAGE_CENTERED', artAreaFraction: 0.92, textLight: false },
+  // Layout G — FRAMED BANDS: mandatory top + bottom illustration bands, text boxed
+  // in the middle (sized down to fit). For dense pages that need illustration all
+  // around but can't give up much text room.
+  LAYOUT_G_FRAMED_BANDS: { textAreaFactor: 0.62, artSlot: 'FRAMED_BANDS', artAreaFraction: 0.3, textLight: false },
   // Title Display — centered short-text block + thin edge ornaments over a
   // SUBTLE full-page illustrated field (the whole page is illustration, not
   // blank paper). Very low text capacity by design (a few lines, not paragraphs).
@@ -178,6 +186,7 @@ const ART_SLOT_LABELS: Record<ArtSlot, string> = {
   REFERENCE_COLUMNS: 'two-column reference',
   BALANCED_BAND: 'balanced top band (~25%)',
   FULL_PAGE_CENTERED: 'full-bleed page · centered text panel',
+  FRAMED_BANDS: 'illustration band top + bottom · text boxed in middle',
 };
 
 /**

@@ -177,6 +177,11 @@ function placementFor(slot: ArtSlot): { imagePlacement: string; textPlacement: s
       return { imagePlacement: 'small bottom-left corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: the full upper block, then a column beside the accent' };
     case 'CORNER_BOTTOM_RIGHT':
       return { imagePlacement: 'small bottom-right corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: the full upper block, then a column beside the accent' };
+    case 'FRAMED_BANDS':
+      return {
+        imagePlacement: 'TWO REQUIRED illustration anchors that FRAME the text. TOP BAND: a main study of the page subject as a full-width band across the very top of the page, bleeding off the top edge. BOTTOM BAND (MANDATORY): a SECOND, REQUIRED illustration as a full-width band across the very BOTTOM of the page — a complementary habitat / environment / tracks-and-sign study of the SAME subject, clearly distinct from the top study, bleeding off the bottom edge. NEVER leave the bottom empty or as plain parchment — there MUST be a real, finished illustration filling the bottom band, every time. The left and right edges also stay illustration; the page is illustration on all four sides.',
+        textPlacement: 'ALL the body text sits in ONE reading panel in the MIDDLE of the page, BETWEEN the top and bottom illustration bands and fully inside the inner orange line. Size the text DOWN — to the smallest still-clearly-readable book size — so every line fits between the bands and inside the inner line. The text must NEVER touch the bands or the orange line, and must NEVER push up into the top band or down into the bottom band.',
+      };
     case 'FULL_PAGE_CENTERED':
       return {
         imagePlacement: 'the ENTIRE page is ONE full-bleed natural-history illustration that runs off ALL FOUR trim edges — fill the whole page edge to edge and let it be cut at the trim. Concentrate strong detail across the TOP and into the four CORNERS; keep ONLY the centre calmer and lower-contrast so the centered text stays legible. The illustration is full-page and is NEVER reduced or shrunk.',
@@ -382,6 +387,7 @@ const BACKGROUND_FIELD_SLOTS = new Set<ArtSlot>([
   'CORNER_BOTTOM_RIGHT',
   'TEXT_DOMINANT',
   'BALANCED_BAND',
+  'FRAMED_BANDS',
 ]);
 
 function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick<LayoutAllocation, 'textSafeZones' | 'typographyZones' | 'imagePriorityZones'> {
@@ -482,6 +488,16 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick
           ),
         ],
       };
+    }
+    case 'FRAMED_BANDS': {
+      // Framed bands (operator 2026-06-21): MANDATORY illustration band at the TOP
+      // and at the BOTTOM (the model skips top/bottom on its own), text boxed in the
+      // middle. No title band — the page is framed top + bottom by illustration, and
+      // the text sizes down to fit between them inside the inner orange line.
+      const topBand = zone('image-band-top', 'primary-art', 0, 0, 100, 15, 'TOP illustration band — the main study of the page subject, full width, bleeding off the top and side edges.');
+      const bottomBand = zone('image-band-bottom', 'primary-art', 0, 85, 100, 15, 'BOTTOM illustration band (MANDATORY) — a complementary habitat / tracks-and-sign study of the SAME subject, distinct from the top, full width, bleeding off the bottom and side edges. There MUST be a real illustration here — never plain parchment.');
+      const reading = zone('reading-field-centered', 'body', 15, 20, 70, 60, 'Reading panel in the MIDDLE, between the two illustration bands and fully inside the inner orange line. Size the text DOWN to fit; never touch the bands or the orange line.', 'organic');
+      return { typographyZones: [], imagePriorityZones: [topBand, bottomBand], textSafeZones: [reading] };
     }
     case 'FULL_PAGE_CENTERED': {
       // Full-page standard (operator 2026-06-21): the WHOLE page is the main

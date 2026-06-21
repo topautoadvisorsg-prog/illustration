@@ -49,6 +49,8 @@ const SHAPE_BY_SLOT: Record<ArtSlot, ImageShape> = {
   BALANCED_BAND: 'portrait',
   // Full-page standard: full-bleed portrait illustration with a centered text panel.
   FULL_PAGE_CENTERED: 'portrait',
+  // Framed bands: top + bottom illustration bands on a portrait page.
+  FRAMED_BANDS: 'portrait',
   // Layout C 25% corner variants are small square vignettes.
   CORNER_TOP_LEFT: 'square',
   CORNER_TOP_RIGHT: 'square',
@@ -93,6 +95,7 @@ export const LAYOUT_IMAGE_SHAPES: Record<LayoutTemplateId, ImageShape> = {
   LAYOUT_D_PURE_TEXT: 'square', // no image — placeholder for the Record completeness
   LAYOUT_E_BAND_BALANCED: 'portrait', // balanced ~25% top band on a portrait page
   LAYOUT_F_FULL_PAGE_CENTERED: 'portrait', // full-bleed page + centered text panel
+  LAYOUT_G_FRAMED_BANDS: 'portrait', // top + bottom illustration bands, text boxed
   LAYOUT_TITLE_DISPLAY: 'portrait', // centered title block, thin top/bottom ornaments
   LAYOUT_FINE_PRINT: 'portrait', // low fine-print block over a calm illustrated field
   LAYOUT_REFERENCE: 'portrait', // two-column reference (glossary/index) over a calm field
