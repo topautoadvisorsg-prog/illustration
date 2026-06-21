@@ -13,6 +13,7 @@ import WebSocketImpl from 'ws';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getEnv, isPlaceholder } from '../../env.js';
 import { LocalStorageService, type StoredFile } from './local-storage.js';
+import { CachedStorageService } from './cached-storage.js';
 
 // supabase-js v2 builds a Realtime client that requires a WebSocket. Node 20 (the
 // backend runtime) has no global WebSocket, so createClient throws even though we
@@ -108,19 +109,26 @@ export function activeStorageKind(): 'supabase' | 'local-ephemeral' {
 
 export function getProjectStorage(): ProjectStorage {
   const env = getEnv();
+  let inner: ProjectStorage;
   if (isSupabaseStorageConfigured()) {
-    return new SupabaseStorageService();
-  }
-  // Local disk is EPHEMERAL on Railway — anything written is lost on the next
-  // redeploy/restart, which silently destroyed the image library before. Never
-  // fall back to it in production: fail loudly so the misconfiguration is caught
-  // immediately instead of being discovered later as a vanished library.
-  if (env.NODE_ENV === 'production') {
+    inner = new SupabaseStorageService();
+  } else if (env.NODE_ENV === 'production') {
+    // Local disk is EPHEMERAL on Railway — anything written is lost on the next
+    // redeploy/restart, which silently destroyed the image library before. Never
+    // fall back to it in production: fail loudly so the misconfiguration is caught
+    // immediately instead of being discovered later as a vanished library.
     throw new Error(
       'PERSISTENT STORAGE NOT CONFIGURED: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are missing or placeholders in ' +
         'production. Refusing to use ephemeral local disk because generated images and rendered PDFs would be lost on ' +
         'the next redeploy. Set the Supabase Storage env vars on the backend service.',
     );
+  } else {
+    inner = new LocalStorageService();
   }
-  return new LocalStorageService();
+  // Wrap with a read/write-through LOCAL cache so each IMMUTABLE render is
+  // transferred at most once — this kills the repeat-download egress that tripped
+  // Supabase's egress quota (1.48 GB stored served as 63 GB of egress). The wrapper
+  // is transparent + best-effort, so every consumer (render pipeline, review
+  // scripts, the deployed backend) benefits with no other change. See cached-storage.ts.
+  return new CachedStorageService(inner);
 }

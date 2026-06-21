@@ -17,6 +17,7 @@ import { pages, wholePageRenders } from '../src/db/schema/index.js';
 import { listPaginatedPagesForProject } from '../src/db/repositories/pagination.repo.js';
 import { createAndRunRender } from '../src/pipeline/whole-page-render/render-whole-page.js';
 import { getProjectStorage } from '../src/services/storage/project-storage.js';
+import { preflight } from './_preflight.js';
 
 const P = '66c1c69c-2c81-409e-a4b5-bff3f3bb04ba';
 const OUTNAME = process.argv[2] ?? 'batch';
@@ -68,6 +69,21 @@ async function renderOne(KEY: string): Promise<void> {
     console.log('FAILED', KEY, (e as Error)?.message ?? e);
     failed++;
   }
+}
+
+// PRE-FLIGHT GATE (operator rule 2026-06-20): verify storage can SAVE before any
+// paid generation. If the Supabase storage canary fails, abort with ZERO spend —
+// never burn paid renders that cannot be saved. Also blocks an invalid OpenAI key.
+const pf = await preflight();
+console.log('--- pre-flight (no spend) ---');
+for (const l of pf.lines) console.log('  ' + l);
+if (!pf.ok) {
+  console.error(
+    pf.storageOk
+      ? 'ABORT: OpenAI pre-flight failed — not rendering with an unreachable/invalid key.'
+      : 'ABORT: STORAGE canary FAILED — refusing to spend on renders that cannot be saved. Fix Supabase storage first, then retry.',
+  );
+  process.exit(1);
 }
 
 // Concurrency pool: CONC workers pull from a shared cursor until the queue drains.

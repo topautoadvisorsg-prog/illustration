@@ -110,6 +110,9 @@ complete-test-book-*.pdf
 # Operator script scratch (regenerable PNGs/dumps)
 backend/scripts/_scratch/
 
+# Local read/write-through render cache (kills repeat-download egress; regenerable)
+backend/.render-cache/
+
 # Front-matter / chapter-run scratch reports (no-spend, regenerable)
 fm-report*.json
 fm-after-fix.json
