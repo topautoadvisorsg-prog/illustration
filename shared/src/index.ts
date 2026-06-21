@@ -124,6 +124,10 @@ export const LayoutTemplateIdSchema = z.enum([
   // 50% band (LAYOUT_B) — for pages that need a real, meaningful illustration
   // without compressing the text or leaving dead parchment.
   'LAYOUT_E_BAND_BALANCED',
+  // Layout F — FULL-PAGE STANDARD: full-bleed illustration over the whole page,
+  // body text in a centered contained panel (text sizes down to fit; art never
+  // shrinks). The reusable "full page with readable centered text" standard.
+  'LAYOUT_F_FULL_PAGE_CENTERED',
   // Title Display — a centered, ceremonial text block with generous negative
   // space + thin edge ornaments. For very short text: title, dedication,
   // epigraph, quote, special notes. Fills the "little text, not a full

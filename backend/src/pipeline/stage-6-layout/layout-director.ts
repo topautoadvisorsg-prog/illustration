@@ -177,6 +177,11 @@ function placementFor(slot: ArtSlot): { imagePlacement: string; textPlacement: s
       return { imagePlacement: 'small bottom-left corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: the full upper block, then a column beside the accent' };
     case 'CORNER_BOTTOM_RIGHT':
       return { imagePlacement: 'small bottom-right corner accent study (~25% of the composition)', textPlacement: 'body text owns the page: the full upper block, then a column beside the accent' };
+    case 'FULL_PAGE_CENTERED':
+      return {
+        imagePlacement: 'the ENTIRE page is ONE full-bleed natural-history illustration that runs off ALL FOUR trim edges — fill the whole page edge to edge and let it be cut at the trim. Concentrate strong detail across the TOP and into the four CORNERS; keep ONLY the centre calmer and lower-contrast so the centered text stays legible. The illustration is full-page and is NEVER reduced or shrunk.',
+        textPlacement: 'ALL the body text sits in ONE reading panel VISUALLY CENTERED in the middle of the page and stays FULLY INSIDE the orange safety line — it must never touch or cross that line. If the text does not all fit at the standard size, REDUCE the text size down to the smallest still-clearly-readable book size to keep it centered and inside the line. The illustration is never shrunk to make room; the TEXT adapts.',
+      };
     case 'BALANCED_BAND':
       return {
         imagePlacement: 'a CONTAINED natural-history illustration BAND across the TOP of the page — roughly a quarter of the page — a real, meaningful subject (the page\'s wildlife, plant, tree, fungi, or habitat/landscape study), sitting high and allowed to graze the top and side trim edges. A genuine illustration, NOT a tiny icon and NOT an ornament; kept to the top band so it never crowds the text.',
@@ -317,6 +322,19 @@ const FOCAL_TOP = 18; // image-priority + reading-field start here, under the ti
 const BOTTOM = 90;
 const GUTTER = 5; // hard separation between image-priority and reading-field — never share a strip
 const clampN = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+
+// Inner text-safe rectangle = just INSIDE the INNER orange line (~1cm in from the
+// trim-safe line). EVERY text/title zone is clamped to this so no red ever crosses
+// the orange line on ANY layout (operator 2026-06-21). Percent of the page.
+const TEXT_SAFE = { x: 15, y: 11, right: 85, bottom: 89 } as const;
+function clampToTextSafe(z: PlanningZone): PlanningZone {
+  const round = (n: number) => Math.round(n * 10) / 10;
+  const x = Math.max(TEXT_SAFE.x, z.xPct);
+  const y = Math.max(TEXT_SAFE.y, z.yPct);
+  const w = Math.max(2, Math.min(TEXT_SAFE.right, z.xPct + z.widthPct) - x);
+  const h = Math.max(2, Math.min(TEXT_SAFE.bottom, z.yPct + z.heightPct) - y);
+  return { ...z, xPct: round(x), yPct: round(y), widthPct: round(w), heightPct: round(h) };
+}
 
 function titleBand(): PlanningZone {
   return zone(
@@ -464,6 +482,18 @@ function zonePlanFor(slot: ArtSlot, imagePercent: number, hasTitle = true): Pick
           ),
         ],
       };
+    }
+    case 'FULL_PAGE_CENTERED': {
+      // Full-page standard (operator 2026-06-21): the WHOLE page is the main
+      // illustration painted STRONG/dark blue (the model ignores the pale light-blue
+      // "field", so there is none here) — full-bleed to all four edges + corners. The
+      // body text is ONE CENTERED red panel; the surrounding dark-blue illustration
+      // FORCES the text to stay in that centered zone, inside the orange safety line.
+      // Text sizes DOWN to fit; the art is never reduced.
+      const fullArt = zone('image-full-bleed', 'primary-art', 0, 0, 100, 100, 'The ENTIRE page is ONE full-bleed natural-history illustration: fill it edge to edge and run it off ALL FOUR trim edges. Strong detail across the top and into all four corners; keep ONLY the centre calm and low-contrast so the centered text panel stays legible. Full-page; never reduced.');
+      const titleC = zone('title-main', 'title', 16, 22, 68, 8, 'Title centered above the reading panel, fully inside the orange safety line.');
+      const reading = zone('reading-field-centered', 'body', 16, 32, 68, 44, 'ONE reading panel VISUALLY CENTERED in the middle of the page, kept FULLY INSIDE the orange safety line (never touching it). If the text does not fit, reduce the text size to the smallest still-clearly-readable book size to keep it centered and inside the line. The illustration is not shrunk; the text adapts.', 'organic');
+      return { typographyZones: [titleC], imagePriorityZones: [fullArt], textSafeZones: [reading] };
     }
     case 'BALANCED_BAND': {
       // Balanced ~25% (operator 2026-06-18): a CONTAINED illustration band across
@@ -628,7 +658,11 @@ function zonesOverlap(a: PlanningZone, b: PlanningZone): boolean {
 export function readingFieldImageConflicts(plan: Pick<LayoutAllocation, 'textSafeZones' | 'imagePriorityZones'>): string[] {
   const conflicts: string[] = [];
   const readingFields = plan.textSafeZones.filter((z) => z.regionType === 'reading-field');
-  const imageZones = plan.imagePriorityZones.filter((z) => z.regionType === 'image-priority');
+  // A full-page image zone (≥95% × ≥95%) is a full-bleed backdrop the text
+  // intentionally sits over (the FULL_PAGE_CENTERED standard) — not a conflict.
+  const imageZones = plan.imagePriorityZones.filter(
+    (z) => z.regionType === 'image-priority' && !(z.widthPct >= 95 && z.heightPct >= 95),
+  );
   for (const rf of readingFields) {
     for (const img of imageZones) {
       if (zonesOverlap(rf, img)) {
@@ -697,6 +731,11 @@ export function directLayout(input: LayoutDirectorInput): LayoutAllocation {
   if (wantsBackgroundField) {
     zonePlan.imagePriorityZones = [backgroundField(), ...zonePlan.imagePriorityZones];
   }
+  // Clamp EVERY text + title zone inside the inner orange safety line so no red
+  // can cross it on any layout (operator 2026-06-21). Illustration zones are NOT
+  // clamped — they bleed off the edges on purpose.
+  zonePlan.textSafeZones = zonePlan.textSafeZones.map(clampToTextSafe);
+  zonePlan.typographyZones = zonePlan.typographyZones.map(clampToTextSafe);
   const notes: string[] = [];
 
   if (estimatedRenderedPages > 1) {

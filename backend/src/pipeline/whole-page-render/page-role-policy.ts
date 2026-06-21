@@ -142,11 +142,12 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
   const initialLayout = rowLayout ?? 'LAYOUT_1_STANDARD';
   const pageType = inferWholePageRole(row, initialLayout);
   let layoutTemplate = rowLayout ?? defaultLayoutForRole(pageType);
-  // Layout Audit 1 §4 — a continuation page carries NO new subject, so it must
-  // not reserve illustration area. Force it to the text-first pure-text layout
-  // (large reading field + edge ornaments) regardless of the stored template,
-  // which also retires the legacy LAYOUT_2_TEXT_HEAVY it used to inherit.
-  if (pageType === 'CONTINUATION') layoutTemplate = 'LAYOUT_D_PURE_TEXT';
+  // A continuation page defaults to the text-first pure-text layout (it carries no
+  // new subject of its own). BUT honor an explicit operator layout override when one
+  // is set on the row — e.g. a 25% corner study of the entry's subject from a new
+  // angle — so continuations can carry a definite illustration instead of the
+  // light-blue field the model ignores. (operator decision 2026-06-21)
+  if (pageType === 'CONTINUATION' && !rowLayout) layoutTemplate = 'LAYOUT_D_PURE_TEXT';
   // Copyright is fine print regardless of any layout stored on the row by an
   // earlier breakdown — force the low fine-print block layout.
   if (pageType === 'COPYRIGHT_PAGE') layoutTemplate = 'LAYOUT_FINE_PRINT';
@@ -222,7 +223,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         // Operator QA (rebalance): a REAL, meaningful habitat study filling a
         // contained top band — substantial enough to balance the page (no dead
         // parchment), kept to the top band so it never crowds the reading text.
-        imageSubject: 'A meaningful New England wilderness habitat study filling a contained band across the TOP of the page — a naturalist scene of the northern woods (white pine and red spruce, ferns and moss, a distant ridgeline or quiet wetland), painted as a real field-guide illustration. Substantial enough to balance the page; kept to the top band so it never crowds the reading text. Never a tiny sprig, never an ornament.',
+        imageSubject: 'A full-bleed New England wilderness SCENE filling the ENTIRE page — northern woods (white pine and red spruce), a distant ridgeline or misty wetland, painted as a real field-guide illustration that runs off all four trim edges. Keep the strongest detail toward the TOP and the four CORNERS; keep the CENTRE calm and low-contrast so the centered reading text stays legible. Never a tiny sprig, never an ornament.',
         allowsEmptyBody: false,
         renderBodyText: true,
       };

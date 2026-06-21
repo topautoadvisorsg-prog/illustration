@@ -116,6 +116,11 @@ function textPanelDims(
       // large reading field (full width × ~60% height; the title + vignette take
       // the top, and the text centres within the rest).
       return { widthPt: W, heightPt: H * 0.6 };
+    case 'FULL_PAGE_CENTERED':
+      // Full-page standard — a centered reading panel (~68% wide × ~44% tall) over
+      // a full-bleed illustration. Capacity at the standard size; text sizes DOWN
+      // to fit if there is more (the art is never reduced).
+      return { widthPt: W * 0.68, heightPt: H * 0.44 };
     case 'TITLE_BLOCK':
       // Display/ceremonial page — text is NOT a reading field but a compact
       // centered block (≈72% wide × ≈26% tall) surrounded by large negative

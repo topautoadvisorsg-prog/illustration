@@ -31,8 +31,12 @@ const COLORS = {
  *  v1.3: 'supporting-art' (specimen studies) is now illustration like any other —
  *  rendered STRONG BLUE, not orange. Orange is freed for the safety rail. */
 function imageZoneFill(role: PlanningZone['role']): string {
-  if (role === 'background-art') return COLORS.field;
-  return COLORS.image; // primary-art AND supporting specimen studies → strong blue
+  // Operator 2026-06-21: NO light-blue field — the model ignores pale blue. EVERY
+  // illustration zone (focal AND background) is painted the same STRONG/dark blue
+  // so the model fills it out to the edges; the red text zones + the orange safety
+  // line are what keep text contained.
+  void role;
+  return COLORS.image;
 }
 
 function rectSvg(z: PlanningZone, fill: string, opacity = 0.85): string {
@@ -92,13 +96,24 @@ export function buildBlueprintSvg(
   {
     const w = options.canvasIn?.w ?? 7.25;
     const h = options.canvasIn?.h ?? 10.25;
-    const xPct = (0.625 / w) * 100;
-    const yPct = (0.625 / h) * 100;
     const sw = Math.max(7, Math.round(widthPx * 0.009));
     const dash = `${Math.round(widthPx * 0.022)} ${Math.round(widthPx * 0.012)}`;
+    // OUTER orange line — the trim-safe edge (0.625in in). Illustration bleeds out
+    // to and past it; nothing important crosses it.
+    const oX = (0.625 / w) * 100;
+    const oY = (0.625 / h) * 100;
     parts.push(
-      `<rect x="${xPct.toFixed(2)}%" y="${yPct.toFixed(2)}%" width="${(100 - 2 * xPct).toFixed(2)}%" height="${(100 - 2 * yPct).toFixed(2)}%" ` +
+      `<rect x="${oX.toFixed(2)}%" y="${oY.toFixed(2)}%" width="${(100 - 2 * oX).toFixed(2)}%" height="${(100 - 2 * oY).toFixed(2)}%" ` +
         `fill="none" stroke="${COLORS.support}" stroke-width="${sw}" stroke-dasharray="${dash}" />`,
+    );
+    // INNER orange line (~1cm / 0.4in further in) = the TEXT line. ALL text stays
+    // inside THIS line; the band between the two orange lines is an illustration-only
+    // buffer, so the red text never rides the trim edge. (operator 2026-06-21)
+    const iX = ((0.625 + 0.4) / w) * 100;
+    const iY = ((0.625 + 0.4) / h) * 100;
+    parts.push(
+      `<rect x="${iX.toFixed(2)}%" y="${iY.toFixed(2)}%" width="${(100 - 2 * iX).toFixed(2)}%" height="${(100 - 2 * iY).toFixed(2)}%" ` +
+        `fill="none" stroke="${COLORS.support}" stroke-width="${Math.max(4, Math.round(sw * 0.6))}" stroke-dasharray="${dash}" />`,
     );
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">${parts.join('')}</svg>`;
