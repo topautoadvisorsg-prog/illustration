@@ -127,6 +127,15 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
     isEntryOpener: pageRow.pageRole === 'opener',
   });
 
+  // Per-PAGE composition-contract override (operator). When a single page's own
+  // manifest carries placement prose, it replaces the layout director's generic
+  // placement strings so the COMPOSITION CONTRACT describes THIS page's actual
+  // scene. Page-scoped (only `pageOverride`, never the shared entry meta), so no
+  // other page is affected. This is the lever that lets a continuation command a
+  // specific framed scene instead of inheriting "small marginal specimen art".
+  if (pageOverride?.imagePlacement) allocation.imagePlacement = pageOverride.imagePlacement;
+  if (pageOverride?.textPlacement) allocation.textPlacement = pageOverride.textPlacement;
+
   const spec = buildPageSpec({
     pageRow,
     config,

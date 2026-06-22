@@ -98,6 +98,13 @@ export interface EntryMetaLookup {
   hazard?: string[];
   region?: string;
   sourceConfidence?: string;
+  /** Per-PAGE composition-contract override (operator). When a single page's
+   *  manifest carries these, prepareRender swaps the layout director's placement
+   *  prose for them so the COMPOSITION CONTRACT describes THIS page's actual scene
+   *  (e.g. a coyote family) instead of the generic layout default. Page-scoped:
+   *  only a page-key manifest sets them, never a shared entry manifest. */
+  imagePlacement?: string;
+  textPlacement?: string;
 }
 
 export async function getEntryMetaByKeys(
@@ -122,7 +129,9 @@ export async function getEntryMetaByKeys(
     if (!content) continue;
     const entryTitle = typeof content.entryTitle === 'string' ? content.entryTitle : '';
     const imageSubject = typeof content.imageSubject === 'string' ? content.imageSubject : '';
-    if (!entryTitle && !imageSubject) continue;
+    const imagePlacement = typeof content.imagePlacement === 'string' ? content.imagePlacement : undefined;
+    const textPlacement = typeof content.textPlacement === 'string' ? content.textPlacement : undefined;
+    if (!entryTitle && !imageSubject && !imagePlacement) continue;
     out.set(row.externalId, {
       entryTitle,
       imageSubject,
@@ -131,6 +140,8 @@ export async function getEntryMetaByKeys(
       region: typeof content.region === 'string' ? content.region : undefined,
       sourceConfidence:
         typeof content.sourceConfidence === 'string' ? content.sourceConfidence : undefined,
+      imagePlacement,
+      textPlacement,
     });
   }
   return out;
