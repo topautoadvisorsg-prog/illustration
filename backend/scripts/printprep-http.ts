@@ -7,6 +7,7 @@
  * never hardcoded. Run: railway run --service "@wildlands/backend" -- node
  *   ../node_modules/tsx/dist/cli.mjs scripts/printprep-http.ts <projectId> [conc]
  */
+import '../src/env.js'; // load <repo-root>/.env so CONSOLE_PASSWORD is available (no railway CLI)
 const BASE = process.env.WL_BACKEND ?? 'https://wildlandsbackend-production.up.railway.app';
 const PW = (process.env.CONSOLE_PASSWORD ?? '').trim();
 if (!PW) { console.error('CONSOLE_PASSWORD not in env — run via `railway run` so it is injected.'); process.exit(2); }

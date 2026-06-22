@@ -237,9 +237,15 @@ export async function printPrepRender(renderId: string): Promise<PrintPrepResult
   const renderPng = await storage.readProjectFile(row.imagePath);
 
   // Reconstruct the badge set from the stored spec's badgeContext.
+  // Volume I has NO wired badge system: the badgeContext values (region/hazard/
+  // source) are reserved-draft placeholders, not real page metadata. Stamping a
+  // placeholder put a badge in the corner, which made print-prep drop the folio
+  // into the bottom-right corner cartouche — OUTSIDE the trim-safe area. Default
+  // to no badges so the page number sits clean at bottom-centre, inside the trim.
+  // A future volume with a real, wired badge system sets WL_ENABLE_BADGES=1.
   const spec = row.specJson as { badgeContext?: { region?: string; hazard?: string[]; source?: string } } | null;
   const bc = spec?.badgeContext;
-  const badgeSet: Badge[] = bc
+  const badgeSet: Badge[] = (process.env.WL_ENABLE_BADGES && bc)
     ? [
         ...(bc.region ? [{ family: 'region' as const, value: bc.region }] : []),
         ...(bc.hazard ?? []).map((h) => ({ family: 'hazard' as const, value: h })),
