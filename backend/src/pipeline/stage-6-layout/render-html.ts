@@ -724,6 +724,13 @@ export interface CoverDimensions {
   spineIn: number;
 }
 
+/** KDP only permits spine text once the interior reaches 79 pages. */
+export const KDP_MIN_SPINE_TEXT_PAGES = 79;
+
+export function coverAllowsSpineText(pageCount: number): boolean {
+  return pageCount >= KDP_MIN_SPINE_TEXT_PAGES;
+}
+
 /** KDP full-wrap cover dimensions for a given interior page count. */
 export function computeCoverDimensions(config: ProjectConfig, pageCount: number): CoverDimensions {
   const trim = config.trimSize;
@@ -797,15 +804,19 @@ ${fontLinkTags(t)}
 </style>
 </head>
 <body>
-  <!-- Operator decision: the AI bakes ALL cover typography (title, subtitle,
-       author, back-cover copy, spine) INTO the wrap illustration. The ONLY
-       engine-stamped element is the barcode; every text node is removed here. -->
+  <!-- Artwork is the full-wrap base layer. Exact typography and barcode
+       elements remain deterministic publishing-engine layers. -->
   <div class="cover">
     <div class="panel back">
+      <div class="blurb">${backBlurb}</div>
       <div class="barcode">ISBN barcode area</div>
     </div>
-    <div class="panel spine"></div>
-    <div class="panel front"></div>
+    <div class="panel spine">${coverAllowsSpineText(pageCount) ? `<span class="spine-text">${bookTitle} &nbsp;·&nbsp; ${author}</span>` : ''}</div>
+    <div class="panel front">
+      <h1 class="book-title">${bookTitle}</h1>
+      ${subtitle ? `<p class="subtitle">${subtitle}</p>` : ''}
+      <p class="author">${author}</p>
+    </div>
   </div>
   ${polyfill}
 </body>

@@ -38,7 +38,7 @@ import { directLayout } from './layout-director.js';
 import { isChromiumAvailable, loadPagedPolyfill, renderHtmlToPdf } from './render-pdf.js';
 import { composeCoverPrint } from '../print-prep/cover-print.js';
 import { preflightBook, stitchPdfs, type PreflightReport } from '../stage-7-pdf-compile/stitch-book.js';
-import { assembleCoverPrompt } from '../whole-page-render/assemble-page-prompt.js';
+import { assemblePagePrompt } from '../whole-page-render/assemble-page-prompt.js';
 import { PAGE_TYPOGRAPHY_DNA } from '../whole-page-render/typography-dna.js';
 import type { WholePageSpec } from '../whole-page-render/types.js';
 import { assembleIllustrationDna } from '../publishing-standard/index.js';
@@ -542,9 +542,8 @@ export async function renderCoverPdf(projectId: string, options: RenderCoverOpti
   };
 }
 
-/** Generate and persist the full-wrap cover artwork. The AI bakes the cover
- *  typography (title/subtitle/author/back-copy/spine) into this image; only the
- *  barcode is added later as an engine-stamped element by buildCoverHtml(). */
+/** Generate and persist the full-wrap artwork layer. Exact cover typography and
+ *  barcode elements are added deterministically during 300-DPI print prep. */
 export async function generateCoverWrapArtwork(
   projectId: string,
   options: RenderCoverOptions = {},
@@ -657,7 +656,7 @@ export function buildCoverWrapPrompt(
               'front cover (right panel): the hero/focal subject of the art-direction, with depth and atmosphere; calm sky/space above for the title',
               'spine: the scene continues unbroken as a quiet vertical strip with low visual contrast',
               'back cover (left panel): the same scene continuing, calmer, with restrained negative space for back-cover copy and a clean lower-right barcode zone',
-              backCover?.mainDescription ? `back-cover copy context: ${backCover.mainDescription}` : 'back-cover copy context: no back-cover copy supplied yet',
+              'back cover: preserve calm negative space for publisher-set descriptive copy',
             ],
             environment: 'a single continuous New England wilderness panorama wrapping back-to-front; archival painterly naturalist atmosphere; the Cinematic Naturalist DNA of the interior plates, scaled up to a premium collector cover — never a flat poster or graphic design',
             mood: 'premium, cinematic, atmospheric, cohesive, calm enough for system typography',
@@ -668,7 +667,7 @@ export function buildCoverWrapPrompt(
               `front cover: cinematic establishing view of the setting evoked by "${sceneSubject}", with depth and atmosphere`,
               'spine: quiet continuous texture with low visual contrast',
               'back cover: restrained atmosphere of the same setting that supports readable copy',
-              backCover?.mainDescription ? `back-cover copy context: ${backCover.mainDescription}` : 'back-cover copy context: no back-cover copy supplied yet',
+              'back cover: preserve calm negative space for publisher-set descriptive copy',
             ],
             environment: `setting evoked by "${sceneSubject}"${coverDescription ? `: ${coverDescription}` : ''}; archival painterly naturalist atmosphere; continuous wrap composition`,
             mood: 'premium, cinematic, atmospheric, calm enough for system typography',
@@ -680,8 +679,8 @@ export function buildCoverWrapPrompt(
       bodyBlocks: [],
       dropCap: null,
     },
-    // Operator decision: the AI bakes the full cover typography into the wrap
-    // illustration; only the barcode stays an engine-stamped element.
+    // Exact copy remains structured on the shared spec for downstream cover
+    // composition, but assemblePagePrompt withholds it from the image model.
     coverCopy: {
       title: title.toUpperCase(),
       subtitle: subtitle || undefined,
@@ -698,5 +697,5 @@ export function buildCoverWrapPrompt(
     badgeContext: { hazard: ['NONE'], region: 'GENERAL', source: 'GENERAL_REFERENCE' },
     badgeSafeZones: [],
   };
-  return assembleCoverPrompt(spec);
+  return assemblePagePrompt(spec);
 }

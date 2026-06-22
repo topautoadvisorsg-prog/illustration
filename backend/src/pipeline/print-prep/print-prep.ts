@@ -27,6 +27,7 @@ import {
   standardCanvas,
 } from './badge-geometry.js';
 import { runPreflight, type PreflightReport } from './preflight.js';
+import { removeGuideLines } from './remove-guide-lines.js';
 import { getProjectStorage } from '../../services/storage/project-storage.js';
 import {
   getRenderById,
@@ -45,6 +46,46 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
 }
 
 const SERIF = TYPOGRAPHY.renderFontFamily; // Typography-owned, Docker-installed fonts first
+
+export interface StampBox { left: number; top: number; width: number; height: number }
+export interface FolioPlacement {
+  side: 'left' | 'right';
+  label: string;
+  fontPx: number;
+  baselineY: number;
+  cx: number;
+  cy: number;
+  numW: number;
+  haloW: number;
+  gRx: number;
+  gRy: number;
+  /** Bounding box of the stamped number on the print canvas (px). */
+  box: StampBox;
+}
+
+/** SINGLE SOURCE OF TRUTH for where the folio is stamped. composePrintPage (the
+ *  stamp) AND the preview overlay both call this, so the preview shows the EXACT
+ *  position that will print — never a guess. Outer bottom corner, mirrored by side. */
+export function folioPlacement(
+  canvas: { width: number; height: number; dpi: number },
+  folioSide: 'left' | 'right',
+  label: string,
+): FolioPlacement {
+  const fontPx = Math.round(0.2 * canvas.dpi);
+  const bleedPx = Math.round(0.125 * canvas.dpi);
+  const safePx = Math.round(0.5 * canvas.dpi);
+  const baselineY = canvas.height - bleedPx - Math.round(0.4 * canvas.dpi);
+  const numW = Math.max(fontPx, label.length * fontPx * 0.62);
+  const onLeft = folioSide === 'left';
+  const cx = onLeft ? bleedPx + safePx + numW / 2 : canvas.width - bleedPx - safePx - numW / 2;
+  const cy = baselineY - fontPx * 0.32;
+  const haloW = Math.max(5, Math.round(fontPx * 0.2));
+  const gRx = numW * 0.85, gRy = fontPx * 0.9;
+  return {
+    side: folioSide, label, fontPx, baselineY, cx, cy, numW, haloW, gRx, gRy,
+    box: { left: Math.round(cx - numW / 2), top: Math.round(baselineY - fontPx), width: Math.round(numW), height: Math.round(fontPx * 1.18) },
+  };
+}
 
 export interface ComposeResult {
   pngBuffer: Buffer;
@@ -82,9 +123,12 @@ export async function composePrintPage(
   const srcW = meta.width ?? 1024;
   const srcH = meta.height ?? 1536;
   const scaledW = Math.round((srcW / srcH) * canvas.height);
-  const upscaled = await sharp(renderPng)
+  const upscaledRaw = await sharp(renderPng)
     .resize({ width: scaledW, height: canvas.height, kernel: 'lanczos3' })
     .toBuffer();
+  // Strip any baked-in orange guide lines that the AI copied from the blueprint
+  // (no-op when none are found) so they never reach the printed page.
+  const upscaled = await removeGuideLines(upscaledRaw);
 
   const composites: sharp.OverlayOptions[] = [
     // 2. Letterbox: centre the page; sides are parchment (the base fill).
@@ -137,17 +181,7 @@ export async function composePrintPage(
   // behind the ink glyph) keeps it legible on busy art without a boxy cartouche.
   let stampedFolio = false;
   if (folioLabel) {
-    const fontPx = Math.round(0.2 * canvas.dpi); // a touch larger — the number read too tiny at 0.16in
-    const bleedPx = Math.round(0.125 * canvas.dpi);
-    const safePx = Math.round(0.5 * canvas.dpi); // the number's OUTER edge sits on this safe line
-    const baselineY = canvas.height - bleedPx - Math.round(0.4 * canvas.dpi); // ~0.4in above the bottom trim
-    const numW = Math.max(fontPx, folioLabel.length * fontPx * 0.62);
-    const onLeft = folioSide === 'left';
-    // Keep the OUTER edge on the safe line; centre the glyphs + glow on cx.
-    const cx = onLeft ? bleedPx + safePx + numW / 2 : canvas.width - bleedPx - safePx - numW / 2;
-    const cy = baselineY - fontPx * 0.32; // vertical centre of the glyphs
-    const haloW = Math.max(5, Math.round(fontPx * 0.2));
-    const gRx = numW * 0.85, gRy = fontPx * 0.9;
+    const fp = folioPlacement(canvas, folioSide, folioLabel); // SAME geometry the preview draws
     // Soft radial parchment glow behind the number (translucent → illustration
     // still shows through) + a tight halo, so it reads on busy/dark art without a
     // hard oval. Ink glyph on top.
@@ -157,9 +191,9 @@ export async function composePrintPage(
       `<stop offset="0%" stop-color="${PALETTE.parchment.hex}" stop-opacity="0.82"/>` +
       `<stop offset="55%" stop-color="${PALETTE.parchment.hex}" stop-opacity="0.55"/>` +
       `<stop offset="100%" stop-color="${PALETTE.parchment.hex}" stop-opacity="0"/></radialGradient></defs>` +
-      `<ellipse cx="${cx}" cy="${cy}" rx="${gRx}" ry="${gRy}" fill="url(#fg)"/>` +
-      `<text x="${cx}" y="${baselineY}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" stroke="${PALETTE.parchment.hex}" stroke-width="${haloW}" stroke-linejoin="round" fill="${PALETTE.parchment.hex}">${folioLabel}</text>` +
-      `<text x="${cx}" y="${baselineY}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" fill="${PALETTE.ink.hex}">${folioLabel}</text></svg>`;
+      `<ellipse cx="${fp.cx}" cy="${fp.cy}" rx="${fp.gRx}" ry="${fp.gRy}" fill="url(#fg)"/>` +
+      `<text x="${fp.cx}" y="${fp.baselineY}" text-anchor="middle" font-family="${SERIF}" font-size="${fp.fontPx}" stroke="${PALETTE.parchment.hex}" stroke-width="${fp.haloW}" stroke-linejoin="round" fill="${PALETTE.parchment.hex}">${folioLabel}</text>` +
+      `<text x="${fp.cx}" y="${fp.baselineY}" text-anchor="middle" font-family="${SERIF}" font-size="${fp.fontPx}" fill="${PALETTE.ink.hex}">${folioLabel}</text></svg>`;
     const fpng = await sharp(Buffer.from(folioSvg)).resize(canvas.width, canvas.height).png().toBuffer();
     composites.push({ input: fpng, left: 0, top: 0 });
     stampedFolio = true;
@@ -267,22 +301,7 @@ export async function printPrepRender(renderId: string): Promise<PrintPrepResult
   const page = await getPaginatedPageById(row.pageId);
   const folioLabel = await computeFolioLabel(page, row.projectId);
 
-  // Physical page side (recto/verso) from the spine order so the folio lands in
-  // the OUTER bottom corner (page-turn edge), never the spine. Same spine sort the
-  // assembler uses → 1-based PDF index; odd = recto = right-hand, even = verso = left.
-  const spine = resolveSpine(
-    (await listPaginatedPagesForProject(row.projectId)).map((p) => ({
-      id: p.id,
-      pageKey: p.pageKey,
-      chapterNumber: p.chapterNumber ?? 0,
-      plannedPageNumber: p.plannedPageNumber ?? 0,
-      section: p.section,
-      spineOrder: p.spineOrder,
-    })),
-  );
-  const pdfIndex = spine.findIndex((p) => p.id === row.pageId) + 1; // 1-based; 0 if missing
-  const folioSide: 'left' | 'right' = pdfIndex > 0 && pdfIndex % 2 === 0 ? 'left' : 'right';
-
+  const folioSide = await folioSideForRender(row.projectId, row.pageId);
   const composed = await composePrintPage(renderPng, badgeSet, folioLabel, canvasIn, folioSide);
 
   const pageKey = page?.pageKey ?? row.pageId;
@@ -314,5 +333,80 @@ export async function printPrepRender(renderId: string): Promise<PrintPrepResult
     preflight,
     stampedBadges: composed.stampedBadges,
     stampedFolio: composed.stampedFolio,
+  };
+}
+
+/** Physical page side (recto/verso) from the spine order — odd PDF index = recto =
+ *  right-hand. SHARED by the stamp (printPrepRender) and the preview geometry. */
+async function folioSideForRender(projectId: string, pageId: string): Promise<'left' | 'right'> {
+  const spine = resolveSpine(
+    (await listPaginatedPagesForProject(projectId)).map((p) => ({
+      id: p.id,
+      pageKey: p.pageKey,
+      chapterNumber: p.chapterNumber ?? 0,
+      plannedPageNumber: p.plannedPageNumber ?? 0,
+      section: p.section,
+      spineOrder: p.spineOrder,
+    })),
+  );
+  const pdfIndex = spine.findIndex((p) => p.id === pageId) + 1; // 1-based; 0 if missing
+  return pdfIndex > 0 && pdfIndex % 2 === 0 ? 'left' : 'right';
+}
+
+export interface StampGeometry {
+  pageKey: string;
+  canvas: { width: number; height: number; dpi: number };
+  folioSide: 'left' | 'right';
+  folioLabel: string | null;
+  trim: StampBox;
+  safe: StampBox;
+  reading: StampBox;
+  folioBox: StampBox | null;
+  badgeBox: StampBox | null;
+}
+
+/** Geometry of every stamped element + boundary for a render, computed WITHOUT
+ *  rendering. The preview overlay calls this so it shows the EXACT placement
+ *  print-prep will stamp (same folioPlacement / folioSideForRender / badge layout).
+ *  QA rule: no stamped element is hidden — every one is reported here. */
+export async function stampGeometryForRender(renderId: string): Promise<StampGeometry> {
+  const row = await getRenderById(renderId);
+  if (!row) throw new Error(`render_not_found:${renderId}`);
+  const project = await getProject(row.projectId);
+  const config = ProjectConfigSchema.parse(project?.config ?? {});
+  const canvas = standardCanvas(resolveGeometry(config).canvasIn);
+  const cv = { width: canvas.width, height: canvas.height, dpi: canvas.dpi };
+
+  const folioSide = await folioSideForRender(row.projectId, row.pageId);
+  const page = await getPaginatedPageById(row.pageId);
+  const folioLabel = await computeFolioLabel(page, row.projectId);
+
+  const spec = row.specJson as { badgeContext?: { region?: string; hazard?: string[]; source?: string } } | null;
+  const bc = spec?.badgeContext;
+  const badgeSet: Badge[] = (process.env.WL_ENABLE_BADGES && bc)
+    ? [
+        ...(bc.region ? [{ family: 'region' as const, value: bc.region }] : []),
+        ...(bc.hazard ?? []).map((h) => ({ family: 'hazard' as const, value: h })),
+        ...(bc.source ? [{ family: 'source' as const, value: bc.source }] : []),
+      ]
+    : [];
+  const stack = computeBadgeStackLayout(badgesForPage(badgeSet), folioLabel, canvas);
+
+  const bleed = Math.round(0.125 * canvas.dpi);
+  const safe = Math.round(0.5 * canvas.dpi);
+  const reading = Math.round(1.0 * canvas.dpi); // inner text/reading boundary
+  const inset = (n: number): StampBox => ({ left: n, top: n, width: canvas.width - 2 * n, height: canvas.height - 2 * n });
+  const cr = stack.cartoucheRect;
+
+  return {
+    pageKey: page?.pageKey ?? row.pageId,
+    canvas: cv,
+    folioSide,
+    folioLabel,
+    trim: inset(bleed),
+    safe: inset(bleed + safe),
+    reading: inset(bleed + reading),
+    folioBox: folioLabel ? folioPlacement(cv, folioSide, folioLabel).box : null,
+    badgeBox: cr ? { left: cr.left, top: cr.top, width: cr.width, height: cr.height } : null,
   };
 }

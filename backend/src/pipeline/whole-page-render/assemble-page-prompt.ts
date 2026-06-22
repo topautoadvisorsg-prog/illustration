@@ -40,59 +40,20 @@ const HARD_NEGATIVES = [
   '- No anthropomorphized animals, cartoon expressions, or whimsical fantasy elements.',
 ].join('\n');
 
-/**
- * DEDICATED cover prompt. The cover is the flagship image — it gets its own
- * lean prompt, NOT the universal page prompt with leftovers. No blueprint, no
- * reading-field coordinates, no badge context, no chapter ornaments, no page
- * geometry block. Information hierarchy (operator-approved):
- *   1. Mission  2. Exact text  3. Composition zones  4. Visual DNA
- *   5. Typography DNA (compressed)  6. Hard negatives
- */
-export function assembleCoverPrompt(spec: WholePageSpec): string {
-  const cc = spec.coverCopy ?? { title: spec.pageText.title.name };
-  const subj = spec.illustrationDNA.subject;
-  return [
-    // 1. MISSION
-    `MISSION — create a complete, FINISHED, publishable collector-edition FULL-WRAP HARDCOVER COVER under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version}: one continuous illustration spanning back cover, spine, and front cover. A museum-grade collector's natural-history volume — an object that feels rare, archival, and worthy of preservation. The entire wrap must appear as a SINGLE printed plate where illustration, typography, and ornamentation are inseparable — never artwork with text pasted on top. You render the complete cover — illustration and typography — as one finished image.`,
-    '',
-    // 2. EXACT TEXT
-    'TEXT TO RENDER — these exact words, engraved into the artwork; do not alter, translate, abbreviate, or reorder:',
-    '```json',
-    JSON.stringify(cc, null, 2),
-    '```',
-    '',
-    // 3. COMPOSITION ZONES
-    'COMPOSITION — one continuous full-bleed wrap:',
-    `- ${spec.composition.imagePlacement}.`,
-    '- FRONT COVER: the title block — title, then subtitle, then the cover-description line — as the engraved focal typography over the strongest part of the scene; the author line lower on the front cover; and, ONLY if a series line is provided in the text, that series line as small engraved caps along the very bottom edge of the front cover.',
-    '- SPINE: the title and author as vertical spine typography in the same ink.',
-    '- BACK COVER: set the back-cover copy as readable engraved typesetting over calm landscape negative space, in this top-to-bottom hierarchy — first "backCover.mainDescription" as the lead sales paragraph; then, if present, "backCover.insideThisVolume" as a titled "INSIDE THIS VOLUME" feature list (each entry its own line); then, if present, "backCover.authorBio" as a smaller author note near the bottom. Keep the lower-right barcode zone clear.',
-    '- Render ONLY the words provided in the text block above; if a field is absent, omit it (do not invent a subtitle, description, author, or series line).',
-    '',
-    // 4. VISUAL DNA — the heart of the style
-    'WILD LANDS VISUAL DNA:',
-    spec.illustrationDNA.masterStyleBlock.trim(),
-    '',
-    `SCENE: ${subj.primary} ${subj.environment}. Mood: ${subj.mood}.`,
-    '',
-    // 5. TYPOGRAPHY DNA — compressed (the model is not setting a PDF)
-    `TYPOGRAPHY: Caslon-class old-style serif (Adobe Caslon, Goudy Old Style, or Garamond) in engraved roman caps — letterpress feel, a slight printed-ink impression, paper grain under the type. Warm sepia ink ${PALETTE.ink.hex} on parchment ${PALETTE.parchment.hex}; never pure black, never a modern sans-serif, never a flat digital label or sticker.`,
-    '',
-    // 6. HARD NEGATIVES
-    'HARD NEGATIVES:',
-    '- No photography, photorealism, 3D render, flat vector, low-poly, anime/cartoon, modern UI, infographic styling, gradients, or digital drop-shadows.',
-    '- No chapter kicker, chapter ornaments, page numbers, folios, running heads, or badges — this is a cover, not an interior page. (A series "VOLUME" line with a Roman numeral IS allowed when provided in the text above.)',
-    '- Do not invent any text beyond the words specified above.',
-    '- If the result would not pass as a real collector-edition hardcover wrap on a bookstore shelf, it is wrong.',
-  ].join('\n');
+function rendersCriticalText(spec: WholePageSpec): boolean {
+  return !['COVER_WRAP', 'TITLE_PAGE', 'GLOSSARY_ORNAMENT', 'INDEX_ORNAMENT'].includes(spec.pageType);
 }
 
-
-function promptHeader(_spec: WholePageSpec): string {
+function promptHeader(spec: WholePageSpec): string {
   // Every page on this path bakes its own text (the cover is the sole exception
   // and uses assembleCoverPrompt — it never reaches here), so the standard
   // text-rendering header always applies.
-  return HEADER;
+  if (rendersCriticalText(spec)) return HEADER;
+  return [
+    `You are rendering the artwork layer for a publishable collector-edition ${spec.pageType.toLowerCase().replaceAll('_', ' ')} under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version}.`,
+    'Render artwork, ornament, paper character, and naturally calm reserved zones only.',
+    'Do not render readable text. The publishing engine adds all exact typography, reference copy, spine text, and barcode elements after artwork generation.',
+  ].join(' ');
 }
 
 function block(title: string, payload: unknown): string {
@@ -112,9 +73,15 @@ function hardConstraints(spec: WholePageSpec): string {
     }
   }
   if (spec.pageType === 'TITLE_PAGE') {
-    const stacked = spec.typographyDNA.titleHierarchy.filter(Boolean);
     lines.push(
-      `- TITLE-PAGE typography, baked INTO the artwork as the engraved title block — stacked and centered on calm parchment, in this exact order top to bottom: ${stacked.map((s) => `"${s}"`).join(' / ')}. The title set largest in stately serif caps; the subtitle and description beneath it; the author/imprint line lower; and the final series "VOLUME" line, when present, as small tracked caps at the bottom. All in warm sepia ink on calm parchment, with NO decorative frame, border, or ornament around the type. Render only these lines, in this order; never a pasted label, never modern type.`,
+      '- TITLE PAGE ARTWORK: reserve a calm central title-safe region and a smaller lower imprint-safe region. Do not render title, subtitle, author, imprint, series, or any other readable text.',
+    );
+  }
+  if (spec.pageType === 'COVER_WRAP') {
+    lines.push(
+      '- COVER ARTWORK ONLY: create one continuous full-bleed illustration across back cover, spine, and front cover.',
+      '- Reserve calm composition zones for front-cover title/subtitle/author, back-cover copy, and optional spine typography. Keep the lower-right back-cover barcode zone visually quiet.',
+      '- Do not render letters, words, title text, author text, back-cover copy, spine text, barcode, ISBN, price box, or placeholder labels. The publishing engine adds those elements exactly.',
     );
   }
   if (spec.pageType === 'INTERIOR' && spec.pageText.title.name) {
@@ -176,28 +143,32 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
     noModernUi: _noModernUi,
     noInfographic: _noInfographic,
     titleFamily,
+    titleHierarchy,
     decorativeInitial,
     ...typoRest
   } = spec.typographyDNA;
   const typographyDNA = {
     ...typoRest,
     ...(emitTitleFamily ? { titleFamily } : {}),
+    ...(rendersCriticalText(spec) ? { titleHierarchy } : {}),
     ...(decorativeInitial != null ? { decorativeInitial } : {}),
   };
   // Every page in this path bakes its own text into the image (the cover is the
   // sole exception and uses the dedicated assembleCoverPrompt — it never reaches
   // here). The single, strongest text-fidelity statement lives HERE and nowhere else.
-  const bodySection = [
-    'PAGE BODY — render every block below IN ORDER, as its type ("heading" = bold serif section heading, "subheading" = smaller bold heading, "paragraph" = body prose).',
-    'Render the provided text EXACTLY: do not add, remove, translate, summarize, or reorder any words. The text is already plain — never print the block labels, the words "type"/"text", braces, or any markdown (#/*/_).',
-    // Legibility floor: pagination already fit this exact amount of text to the
-    // reading field at the body size below, so the model must NOT shrink the type
-    // to cram — that is what produced cramped pages. The size is the floor.
-    `TEXT SIZE — set the body text at ${spec.typographyDNA.bodyPt}pt at this trim (about ${spec.typographyDNA.bodyMeasureChars ?? 70} characters per line). This is the MAXIMUM size: NEVER render the body text larger than ${spec.typographyDNA.bodyPt}pt, and never enlarge it to fill empty space. If ALL the text does not fit inside the inner orange line at ${spec.typographyDNA.bodyPt}pt, REDUCE the size — down to the smallest still-clearly-readable book size — until every line fits inside the inner orange line. The text only ever sizes DOWN to fit, never UP. Keeping every line inside the inner orange line outranks the text size.`,
-    '```json',
-    JSON.stringify(spec.pageText.bodyBlocks, null, 2),
-    '```',
-  ];
+  const bodySection = rendersCriticalText(spec)
+    ? [
+        'PAGE BODY — render every block below IN ORDER, as its type ("heading" = bold serif section heading, "subheading" = smaller bold heading, "paragraph" = body prose).',
+        'Render the provided text EXACTLY: do not add, remove, translate, summarize, or reorder any words. The text is already plain — never print the block labels, the words "type"/"text", braces, or any markdown (#/*/_).',
+        `TEXT SIZE — set the body text at ${spec.typographyDNA.bodyPt}pt at this trim (about ${spec.typographyDNA.bodyMeasureChars ?? 70} characters per line). This is the MAXIMUM size: NEVER render the body text larger than ${spec.typographyDNA.bodyPt}pt, and never enlarge it to fill empty space. If ALL the text does not fit inside the inner orange line at ${spec.typographyDNA.bodyPt}pt, REDUCE the size — down to the smallest still-clearly-readable book size — until every line fits inside the inner orange line. The text only ever sizes DOWN to fit, never UP. Keeping every line inside the inner orange line outranks the text size.`,
+        '```json',
+        JSON.stringify(spec.pageText.bodyBlocks, null, 2),
+        '```',
+      ]
+    : [
+        'TEXT POLICY — render no readable text for this page role.',
+        'Keep typography-safe and reference-safe regions calm and naturally integrated into the artwork. Never draw a blank card, panel, label, frame, or cutout.',
+      ];
 
   // Continuation/compacted pages carry the SAME subject as the entry opener, but
   // must not reprint the opener's portrait — each page should teach something new.
@@ -224,8 +195,7 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
     '',
     block('READING-FIELD GEOMETRY (inches)', spec.readingFieldGeometry),
     '',
-    block('PAGE TEXT — title', spec.pageText.title),
-    '',
+    ...(rendersCriticalText(spec) ? [block('PAGE TEXT — title', spec.pageText.title), ''] : []),
     ...bodySection,
     '',
     block('DECORATIVE ELEMENTS', spec.decorativeElements),
