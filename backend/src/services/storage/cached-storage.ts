@@ -18,6 +18,7 @@
  */
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { StoredFile } from './local-storage.js';
@@ -40,6 +41,19 @@ export class CachedStorageService implements ProjectStorage {
   constructor(private readonly inner: ProjectStorage) {}
 
   async writeProjectFile(projectId: string, parts: string[], data: Buffer | string): Promise<StoredFile> {
+    // Fast path (RENDER_CACHE_ONLY): write ONLY to the local cache and skip the
+    // backing-store upload entirely. The Supabase upload of large print PNGs is
+    // bandwidth-bound (~32s/file from a home connection); for LOCAL book assembly
+    // we only need the bytes in the cache, and the cloud copy is re-synced later.
+    // Not best-effort here: if the cache write fails there is no fallback, so throw.
+    if (process.env.RENDER_CACHE_ONLY) {
+      const buf = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');
+      const relativePath = [projectId, ...parts].join('/');
+      const cp = cachePathFor(relativePath);
+      await mkdir(path.dirname(cp), { recursive: true });
+      await writeFile(cp, buf);
+      return { relativePath, absolutePath: cp, sha256: createHash('sha256').update(buf).digest('hex'), sizeBytes: buf.length };
+    }
     // The real (durable) write happens first and is authoritative.
     const result = await this.inner.writeProjectFile(projectId, parts, data);
     // Write-through: a freshly-written file is cached so review needs no egress.

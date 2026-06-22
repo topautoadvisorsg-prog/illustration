@@ -148,9 +148,15 @@ export async function composePrintPage(
         top: canvas.height - bleedPx - Math.round(0.4 * canvas.dpi) - h,
       };
     }
+    // A tight parchment halo (light glyph drawn thick BEHIND the ink glyph) keeps
+    // the bare centred folio legible on busy/dark bottom art — no boxy cartouche.
+    // Two text elements (not paint-order) so it renders regardless of SVG support.
+    const fcx = r.width / 2, fcy = r.height * 0.72;
+    const haloW = Math.max(4, Math.round(fontPx * 0.22));
     const folioSvg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${r.width}" height="${r.height}" viewBox="0 0 ${r.width} ${r.height}">` +
-      `<text x="${r.width / 2}" y="${r.height * 0.72}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" fill="${PALETTE.ink.hex}">${stack.folio.label}</text></svg>`;
+      `<text x="${fcx}" y="${fcy}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" stroke="${PALETTE.parchment.hex}" stroke-width="${haloW}" stroke-linejoin="round" fill="${PALETTE.parchment.hex}">${stack.folio.label}</text>` +
+      `<text x="${fcx}" y="${fcy}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" fill="${PALETTE.ink.hex}">${stack.folio.label}</text></svg>`;
     // Centred lone folio prints at full ink (most readable); the corner-stack
     // folio stays dimmed to match the badges.
     const base = sharp(Buffer.from(folioSvg));
