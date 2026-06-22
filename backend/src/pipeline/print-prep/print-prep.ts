@@ -32,7 +32,8 @@ import {
   getRenderById,
   persistPrintPrep,
 } from '../../db/repositories/whole-page-render.repo.js';
-import { getPaginatedPageById, getMaxBodyPlannedPageNumber } from '../../db/repositories/pagination.repo.js';
+import { getPaginatedPageById, getMaxBodyPlannedPageNumber, listPaginatedPagesForProject } from '../../db/repositories/pagination.repo.js';
+import { resolveSpine } from '../book-assembly/spine-order.js';
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace('#', '');
@@ -67,6 +68,7 @@ export async function composePrintPage(
   badgeSet: Badge[] | null,
   folioLabel: string | null,
   canvasIn: { w: number; h: number },
+  folioSide: 'left' | 'right' = 'right',
 ): Promise<ComposeResult> {
   const canvas = standardCanvas(canvasIn);
   const parchment = hexToRgb(PALETTE.parchment.hex);
@@ -127,41 +129,39 @@ export async function composePrintPage(
     composites.push({ input: bpng, left: p.rect.left, top: p.rect.top });
   }
 
-  // 3c. Folio (page number). With NO badges (this book), the lone folio sits
-  // BOTTOM-CENTRE with a clean margin above the trim — the standard book
-  // position — instead of floating in the empty bottom-right corner. With badges
-  // present it joins the corner stack (dimmed to match the badges).
+  // 3c. Folio (page number) — OUTER bottom corner, INSIDE the safe margin,
+  // MIRRORED by page side so the number sits on the page-TURN edge and never near
+  // the spine: recto (right-hand page) → bottom-RIGHT, verso (left-hand) →
+  // bottom-LEFT. `folioSide` is derived from the page's physical position in the
+  // spine (odd PDF index = recto = right). A tight parchment halo (light glyph
+  // behind the ink glyph) keeps it legible on busy art without a boxy cartouche.
   let stampedFolio = false;
-  if (stack.folio) {
-    const fontPx = Math.round(0.16 * canvas.dpi);
-    const centred = stack.placedBadges.length === 0;
-    let r = stack.folio.rect;
-    if (centred) {
-      const bleedPx = Math.round(0.125 * canvas.dpi);
-      const w = Math.round(1.4 * canvas.dpi);
-      const h = Math.round(0.3 * canvas.dpi);
-      r = {
-        width: w,
-        height: h,
-        left: Math.round((canvas.width - w) / 2),
-        // baseline ~0.4in above the bottom trim
-        top: canvas.height - bleedPx - Math.round(0.4 * canvas.dpi) - h,
-      };
-    }
-    // A tight parchment halo (light glyph drawn thick BEHIND the ink glyph) keeps
-    // the bare centred folio legible on busy/dark bottom art — no boxy cartouche.
-    // Two text elements (not paint-order) so it renders regardless of SVG support.
-    const fcx = r.width / 2, fcy = r.height * 0.72;
-    const haloW = Math.max(4, Math.round(fontPx * 0.22));
+  if (folioLabel) {
+    const fontPx = Math.round(0.2 * canvas.dpi); // a touch larger — the number read too tiny at 0.16in
+    const bleedPx = Math.round(0.125 * canvas.dpi);
+    const safePx = Math.round(0.5 * canvas.dpi); // the number's OUTER edge sits on this safe line
+    const baselineY = canvas.height - bleedPx - Math.round(0.4 * canvas.dpi); // ~0.4in above the bottom trim
+    const numW = Math.max(fontPx, folioLabel.length * fontPx * 0.62);
+    const onLeft = folioSide === 'left';
+    // Keep the OUTER edge on the safe line; centre the glyphs + glow on cx.
+    const cx = onLeft ? bleedPx + safePx + numW / 2 : canvas.width - bleedPx - safePx - numW / 2;
+    const cy = baselineY - fontPx * 0.32; // vertical centre of the glyphs
+    const haloW = Math.max(5, Math.round(fontPx * 0.2));
+    const gRx = numW * 0.85, gRy = fontPx * 0.9;
+    // Soft radial parchment glow behind the number (translucent → illustration
+    // still shows through) + a tight halo, so it reads on busy/dark art without a
+    // hard oval. Ink glyph on top.
     const folioSvg =
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${r.width}" height="${r.height}" viewBox="0 0 ${r.width} ${r.height}">` +
-      `<text x="${fcx}" y="${fcy}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" stroke="${PALETTE.parchment.hex}" stroke-width="${haloW}" stroke-linejoin="round" fill="${PALETTE.parchment.hex}">${stack.folio.label}</text>` +
-      `<text x="${fcx}" y="${fcy}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" fill="${PALETTE.ink.hex}">${stack.folio.label}</text></svg>`;
-    // Centred lone folio prints at full ink (most readable); the corner-stack
-    // folio stays dimmed to match the badges.
-    const base = sharp(Buffer.from(folioSvg));
-    const fpng = await (centred ? base : base.modulate({ brightness: 0.85 })).png().toBuffer();
-    composites.push({ input: fpng, left: r.left, top: r.top });
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">` +
+      `<defs><radialGradient id="fg" cx="50%" cy="50%" r="50%">` +
+      `<stop offset="0%" stop-color="${PALETTE.parchment.hex}" stop-opacity="0.82"/>` +
+      `<stop offset="55%" stop-color="${PALETTE.parchment.hex}" stop-opacity="0.55"/>` +
+      `<stop offset="100%" stop-color="${PALETTE.parchment.hex}" stop-opacity="0"/></radialGradient></defs>` +
+      `<ellipse cx="${cx}" cy="${cy}" rx="${gRx}" ry="${gRy}" fill="url(#fg)"/>` +
+      `<text x="${cx}" y="${baselineY}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" stroke="${PALETTE.parchment.hex}" stroke-width="${haloW}" stroke-linejoin="round" fill="${PALETTE.parchment.hex}">${folioLabel}</text>` +
+      `<text x="${cx}" y="${baselineY}" text-anchor="middle" font-family="${SERIF}" font-size="${fontPx}" fill="${PALETTE.ink.hex}">${folioLabel}</text></svg>`;
+    const fpng = await sharp(Buffer.from(folioSvg)).resize(canvas.width, canvas.height).png().toBuffer();
+    composites.push({ input: fpng, left: 0, top: 0 });
     stampedFolio = true;
   }
 
@@ -267,7 +267,23 @@ export async function printPrepRender(renderId: string): Promise<PrintPrepResult
   const page = await getPaginatedPageById(row.pageId);
   const folioLabel = await computeFolioLabel(page, row.projectId);
 
-  const composed = await composePrintPage(renderPng, badgeSet, folioLabel, canvasIn);
+  // Physical page side (recto/verso) from the spine order so the folio lands in
+  // the OUTER bottom corner (page-turn edge), never the spine. Same spine sort the
+  // assembler uses → 1-based PDF index; odd = recto = right-hand, even = verso = left.
+  const spine = resolveSpine(
+    (await listPaginatedPagesForProject(row.projectId)).map((p) => ({
+      id: p.id,
+      pageKey: p.pageKey,
+      chapterNumber: p.chapterNumber ?? 0,
+      plannedPageNumber: p.plannedPageNumber ?? 0,
+      section: p.section,
+      spineOrder: p.spineOrder,
+    })),
+  );
+  const pdfIndex = spine.findIndex((p) => p.id === row.pageId) + 1; // 1-based; 0 if missing
+  const folioSide: 'left' | 'right' = pdfIndex > 0 && pdfIndex % 2 === 0 ? 'left' : 'right';
+
+  const composed = await composePrintPage(renderPng, badgeSet, folioLabel, canvasIn, folioSide);
 
   const pageKey = page?.pageKey ?? row.pageId;
   const base = `${pageKey}-${renderId}`;

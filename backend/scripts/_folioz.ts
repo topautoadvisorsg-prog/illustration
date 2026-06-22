@@ -17,17 +17,23 @@ const pngPath = (r.printPngPath as string) ?? (r.printPdfPath as string).replace
 const raw = await storage.readProjectFile(pngPath);
 const m = await sharp(raw).metadata();
 const W = m.width!, H = m.height!;
-// centred folio box (print-prep.ts): w=1.4in, h=0.3in, left=(W-w)/2, top=H-bleed-0.4in-h
 const dpi = W / 7.25;
-const fw = Math.round(1.4 * dpi), fh = Math.round(0.3 * dpi);
-const fleft = Math.round((W - fw) / 2), ftop = Math.round(H - 0.125 * dpi - 0.4 * dpi - fh);
-const padX = Math.round(0.4 * dpi), padY = Math.round(0.25 * dpi);
-const ex = {
-  left: Math.max(0, fleft - padX), top: Math.max(0, ftop - padY),
-  width: Math.min(W, fw + 2 * padX), height: Math.min(H - (ftop - padY), fh + 2 * padY),
-};
-console.log(`${KEY}: folio box expected at left=${fleft} top=${ftop} (${fw}x${fh}); extracting`, JSON.stringify(ex));
-const out = await sharp(raw).extract(ex).resize({ width: 900 }).png().toBuffer();
+const cw = Math.round(2.3 * dpi), ch = Math.round(1.1 * dpi);
+const top = H - ch;
+const leftBox = await sharp(raw).extract({ left: 0, top, width: cw, height: ch }).resize({ width: 460 }).png().toBuffer();
+const rightBox = await sharp(raw).extract({ left: W - cw, top, width: cw, height: ch }).resize({ width: 460 }).png().toBuffer();
+const bh = (await sharp(leftBox).metadata()).height!;
+const gap = 18, labelH = 30;
+const sheetW = 460 * 2 + gap * 3, sheetH = bh + labelH + gap;
+const labels = `<svg xmlns="http://www.w3.org/2000/svg" width="${sheetW}" height="${sheetH}">` +
+  `<text x="${gap + 230}" y="22" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#333">bottom-LEFT corner</text>` +
+  `<text x="${gap * 2 + 460 + 230}" y="22" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#333">bottom-RIGHT corner</text></svg>`;
+const out = await sharp({ create: { width: sheetW, height: sheetH, channels: 3, background: '#ffffff' } })
+  .composite([
+    { input: leftBox, left: gap, top: labelH },
+    { input: rightBox, left: gap * 2 + 460, top: labelH },
+    { input: await sharp(Buffer.from(labels)).png().toBuffer(), left: 0, top: 0 },
+  ]).png().toBuffer();
 writeFileSync('C:/Users/jovan/Downloads/_folioz.png', out);
-console.log('→ _folioz.png');
+console.log(`${KEY}: → _folioz.png (both bottom corners)`);
 process.exit(0);

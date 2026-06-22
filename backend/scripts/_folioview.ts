@@ -21,22 +21,26 @@ const raw = await storage.readProjectFile(pngPath);
 const m = await sharp(raw).metadata();
 const W = m.width!, H = m.height!;
 
-// Zoom tight into the CENTER-BOTTOM (where the centred folio lives), then draw the
-// bottom TRIM + SAFE lines so the page number's position is unmistakable.
-const cropL = Math.round(W * 0.22), cropW = Math.round(W * 0.56);
-const cropTop = Math.round(H * 0.85), cropH = H - cropTop;
-const OUTW = 1000;
-const scale = OUTW / cropW;
-const cm = await sharp(raw).extract({ left: cropL, top: cropTop, width: cropW, height: cropH }).resize({ width: OUTW }).png().toBuffer();
+// FULL-WIDTH bottom band so BOTH corners are visible, with trim (red) + safe
+// (orange) lines on all four sides — shows which outer corner the folio sits in.
+const cropTop = Math.round(H * 0.84), cropH = H - cropTop;
+const OUTW = 1150;
+const scale = OUTW / W;
+const cm = await sharp(raw).extract({ left: 0, top: cropTop, width: W, height: cropH }).resize({ width: OUTW }).png().toBuffer();
 const cmeta = await sharp(cm).metadata();
 const ow = cmeta.width!, oh = cmeta.height!;
 const yTrimB = (H - (H * 0.125 / 10.25) - cropTop) * scale;
 const ySafeB = (H - (H * 0.625 / 10.25) - cropTop) * scale;
+const xTrimL = (W * 0.125 / 7.25) * scale, xTrimR = ow - xTrimL;
+const xSafeL = (W * 0.625 / 7.25) * scale, xSafeR = ow - xSafeL;
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ow}" height="${oh}">` +
   `<line x1="0" y1="${yTrimB}" x2="${ow}" y2="${yTrimB}" stroke="#cc2222" stroke-width="3" stroke-dasharray="11 7"/>` +
-  `<text x="6" y="${yTrimB - 6}" font-family="sans-serif" font-size="18" fill="#cc2222">TRIM (cut)</text>` +
+  `<line x1="${xTrimL}" y1="0" x2="${xTrimL}" y2="${oh}" stroke="#cc2222" stroke-width="3" stroke-dasharray="11 7"/>` +
+  `<line x1="${xTrimR}" y1="0" x2="${xTrimR}" y2="${oh}" stroke="#cc2222" stroke-width="3" stroke-dasharray="11 7"/>` +
   `<line x1="0" y1="${ySafeB}" x2="${ow}" y2="${ySafeB}" stroke="#e08a2e" stroke-width="2" stroke-dasharray="9 6"/>` +
-  `<text x="6" y="${ySafeB - 6}" font-family="sans-serif" font-size="16" fill="#c9781f">SAFE</text></svg>`;
+  `<line x1="${xSafeL}" y1="0" x2="${xSafeL}" y2="${oh}" stroke="#e08a2e" stroke-width="2" stroke-dasharray="9 6"/>` +
+  `<line x1="${xSafeR}" y1="0" x2="${xSafeR}" y2="${oh}" stroke="#e08a2e" stroke-width="2" stroke-dasharray="9 6"/>` +
+  `<text x="${xSafeL + 6}" y="22" font-family="sans-serif" font-size="16" fill="#c9781f">red=TRIM  orange=SAFE</text></svg>`;
 const overlay = await sharp(Buffer.from(svg)).resize(ow, oh).png().toBuffer();
 const out = await sharp(cm).composite([{ input: overlay, top: 0, left: 0 }]).png().toBuffer();
 writeFileSync('C:/Users/jovan/Downloads/_folioview_bottom.png', out);
