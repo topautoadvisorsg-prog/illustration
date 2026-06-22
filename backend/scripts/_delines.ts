@@ -25,7 +25,7 @@ const idx = (x: number, y: number) => (y * W + x) * C;
 // saturated guide-orange (≈ #B5500A): high R, low B, clearly redder/oranger than parchment.
 function isGuide(x: number, y: number): boolean {
   const i = idx(x, y); const R = data[i], G = data[i + 1], B = data[i + 2];
-  return R > 120 && G > 35 && G < 135 && B < 85 && R - B > 75 && R - G > 38;
+  return R > 110 && G > 30 && G < 150 && B < 105 && R - B > 52 && R - G > 26;
 }
 // A guide line is a THIN column with guide-orange spread across the FULL height
 // (a dashed line runs top→bottom). Illustration oranges (a pinecone, foliage) are
@@ -36,12 +36,15 @@ const colThirds: number[][] = Array.from({ length: W }, () => [0, 0, 0]);
 for (let x = 0; x < W; x++) {
   for (let y = 0; y < H; y++) if (isGuide(x, y)) { colCount[x]++; colThirds[x][Math.min(2, Math.floor(y / third))]++; }
 }
-const isGuideCol = (x: number) => colCount[x] >= H * 0.18 && colThirds[x].filter((c) => c >= third * 0.06).length >= 2;
+const isGuideCol = (x: number) => colCount[x] >= H * 0.10 && colThirds[x].filter((c) => c >= third * 0.04).length >= 2;
 const raw: Array<[number, number]> = [];
 let s = -1;
 for (let x = 0; x < W; x++) { if (isGuideCol(x)) { if (s < 0) s = x; } else if (s >= 0) { raw.push([s, x - 1]); s = -1; } }
 if (s >= 0) raw.push([s, W - 1]);
 const bands = raw.filter(([a, b]) => b - a <= 5); // guide lines are thin (≤6px); reject wide illustration edges
+// DEBUG: top orange columns (even below threshold) to see where a missed line is
+const top = colCount.map((c, x) => ({ x, c, t: colThirds[x]! })).sort((a, b) => b.c - a.c).slice(0, 8);
+console.log('  top orange cols (x ~in, count/' + H + ', thirds):', top.map((o) => `x${o.x}~${(o.x / (W / 7.25)).toFixed(2)}in c=${o.c} [${o.t.join(',')}]`).join(' | '));
 console.log(`${KEY}: line bands (x0..x1, /${(W / 7.25).toFixed(0)}dpi):`, bands.map(([a, b]) => `${a}-${b} (~${(a / (W / 7.25)).toFixed(2)}in)`).join(', ') || 'NONE');
 
 // bridge each band horizontally (pad ±2px), interpolating from the immediate neighbours

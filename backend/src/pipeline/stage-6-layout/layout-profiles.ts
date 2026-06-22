@@ -81,7 +81,7 @@ export const LAYOUT_PROFILES: Record<LayoutTemplateId, LayoutProfile> = {
   // Repurposed as the TEXT-DOMINANT layout: one large centered reading field +
   // a small supporting illustration vignette (~12%). Used as the reduce-illustration
   // target for pages whose text was crowding the safe boundary.
-  LAYOUT_2_TEXT_HEAVY: { textAreaFactor: 0.88, artSlot: 'TEXT_DOMINANT', artAreaFraction: 0.12, textLight: false },
+  LAYOUT_2_TEXT_HEAVY: { textAreaFactor: 0.92, artSlot: 'FLOAT_LEFT', artAreaFraction: 0.14, textLight: false },
   LAYOUT_3_ILLUSTRATION_DOMINANT: { textAreaFactor: 0.55, artSlot: 'FLOAT_RIGHT', artAreaFraction: 0.5, textLight: false },
   LAYOUT_4_DANGER_WARNING: { textAreaFactor: 0.72, artSlot: 'FLOAT_LEFT', artAreaFraction: 0.34, textLight: false },
   LAYOUT_5_CHAPTER_OPENER: { textAreaFactor: 0.3, artSlot: 'TOP_BAND', artAreaFraction: 0.55, textLight: true },
