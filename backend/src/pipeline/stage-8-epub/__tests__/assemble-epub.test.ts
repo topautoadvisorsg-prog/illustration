@@ -59,6 +59,36 @@ describe('assembleEpubModel', () => {
     expect(model.stats.entries).toBe(1);
   });
 
+  it('exposes structured entries + image plan for the in-console preview', () => {
+    const model = assembleEpubModel(
+      baseInput([
+        page({ pageKey: 'CH01_P005', entryKey: 'CH01_P005', plannedPageNumber: 5, readingFieldText: '*Pekania pennanti* | mammal\n\nThe fisher is a forest predator.' }),
+      ]),
+    );
+    const chapter = model.chapters.find((c) => c.kind === 'BODY');
+    expect(chapter?.entries).toHaveLength(1);
+    const entry = chapter!.entries![0]!;
+    expect(entry.title).toBe('Fisher');
+    expect(entry.scientificName).toBe('Pekania pennanti');
+    expect(entry.bodyHtml).toContain('forest predator');
+    // image placement is never invisible: a hero slot is declared, not yet included
+    expect(entry.heroPlacement).toBe('BEFORE_TITLE');
+    expect(entry.heroIncluded).toBe(false);
+    expect(model.imagePlan.heroMode).toBe('OFF');
+    expect(model.imagePlan.entriesAwaitingHero).toBe(1);
+    expect(model.stats.omittedImages).toBe(1);
+    // chapters carry a section kind for the preview tree
+    expect(model.chapters[0]?.kind).toBe('TITLE');
+  });
+
+  it('records a warning for an entry with no body text', () => {
+    const model = assembleEpubModel(
+      baseInput([page({ pageKey: 'CH01_P005', entryKey: 'CH01_P005', plannedPageNumber: 5, readingFieldText: '' })]),
+    );
+    // entry has a title (Fisher) but empty body → warning, no crash
+    expect(model.stats.warnings.some((w) => /no body text/i.test(w))).toBe(true);
+  });
+
   it('XML-escapes body text', () => {
     const model = assembleEpubModel(
       baseInput([page({ pageKey: 'CH01_P005', entryKey: 'CH01_P005', plannedPageNumber: 5, readingFieldText: 'Trees & shrubs <thrive> here.' })]),

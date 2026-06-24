@@ -14,7 +14,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { buildKindleEpub } from '../pipeline/stage-8-epub/build-epub.js';
+import { assembleProjectModel, buildKindleEpub } from '../pipeline/stage-8-epub/build-epub.js';
 
 const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
 
@@ -44,24 +44,43 @@ export async function registerEpubRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // Full in-console preview model: structure (chapters with kind), per-entry text
+  // for click-through, the image plan, and the build report. Read-only, no packing,
+  // no spend — so "preview first, export second" works inside the platform.
   app.get('/api/projects/:projectId/export/kindle-epub/preview', async (request, reply) => {
     const parsed = ProjectParamsSchema.safeParse(request.params);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Bad Request', message: 'Invalid projectId.', statusCode: 400 });
     }
     try {
-      const result = await buildKindleEpub(parsed.data.projectId);
+      const { model, meta, fileName } = await assembleProjectModel(parsed.data.projectId);
       return reply.send({
-        fileName: result.fileName,
-        coverEmbedded: result.coverEmbedded,
+        fileName,
         meta: {
-          title: result.meta.title,
-          subtitle: result.meta.subtitle,
-          authors: result.meta.authors,
-          language: result.meta.language,
-          series: result.meta.series,
+          title: meta.title,
+          subtitle: meta.subtitle,
+          authors: meta.authors,
+          language: meta.language,
+          series: meta.series,
+          coverAlt: meta.coverAlt,
         },
-        stats: result.model.stats,
+        imagePlan: model.imagePlan,
+        stats: model.stats,
+        // Full structure + text for the operator preview (click-through reading).
+        chapters: model.chapters.map((c) => ({
+          kind: c.kind,
+          title: c.title,
+          beforeToc: c.beforeToc ?? false,
+          content: c.entries ? undefined : c.content,
+          entries: c.entries?.map((e) => ({
+            title: e.title,
+            scientificName: e.scientificName,
+            bodyHtml: e.bodyHtml,
+            words: e.words,
+            heroPlacement: e.heroPlacement,
+            heroIncluded: e.heroIncluded,
+          })),
+        })),
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

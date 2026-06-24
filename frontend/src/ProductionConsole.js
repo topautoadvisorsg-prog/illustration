@@ -58,6 +58,7 @@ const STEPS = [
   { key: "matter", label: "6 · Build Front/Back Matter", purpose: "BUILD step: makes title, copyright, TOC, glossary, index. Review & render them in Step 7." },
   { key: "render", label: "7 · Render & Review", purpose: "The cover (one full wrap) plus every interior page: render, review and approve." },
   { key: "assemble", label: "8 · Build Book", purpose: "Assemble approved pages + cover into print-ready files (300+ DPI)." },
+  { key: "editions", label: "9 · Editions / Export", purpose: "Hardcover, paperback, and Kindle EPUB — all from the same approved content." },
 ];
 
 function statusColor(s) {
@@ -100,6 +101,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [coverAR, setCoverAR] = useState(null); // full-wrap image aspect ratio (w/h), for spine fold lines
   const [cover, setCover] = useState(null);
   const [assembly, setAssembly] = useState(null);
+  const [epubReport, setEpubReport] = useState(null); // Kindle EPUB build report (preview endpoint)
   const [status, setStatus] = useState({}); // real backend progress for the step checkmarks
   const [authed, setAuthed] = useState(false); // shared-password gate
   const [authReady, setAuthReady] = useState(false); // initial stored-password check done
@@ -445,6 +447,39 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return { notice: coverPdfPath ? `Book built: ${d.assembledPages} pages + print cover.` : `Interior built: ${d.assembledPages} pages. Generate the cover in Step 7 · Render & Review for a complete print package.` };
   });
 
+  // Kindle build report (chapters/entries/words/cover) from the read-only preview
+  // endpoint. No image spend; reads the existing structured text + cover.
+  const loadEpubReport = () => run("Reading Kindle build report", async () => {
+    const d = await api(`/api/projects/${project.id}/export/kindle-epub/preview`);
+    setEpubReport(d);
+    return { notice: `Kindle: ${d.stats?.entries ?? 0} entries · ${d.stats?.words ?? 0} words.` };
+  });
+
+  // Export the Kindle EPUB. The endpoint returns binary; the shared api() helper
+  // parses text, so do a direct fetch + blob download (with the same auth header).
+  const downloadEpub = () => run("Building Kindle EPUB", async () => {
+    const pw = sessionStorage.getItem("wl_pw") || "";
+    const res = await fetch(`${BACKEND}/api/projects/${project.id}/export/kindle-epub`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(pw ? { Authorization: `Bearer ${pw}` } : {}) },
+      body: "{}",
+    });
+    if (!res.ok) {
+      let msg = `${res.status} ${res.statusText}`;
+      try { const j = await res.json(); msg = j.message || j.error || msg; } catch { /* binary/no body */ }
+      throw new Error(`Kindle export failed: ${msg}`);
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get("content-disposition") || "";
+    const m = /filename="?([^"]+)"?/.exec(cd);
+    const name = m ? m[1] : "book_KINDLE.epub";
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    return { notice: `Kindle EPUB downloaded: ${name}` };
+  });
+
   const doneFlags = useMemo(() => ({
     project: !!project,
     manuscript: !!project?.manuscriptPath,
@@ -455,7 +490,8 @@ export default function ProductionConsole({ onExitToLegacy }) {
     render: !!status.render || (renders?.bookReady || 0) > 0,
     cover: !!cover,
     assemble: !!assembly && !assembly.blocked,
-  }), [project, status, breakdown, pagination, matter, renders, cover, assembly]);
+    editions: !!epubReport,
+  }), [project, status, breakdown, pagination, matter, renders, cover, assembly, epubReport]);
 
   if (!authReady) return null; // brief: checking a stored password
   if (!authed) return <LoginScreen onLogin={doLogin} />;
@@ -824,6 +860,10 @@ export default function ProductionConsole({ onExitToLegacy }) {
                             {assembly.coverPdfPath && <a style={{ ...S.btn("ok"), textDecoration: "none", display: "inline-block" }} href={fileUrl(assembly.coverPdfPath)} target="_blank" rel="noreferrer">Open / download cover PDF</a>}
                             <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>Final book preview (scroll through every page before you export):</div>
                             <iframe title="book-preview" src={fileUrl(assembly.interiorPdfPath)} style={{ width: "100%", height: 520, border: `1px solid ${C.line}`, borderRadius: 8, marginTop: 6 }} />
+                            <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.line}` }}>
+                              <span style={{ color: C.muted, fontSize: 13, marginRight: 10 }}>Print is built. Want a paperback or a Kindle eBook from the same content?</span>
+                              <button style={S.btn()} onClick={() => setStep("editions")}>Go to Editions / Export →</button>
+                            </div>
                           </>
                         )}
                       </div>
@@ -854,6 +894,52 @@ export default function ProductionConsole({ onExitToLegacy }) {
                   </div>
                 )}
               </div>
+            )}
+          </Panel>
+        )}
+        {step === "editions" && (
+          <Panel title="Editions / Export" sub="One manuscript, multiple editions. Print and Kindle are separate exports from the same approved content — building a Kindle file does not touch the print files.">
+            <Guard project={project} setStep={setStep} />
+            {project && (
+              <>
+                {/* Hardcover */}
+                <div style={S.card}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <b>Hardcover · 7×10</b>
+                    <span style={S.pill(assembly && !assembly.blocked ? C.green : C.muted)}>{assembly && !assembly.blocked ? "BUILT" : "BUILD IN STEP 8"}</span>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>The print interior PDF plus the hardcover full-wrap cover (spine 0.834″). Built in Step 8 · Build Book.</div>
+                  {assembly?.interiorPdfPath
+                    ? <a style={{ ...S.btn("ok"), textDecoration: "none", display: "inline-block" }} href={fileUrl(assembly.interiorPdfPath)} target="_blank" rel="noreferrer">Open interior PDF</a>
+                    : <button style={S.ghost} onClick={() => setStep("assemble")}>Go to Build Book →</button>}
+                </div>
+
+                {/* Paperback */}
+                <div style={S.card}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <b>Paperback · 7×10</b>
+                    <span style={S.pill(C.muted)}>SAME INTERIOR</span>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>
+                    Paperback uses the <b>exact same interior PDF</b> as the hardcover, paired with the paperback full-wrap cover (narrower spine). No new interior build and no image spend — it's the same print-prepped pages with a different cover. Upload the shared interior + the paperback wrap to KDP as a paperback edition.
+                  </div>
+                </div>
+
+                {/* Kindle EPUB */}
+                <div style={S.card}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <b>Kindle eBook · EPUB</b>
+                    <span style={S.pill(C.blue)}>REFLOWABLE TEXT</span>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>
+                    A reflowable EPUB built from the real manuscript text — selectable and resizable on any Kindle, with the cover. Built from the structured content, NOT the print page images.
+                  </div>
+                  <button style={S.btn()} onClick={() => loadEpubReport().catch(() => {})}>{epubReport ? "Refresh preview" : "Preview Kindle edition →"}</button>
+                  {epubReport
+                    ? <KindlePreview report={epubReport} busy={busy} onExport={() => downloadEpub().catch(() => {})} />
+                    : <div style={{ color: C.muted, fontSize: 13, marginTop: 8 }}>Preview first — read the structure and the actual reflowable text, check image placement and the build report, then export. (Hero illustrations are a future / post-proof addition; v1 is text + cover, no image spend here.)</div>}
+                </div>
+              </>
             )}
           </Panel>
         )}
@@ -992,6 +1078,157 @@ function Panel({ title, sub, children }) {
 function Guard({ project, setStep }) {
   if (project) return null;
   return <div style={{ ...S.card, borderColor: C.orange }}>Open or create a project first. <button style={S.ghost} onClick={() => setStep("project")}>Go to Project</button></div>;
+}
+function Stat({ label, value }) {
+  return (
+    <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: "10px 12px", background: "#fff" }}>
+      <div style={{ fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{value ?? "—"}</div>
+    </div>
+  );
+}
+
+// Colour + label for a chapter's section kind in the preview structure tree.
+const KIND_META = {
+  TITLE: { label: "Title page", color: C.muted },
+  COPYRIGHT: { label: "Copyright", color: C.muted },
+  INTRODUCTION: { label: "Introduction", color: C.blue },
+  BODY: { label: "Chapter", color: C.green },
+  GLOSSARY: { label: "Glossary", color: C.orange },
+  ABOUT: { label: "About", color: C.orange },
+};
+
+/**
+ * In-console Kindle preview: read the EPUB structure + actual reflowable text +
+ * image placement BEFORE export. Mirrors the print preview mindset — preview
+ * first, export second, upload third. `report` is the preview-endpoint model.
+ */
+function KindlePreview({ report, onExport, busy }) {
+  const chapters = report.chapters || [];
+  const [ci, setCi] = useState(0);
+  const [ei, setEi] = useState(chapters[0]?.entries ? 0 : null);
+  const chapter = chapters[ci] || null;
+  const entries = chapter?.entries || null;
+  const entry = entries && ei != null ? entries[ei] : null;
+  const ip = report.imagePlan || {};
+  const st = report.stats || {};
+
+  const select = (i, j) => { setCi(i); setEi(j); };
+
+  // Section grouping for the structure tree (Front matter / Contents / Back matter).
+  const groupOf = (kind) => (kind === "BODY" ? "Contents" : ["GLOSSARY", "ABOUT"].includes(kind) ? "Back matter" : "Front matter");
+  let prevGroup = null;
+  const rows = chapters.map((c, i) => { const g = groupOf(c.kind); const showHeader = g !== prevGroup; prevGroup = g; return { c, i, g, showHeader }; });
+
+  // Flat reading order for linear prev/next (each non-body chapter + each body entry).
+  const flat = [];
+  chapters.forEach((c, i) => {
+    if (c.entries && c.entries.length) c.entries.forEach((_, j) => flat.push({ ci: i, ei: j }));
+    else flat.push({ ci: i, ei: null });
+  });
+  const curIdx = flat.findIndex((f) => f.ci === ci && f.ei === ei);
+  const go = (delta) => { const n = curIdx + delta; if (n >= 0 && n < flat.length) select(flat[n].ci, flat[n].ei); };
+
+  return (
+    <div style={{ ...S.card, marginTop: 12 }}>
+      <div style={{ marginBottom: 8 }}>
+        <b>{report.meta?.title}</b>{report.meta?.series ? ` — ${report.meta.series}` : ""}
+        <span style={{ ...S.pill(C.muted), marginLeft: 8 }}>PREVIEW</span>
+      </div>
+
+      {/* Build report */}
+      <div style={S.grid}>
+        <Stat label="Chapters" value={st.chapters} />
+        <Stat label="Entries" value={st.entries} />
+        <Stat label="Words" value={(st.words ?? 0).toLocaleString()} />
+        <Stat label="Cover" value={ip.coverIncluded ? "Included" : "None"} />
+      </div>
+      <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>
+        Images: cover {ip.coverIncluded ? "included" : "not found"} · interior entry images <b>not included in v1</b>
+        {" "}({st.omittedImages ?? 0} future hero illustrations, one per entry, would appear {String(ip.plannedHeroPlacement || "BEFORE_ENTRY_TITLE").replace(/_/g, " ").toLowerCase()}).
+      </div>
+      {Array.isArray(st.skipped) && st.skipped.length > 0 && (
+        <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Omitted (not meaningful in reflow): {st.skipped.join(", ")}</div>
+      )}
+      {Array.isArray(st.warnings) && st.warnings.length > 0 && (
+        <div style={{ ...S.card, borderColor: C.orange, marginTop: 8 }}>
+          <b style={{ color: C.orange }}>⚠ {st.warnings.length} warning(s)</b>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>{st.warnings.slice(0, 8).map((w, i) => <li key={i} style={{ fontSize: 13 }}>{w}</li>)}</ul>
+        </div>
+      )}
+
+      {/* Structure + reading panes */}
+      <div style={{ display: "flex", gap: 12, marginTop: 14, alignItems: "flex-start" }}>
+        {/* left: structure tree */}
+        <div style={{ flex: "0 0 260px", maxHeight: 460, overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 8, background: "#fff", padding: 8 }}>
+          {rows.map(({ c, i, g, showHeader }) => {
+            const km = KIND_META[c.kind] || { label: c.kind, color: C.muted };
+            const activeChapter = i === ci && ei == null;
+            return (
+              <div key={i}>
+                {showHeader && <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: "8px 8px 4px" }}>{g}</div>}
+                <div onClick={() => select(i, c.entries ? 0 : null)} style={{ padding: "6px 8px", borderRadius: 6, cursor: "pointer", background: activeChapter ? C.blue : "transparent", color: activeChapter ? "#fff" : C.ink, fontSize: 13.5, fontWeight: 600 }}>
+                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 8, background: km.color, marginRight: 8 }} />
+                  {c.title}
+                </div>
+                {c.entries && i === ci && (
+                  <div style={{ marginLeft: 14, borderLeft: `1px solid ${C.line}`, paddingLeft: 6, marginBottom: 4 }}>
+                    {c.entries.map((e, j) => {
+                      const activeEntry = i === ci && ei === j;
+                      return (
+                        <div key={j} onClick={() => select(i, j)} style={{ padding: "4px 8px", borderRadius: 6, cursor: "pointer", background: activeEntry ? C.field : "transparent", fontSize: 12.5 }}>
+                          {e.title}{!e.heroIncluded && <span style={{ color: C.muted }}> · no image (v1)</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* right: reading pane — the ACTUAL text that goes into the EPUB */}
+        <div style={{ flex: 1, maxHeight: 460, overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 8, background: "#fff", padding: "14px 18px" }}>
+          {/* linear navigation — step through the book in reading order */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${C.line}` }}>
+            <button style={{ ...S.ghost, margin: 0, opacity: curIdx <= 0 ? 0.4 : 1 }} disabled={curIdx <= 0} onClick={() => go(-1)}>← Prev</button>
+            <span style={{ fontSize: 12, color: C.muted }}>{curIdx >= 0 ? `${curIdx + 1} of ${flat.length}` : ""}</span>
+            <button style={{ ...S.ghost, margin: 0, opacity: curIdx >= flat.length - 1 ? 0.4 : 1 }} disabled={curIdx >= flat.length - 1} onClick={() => go(1)}>Next →</button>
+          </div>
+          {/* image-placement marker, never invisible */}
+          {entry ? (
+            <div style={{ border: `1px dashed ${C.line}`, borderRadius: 8, padding: "8px 10px", marginBottom: 12, color: C.muted, fontSize: 12.5, background: C.panel }}>
+              🖼 Hero illustration slot — would appear <b>before the title</b>. Future / post-proof; <b>not included in this v1 export</b>.
+            </div>
+          ) : chapter?.kind === "TITLE" && ip.coverIncluded ? (
+            <div style={{ border: `1px dashed ${C.line}`, borderRadius: 8, padding: "8px 10px", marginBottom: 12, color: C.muted, fontSize: 12.5, background: C.panel }}>
+              🖼 Cover image is included and precedes the title page.
+            </div>
+          ) : null}
+          {entry ? (
+            <>
+              <h2 style={{ margin: "0 0 2px" }}>{entry.title}</h2>
+              {entry.scientificName && <p style={{ fontStyle: "italic", color: C.muted, marginTop: 0 }}>{entry.scientificName}</p>}
+              <div style={{ lineHeight: 1.55, fontSize: 15 }} dangerouslySetInnerHTML={{ __html: entry.bodyHtml || "" }} />
+            </>
+          ) : (
+            <>
+              <h2 style={{ margin: "0 0 8px" }}>{chapter?.title}</h2>
+              <div style={{ lineHeight: 1.55, fontSize: 15 }} dangerouslySetInnerHTML={{ __html: chapter?.content || "<p style='color:#7a6f57'>(no readable text on this page)</p>" }} />
+            </>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+        <button style={S.btn("ok")} disabled={!!busy} onClick={onExport}>Export Kindle EPUB ↓</button>
+        <div style={{ color: C.muted, fontSize: 13, marginTop: 8 }}>
+          Next, once it looks right above: <b>1.</b> Export downloads the <code>.epub</code>. <b>2.</b> Open it in Amazon Kindle Previewer (final validation). <b>3.</b> In KDP, add a <b>Kindle eBook</b> edition to this same title and upload the <code>.epub</code> + the cover. The print book is unaffected.
+        </div>
+      </div>
+    </div>
+  );
 }
 function StepRun({ title, sub, project, setStep, actionLabel, onRun, result }) {
   return (

@@ -52,22 +52,58 @@ export interface EpubAssembleInput {
   pages: EpubSourcePage[];
 }
 
+export type EpubChapterKind = 'TITLE' | 'COPYRIGHT' | 'INTRODUCTION' | 'BODY' | 'GLOSSARY' | 'ABOUT';
+
+/** A single navigable entry inside a body chapter — the unit the operator clicks
+ *  through in the in-console preview, and where a future hero illustration lands. */
+export interface EpubEntry {
+  title: string;
+  scientificName?: string;
+  /** Body XHTML (headings + paragraphs), excludes the <h2> title + sci line. */
+  bodyHtml: string;
+  words: number;
+  /** Where a hero illustration WILL appear once hero-image mode ships. */
+  heroPlacement: 'BEFORE_TITLE';
+  /** v1: heroes are not generated/embedded yet, so this is always false for now. */
+  heroIncluded: boolean;
+}
+
 /** One EPUB chapter = one XHTML file. `content` is a body fragment (no <html>). */
 export interface EpubChapter {
   title: string;
   content: string;
   /** Front matter before the TOC (title page, copyright). */
   beforeToc?: boolean;
+  /** Section classification for the preview UI. */
+  kind: EpubChapterKind;
+  /** Present for BODY chapters: the structured entries (click-through + image plan). */
+  entries?: EpubEntry[];
+}
+
+/** What images the EPUB contains and where future hero images will go — so image
+ *  placement is never invisible in the operator preview. */
+export interface ImagePlan {
+  /** Set by the I/O layer (build-epub) once the cover is resolved. */
+  coverIncluded: boolean;
+  /** v1 = OFF (text-only interior). Future = ON (one hero per entry). */
+  heroMode: 'OFF' | 'ON';
+  /** Where each hero will appear in the entry once enabled. */
+  plannedHeroPlacement: 'BEFORE_ENTRY_TITLE';
+  /** Count of body entries that will receive a hero (currently omitted in v1). */
+  entriesAwaitingHero: number;
 }
 
 export interface EpubModel {
   chapters: EpubChapter[];
+  imagePlan: ImagePlan;
   stats: {
     chapters: number;
     bodyChapters: number;
     entries: number;
     words: number;
     skipped: string[]; // page kinds intentionally dropped (e.g. INDEX, CONTENTS)
+    omittedImages: number; // interior images not yet included (future hero illustrations)
+    warnings: string[]; // content issues the operator should see before exporting
   };
 }
 
@@ -111,15 +147,28 @@ function bySpineThenKey(a: EpubSourcePage, b: EpubSourcePage): number {
   return a.pageKey.localeCompare(b.pageKey);
 }
 
-/** Render one entry (opener + continuations already concatenated) to XHTML. */
-function entryHtml(title: string, rawText: string): { html: string; words: number } {
+/** Build one entry (opener + continuations already concatenated) as structured
+ *  parts: title, optional scientific name, and the body XHTML. */
+function buildEntry(title: string, rawText: string): EpubEntry {
   const binomial = extractBinomial(rawText) ?? undefined;
   const cleaned = stripReadingFieldMetadata(rawText);
   const blocks = markdownToBlocks(cleaned);
-  const parts: string[] = [`<h2>${escapeXml(title)}</h2>`];
-  if (binomial) parts.push(`<p class="sci"><em>${escapeXml(binomial)}</em></p>`);
-  parts.push(blocksToHtml(blocks));
-  return { html: parts.join('\n'), words: wordCount(cleaned) };
+  return {
+    title,
+    scientificName: binomial,
+    bodyHtml: blocksToHtml(blocks),
+    words: wordCount(cleaned),
+    heroPlacement: 'BEFORE_TITLE',
+    heroIncluded: false, // v1: no interior hero images yet
+  };
+}
+
+/** Pack a structured entry into the EPUB XHTML fragment (title + sci + body). */
+function entryToXhtml(e: EpubEntry): string {
+  const parts = [`<h2>${escapeXml(e.title)}</h2>`];
+  if (e.scientificName) parts.push(`<p class="sci"><em>${escapeXml(e.scientificName)}</em></p>`);
+  parts.push(e.bodyHtml);
+  return `<section class="entry">${parts.join('\n')}</section>`;
 }
 
 const FRONT_MATTER_SKIP = new Set(['HALF_TITLE', 'TITLE_PAGE', 'CONTENTS', 'BLANK']);
@@ -135,6 +184,7 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
   const { meta, chapterTitles, entryTitles, pages } = input;
   const chapters: EpubChapter[] = [];
   const skipped = new Set<string>();
+  const warnings: string[] = [];
   let totalWords = 0;
   let entryCount = 0;
 
@@ -143,6 +193,7 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
   // is NOT repeated in `content` here (that double-rendered it). Publisher lives
   // on the copyright page, not the title page.
   chapters.push({
+    kind: 'TITLE',
     beforeToc: true,
     title: meta.title,
     content: [
@@ -163,7 +214,7 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
   if (copyright.length) {
     const text = joinPageText(copyright);
     const blocks = markdownToBlocks(stripReadingFieldMetadata(text));
-    chapters.push({ beforeToc: true, title: 'Copyright', content: blocksToHtml(blocks) });
+    chapters.push({ kind: 'COPYRIGHT', beforeToc: true, title: 'Copyright', content: blocksToHtml(blocks) });
   }
 
   // ── 3. Introduction (INTRODUCTION + INTRODUCTION_CONT, grouped & ordered) ──
@@ -173,7 +224,7 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
   if (intro.length) {
     const text = joinPageText(intro);
     const blocks = markdownToBlocks(stripReadingFieldMetadata(text));
-    chapters.push({ title: 'Introduction', content: blocksToHtml(blocks) });
+    chapters.push({ kind: 'INTRODUCTION', title: 'Introduction', content: blocksToHtml(blocks) });
     totalWords += wordCount(text);
   }
   for (const p of front) {
@@ -194,21 +245,26 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
       if (!groups.has(key)) { groups.set(key, []); order.push(key); }
       groups.get(key)!.push(p);
     }
-    const parts: string[] = [];
+    const chapterTitle = chapterTitles.get(chNum) || `Chapter ${chNum}`;
+    const entries: EpubEntry[] = [];
     for (const key of order) {
       const grp = groups.get(key)!;
       const title = entryTitles.get(key) || entryTitles.get(grp[0]!.pageKey) || '';
       const raw = joinPageText(grp);
       if (!raw && !title) continue;
-      const { html, words } = entryHtml(title || 'Untitled', raw);
-      parts.push(`<section class="entry">${html}</section>`);
-      totalWords += words;
+      if (!title) warnings.push(`${chapterTitle}: an entry (${key}) has no title — shown as "Untitled".`);
+      if (!raw.trim()) warnings.push(`${chapterTitle}: entry "${title || key}" has no body text.`);
+      const entry = buildEntry(title || 'Untitled', raw);
+      entries.push(entry);
+      totalWords += entry.words;
       entryCount += 1;
     }
-    if (parts.length) {
+    if (entries.length) {
       chapters.push({
-        title: chapterTitles.get(chNum) || `Chapter ${chNum}`,
-        content: parts.join('\n'),
+        kind: 'BODY',
+        title: chapterTitle,
+        content: entries.map(entryToXhtml).join('\n'),
+        entries,
       });
       bodyChapters += 1;
     }
@@ -218,12 +274,12 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
   const glossary = back.filter((p) => p.frontMatterType === 'GLOSSARY').sort(bySpineThenKey);
   if (glossary.length) {
     const blocks = markdownToBlocks(stripReadingFieldMetadata(joinPageText(glossary)));
-    chapters.push({ title: 'Glossary', content: blocksToHtml(blocks) });
+    chapters.push({ kind: 'GLOSSARY', title: 'Glossary', content: blocksToHtml(blocks) });
   }
   const about = back.filter((p) => p.frontMatterType === 'ABOUT_SERIES').sort(bySpineThenKey);
   if (about.length) {
     const blocks = markdownToBlocks(stripReadingFieldMetadata(joinPageText(about)));
-    chapters.push({ title: 'About the Series', content: blocksToHtml(blocks) });
+    chapters.push({ kind: 'ABOUT', title: 'About the Series', content: blocksToHtml(blocks) });
   }
   for (const p of back) {
     const t = p.frontMatterType ?? '';
@@ -232,12 +288,20 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
 
   return {
     chapters,
+    imagePlan: {
+      coverIncluded: false, // set by the I/O layer (build-epub) once the cover is resolved
+      heroMode: 'OFF', // v1: text-only interior
+      plannedHeroPlacement: 'BEFORE_ENTRY_TITLE',
+      entriesAwaitingHero: entryCount,
+    },
     stats: {
       chapters: chapters.length,
       bodyChapters,
       entries: entryCount,
       words: totalWords,
       skipped: [...skipped],
+      omittedImages: entryCount, // one future hero per entry, none embedded in v1
+      warnings,
     },
   };
 }

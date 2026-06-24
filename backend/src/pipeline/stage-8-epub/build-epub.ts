@@ -81,8 +81,27 @@ function resolveMeta(project: NonNullable<Awaited<ReturnType<typeof getProject>>
   };
 }
 
-/** Build the Kindle EPUB for a project. Returns the bytes + a build report. */
-export async function buildKindleEpub(projectId: string): Promise<BuildEpubResult> {
+function fileNameFor(title: string): string {
+  const safe = title.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
+  return `${safe || 'BOOK'}_KINDLE.epub`;
+}
+
+export interface ProjectEpubModel {
+  model: EpubModel;
+  meta: EpubMeta;
+  coverAssetPath?: string;
+  fileName: string;
+}
+
+/**
+ * Assemble the EPUB MODEL for a project WITHOUT packing the .epub — read-only,
+ * cheap, no zip. Powers the in-console preview (structure + text + image plan +
+ * report). `buildKindleEpub` reuses this then packs the bytes.
+ */
+export async function assembleProjectModel(
+  projectId: string,
+  opts: { verifyCover?: boolean } = {},
+): Promise<ProjectEpubModel> {
   const project = await getProject(projectId);
   if (!project) throw new Error(`project_not_found:${projectId}`);
   const meta = resolveMeta(project);
@@ -118,13 +137,43 @@ export async function buildKindleEpub(projectId: string): Promise<BuildEpubResul
   for (const [k, v] of entryMeta) if (v.entryTitle) entryTitles.set(k, v.entryTitle);
 
   const model = assembleEpubModel({ meta, chapterTitles, entryTitles, pages });
+  const coverAssetPath = ProjectConfigSchema.parse(project.config).publishing.coverAssetPath;
+
+  // Cover status must be TRUTHFUL before export: a path existing is not enough —
+  // actually read the file so the preview can't claim a cover that won't embed.
+  // The export path (buildKindleEpub) reads + resizes the cover itself, so it
+  // passes verifyCover:false to skip the redundant read.
+  if (opts.verifyCover === false) {
+    model.imagePlan.coverIncluded = Boolean(coverAssetPath); // finalized at pack time
+  } else if (!coverAssetPath) {
+    model.imagePlan.coverIncluded = false;
+    model.stats.warnings.push('No cover image is set — the EPUB will export WITHOUT a cover. Generate the cover in Step 7 · Render & Review.');
+  } else {
+    try {
+      const bytes = await getProjectStorage().readProjectFile(coverAssetPath);
+      if (!bytes || bytes.length === 0) throw new Error('empty file');
+      model.imagePlan.coverIncluded = true;
+    } catch (err) {
+      model.imagePlan.coverIncluded = false;
+      model.stats.warnings.push(
+        `Cover image is set but could NOT be read (${coverAssetPath}: ${err instanceof Error ? err.message : String(err)}) — ` +
+          'the EPUB will export WITHOUT a cover. Regenerate the cover in Step 7 · Render & Review before exporting.',
+      );
+    }
+  }
+  return { model, meta, coverAssetPath, fileName: fileNameFor(meta.title) };
+}
+
+/** Build the Kindle EPUB for a project. Returns the bytes + a build report. */
+export async function buildKindleEpub(projectId: string): Promise<BuildEpubResult> {
+  // verifyCover:false — this path reads + resizes the cover below and finalizes
+  // coverIncluded from the actual embed, so no need to pre-read it here too.
+  const { model, meta, coverAssetPath, fileName } = await assembleProjectModel(projectId, { verifyCover: false });
 
   // Cover — read from storage, resize to <=1600px wide (Kindle practical cap),
   // write to a temp file and hand epub-gen-memory a file:// URL (Node path read).
   let coverFileUrl: string | undefined;
   let coverEmbedded = false;
-  const config = ProjectConfigSchema.parse(project.config);
-  const coverAssetPath = config.publishing.coverAssetPath;
   if (coverAssetPath) {
     try {
       const storage = getProjectStorage();
@@ -156,10 +205,12 @@ export async function buildKindleEpub(projectId: string): Promise<BuildEpubResul
     css: EPUB_CSS,
   };
 
+  // Reflect the ACTUAL cover outcome in the model's image plan.
+  model.imagePlan.coverIncluded = coverEmbedded;
+
   // Use the EPub class (named export) rather than the default function: under
   // some ESM loaders the CJS default export isn't unwrapped to a callable.
   const epubDoc = await new EPub(options, model.chapters).render();
   const buffer = await epubDoc.genEpub();
-  const safeTitle = meta.title.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
-  return { buffer, model, meta, coverEmbedded, fileName: `${safeTitle}_KINDLE.epub` };
+  return { buffer, model, meta, coverEmbedded, fileName };
 }
