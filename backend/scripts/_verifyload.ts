@@ -1,0 +1,16 @@
+import { eq, and } from 'drizzle-orm';
+import { getDb } from '../src/db/client.js';
+import { pages as pagesTbl, wholePageRenders } from '../src/db/schema/index.js';
+import { SupabaseStorageService } from '../src/services/storage/project-storage.js';
+const ID = 'ba956766-c904-4900-9b3a-aaec2cc2c924';
+const db = getDb();
+const pg = await db.select().from(pagesTbl).where(eq(pagesTbl.projectId, ID));
+const rd = await db.select().from(wholePageRenders).where(eq(wholePageRenders.projectId, ID));
+const active = rd.filter(r => r.active);
+console.log('page rows        :', pg.length);
+console.log('render rows      :', rd.length, '· active:', active.length, '· status RENDERED:', rd.filter(r=>r.status==='RENDERED').length);
+console.log('sample imagePath :', active[0]?.imagePath);
+const supa = new SupabaseStorageService();
+const buf = await supa.readProjectFile(active[0]!.imagePath as string);
+console.log('sample file in Supabase: readable,', buf.length, 'bytes (PNG header:', buf.slice(0,4).toString('hex'), ')');
+process.exit(0);

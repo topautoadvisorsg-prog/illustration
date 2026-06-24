@@ -35,9 +35,26 @@ src/
 scripts/
   smoke-test.ts       External API smoke tests
   audit-manuscript.ts Deterministic manuscript parser audit
+  storage-prune.ts    R2 cleanup (yarn storage:prune --dry-run | --confirm)
+  build-local2.ts     Assemble the interior PDF to local disk
+  printprep-local.ts  Local 300-DPI print-prep (folio centered, badges gated)
+  _*.ts               Ad-hoc operator/QA tools (render, inspect, fix, audit) — disposable
 ```
 
 Each major subdirectory has its own README. Read those for stage-by-stage detail.
+
+## Operating rules & ops
+
+- **`/CLAUDE.md`** (repo root) — agent operating rules: strict scope, render-once,
+  reproduce-the-approved-blueprint, the R2 storage policy, and the build→local→KDP flow.
+  Read it before working in this repo.
+- **`KNOWN_BUGS.md`** — tracked platform bugs (e.g. per-page blueprint overrides not
+  applying to opener pages).
+- **Storage:** writes are R2-only. Run `yarn storage:prune` (dry-run) to review junk,
+  `--confirm` to delete. ACTIVE / FINAL_EXPORT / APPROVED_BACKUP are never deleted.
+- **Build:** `build-local2.ts <projectId> <outDir>` (node `--max-old-space-size=8192`)
+  writes the interior PDF locally; validate with `validate-delivery.ts`. Use the
+  hardcover cover, not `build-local2`'s auto paperback cover.
 
 ## How To Run Locally
 

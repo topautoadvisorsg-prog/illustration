@@ -134,7 +134,11 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
   // other page is affected. This is the lever that lets a continuation command a
   // specific framed scene instead of inheriting "small marginal specimen art".
   if (pageOverride?.imagePlacement) allocation.imagePlacement = pageOverride.imagePlacement;
+  else if (pageRow.pageKey === entryKey && (meta as { imagePlacement?: string })?.imagePlacement)
+    allocation.imagePlacement = (meta as { imagePlacement?: string }).imagePlacement!;
   if (pageOverride?.textPlacement) allocation.textPlacement = pageOverride.textPlacement;
+  else if (pageRow.pageKey === entryKey && (meta as { textPlacement?: string })?.textPlacement)
+    allocation.textPlacement = (meta as { textPlacement?: string }).textPlacement!;
 
   const spec = buildPageSpec({
     pageRow,

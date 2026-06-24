@@ -11,13 +11,16 @@ import { P } from './_project.js';
 
 const CONC = Number(process.env.CONC ?? 4);
 const ONLY = process.argv[2]; // optional single pageKey for a smoke test
+// Optional: only re-prep renders created on/after this date (the pages re-rendered
+// this session). Unchanged pages keep their existing valid print-prep.
+const SINCE = process.env.WL_PREP_SINCE ? new Date(process.env.WL_PREP_SINCE).getTime() : 0;
 const db = getDb();
 const allPages = (await db.select().from(pages).where(eq(pages.projectId, P))).filter((p) => !ONLY || p.pageKey === ONLY);
 const ids: string[] = [];
 for (const p of allPages) {
   const r = (await db.select().from(wholePageRenders)
     .where(and(eq(wholePageRenders.pageId, p.id), eq(wholePageRenders.active, true), eq(wholePageRenders.approvedForBook, true))))[0];
-  if (r) ids.push(r.id);
+  if (r && new Date(r.createdAt as unknown as string).getTime() >= SINCE) ids.push(r.id);
 }
 console.log(`re-prepping ${ids.length} renders LOCALLY (badges gated off → folio centres). CONC=${CONC}`);
 if (process.env.WL_ENABLE_BADGES) { console.error('WL_ENABLE_BADGES is set — unset it so badges stay off'); process.exit(2); }

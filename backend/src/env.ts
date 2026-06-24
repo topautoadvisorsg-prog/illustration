@@ -44,6 +44,15 @@ const EnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   DATABASE_URL: z.string().min(1),
 
+  // Cloudflare R2 object storage (S3-compatible). Optional: when all four are set
+  // with real values, getProjectStorage() uses R2 instead of Supabase Storage —
+  // zero-egress image/file storage. Absent → falls back to Supabase (current
+  // behavior), so rollback is just unsetting these. DB stays on Supabase regardless.
+  R2_ACCOUNT_ID: z.string().default(''),
+  R2_ACCESS_KEY_ID: z.string().default(''),
+  R2_SECRET_ACCESS_KEY: z.string().default(''),
+  R2_BUCKET: z.string().default('project-files'),
+
   UPSTASH_REDIS_URL: z.string().default(''),
   UPSTASH_REDIS_TOKEN: z.string().default(''),
 

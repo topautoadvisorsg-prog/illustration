@@ -11,6 +11,7 @@
     "start": "drizzle-kit migrate && node dist/index.js",
     "smoke": "tsx scripts/smoke-test.ts",
     "audit:manuscript": "tsx scripts/audit-manuscript.ts",
+    "storage:prune": "tsx scripts/storage-prune.ts",
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "drizzle-kit migrate",
     "worker:image-generation": "tsx src/workers/image-generation.worker.ts",
@@ -24,6 +25,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
+    "@aws-sdk/client-s3": "^3.1075.0",
     "@fastify/cors": "^10.0.1",
     "@fastify/sensible": "^6.0.1",
     "@fastify/swagger": "^9.2.0",

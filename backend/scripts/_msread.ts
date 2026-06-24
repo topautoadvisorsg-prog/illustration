@@ -1,0 +1,17 @@
+import { eq } from 'drizzle-orm';
+import { getDb } from '../src/db/client.js';
+import { projects } from '../src/db/schema/index.js';
+import { getProjectStorage } from '../src/services/storage/project-storage.js';
+const ID = process.argv[2]!;
+const row = (await getDb().select().from(projects).where(eq(projects.id, ID)))[0]!;
+const path = (row as any).manuscriptPath as string;
+const buf = await getProjectStorage().readProjectFile(path);
+const txt = buf.toString('utf8');
+const lines = txt.split('\n');
+console.log('manuscript chars:', txt.length, '· lines:', lines.length, '· words ~', txt.split(/\s+/).filter(Boolean).length);
+const heads = lines.map((l,i)=>({l,i})).filter(x=>/^#{1,3}\s|^chapter\s/i.test(x.l.trim()));
+console.log('\n--- headings (' + heads.length + ') ---');
+for (const h of heads.slice(0,40)) console.log(String(h.i).padStart(5), JSON.stringify(h.l.trim().slice(0,70)));
+console.log('\n--- first 24 lines ---');
+for (const l of lines.slice(0,24)) console.log(l);
+process.exit(0);
