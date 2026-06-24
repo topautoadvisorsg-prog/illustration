@@ -36,8 +36,9 @@ scripts/
   smoke-test.ts       External API smoke tests
   audit-manuscript.ts Deterministic manuscript parser audit
   storage-prune.ts    R2 cleanup (yarn storage:prune --dry-run | --confirm)
-  build-local2.ts     Assemble the interior PDF to local disk
+  build-local2.ts     Assemble the PRINT interior PDF to local disk
   printprep-local.ts  Local 300-DPI print-prep (folio centered, badges gated)
+  build-epub-local.ts Build the KINDLE EPUB to local disk (text-first, read-only)
   _*.ts               Ad-hoc operator/QA tools (render, inspect, fix, audit) — disposable
 ```
 
@@ -52,9 +53,19 @@ Each major subdirectory has its own README. Read those for stage-by-stage detail
   applying to opener pages).
 - **Storage:** writes are R2-only. Run `yarn storage:prune` (dry-run) to review junk,
   `--confirm` to delete. ACTIVE / FINAL_EXPORT / APPROVED_BACKUP are never deleted.
-- **Build:** `build-local2.ts <projectId> <outDir>` (node `--max-old-space-size=8192`)
-  writes the interior PDF locally; validate with `validate-delivery.ts`. Use the
-  hardcover cover, not `build-local2`'s auto paperback cover.
+- **Build (PRINT):** `build-local2.ts <projectId> <outDir>` (node `--max-old-space-size=8192`)
+  writes the interior PDF locally; validate with `validate-delivery.ts` (now validates the
+  HARDCOVER wrap). Use the hardcover cover, not `build-local2`'s auto paperback cover.
+- **Editions — one manuscript, many outputs.** Print and Kindle are separate exports from
+  the same source content; print is unaffected by the Kindle path.
+  - **Kindle EPUB (Stage 8):** `build-epub-local.ts [outDir]` writes a reflowable,
+    text-first EPUB (real selectable text + cover, no baked page images). Validated with
+    EPUBCheck (`java -jar epubcheck.jar <file>.epub`) + Kindle Previewer. API:
+    `POST /api/projects/:id/export/kindle-epub` (bytes) · `GET …/preview` (report).
+    Code + design: `src/pipeline/stage-8-epub/` (`README.md`, `SPEC_EPUB_EXPORT.md`).
+  - **Future direction (post-proof, spend-gated):** entry-centric content + one hero
+    illustration per entry, reusable across print/Kindle/web/flashcards. Platform-generic
+    (any book/genre, nothing hardcoded). Design: `docs/ENTRY_CENTRIC_ARCHITECTURE_SPEC.md`.
 
 ## How To Run Locally
 
