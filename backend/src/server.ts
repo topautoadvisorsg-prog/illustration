@@ -18,6 +18,7 @@ import { registerPaginationRoutes } from './api/pagination.routes.js';
 import { registerWholePageRoutes } from './api/whole-page.routes.js';
 import { registerSubjectBadgeRoutes } from './api/subject-badges.routes.js';
 import { registerSupervisorRoutes } from './api/supervisor.routes.js';
+import { registerEpubRoutes } from './api/epub.routes.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -92,6 +93,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   // and returns a unified PipelineReport with PASS / WARNING / BLOCKED verdict +
   // next-action CTA. Image generation stays gated behind operator authorization.
   await registerSupervisorRoutes(app);
+  // Stage 8 — Kindle EPUB export. Read-only; builds a reflowable EPUB from the
+  // existing structured book data. Does not touch the print pipeline.
+  await registerEpubRoutes(app);
 
   app.get('/', async () => ({
     service: 'wildlands-backend',

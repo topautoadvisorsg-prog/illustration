@@ -11,7 +11,7 @@ const HealthResponseSchema = z.object({
   placeholderKeys: z.array(z.string()),
   // Persistence status — one call confirms the image library won't vanish:
   // durable storage + a live DB connection.
-  storage: z.enum(['supabase', 'local-ephemeral']),
+  storage: z.enum(['r2', 'supabase', 'local-ephemeral']),
   storageDurable: z.boolean(),
   db: z.enum(['connected', 'error']),
   projectCount: z.number(),
@@ -45,7 +45,7 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
         version: '0.1.0',
         placeholderKeys: getPlaceholderKeys(),
         storage,
-        storageDurable: storage === 'supabase',
+        storageDurable: storage !== 'local-ephemeral',
         db,
         projectCount,
       };

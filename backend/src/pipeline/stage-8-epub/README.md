@@ -1,8 +1,27 @@
 # Stage 8 — Ebook Export (EPUB)
 
-**Status:** Phase 0 — scaffold only. Spike 5 (D9) validates EPUB quality end-to-end before production worker is built.
+**Status:** v1 IMPLEMENTED (text-first reflowable). See `SPEC_EPUB_EXPORT.md`.
+Code: `assemble-epub.ts` (pure model builder, unit-tested), `build-epub.ts` (I/O
+orchestrator), API `src/api/epub.routes.ts`, local runner `scripts/build-epub-local.ts`.
+READ-ONLY against book data — no re-render, no image spend, print pipeline untouched.
 
-**What it does:** Generates a Kindle-compatible EPUB directly from page manifests and manuscript text. **Not** from the PDF — PDF-to-EPUB conversion produces broken reflow.
+**What it does:** Generates a Kindle-compatible reflowable EPUB directly from the
+existing structured book data (real page reading text + chapter/entry titles +
+metadata + cover). **Not** from the PDF or the baked full-page renders — both bake
+text into pixels and produce broken reflow / unreadable text.
+
+**v1 scope:** real selectable text, TOC, metadata, front matter (title/copyright/
+intro), 8 body chapters with entries (heading + scientific name + body), glossary,
+about-the-series, cover image with alt text. Skips: half-title, title-page art,
+the print contents page (EPUB auto-TOC replaces it), and the page-number index
+(meaningless in reflow). Entry illustrations are omitted until clean illustration-
+only art exists (the only images today are baked full-page renders). The model
+leaves a hook for per-entry art when available.
+
+**Run locally:** `node ../node_modules/tsx/dist/cli.mjs scripts/build-epub-local.ts`
+(PROJECT_ID from env) → writes `THE_WILDLANDS_KINDLE.epub` to Downloads.
+**API:** `POST /api/projects/:id/export/kindle-epub` (bytes) ·
+`GET …/export/kindle-epub/preview` (build report JSON).
 
 **Input:**
 - All page manifests
