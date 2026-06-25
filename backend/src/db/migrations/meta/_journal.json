@@ -50,6 +50,13 @@
       "when": 1781110933110,
       "tag": "0006_rich_anita_blake",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1782357221541,
+      "tag": "0007_blushing_callisto",
+      "breakpoints": true
     }
   ]
 }

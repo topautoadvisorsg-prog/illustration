@@ -12,7 +12,6 @@ import { getEnv } from './env.js';
 import { registerHealthRoutes } from './api/health.routes.js';
 import { registerProjectRoutes } from './api/projects.routes.js';
 import { registerPageRoutes } from './api/pages.routes.js';
-import { registerIntelligenceRoutes } from './api/intelligence.routes.js';
 import { registerAgentRoutes } from './api/agents.routes.js';
 import { registerPaginationRoutes } from './api/pagination.routes.js';
 import { registerWholePageRoutes } from './api/whole-page.routes.js';
@@ -80,7 +79,6 @@ export async function buildServer(): Promise<FastifyInstance> {
   await registerHealthRoutes(app);
   await registerProjectRoutes(app);
   await registerPageRoutes(app);
-  await registerIntelligenceRoutes(app);
   await registerAgentRoutes(app);
   // Pagination v1 — routes are registered always; each one self-gates on
   // PAGINATION_V1_ENABLED and returns 503 when the flag is off.
