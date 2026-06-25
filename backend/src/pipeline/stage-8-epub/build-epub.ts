@@ -170,15 +170,34 @@ export async function buildKindleEpub(projectId: string): Promise<BuildEpubResul
   // coverIncluded from the actual embed, so no need to pre-read it here too.
   const { model, meta, coverAssetPath, fileName } = await assembleProjectModel(projectId, { verifyCover: false });
 
-  // Cover — read from storage, resize to <=1600px wide (Kindle practical cap),
-  // write to a temp file and hand epub-gen-memory a file:// URL (Node path read).
+  // Cover — Kindle wants a PORTRAIT front cover (~1600x2560), NOT the landscape
+  // print wrap. The stored cover asset is the full wrap (back | spine | front);
+  // `fit:cover, position:right` extracts the rightmost portrait region — i.e. the
+  // front panel — for any standard left-to-right wrap, and merely fits an
+  // already-portrait source. Output a clean 1600x2560 JPEG. Then write to a temp
+  // file and hand epub-gen-memory a file:// URL (Node path read).
   let coverFileUrl: string | undefined;
   let coverEmbedded = false;
   if (coverAssetPath) {
     try {
       const storage = getProjectStorage();
       const raw = await storage.readProjectFile(coverAssetPath);
-      const resized = await sharp(raw).resize({ width: 1600, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+      const cm = await sharp(raw).metadata();
+      const cw = cm.width ?? 0;
+      const ch = cm.height ?? 0;
+      const targetRatio = 1600 / 2560; // 0.625 portrait
+      const cropW = Math.round(ch * targetRatio);
+      // Pull the window slightly off the right bleed edge so the front-panel
+      // subject (e.g. the title + animal) isn't clipped at its left edge.
+      const rightInset = Math.round(cw * 0.04);
+      const left = cw - cropW - rightInset;
+      const pipe =
+        cw > ch && cropW > 0 && left >= 0
+          ? // Landscape wrap → extract the front (right) panel, then scale to 1600x2560.
+            sharp(raw).extract({ left, top: 0, width: cropW, height: ch }).resize(1600, 2560)
+          : // Already portrait / not a wrap → fit the portrait box (front-biased right).
+            sharp(raw).resize(1600, 2560, { fit: 'cover', position: 'right' });
+      const resized = await pipe.jpeg({ quality: 88 }).toBuffer();
       const tmp = join(tmpdir(), `wl-cover-${projectId}.jpg`);
       writeFileSync(tmp, resized);
       coverFileUrl = pathToFileURL(tmp).href;
