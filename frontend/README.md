@@ -2,78 +2,53 @@
 
 Operator console for The Wildlands Publishing Platform.
 
-## Current Status
+## What this is
 
-The UI is no longer a frozen scaffold. It is an operator review surface for the
-backend-first publishing pipeline.
-
-The primary product model is:
+One guided **Operator Production Console** (`ProductionConsole.js`) — the single
+operator path, top-to-bottom, one book at a time. The model is:
 
 ```text
-AI publishing agents do the work -> operator reviews, corrects, approves, and exports
+AI publishing agents do the work -> operator reviews, corrects, approves, exports
 ```
 
-## Main Screens
+`index.js` renders the Production Console by default. The older "Publishing
+Platform" workbench (`App.js`) is **retired** and has no visible entry point; it
+remains reachable only as a deliberate backdoor at **`?legacy=1`** (advanced/dev
+use), pending its post-launch teardown. Don't use it for new books.
 
-The console is one project workspace with five top-nav tabs, plus a sidebar
-that pins the project, the workflow stages, and resource shortcuts.
+## The workflow (sidebar steps)
 
-Tabs (left-to-right):
+1. **Project** — create a book (title/subtitle/author/trim) or open/delete one.
+2. **Manuscript** — paste/drop the Markdown manuscript.
+3. **Book Setup** — confirm title/subtitle/author/trim.
+4. **Breakdown** — deterministic split into chapters + entries (no AI, no spend).
+5. **Paginate** — flow text onto pages; per-page fit blueprint (FITS / UNDERFILLED / OVERFLOW).
+6. **Build Front/Back Matter** — title, copyright, contents, glossary, index, sources, about.
+7. **Render & Review** — the **review hub**. Previewing is free; rendering spends.
+   - **Cover** — generate the full-wrap (paid); shows the **print front cover (7×10)** and the **Kindle front cover (portrait 1600×2560)** side by side, with trim/safe + spine-fold QA overlays.
+   - **Interior pages** — one finished, text-baked image per page: Preview / Render / Approve / Reject.
+   - **Kindle eBook — preview & export** — reflowable EPUB from the real text: structure tree (Front matter / Contents / Back matter), the actual reflowable text, per-entry hero-image slots (future), build report, and export.
+8. **Build Book** — assemble the print-ready interior + cover PDFs (300 DPI). Carries the paperback note (same interior, paperback wrap).
 
-1. **🛠 Control Center** — Production Status tile (calls the Supervisor,
-   shows verdict / why / next action / run), Dashboard hero, Operator
-   guidance, Chat agent, Page Plan, Render Proofs, Image review, Decision
-   Ledger, Quality Review.
-2. **Setup** — Project create / select, manuscript upload, publishing
-   format (trim / typography), format calibration.
-3. **Library** — Reference catalog of layout templates with thumbnails.
-4. **Intelligence** — Decisions / experiments / standards / SOPs / cost
-   events / print findings (gated to power users behind Advanced mode).
-5. **Export** — Chapter production grid, book parts, render proof
-   preview, download.
+## Where things belong (rule)
 
-Floating elements:
+- **Edition previews / reviews → Render & Review** (print pages, cover, Kindle preview — one hub).
+- **Final file generation / download → Build & Export** (Build Book).
+- Setup → Setup. QA overlays → in the preview. Don't add a new tab per edition feature.
 
-- Notice strip for last action / errors.
-- Advanced Mode toggle (top-right) to unlock power features and raw
-  internals.
-- Chat agent panel that can answer "why" against the live project.
+## Editions
 
-## Normal vs Advanced
-
-Normal operator mode should show:
-
-- chapter/page structure
-- selected layout name
-- page purpose
-- word count
-- fit status
-- image approval status
-- preview/export controls
-
-Advanced mode is intentionally opt-in and may show:
-
-- raw prompts
-- prompt hashes
-- layout instruction internals
-- file paths
-- placeholder lists
-- model/prompt setup details
+Hardcover, paperback, and Kindle are editions of the **same approved content**
+(no re-render between them). Kindle is text-first + cover in v1; per-entry hero
+illustrations are a future addition (rendered/reviewed in Render & Review, not a
+separate grid).
 
 ## Commands
 
 ```bash
-yarn workspace frontend dev
-yarn workspace frontend build
+yarn workspace frontend dev     # local dev server (craco)
+yarn workspace frontend build   # production build
 ```
 
-## Test Notes
-
-The frontend build is part of the root verifier:
-
-```bash
-yarn verify:pipeline
-```
-
-The current UI is intentionally wired to existing backend routes only. EPUB export
-is shown as not wired until a backend endpoint exists.
+A shared-password gate guards the console; the backend URL defaults to the
+deployed Railway backend (override with `REACT_APP_BACKEND_URL`).

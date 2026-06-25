@@ -4,9 +4,9 @@ Turns a finished manuscript into a print-ready, fully illustrated KDP book throu
 a single guided **Operator Console** — no terminal required.
 
 ```text
-Operator Console (9 steps):
+Operator Console (8 steps):
   Project → Manuscript → Book Setup → Breakdown → Paginate →
-  Front & Back Matter → Render Pages → Cover → Assemble & Export
+  Front & Back Matter → Render & Review (pages + cover + Kindle) → Build Book
 ```
 
 - Live frontend (Operator Console): `https://frontend-production-f65d.up.railway.app`
@@ -34,14 +34,16 @@ boxed `<img>`. Only the barcode (on the cover) is engine-stamped.
   spine order (lossless, `pdf-lib`). Code: `pipeline/book-assembly/`.
 
 The legacy layered / Paged.js "text-safe zone + scrim" renderer (Stage 2–6, the
-CLI `scripts/`, the `images` review table, Replicate Real-ESRGAN upscale) is
-**retired from the production path** and reachable only behind the console's
-"Legacy tools" toggle. Do not use it for new books.
+CLI `scripts/`, the `images` review table, Replicate Real-ESRGAN upscale) and the
+old "Publishing Platform" UI (`App.js`) are **retired from the production path**.
+The legacy UI has **no visible entry point** — it's reachable only as a deliberate
+backdoor at **`?legacy=1`** (advanced/dev use), pending teardown. Do not use it
+for new books.
 
 ## The Operator Console workflow
 
 Top-to-bottom, one book at a time. A ✓ on a step means it's done. Previewing is
-free; only **Render** (step 7) and **Cover** (step 8) spend.
+free; only **Render & Review** (step 7) spends (page renders + cover artwork).
 
 1. **Project** — create a book (title, subtitle, author, trim) or open/delete one.
 2. **Manuscript** — paste/drop the Markdown manuscript (keep Glossary, Index,
@@ -55,15 +57,20 @@ free; only **Render** (step 7) and **Cover** (step 8) spend.
    FITS/UNDERFILLED/OVERFLOW chip) so the operator confirms fit before any spend.
 6. **Front & Back Matter** — builds title, copyright, contents (from real page
    numbers), glossary, index, sources, about-the-author.
-7. **Render Pages** — one finished, text-baked image per page (paid). Per page:
-   **Preview** (free; shows the exact text the AI will print), **Render** (paid;
-   re-click to retry a FAILED page), **Approve for book** / **Reject**.
-8. **Cover** — generate the full-wrap cover artwork (paid); spine sized to the
-   current page count.
-9. **Assemble & Export** — merges the interior PDF and produces the print-ready
-   cover PDF. Blocks if any page isn't book-ready **or** if the cover is out of
-   sync with the interior (see below). On success: interior PDF + cover PDF + an
-   in-page preview of the finished book.
+7. **Render & Review** — the review hub. Free to preview; rendering spends.
+   - **Cover** — generate the full-wrap artwork (paid); spine sized to the current
+     page count. Shows the **print front cover (7×10)** and the **Kindle front
+     cover (portrait 1600×2560)** side by side, with trim/safe + spine-fold QA overlays.
+   - **Interior pages** — one finished, text-baked image per page: **Preview** (free;
+     shows the exact text the AI will print), **Render** (paid; re-click to retry a
+     FAILED page), **Approve for book** / **Reject**.
+   - **Kindle eBook — preview & export** — reflowable EPUB from the real text
+     (structure tree, actual reflowable text, per-entry hero-image slots [future],
+     build report, export). No spend.
+8. **Build Book** — merges the approved pages into the interior PDF and produces the
+   print-ready cover PDF (300 DPI). Blocks if any page isn't book-ready **or** if the
+   cover is out of sync with the interior (see below). On success: interior PDF +
+   cover PDF + an in-page preview. Paperback = same interior + paperback wrap.
 
 Operator SOP with screen-by-screen detail: `WILDLANDS_OPERATOR_MANUAL.md` (repo root).
 
@@ -79,7 +86,7 @@ interior page count and BLOCKS the export on a mismatch**, with:
 > "Cover is out of date. The interior page count changed and the spine width may
 > be incorrect. Regenerate the cover before exporting."
 
-Regenerating the cover (step 8) refreshes `coverSync` and clears the block. Chapter
+Regenerating the cover (step 7 · Render & Review) refreshes `coverSync` and clears the block. Chapter
 proofs and pre-existing covers without a recorded count are exempt. Code:
 `coverSyncStatus()` in `pipeline/book-assembly/assemble-book.ts`. No cover
 versioning, no separate cover project.
@@ -117,6 +124,12 @@ A project is a **temporary production workspace**. The intended lifecycle:
 - **300 DPI** interior print-prep (sharp Lanczos) and **300 DPI** full-wrap cover
   (direct lossless embed); KDP-shaped interior + cover PDFs.
 - Cover/interior synchronization export gate.
+- **Kindle EPUB export (Stage 8)** — text-first reflowable EPUB from the real
+  manuscript text (selectable, no baked page images) + a portrait front cover
+  (1600×2560, cropped from the wrap); previewed/exported in Render & Review;
+  EPUBCheck-clean. Code: `pipeline/stage-8-epub/`.
+- Cloudflare R2 storage adapter (zero-egress; dormant until R2 env vars are set —
+  prod currently on Supabase). Code: `services/storage/`.
 - Fastify backend; Supabase Postgres + Drizzle migrations (auto-applied on
   deploy); durable Supabase Storage.
 
@@ -124,7 +137,8 @@ A project is a **temporary production workspace**. The intended lifecycle:
 
 - **Permanent Image Library** (project-independent archive of approved AI masters).
 - **Safe project deletion** (purge project storage files; preserve library).
-- Kindle EPUB export.
+- **Per-entry hero illustrations for Kindle** (one cinematic image per entry;
+  needs the `entry_assets` foundation — spec'd, not built).
 - BullMQ background workers (rendering runs synchronously per request).
 - Single-user auth enforcement.
 
