@@ -769,7 +769,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 {renders?.merged && (
                   <>
                     <div style={{ marginTop: 8, fontSize: 13, color: C.muted }}>{renders.merged.length} pages · {renders.merged.filter((m) => m.status !== "NOT RENDERED").length} rendered · {renders.merged.filter((m) => m.approvedForBook).length} approved · {renders.merged.filter((m) => m.printReady).length} print-ready</div>
-                    <div style={{ marginTop: 2, fontSize: 11, color: C.muted }}>Approved = picked for the book. Print-ready = page numbers + badges stamped and preflight passed — required before Build Book. Approving a page does not print-prep it.</div>
+                    <div style={{ marginTop: 2, fontSize: 11, color: C.muted }}>“Approve for book” does it all in one click: approve + print-prep (page numbers / badges + preflight) + select for the book → the page becomes print-ready. A “needs print-prep” tag only appears if that print-prep step didn’t finish — click Approve for book again.</div>
                     <div style={S.grid}>
                       {renders.merged.map((m) => (
                         // content-visibility:auto keeps off-screen cards unpainted and their
