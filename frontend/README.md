@@ -11,10 +11,12 @@ operator path, top-to-bottom, one book at a time. The model is:
 AI publishing agents do the work -> operator reviews, corrects, approves, exports
 ```
 
-`index.js` renders the Production Console by default. The older "Publishing
-Platform" workbench (`App.js`) is **retired** and has no visible entry point; it
-remains reachable only as a deliberate backdoor at **`?legacy=1`** (advanced/dev
-use), pending its post-launch teardown. Don't use it for new books.
+`index.js` renders the Production Console by default. The old "Publishing
+Platform" workbench (`App.js`, 7k lines: duplicate pipeline + Publishing
+Intelligence center + chat) has been **deleted**. The **`?legacy=1`** URL param
+now opens a lean **Advanced/dev panel** (`AdvancedPanel.js`) holding only
+genuinely-needed tools (currently the no-spend Pipeline Check) — never the old
+over-built workbench.
 
 ## The workflow (sidebar steps)
 

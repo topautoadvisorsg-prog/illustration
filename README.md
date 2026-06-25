@@ -34,11 +34,16 @@ boxed `<img>`. Only the barcode (on the cover) is engine-stamped.
   spine order (lossless, `pdf-lib`). Code: `pipeline/book-assembly/`.
 
 The legacy layered / Paged.js "text-safe zone + scrim" renderer (Stage 2–6, the
-CLI `scripts/`, the `images` review table, Replicate Real-ESRGAN upscale) and the
-old "Publishing Platform" UI (`App.js`) are **retired from the production path**.
-The legacy UI has **no visible entry point** — it's reachable only as a deliberate
-backdoor at **`?legacy=1`** (advanced/dev use), pending teardown. Do not use it
-for new books.
+CLI `scripts/`, the `images` review table, Replicate Real-ESRGAN upscale) is
+**retired from the production path**. The old "Publishing Platform" UI (`App.js`)
+has been **deleted**; the **`?legacy=1`** URL param now opens a lean Advanced/dev
+panel (`AdvancedPanel.js`) with only genuinely-needed tools (the no-spend Pipeline
+Check). Do not use the legacy renderer for new books.
+
+> Backend note: the unused "Publishing Intelligence" backend (intelligence routes,
+> service, `knowledge.repo`, and the `experiments`/`decisions`/`sops`/
+> `lessons_learned`/`print_reviews` tables) is dead weight pending a careful
+> teardown — not yet removed.
 
 ## The Operator Console workflow
 
