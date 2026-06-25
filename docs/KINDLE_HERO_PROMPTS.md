@@ -46,7 +46,7 @@ You only review/edit the **scene bodies** below (and the preamble once). Orienta
 ---
 
 ## SECTION IMAGES
-- **T · Title** `[P]` — A bull moose lifting its head from a mist-covered lake at sunrise, water sheeting from its antlers, layered mountains and autumn forest behind, golden light through fog.
+- **T · Opening illustration** `[REUSE — DO NOT RENDER]` — Use the existing **FM_001 half-title** render (misty boreal pond at sunrise, great pine, ferns, animal tracks). Illustration-only, zero baked text → reused as the Kindle frontispiece for free. The typeset title page (real text) follows it. *(Was a rendered moose-at-lake — cut, no spend.)*
 - **I · Introduction** `[L]` — A single narrow trail dissolving into misty old-growth forest at first light, soft god-rays through the trunks, the wild opening up ahead.
 - **G · Glossary** `[L]` — A naturalist's field desk at dusk in lamplight: a pinned feather, a pressed maple leaf, a brass hand lens, and an open leather journal on aged wood.
 - **A · About the Series** `[L]` — A weathered leather journal and a glowing oil lantern beside a dying campfire under a vast field of stars, boreal silhouettes around.

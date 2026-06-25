@@ -109,6 +109,36 @@ describe('assembleEpubModel', () => {
     expect(model.stats.skipped).toContain('INDEX');
   });
 
+  it('embeds hero images before the entry title, in sections, and on the title page, with alt text', () => {
+    const input = baseInput([
+      page({ pageKey: 'CH01_P005', entryKey: 'CH01_P005', plannedPageNumber: 5, readingFieldText: '*Pekania pennanti* | mammal\n\nThe fisher is a forest predator.' }),
+      page({ pageKey: 'FM_005', section: 'FRONT_MATTER', frontMatterType: 'INTRODUCTION', chapterNumber: 0, readingFieldText: 'Welcome to the wild.' }),
+    ]);
+    input.heroes = {
+      entries: new Map([['CH01_P005', { src: 'images/fisher.jpg', alt: 'Fisher (Pekania pennanti)' }]]),
+      sections: new Map([['INTRODUCTION', { src: 'images/intro.jpg', alt: 'Introduction' }]]),
+      frontispiece: { src: 'images/front.jpg', alt: 'Opening illustration' },
+    };
+    const model = assembleEpubModel(input);
+
+    const body = model.chapters.find((c) => c.kind === 'BODY')!;
+    // hero <img> appears BEFORE the <h2> title, with class + alt
+    expect(body.content).toMatch(/<img class="hero" src="images\/fisher\.jpg" alt="Fisher \(Pekania pennanti\)"\/>\s*<h2>Fisher<\/h2>/);
+    expect(body.entries![0]!.heroIncluded).toBe(true);
+    expect(body.entries![0]!.heroSrc).toBe('images/fisher.jpg');
+    // section hero on the introduction
+    const intro = model.chapters.find((c) => c.kind === 'INTRODUCTION')!;
+    expect(intro.content).toContain('<img class="hero" src="images/intro.jpg"');
+    // frontispiece on the title page (beforeToc), not a separate empty-title chapter
+    const title = model.chapters.find((c) => c.kind === 'TITLE')!;
+    expect(title.title).toBe('THE WILDLANDS');
+    expect(title.content).toContain('<img class="hero" src="images/front.jpg"');
+    // plan + counts
+    expect(model.imagePlan.heroMode).toBe('ON');
+    expect(model.imagePlan.entriesAwaitingHero).toBe(0);
+    expect(model.stats.heroesEmbedded).toBe(3); // entry + section + frontispiece
+  });
+
   it('groups copyright + introduction front matter and skips half-title/title/contents', () => {
     const model = assembleEpubModel(
       baseInput([

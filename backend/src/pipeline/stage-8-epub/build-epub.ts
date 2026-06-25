@@ -13,7 +13,7 @@
  * leaves a hook for clean per-entry art when it exists.
  */
 
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -30,7 +30,8 @@ import {
 } from '../../db/repositories/pagination.repo.js';
 import { listEntriesForProject } from '../../db/repositories/entries.repo.js';
 import { getProjectStorage } from '../../services/storage/project-storage.js';
-import { assembleEpubModel, type EpubMeta, type EpubModel, type EpubSourcePage } from './assemble-epub.js';
+import { assembleEpubModel, type EpubMeta, type EpubModel, type EpubSourcePage, type HeroAssembleInput, type HeroRef } from './assemble-epub.js';
+import { loadHeroPlan } from './hero-plan.js';
 
 /** Minimal reader-theme-friendly CSS — relative units only (no fixed px) so
  *  Kindle reflow is never broken. The device controls fonts/colors. */
@@ -44,6 +45,9 @@ const EPUB_CSS = [
   'p.subtitle { font-size: 1.1em; font-style: italic; }',
   'p.author { font-size: 1.1em; margin-top: 1em; }',
   'section.entry { margin: 0 0 1.5em; }',
+  // Hero illustrations: responsive, never overflow the reader column, centered,
+  // with breathing room above the heading they precede.
+  'img.hero { display: block; max-width: 100%; height: auto; margin: 0.5em auto 0.8em; }',
 ].join('\n');
 
 export interface BuildEpubResult {
@@ -105,7 +109,7 @@ export interface ProjectEpubModel {
  */
 export async function assembleProjectModel(
   projectId: string,
-  opts: { verifyCover?: boolean } = {},
+  opts: { verifyCover?: boolean; heroes?: HeroAssembleInput } = {},
 ): Promise<ProjectEpubModel> {
   const project = await getProject(projectId);
   if (!project) throw new Error(`project_not_found:${projectId}`);
@@ -159,7 +163,7 @@ export async function assembleProjectModel(
     }
   }
 
-  const model = assembleEpubModel({ meta, chapterTitles, entryTitles, pages, scientificNames });
+  const model = assembleEpubModel({ meta, chapterTitles, entryTitles, pages, scientificNames, heroes: opts.heroes });
   const coverAssetPath = ProjectConfigSchema.parse(project.config).publishing.coverAssetPath;
 
   // Cover status must be TRUTHFUL before export: a path existing is not enough —
@@ -187,11 +191,39 @@ export async function assembleProjectModel(
   return { model, meta, coverAssetPath, fileName: fileNameFor(meta.title), entrySource };
 }
 
+/** Resolve the hero plan into temp files for export: read each Kindle-optimized
+ *  JPEG from storage, write it to a per-project temp dir, and hand the assembler
+ *  a file:// URL. epub-gen-memory reads those URLs from the chapter content and
+ *  bundles the bytes into the .epub. Returns undefined when no heroes are imported
+ *  (the EPUB then builds text-only, exactly as before). */
+async function resolveHeroesForExport(projectId: string): Promise<HeroAssembleInput | undefined> {
+  const plan = await loadHeroPlan(projectId);
+  if (plan.entries.size === 0 && plan.sections.size === 0 && !plan.frontispiece) return undefined;
+  const storage = getProjectStorage();
+  const dir = join(tmpdir(), `wl-heroes-${projectId}`);
+  mkdirSync(dir, { recursive: true });
+  const toRef = async (heroId: string, kindleKey: string, alt: string): Promise<HeroRef> => {
+    const bytes = await storage.readProjectFile(kindleKey);
+    const f = join(dir, `hero_${heroId}.jpg`);
+    writeFileSync(f, bytes);
+    return { src: pathToFileURL(f).href, alt };
+  };
+  const entries = new Map<string, HeroRef>();
+  for (const [entryKey, h] of plan.entries) entries.set(entryKey, await toRef(h.heroId, h.kindleKey, h.alt));
+  const sections = new Map<string, HeroRef>();
+  for (const [label, h] of plan.sections) sections.set(label, await toRef(h.heroId, h.kindleKey, h.alt));
+  const frontispiece = plan.frontispiece
+    ? await toRef(plan.frontispiece.heroId, plan.frontispiece.kindleKey, plan.frontispiece.alt)
+    : undefined;
+  return { entries, sections, frontispiece };
+}
+
 /** Build the Kindle EPUB for a project. Returns the bytes + a build report. */
 export async function buildKindleEpub(projectId: string): Promise<BuildEpubResult> {
   // verifyCover:false — this path reads + resizes the cover below and finalizes
   // coverIncluded from the actual embed, so no need to pre-read it here too.
-  const { model, meta, coverAssetPath, fileName, entrySource } = await assembleProjectModel(projectId, { verifyCover: false });
+  const heroes = await resolveHeroesForExport(projectId);
+  const { model, meta, coverAssetPath, fileName, entrySource } = await assembleProjectModel(projectId, { verifyCover: false, heroes });
 
   // Cover — Kindle wants a PORTRAIT front cover (~1600x2560), NOT the landscape
   // print wrap. The stored cover asset is the full wrap (back | spine | front);
