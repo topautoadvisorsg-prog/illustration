@@ -58,7 +58,6 @@ const STEPS = [
   { key: "matter", label: "6 · Build Front/Back Matter", purpose: "BUILD step: makes title, copyright, TOC, glossary, index. Review & render them in Step 7." },
   { key: "render", label: "7 · Render & Review", purpose: "The cover (one full wrap) plus every interior page: render, review and approve." },
   { key: "assemble", label: "8 · Build Book", purpose: "Assemble approved pages + cover into print-ready files (300+ DPI)." },
-  { key: "editions", label: "9 · Editions / Export", purpose: "Hardcover, paperback, and Kindle EPUB — all from the same approved content." },
 ];
 
 function statusColor(s) {
@@ -490,8 +489,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
     render: !!status.render || (renders?.bookReady || 0) > 0,
     cover: !!cover,
     assemble: !!assembly && !assembly.blocked,
-    editions: !!epubReport,
-  }), [project, status, breakdown, pagination, matter, renders, cover, assembly, epubReport]);
+  }), [project, status, breakdown, pagination, matter, renders, cover, assembly]);
 
   if (!authReady) return null; // brief: checking a stored password
   if (!authed) return <LoginScreen onLogin={doLogin} />;
@@ -745,10 +743,17 @@ export default function ProductionConsole({ onExitToLegacy }) {
                         <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Click the wrap to open it full-size and read every word. Back cover (left) · spine (center) · front cover (right).</div>
                         <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
                           <div>
-                            <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 700 }}>Front cover</div>
+                            <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 700 }}>Front cover (print · 7×10)</div>
                             <a href={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} target="_blank" rel="noreferrer" title="Open full-size" style={{ display: "block", width: 300, aspectRatio: "7 / 10", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 6, background: "#000", cursor: "zoom-in" }}>
-                              <img alt="Front cover" src={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "100% 50%", display: "block" }} />
+                              <img alt="Print front cover" src={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "100% 50%", display: "block" }} />
                             </a>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 700 }}>Kindle eBook front cover <span style={{ ...S.pill(C.blue), fontSize: 9.5, padding: "1px 6px", verticalAlign: "middle" }}>EPUB</span></div>
+                            <a href={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} target="_blank" rel="noreferrer" title="Open full-size — exactly the portrait front cover the Kindle EPUB embeds" style={{ display: "block", width: 300, aspectRatio: "1600 / 2560", overflow: "hidden", border: `1px solid ${C.line}`, borderRadius: 6, background: "#000", cursor: "zoom-in" }}>
+                              <img alt="Kindle front cover" src={`${fileUrl(cover.imagePath)}&v=${cover._cb || 0}`} decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "93% 50%", display: "block" }} />
+                            </a>
+                            <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4, maxWidth: 300 }}>Portrait 1600×2560 — exactly what the Kindle EPUB embeds (front panel auto-cropped from the wrap).</div>
                           </div>
                           <div>
                             <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, fontWeight: 700 }}>Back cover + spine</div>
@@ -794,6 +799,19 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     </div>
                   </>
                 )}
+                {/* KINDLE eBOOK — preview & export, in the review hub. Kindle reflows
+                    (no fixed pages), so this shows the structure, the real text, and where
+                    each entry's hero illustration will sit. Future hero illustrations are
+                    rendered/reviewed alongside the page renders above — same place. */}
+                <div style={{ ...S.card, marginTop: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                    <div style={{ fontWeight: 800, fontSize: 15 }}>Kindle eBook — preview &amp; export</div>
+                    <span style={S.pill(C.blue)}>REFLOWABLE</span>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>The Kindle edition reflows (no fixed pages). Preview the structure, the real text, and where each entry's hero illustration will sit — then export. Built from the same approved content; no spend.</div>
+                  <button style={{ ...S.btn(), marginTop: 8 }} onClick={() => loadEpubReport().catch(() => {})}>{epubReport ? "Refresh Kindle preview" : "Preview Kindle edition →"}</button>
+                  {epubReport && <KindlePreview report={epubReport} busy={busy} onExport={() => downloadEpub().catch(() => {})} />}
+                </div>
                 {preview && (
                   // Floating modal overlay — pops up centered over the page regardless
                   // of how far the operator has scrolled the (hundreds-long) page grid.
@@ -861,8 +879,9 @@ export default function ProductionConsole({ onExitToLegacy }) {
                             <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>Final book preview (scroll through every page before you export):</div>
                             <iframe title="book-preview" src={fileUrl(assembly.interiorPdfPath)} style={{ width: "100%", height: 520, border: `1px solid ${C.line}`, borderRadius: 8, marginTop: 6 }} />
                             <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.line}` }}>
-                              <span style={{ color: C.muted, fontSize: 13, marginRight: 10 }}>Print is built. Want a paperback or a Kindle eBook from the same content?</span>
-                              <button style={S.btn()} onClick={() => setStep("editions")}>Go to Editions / Export →</button>
+                              <div style={{ color: C.muted, fontSize: 13 }}><b>Paperback:</b> same interior PDF as the hardcover, paired with the paperback wrap (narrower spine) — no rebuild, no spend. Upload the shared interior + the paperback wrap to KDP.</div>
+                              <div style={{ color: C.muted, fontSize: 13, marginTop: 6 }}><b>Kindle eBook:</b> preview &amp; export it in Step 7 · Render &amp; Review (alongside the page renders).</div>
+                              <button style={{ ...S.btn(), marginTop: 6 }} onClick={() => setStep("render")}>Go to Render &amp; Review →</button>
                             </div>
                           </>
                         )}
@@ -894,52 +913,6 @@ export default function ProductionConsole({ onExitToLegacy }) {
                   </div>
                 )}
               </div>
-            )}
-          </Panel>
-        )}
-        {step === "editions" && (
-          <Panel title="Editions / Export" sub="One manuscript, multiple editions. Print and Kindle are separate exports from the same approved content — building a Kindle file does not touch the print files.">
-            <Guard project={project} setStep={setStep} />
-            {project && (
-              <>
-                {/* Hardcover */}
-                <div style={S.card}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <b>Hardcover · 7×10</b>
-                    <span style={S.pill(assembly && !assembly.blocked ? C.green : C.muted)}>{assembly && !assembly.blocked ? "BUILT" : "BUILD IN STEP 8"}</span>
-                  </div>
-                  <div style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>The print interior PDF plus the hardcover full-wrap cover (spine 0.834″). Built in Step 8 · Build Book.</div>
-                  {assembly?.interiorPdfPath
-                    ? <a style={{ ...S.btn("ok"), textDecoration: "none", display: "inline-block" }} href={fileUrl(assembly.interiorPdfPath)} target="_blank" rel="noreferrer">Open interior PDF</a>
-                    : <button style={S.ghost} onClick={() => setStep("assemble")}>Go to Build Book →</button>}
-                </div>
-
-                {/* Paperback */}
-                <div style={S.card}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <b>Paperback · 7×10</b>
-                    <span style={S.pill(C.muted)}>SAME INTERIOR</span>
-                  </div>
-                  <div style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>
-                    Paperback uses the <b>exact same interior PDF</b> as the hardcover, paired with the paperback full-wrap cover (narrower spine). No new interior build and no image spend — it's the same print-prepped pages with a different cover. Upload the shared interior + the paperback wrap to KDP as a paperback edition.
-                  </div>
-                </div>
-
-                {/* Kindle EPUB */}
-                <div style={S.card}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <b>Kindle eBook · EPUB</b>
-                    <span style={S.pill(C.blue)}>REFLOWABLE TEXT</span>
-                  </div>
-                  <div style={{ color: C.muted, fontSize: 13, marginTop: 6 }}>
-                    A reflowable EPUB built from the real manuscript text — selectable and resizable on any Kindle, with the cover. Built from the structured content, NOT the print page images.
-                  </div>
-                  <button style={S.btn()} onClick={() => loadEpubReport().catch(() => {})}>{epubReport ? "Refresh preview" : "Preview Kindle edition →"}</button>
-                  {epubReport
-                    ? <KindlePreview report={epubReport} busy={busy} onExport={() => downloadEpub().catch(() => {})} />
-                    : <div style={{ color: C.muted, fontSize: 13, marginTop: 8 }}>Preview first — read the structure and the actual reflowable text, check image placement and the build report, then export. (Hero illustrations are a future / post-proof addition; v1 is text + cover, no image spend here.)</div>}
-                </div>
-              </>
             )}
           </Panel>
         )}
