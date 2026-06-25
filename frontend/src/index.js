@@ -1,16 +1,16 @@
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
 import "@/index.css";
-import App from "@/App";
+import AdvancedPanel from "@/AdvancedPanel";
 import ProductionConsole from "@/ProductionConsole";
 
 /**
  * The operator sees ONE publishing system: the Production Console, which drives
- * the validated whole-page AI pipeline. The legacy "Publishing Platform"
- * workbench (App.js) is NOT shown by default and has NO visible entry point — it
- * stays reachable only as a deliberate backdoor via the `?legacy=1` URL param
- * (advanced/dev use), pending its post-launch teardown. This keeps a first-time
- * operator from wandering into the redundant, broken legacy UI.
+ * the validated whole-page AI pipeline. The retired "Publishing Platform" UI
+ * (App.js — duplicate pipeline + over-built Publishing Intelligence center) has
+ * been DELETED. The `?legacy=1` URL param now opens a lean Advanced/dev panel
+ * (AdvancedPanel) holding only genuinely-needed tools (e.g. the no-spend Pipeline
+ * Check), never the old over-built workbench.
  */
 function Root() {
   const [legacy, setLegacy] = useState(
@@ -25,7 +25,7 @@ function Root() {
         >
           ← Back to Operator Console
         </button>
-        <App />
+        <AdvancedPanel />
       </div>
     );
   }
