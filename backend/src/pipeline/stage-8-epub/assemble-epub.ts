@@ -45,11 +45,15 @@ export interface EpubSourcePage {
 
 export interface EpubAssembleInput {
   meta: EpubMeta;
-  /** chapterNumber → chapter title (from CHAPTER manifests). */
+  /** chapterNumber → chapter title (from CHAPTER manifests, or the entries layer). */
   chapterTitles: Map<number, string>;
-  /** entryKey → entry title (from PAGE manifests). */
+  /** entryKey → entry title (from PAGE manifests, or the entries layer). */
   entryTitles: Map<string, string>;
   pages: EpubSourcePage[];
+  /** entryKey → scientific name, from the entries layer when available. When an
+   *  entry isn't in this map, the body's binomial is extracted as before, so output
+   *  is preserved whether or not the entries layer is present. */
+  scientificNames?: Map<string, string>;
 }
 
 export type EpubChapterKind = 'TITLE' | 'COPYRIGHT' | 'INTRODUCTION' | 'BODY' | 'GLOSSARY' | 'ABOUT';
@@ -149,8 +153,11 @@ function bySpineThenKey(a: EpubSourcePage, b: EpubSourcePage): number {
 
 /** Build one entry (opener + continuations already concatenated) as structured
  *  parts: title, optional scientific name, and the body XHTML. */
-function buildEntry(title: string, rawText: string): EpubEntry {
-  const binomial = extractBinomial(rawText) ?? undefined;
+function buildEntry(title: string, rawText: string, scientificNameOverride?: string): EpubEntry {
+  // Prefer the entries-layer scientific name when supplied; else extract from the
+  // body exactly as before (the entries value was itself backfilled this way, so
+  // the output is identical with or without the entries layer).
+  const binomial = scientificNameOverride ?? extractBinomial(rawText) ?? undefined;
   const cleaned = stripReadingFieldMetadata(rawText);
   const blocks = markdownToBlocks(cleaned);
   return {
@@ -181,7 +188,7 @@ const BACK_MATTER_SKIP = new Set(['INDEX']); // page-number index is meaningless
  * Body chapters 1..N (each with its entries) → Glossary → About the Series.
  */
 export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
-  const { meta, chapterTitles, entryTitles, pages } = input;
+  const { meta, chapterTitles, entryTitles, pages, scientificNames } = input;
   const chapters: EpubChapter[] = [];
   const skipped = new Set<string>();
   const warnings: string[] = [];
@@ -254,7 +261,7 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
       if (!raw && !title) continue;
       if (!title) warnings.push(`${chapterTitle}: an entry (${key}) has no title — shown as "Untitled".`);
       if (!raw.trim()) warnings.push(`${chapterTitle}: entry "${title || key}" has no body text.`);
-      const entry = buildEntry(title || 'Untitled', raw);
+      const entry = buildEntry(title || 'Untitled', raw, scientificNames?.get(key));
       entries.push(entry);
       totalWords += entry.words;
       entryCount += 1;

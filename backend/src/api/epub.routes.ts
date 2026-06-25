@@ -53,9 +53,10 @@ export async function registerEpubRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'Bad Request', message: 'Invalid projectId.', statusCode: 400 });
     }
     try {
-      const { model, meta, fileName } = await assembleProjectModel(parsed.data.projectId);
+      const { model, meta, fileName, entrySource } = await assembleProjectModel(parsed.data.projectId);
       return reply.send({
         fileName,
+        entrySource,
         meta: {
           title: meta.title,
           subtitle: meta.subtitle,

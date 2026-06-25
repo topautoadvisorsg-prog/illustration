@@ -408,3 +408,38 @@ export const imageEvents = pgTable('image_events', {
   metadata: jsonb('metadata'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// First-class ENTRY layer (Phase A — see docs/KINDLE_ARCHITECTURE_AUDIT.md). An entry
+// is one subject/topic (Black Bear, Moose, Navigation): a BODY opener page + its
+// continuations, grouped by `entryKey`. DERIVED/backfilled READ-ONLY from `pages` +
+// `manifests` — it changes no page/render/print data. The reusable handle that
+// editions (Kindle, hero illustrations, web, flashcards, translations) attach to,
+// instead of re-deriving entries from pages every time.
+export const entries = pgTable(
+  'entries',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    entryKey: text('entry_key').notNull(),
+    chapterNumber: integer('chapter_number').notNull(),
+    chapterTitle: text('chapter_title'),
+    entryTitle: text('entry_title').notNull(),
+    scientificName: text('scientific_name'),
+    // Always BODY for entries (front/back matter pages are NOT entries).
+    section: text('section').default('BODY').notNull(),
+    // Manifest contentType when available (SPECIES / PLANT / WARNING / …) — generic.
+    entryType: text('entry_type'),
+    firstPageKey: text('first_page_key').notNull(),
+    pageKeys: jsonb('page_keys').notNull(), // ordered string[] of the entry's page keys
+    pageCount: integer('page_count').notNull(),
+    readingOrder: integer('reading_order').notNull(), // 1-based order within the book body
+    wordCount: integer('word_count').default(0).notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    projectEntryKeyIdx: uniqueIndex('entries_project_entry_key_idx').on(table.projectId, table.entryKey),
+    projectOrderIdx: index('entries_project_reading_order_idx').on(table.projectId, table.readingOrder),
+  }),
+);

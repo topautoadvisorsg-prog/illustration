@@ -17,7 +17,7 @@ writeFileSync(outPath, result.buffer);
 console.log('\n=== KINDLE EPUB BUILT ===');
 console.log('file:', outPath, `(${(result.buffer.length / 1048576).toFixed(2)} MB)`);
 console.log('title:', result.meta.title, '| author:', result.meta.authors.join(', '), '| lang:', result.meta.language);
-console.log('cover embedded:', result.coverEmbedded);
+console.log('cover embedded:', result.coverEmbedded, '| entry source:', result.entrySource);
 console.log('chapters:', result.model.stats.chapters, '| body chapters:', result.model.stats.bodyChapters, '| entries:', result.model.stats.entries, '| words:', result.model.stats.words);
 console.log('skipped page kinds:', result.model.stats.skipped.join(', ') || '(none)');
 console.log('\nNext: validate with EPUBCheck + Kindle Previewer before upload.');

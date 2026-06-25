@@ -28,6 +28,7 @@ import {
   getEntryMetaByKeys,
   listPaginatedPagesForProject,
 } from '../../db/repositories/pagination.repo.js';
+import { listEntriesForProject } from '../../db/repositories/entries.repo.js';
 import { getProjectStorage } from '../../services/storage/project-storage.js';
 import { assembleEpubModel, type EpubMeta, type EpubModel, type EpubSourcePage } from './assemble-epub.js';
 
@@ -51,6 +52,8 @@ export interface BuildEpubResult {
   meta: EpubMeta;
   coverEmbedded: boolean;
   fileName: string;
+  /** 'entries' = sourced from the first-class entries layer; 'manifests' = fallback. */
+  entrySource: 'entries' | 'manifests';
 }
 
 /** Resolve the EPUB metadata block from project + config.publishing (fallbacks
@@ -91,6 +94,8 @@ export interface ProjectEpubModel {
   meta: EpubMeta;
   coverAssetPath?: string;
   fileName: string;
+  /** Whether entry titles/order came from the entries layer or fell back to manifests. */
+  entrySource: 'entries' | 'manifests';
 }
 
 /**
@@ -136,7 +141,25 @@ export async function assembleProjectModel(
   const entryTitles = new Map<string, string>();
   for (const [k, v] of entryMeta) if (v.entryTitle) entryTitles.set(k, v.entryTitle);
 
-  const model = assembleEpubModel({ meta, chapterTitles, entryTitles, pages });
+  // Phase A: read from the first-class ENTRIES layer when it's been backfilled.
+  // Entry titles, chapter titles, and scientific names are sourced from the entry
+  // objects instead of re-derived from manifests. Output is preserved because the
+  // entries were backfilled from those same manifests; falls back to manifests when
+  // no entries exist (e.g. a project not yet backfilled).
+  const entryRows = await listEntriesForProject(projectId);
+  let scientificNames: Map<string, string> | undefined;
+  let entrySource: 'entries' | 'manifests' = 'manifests';
+  if (entryRows.length > 0) {
+    entrySource = 'entries';
+    scientificNames = new Map();
+    for (const e of entryRows) {
+      if (e.entryTitle) entryTitles.set(e.entryKey, e.entryTitle);
+      if (e.chapterTitle) chapterTitles.set(e.chapterNumber, e.chapterTitle);
+      if (e.scientificName) scientificNames.set(e.entryKey, e.scientificName);
+    }
+  }
+
+  const model = assembleEpubModel({ meta, chapterTitles, entryTitles, pages, scientificNames });
   const coverAssetPath = ProjectConfigSchema.parse(project.config).publishing.coverAssetPath;
 
   // Cover status must be TRUTHFUL before export: a path existing is not enough —
@@ -161,14 +184,14 @@ export async function assembleProjectModel(
       );
     }
   }
-  return { model, meta, coverAssetPath, fileName: fileNameFor(meta.title) };
+  return { model, meta, coverAssetPath, fileName: fileNameFor(meta.title), entrySource };
 }
 
 /** Build the Kindle EPUB for a project. Returns the bytes + a build report. */
 export async function buildKindleEpub(projectId: string): Promise<BuildEpubResult> {
   // verifyCover:false — this path reads + resizes the cover below and finalizes
   // coverIncluded from the actual embed, so no need to pre-read it here too.
-  const { model, meta, coverAssetPath, fileName } = await assembleProjectModel(projectId, { verifyCover: false });
+  const { model, meta, coverAssetPath, fileName, entrySource } = await assembleProjectModel(projectId, { verifyCover: false });
 
   // Cover — Kindle wants a PORTRAIT front cover (~1600x2560), NOT the landscape
   // print wrap. The stored cover asset is the full wrap (back | spine | front);
@@ -231,5 +254,5 @@ export async function buildKindleEpub(projectId: string): Promise<BuildEpubResul
   // some ESM loaders the CJS default export isn't unwrapped to a callable.
   const epubDoc = await new EPub(options, model.chapters).render();
   const buffer = await epubDoc.genEpub();
-  return { buffer, model, meta, coverEmbedded, fileName };
+  return { buffer, model, meta, coverEmbedded, fileName, entrySource };
 }
