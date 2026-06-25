@@ -23,6 +23,46 @@ accurate. **A reader should stop and admire it.**
 
 ---
 
+## Whole-book visual direction (read it like a film)
+
+End to end, the book should *move*: open on **awe and scale**, explode into **living
+motion**, take a reverent breath, deepen into **mystery**, and resolve in **human
+warmth**. Same artistic DNA throughout — but each chapter gets its own lens so the eye
+never tires.
+
+### The emotional arc
+Ch1 Region — *awe, first thread of danger* → Ch2 Animals — *wonder + motion, spiked with
+danger* → Ch3 Plants — *serene abundance turning to dread* → Ch4 Trees — *reverent
+stillness (the deep breath)* → Ch5 Fungi — *intimate mystery turning to dread* → Ch6
+Terrain — *adventure + epic weather tension* → Ch7 Survival — *tension + hard-won resolve*
+→ Ch8 Bushcraft — *warmth, mastery, a satisfying close*.
+
+### Chapter visual identities (binding per chapter)
+| Chapter | Camera language | Lighting signature | Palette accent | Dominant emotion |
+|---|---|---|---|---|
+| 1 · Region | wide, high vantage, big skies | transitional — dawn / storm | full landscape range | **awe** / tension |
+| 2 · Animals | dynamic — low for power, eye-level for intimacy, motion | golden hour, dawn/dusk drama | living, warm | **wonder** / danger |
+| 3 · Plants | close botanical macro + a few fields | soft morning, backlight; toxic run cold | fresh greens → ominous shadow | **curiosity** → dread |
+| 4 · Trees | looking UP; wide for lone giants; intimate bark | atmospheric — mist, shafts, storm sky | stately, seasonal | **awe** / serenity |
+| 5 · Fungi | low, ground-level, shallow focus, emerging from shadow | dim, dappled, single shafts; deadly = cold spectral glow | dark earth; jewel edibles vs ghostly deadly | **mystery** → danger |
+| 6 · Terrain | grand vistas; trail leading the eye; human-against-landscape | dramatic weather, fog, big skies | epic, atmospheric | **adventure** / awe |
+| 7 · Survival | hands-and-action close; human-in-place medium | working light, dusk, firelight | grounded; warm fire vs cold threat | **tension** / accomplishment |
+| 8 · Bushcraft | intimate hands-at-work; one grand "at home" | warm, golden, firelight | warm amber & wood | **warmth** / mastery |
+
+### Variety axes — must rotate across the *whole* book, not just within a chapter
+- **Camera angle:** low/heroic · eye-level · high/overlook · top-down · over-the-shoulder · macro. (Don't shoot everything eye-level.)
+- **Composition:** thirds (subject left/right) · centered hero · leading lines · framed-through-foliage · negative space.
+- **Lighting:** dawn · golden hour · dusk · night/moon · overcast · backlit/rim · single shaft · firelight.
+- **Weather/season:** spring growth · summer · autumn fire · winter snow · fog · rain · storm.
+- **Scale:** CU · MED · GRAND. **Emotion:** wonder · tension · serenity · mystery · danger · curiosity · accomplishment · awe.
+
+### The museum bar
+Every hero must pass: ***"Would someone hang this as an 11×14 print?"*** If a concept only
+*shows the thing accurately*, it fails — push it to a moment with light, atmosphere, and
+emotion. The audit at the end flags the few honest functional exceptions.
+
+---
+
 ## Section establishing images
 | R | Section | Scene |
 |---|---|---|
@@ -214,6 +254,18 @@ accurate. **A reader should stop and admire it.**
 2. **Deadly fungi 85–90 are all CU** — intentional (tight + cold = menace), but six in a row. *Fix option:* push one (e.g. Death Cap, 87, already MED) wider, or insert a MED "deadly trio in dark woods" establishing shot at 85.
 3. **Survival/Bushcraft (109–127) lean CU "hands at work."** *Fix applied:* GRAND beats at 113 (signaling) and 123 (mindset) + the closing sky (127) to lift the rhythm.
 4. **Trees** have no behavior — carried entirely by **season/weather/scale variety** (spring birch, autumn maple/tamarack, winter beech/fir, storm-sky pine). Watch that we don't render four "lone tree, blue sky" in a row; tags enforce the spread.
+
+## Museum-piece audit ("would you hang it?")
+- **Gallery-grade as written (lead with these prints):** Title moose-at-mist-lake · Three-Zones vista · Sugar Maple mirrored in a pond · Tamarack gold raining over a black bog · White Pine against storm clouds · Moose feeding at sunrise · Bald Eagle to the nest · Peregrine in a stoop · Loon's red eye at dawn · Barred Owl in flight · Bobcat stalking in golden grass · Lynx in snowfall · Chanterelles glowing on the dark floor · Destroying Angel ghost-white in shadow · the rime-iced Presidential summit · fog pouring over a ridge · the cairn above a sea of cloud · the closing storm sky. **~25 are already wall-worthy.**
+- **Elevated this pass (were merely accurate → now art):** the macro insects reframed as dramatic backlit naturalist plates (tick questing in a sun-flare; black-fly swarm backlit over a stream); craft shots reframed as warm still-lifes — **knots / cordage / carving lit by raking firelight on weathered hands and aged rope**; "fire from the land" pinned to the single beautiful moment the ember catches.
+- **Functional, not gallery — and that's honest for a field guide:** the Rule-of-Threes lifelines layout (109), emergency-botany spread (120), essential-knots study (125), first-aid splint (114). They earn their place as handsome instructional plates; we keep them tasteful but won't pretend they're prints. **Your call:** convert any into a true scene (e.g. knots tied around a real shelter at dusk; the botany spread as a forager's haul on a mossy log at golden hour) if you'd rather have zero non-gallery frames.
+
+## Emotional-rhythm check (no tone repeats 4+ in a row)
+- **Animals** spike **danger** (rattlesnake, copperhead, snapping turtle) between beats of **wonder** (loon, lynx) and **curiosity** (otter at play, turkey strutting).
+- **Plants** open **serene/abundant** and hard-cut to **dread** at the toxic gate (54–61).
+- **Fungi** run **mysterious/intimate**, then turn to cold **dread** at the deadly gate (85–90).
+- **Trees** are the **serene/awe "breath"** deliberately placed between the kinetic Animals and the dark Fungi.
+- **Terrain** swings **awe ↔ tension** with the weather; **Survival** carries **tension → accomplishment**; **Bushcraft** lands on **warmth/mastery** so the book *closes on a high*, not a hazard.
 
 ## Summary
 - **127 body heroes + 4 section images** (Title, Intro, Glossary, About). Index omitted.
