@@ -1,217 +1,224 @@
-# Kindle Hero Illustration — Shot List (The Wildlands: New England)
+# Kindle Hero Illustration — Shot List (Editorial v2)
 
-**Design list only. No rendering, no spend.** One hero illustration per **entry**
-(a new render only when the subject changes), sourced from the Phase-A `entries`
-layer + the manifest subjects (real data, not guesses).
+**Design list only. No rendering, no prompts, no spend.** This is the art-directed
+pass over every hero: behavior over portrait, one strong subject each, sequenced for
+visual rhythm. (Supersedes the v1 data list; subjects still trace to real entries.)
 
-## Shared image DNA (every render, no exceptions)
-- **Style:** the Wildlands "Cinematic Naturalist" — a museum-grade vintage
-  natural-history / expedition-journal illustration. Same look as the cover.
-- **Palette:** warm sepia ink on parchment tone; never pure black, never neon.
-- **NO TEXT.** Full-bleed, edge-to-edge illustration only — no labels, captions,
-  callouts, badges, or borders. (Typography is the EPUB's job, not the image's.)
-- **Composition:** the subject is the **majestic hero** of the frame, in its real
-  New England environmental context (habitat, season, weather, light) — cinematic,
-  atmospheric, "that's great art." Scientific accuracy preserved.
-- **One subject per render.** Where the print page used a montage/safety-plate, the
-  hero is the **single strongest subject** rendered dramatically (noted below).
+## Shared image DNA (every render)
+Cinematic Naturalist — museum-grade vintage natural-history / expedition-journal art,
+warm sepia on parchment, **NO text**, full-bleed. The subject is the **majestic hero of
+a moment**, in real New England habitat, season, weather, and light. Scientifically
+accurate. **A reader should stop and admire it.**
 
-## Hero subject by entry type (the framing rule)
-| Entry type | Hero subject |
-|---|---|
-| Animal / species | the animal as a hero portrait or behavior study in its habitat |
-| Plant / tree / fungus | the organism as a cinematic botanical/mycological hero in its setting |
-| Warning (toxic/dangerous) | the single dangerous organism, rendered dramatically/ominously (not a safety montage) |
-| Terrain / zone / weather | a sweeping cinematic New England landscape of that feature |
-| Survival / bushcraft technique | a cinematic scene of the technique/tool alive in the wild |
+## Editorial rules applied
+- **Behavior > portrait.** No "animal standing, looking at camera." Each is *doing*
+  something true to the species (hunting, feeding, climbing, flying, swimming, nesting,
+  defending, seasonal change).
+- **One subject.** Warning plants/fungi = a single dramatic hero, never a cluttered
+  safety montage.
+- **Habitat = iconic, not generic.** A scene that *defines* that ecosystem.
+- **Variety + rhythm.** Alternate **CU** (intimate/close), **MED** (subject + action in
+  habitat), **GRAND** (sweeping landscape); vary time of day, season, and weather so no
+  two neighbors feel alike. Tags below: `[scale · time · season/weather]`.
 
 ---
 
-## Section establishing renders (front/back matter)
-| Render | Section | Hero subject |
+## Section establishing images
+| R | Section | Scene |
 |---|---|---|
-| **T** | Title page | Grand establishing panorama of the New England wildlands — a hero animal (e.g. a bull moose at a misty dawn lake) framed by mountains, boreal forest, and autumn color. The "welcome to the wild" image. |
-| **I** | Introduction | A lone trail / figure entering deep misty wilderness at first light — the invitation into the book. |
-| **G** | Glossary | A naturalist's field desk / specimen study — pinned leaves, feathers, a hand lens — atmospheric, no text. |
-| **A** | About the Series | A fireside / expedition-journal scene at dusk in the New England woods. |
-| — | Index | *Omitted — the index is skipped in the reflowable Kindle edition (no image).* |
+| **T** | Title page | A bull moose lifting from a mist-covered lake at sunrise, mountains piling behind — the book's first breath. `[GRAND · sunrise · autumn]` |
+| **I** | Introduction | A single trail dissolving into misty forest at first light — the wild opening up ahead of you. `[MED · dawn · spring]` |
+| **G** | Glossary | A naturalist's field desk in lamplight at dusk: a pinned feather, a pressed leaf, a hand lens, an open journal. `[CU · dusk]` |
+| **A** | About the Series | A worn journal and a lantern beside a dying campfire under a field of stars. `[MED · night]` |
+| — | Index | *Omitted in the reflowable Kindle (no image).* |
 
 ---
 
-## Body entries — 127 hero renders (in reading order)
-
-### Chapter 1 — Know Your Region
-| # | Entry | Hero subject |
+## Chapter 1 — Know Your Region
+*Rhythm: grand vistas establish the land, broken by one macro (tick) and intimate weather menace.*
+| # | Entry | Hero moment |
 |---|---|---|
-| 1 | The Bones of the Land — Geography & Geology | A glacial valley with a flowing river cutting through New England bedrock — sweeping geologic landscape |
-| 2 | The Three Wilderness Zones | Boreal spruce-fir giving way to northern hardwood forest — the zones layered across a vista |
-| 3 | Climate & Seasons | A mountain range over northern hardwood forest through shifting seasonal light |
-| 4 | The First Peoples of This Land | A flowing river through old forest understory — quiet, ancestral, untouched |
-| 5 | Key Hazards (overview) | The surrounding wilderness landscape at a foreboding hour — beautiful but serious |
-| 6 | Hazard 1 — Weather Above Treeline | A mountain range and rocky ridgeline under building, dangerous weather |
-| 7 | Hazard 2 — Lyme / Ticks | A deer-tick hero study at naturalist macro scale at a forest edge (single subject, dramatic) |
-| 8 | Hazard 3 — Moose | A mature bull moose at a quiet beaver pond, boreal forest, autumn, morning mist |
-| 9 | Hazard 4 — Spring River Crossings | A snowmelt-swollen river crossing — fast cold water, dangerous beauty |
-| 10 | Hazard 5 — Hypothermia | A cold, exposed mountain range — the killing cold made cinematic |
-| 11 | Hazard 6 — Spruce Traps & Boreal Disorientation | A dense, disorienting boreal spruce-fir forest, deep snow |
+| 1 | Bones of the Land | A glacier-carved U-valley with a lone perched erratic on the ridge, a river threading the floor in low gold light — deep time made visible. `[GRAND · low sun · autumn]` |
+| 2 | The Three Wilderness Zones | **The thesis image:** salt marsh → hardwood → spruce-fir → alpine tundra rising in stacked bands in a single sweeping morning vista. `[GRAND · morning · early autumn]` |
+| 3 | Climate & Seasons | One ridge caught mid-turn — half ablaze in autumn fire, half under the season's first snow. `[GRAND · midday · autumn→winter]` |
+| 4 | The First Peoples of This Land | A quiet river bend in dawn mist with a worn portage path through old growth — presence without people. `[MED · dawn mist]` |
+| 5 | Key Hazards (overview) | A lone hiker dwarfed at a fog-swallowed trail junction as weather closes in. `[GRAND · overcast]` |
+| 6 | Hazard 1 — Weather Above Treeline | A rime-ice-caked summit cairn in screaming wind as a knife of clear sky tears open. `[MED · storm · winter]` |
+| 7 | Hazard 2 — Lyme / Ticks | Extreme macro: a deer tick "questing" on a grass tip at the trail's edge, sun flaring behind — the small thing that changes everything. `[CU · summer]` |
+| 8 | Hazard 3 — Moose | A bull moose lifting its head from a mist pond at sunrise, water sheeting off its rack, weed trailing. `[GRAND · sunrise · autumn]` |
+| 9 | Hazard 4 — Spring River Crossings | Snowmelt churning white over boulders, spray catching light, a single pole probing the current. `[MED · spring]` |
+| 10 | Hazard 5 — Hypothermia | A hunched figure silhouetted against driving cold rain on a bare ridge, daylight failing. `[MED · dusk · cold rain]` |
+| 11 | Hazard 6 — Spruce Traps | A claustrophobic boreal thicket, deep soft snow hiding a tree-well hollow, blue low light. `[MED · winter overcast]` |
 
-### Chapter 2 — Animals
-| # | Entry | Hero subject |
+## Chapter 2 — Animals
+*Rhythm: behavior-forward and deliberately varied — feeding, hunting, climbing, flying, swimming, denning, defending; the marquee species (moose, eagle, peregrine) carry the GRAND beats, snakes/frog/insects pull tight to CU.*
+| # | Entry | Hero moment |
 |---|---|---|
-| 12 | Black Bear | Black bear (*Ursus americanus*) — hero portrait in a New England hardwood setting |
-| 13 | Moose | Moose (*Alces alces*) — towering hero in a wetland/boreal setting |
-| 14 | White-Tailed Deer | White-tailed deer (*Odocoileus virginianus*) in dappled forest light |
-| 15 | Coyote | Coyote (*Canis latrans*) alert in field-edge habitat |
-| 16 | Fisher | Fisher (*Pekania pennanti*) moving through forest |
-| 17 | Bobcat | Bobcat (*Lynx rufus*) hero portrait in rocky woodland |
-| 18 | Canada Lynx | Lynx moving silently through deep snow, oversized paws, falling snow, trail of tracks (behavior study) |
-| 19 | Porcupine | Porcupine (*Erethizon dorsatum*) in a tree / forest floor |
-| 20 | Beaver | Beaver (*Castor canadensis*) at its pond / lodge |
-| 21 | River Otter | River otter (*Lontra canadensis*) at a river's edge |
-| 22 | Striped Skunk | Striped skunk (*Mephitis mephitis*) — single subject, twilight forest edge |
-| 23 | Snowshoe Hare | Snowshoe hare (*Lepus americanus*) in seasonal coat |
-| 24 | Common Loon | Loon at dawn on a still northern lake, near-frontal, striking red eye, mist (solo hero) |
-| 25 | Bald Eagle | Eagle landing at its white-pine nest with a fish, eaglets reaching (behavior study) |
-| 26 | Barred Owl | Barred owl in silent flight through misty old-growth (behavior study) |
-| 27 | Wild Turkey | Wild turkey (*Meleagris gallopavo*) displaying in forest clearing |
-| 28 | Peregrine Falcon | Peregrine falcon (*Falco peregrinus*) on a cliff / in a stoop |
-| 29 | Timber Rattlesnake | Rattlesnake basking, body extended across sun-dappled forest floor (calm natural-history hero) |
-| 30 | Eastern Copperhead | Copperhead (*Agkistrodon contortrix*) — single subject, leaf-litter camouflage, dramatic |
-| 31 | Common Snapping Turtle | Snapper emerging from dark pond water, head + algae-shell breaking the surface (wetland study) |
-| 32 | Wood Frog | Wood frog at a spring vernal pool with egg masses, robber's-mask face (life-cycle study) |
-| 33 | Black-Legged / Deer Tick | Deer tick (*Ixodes scapularis*) hero macro study (single subject) |
-| 34 | Yellow Jacket | Yellow jacket wasp + papery nest at a woodland edge — insect as clear subject |
-| 35 | Black Fly | Black fly (*Simulium*) macro, foraging |
+| 12 | Black Bear | Heaving a fallen log over in dawn fog, claws raking, nose down for grubs. `[MED · dawn fog · summer]` |
+| 13 | Moose | A bull feeding chest-deep in a mist pond at sunrise, head streaming water. `[GRAND · sunrise · autumn]` |
+| 14 | White-Tailed Deer | A doe exploding into flight at the forest edge at dusk, white tail flagging, fawn behind. `[MED · dusk]` |
+| 15 | Coyote | Mid-pounce on a vole in a snow-dusted field at dawn, breath fogging. `[MED · winter dawn]` |
+| 16 | Fisher | Descending a trunk **headfirst** in pursuit, claws gripping bark, intent. `[MED · forest]` |
+| 17 | Bobcat | Frozen mid-stalk in tall amber autumn grass, weight back, about to spring. `[MED · autumn · golden hour]` |
+| 18 | Canada Lynx | Gliding through deep powder on snowshoe paws, fresh tracks trailing, snow falling. `[MED · winter snowfall]` |
+| 19 | Porcupine | High in a bare tree at dusk, silhouetted, gnawing buds. `[MED · dusk · winter]` |
+| 20 | Beaver | Swimming a fresh-cut branch toward its lodge at twilight, a V-wake spreading. `[MED · dusk]` |
+| 21 | River Otter | Caught mid-slide down a snowy bank into black water — pure play. `[MED · winter]` |
+| 22 | Striped Skunk | Front feet stamped, tail flared in a full warning bluff at twilight. `[CU · dusk]` |
+| 23 | Snowshoe Hare | Mid-bound across fresh snow in white winter coat, huge hind feet thrown forward. `[MED · winter]` |
+| 24 | Common Loon | Low on a still dawn lake, near-frontal, blazing red eye, mist on the water. `[CU · dawn]` |
+| 25 | Bald Eagle | Banking into its white-pine nest with a fish, two eaglets reaching up. `[GRAND · day]` |
+| 26 | Barred Owl | In silent flight low through misty old-growth, wings spread, eyes fixed ahead. `[MED · dusk fog]` |
+| 27 | Wild Turkey | A tom in full strut, tail fanned and iridescent, last snow melting in a spring clearing. `[MED · spring]` |
+| 28 | Peregrine Falcon | In a full stoop down a cliff face, wings tucked, blurred with speed. `[GRAND · day]` |
+| 29 | Timber Rattlesnake | Basking long and loose across a sun-dappled leaf floor, full pattern shown. `[CU · summer]` |
+| 30 | Eastern Copperhead | Nearly invisible coiled in autumn leaf litter, tongue flicking, one shaft of light finding it. `[CU · autumn]` |
+| 31 | Snapping Turtle | An ancient head and algae-shell breaking a still pond's surface, ripples spreading. `[MED · day]` |
+| 32 | Wood Frog | Floating at a spring vernal pool among egg masses, robber's-mask eyes at the waterline. `[CU · spring]` |
+| 33 | Deer Tick | Macro on a grass blade, legs outstretched questing — the menace at scale. `[CU · summer]` |
+| 34 | Yellow Jacket | Workers crawling a torn papery nest, one banking in to land, late-summer gold. `[CU · late summer]` |
+| 35 | Black Fly | A backlit spring swarm hazing the air over a stream at dusk, one in sharp macro. `[CU · spring dusk]` |
 
-### Chapter 3 — Plants
-| # | Entry | Hero subject |
+## Chapter 3 — Plants
+*Rhythm: chapter opens GRAND (ramp carpet); then alternate tight CU botanical detail (dew, unfurling, single bloom) with MED field/edge shots; toxic run = single dramatic subjects in moody light, never montages.*
+| # | Entry | Hero moment |
 |---|---|---|
-| 36 | The Forager's Code (overview) | Wild ramps (*Allium tricoccum*) carpeting a spring forest floor — the foraging invitation |
-| 37 | Wild Ramps / Ramsons | Ramps (*Allium tricoccum*) in spring woodland |
-| 38 | Fiddlehead Fern | Ostrich-fern fiddleheads (*Matteuccia struthiopteris*) unfurling streamside |
-| 39 | Wild Blueberry | Lowbush blueberry (*Vaccinium angustifolium*) on a sunny barren |
-| 40 | Highbush Blueberry | Highbush blueberry (*Vaccinium corymbosum*) laden with fruit |
-| 41 | Wild Strawberry | Wild strawberry (*Fragaria virginiana*) in a meadow |
-| 42 | Black Raspberry & Wild Blackberry | Brambles (*Rubus occidentalis*) heavy with fruit |
-| 43 | Wood Sorrel | Wood sorrel (*Oxalis montana*) on the shaded forest floor |
-| 44 | Sheep Sorrel | Sheep sorrel (*Rumex acetosella*) in a field |
-| 45 | Cattail | Cattails (*Typha latifolia*) at a marsh edge |
-| 46 | Stinging Nettle | Stinging nettle (*Urtica dioica*) stand |
-| 47 | Trout Lily | Trout lily (*Erythronium americanum*) mottled spring carpet |
-| 48 | Elderberry | Elderberry (*Sambucus canadensis*) flower/fruit clusters — single subject |
-| 49 | Spruce Tips | Fresh red-spruce tips (*Picea rubens*) |
-| 50 | Yarrow | Yarrow (*Achillea millefolium*) — feathery leaves, flat white flower clusters, meadow edge |
-| 51 | Broadleaf Plantain | Broadleaf plantain (*Plantago major*) — basal rosette + seed spike, path edge |
-| 52 | St. John's Wort | St. John's wort (*Hypericum perforatum*) in bloom |
-| 53 | Goldenrod | Goldenrod (*Solidago*) glowing in a late-summer field |
-| 54 | Toxic & Dangerous Plants (overview) | A single dramatic toxic plant (e.g. water hemlock) in moody light — ominous but tasteful (was a montage; render the strongest one as hero) |
-| 55 | Water Hemlock DEADLY | Water hemlock (*Cicuta maculata*) at a wet ditch — dramatic, ominous |
-| 56 | False Hellebore DEADLY | False hellebore (*Veratrum viride*) emerging in wet woods — dramatic |
-| 57 | Wild Parsnip (phototoxic) | Wild parsnip (*Pastinaca sativa*) yellow umbels — dramatic |
-| 58 | Poison Sumac | Poison sumac (*Toxicodendron vernix*) in a swamp — dramatic |
-| 59 | Poison Ivy | Poison ivy (*Toxicodendron radicans*) climbing — dramatic |
-| 60 | Baneberry TOXIC | Baneberry (*Actaea rubra*) "doll's-eyes" berries — dramatic |
-| 61 | Jimsonweed DEADLY | Jimsonweed (*Datura stramonium*) flower + spiny pod — dramatic |
+| 36 | The Forager's Code | A spring hillside carpeted in wild ramps under shafts of new-leaf light. `[GRAND · spring morning]` |
+| 37 | Wild Ramps | A clump pulled half-free, soil clinging to white bulbs, broad leaves, dappled floor. `[CU · spring]` |
+| 38 | Fiddlehead Fern | Tight crosiers unfurling, dew-beaded, streamside, backlit. `[CU · spring dawn]` |
+| 39 | Wild Blueberry | A sun-baked summit barren reddening at the edges, berries heavy, mountains beyond. `[MED · late summer]` |
+| 40 | Highbush Blueberry | A fruit-laden branch arcing over dark pond water. `[CU · summer]` |
+| 41 | Wild Strawberry | Tiny ruby berries low in a sunlit meadow, a single perfect dewdrop. `[CU · early summer]` |
+| 42 | Black Raspberry & Blackberry | An arching cane dense with fruit at a forest edge, late-day warmth. `[CU · summer]` |
+| 43 | Wood Sorrel | Clover-like leaves and one veined white flower glowing on the dark mossy floor. `[CU · summer]` |
+| 44 | Sheep Sorrel | A wind-bent stand reddening across an open field at golden hour. `[MED · golden hour]` |
+| 45 | Cattail | A backlit cattail stand at a marsh edge at sunset, seed-heads bursting. `[MED · autumn sunset]` |
+| 46 | Stinging Nettle | Backlit so the stinging hairs glint, riverbank, flat morning light. `[CU · summer dawn]` |
+| 47 | Trout Lily | Mottled leaves and one nodding yellow bloom on a brown spring floor. `[CU · spring]` |
+| 48 | Elderberry | Heavy dark berry clusters drooping against the sky at a stream bank. `[CU · late summer]` |
+| 49 | Spruce Tips | Bright lime-green new tips against dark old needles, dew, soft light. `[CU · spring]` |
+| 50 | Yarrow | A flat white flower-head crowded with morning dew at a meadow edge. `[CU · summer dawn]` |
+| 51 | Broadleaf Plantain | A ribbed rosette and seed spike in a sunlit path crack, raindrops beading. `[CU · summer]` |
+| 52 | St. John's Wort | Yellow stars catching first sun in a dry field, one backlit. `[CU · summer]` |
+| 53 | Goldenrod | A field blazing at golden hour, one plume sharp against soft bokeh. `[MED · late summer · golden hour]` |
+| 54 | Toxic & Dangerous Plants | A single water hemlock standing alone in a misty wet ditch, ominous light (one subject, not a montage). `[MED · overcast]` |
+| 55 | Water Hemlock DEADLY | Lacy white umbels glowing eerily against dark wetland shadow. `[CU · overcast]` |
+| 56 | False Hellebore DEADLY | Bold pleated leaves unfurling like a trap in a foggy spring seep. `[CU · spring fog]` |
+| 57 | Wild Parsnip (phototoxic) | Yellow umbels backlit by harsh sun casting hard shadow — the burn implied by the light. `[MED · harsh sun]` |
+| 58 | Poison Sumac | Flame-red autumn foliage over black swamp water — beautiful and forbidding. `[MED · autumn]` |
+| 59 | Poison Ivy | "Leaves of three" climbing a trunk in vivid glossy autumn red. `[CU · autumn]` |
+| 60 | Baneberry TOXIC | White "doll's-eyes" berries on red stalks staring from forest shadow. `[CU · summer]` |
+| 61 | Jimsonweed DEADLY | A single moonlit white trumpet opening at dusk, spiny pod below. `[CU · dusk]` |
 
-### Chapter 4 — Trees
-| # | Entry | Hero subject |
+## Chapter 4 — Trees
+*Rhythm: trees can't "behave," so vary by season, weather, light, and scale — lone giants (GRAND) against intimate bark/cone detail (CU); span spring growth → autumn fire → winter snow.*
+| # | Entry | Hero moment |
 |---|---|---|
-| 62 | Eastern White Pine | White pine (*Pinus strobus*) — towering hero in a New England forest |
-| 63 | Sugar Maple | Sugar maple (*Acer saccharum*) in full autumn fire |
-| 64 | Yellow Birch | Yellow birch (*Betula alleghaniensis*) with curling golden bark |
-| 65 | Paper / White Birch | Paper birch (*Betula papyrifera*) stand |
-| 66 | American Beech | American beech (*Fagus grandifolia*) — smooth grey bark, marcescent leaves |
-| 67 | Balsam Fir | Balsam fir (*Abies balsamea*) spire in boreal forest |
-| 68 | Red Spruce | Red spruce (*Picea rubens*) on a mountainside |
-| 69 | Eastern Hemlock | Hemlock (*Tsuga canadensis*) — layered drooping branches, soft needles, cones (normal tree, not a warning) |
-| 70 | Tamarack / Eastern Larch | Tamarack (*Larix laricina*) gold in a bog, autumn |
-| 71 | Quaking Aspen | Quaking aspen (*Populus tremuloides*) shimmering grove |
-| 72 | Black Cherry | Black cherry (*Prunus serotina*) — dark scaly bark, drooping fruit (normal tree, not a warning) |
-| 73 | Striped Maple | Striped maple (*Acer pensylvanicum*) green-striped bark in understory |
-| 74 | Red Oak | Red oak (*Quercus rubra*) — broad crown, acorns |
+| 62 | Eastern White Pine | A lone giant towering above the canopy against piled storm clouds, branches in wind. `[GRAND · dramatic sky]` |
+| 63 | Sugar Maple | A single tree in peak autumn fire mirrored in a still pond. `[GRAND · autumn]` |
+| 64 | Yellow Birch | Curling golden bark in low light, roots straddling a mossy boulder over a brook. `[CU · autumn]` |
+| 65 | Paper Birch | White trunks luminous in a grove after rain, wet bark gleaming. `[MED · spring · post-rain]` |
+| 66 | American Beech | Smooth grey trunks holding coppery marcescent leaves as first snow falls. `[MED · winter snowfall]` |
+| 67 | Balsam Fir | A dark fir spire against a pale winter sky on a snowy ridge, boughs laden. `[MED · winter]` |
+| 68 | Red Spruce | Wind-sculpted at the krummholz edge above treeline, mist tearing past. `[MED · mountain fog]` |
+| 69 | Eastern Hemlock | Layered drooping boughs over a shaded brook, one shaft of light, tiny cones. `[MED · summer]` |
+| 70 | Tamarack / Larch | Gold needles raining into the black mirror of a misty bog at dawn. `[GRAND · autumn dawn]` |
+| 71 | Quaking Aspen | Leaves shimmering pale in a gust, low autumn sun behind. `[MED · autumn · windy]` |
+| 72 | Black Cherry | Dark scaly bark and drooping fruit at a forest edge, a bird-pecked branch. `[CU · late summer]` |
+| 73 | Striped Maple | Green-and-white striped bark vivid in a grey winter understory, snow at its base. `[CU · winter]` |
+| 74 | Red Oak | A massive lone oak in a field holding its rust leaves, acorns scattered. `[GRAND · late autumn]` |
 
-### Chapter 5 — Fungi & Mushrooms
-| # | Entry | Hero subject |
+## Chapter 5 — Fungi & Mushrooms
+*Rhythm: edibles in warm forest-floor light (CU/MED); the deadly run pulls intimate and cold — single specimens glowing out of shadow, never a montage.*
+| # | Entry | Hero moment |
 |---|---|---|
-| 75 | The Mycologist's Protocol (overview) | A single hero edible (e.g. hen-of-the-woods) on a forest floor with a hand lens nearby — foraging study (was a montage; render the strongest subject) |
-| 76 | Hen of the Woods / Maitake | Maitake (*Grifola frondosa*) at an oak base |
-| 77 | Chicken of the Woods | *Laetiporus sulphureus* bright shelf on a log |
-| 78 | Giant Puffball | Giant puffball (*Calvatia gigantea*) in a meadow |
-| 79 | Chanterelle | Chanterelles (*Cantharellus*) golden on the forest floor |
-| 80 | Oyster Mushroom | Oyster (*Pleurotus ostreatus*) cluster on a trunk |
-| 81 | Lion's Mane | Lion's mane (*Hericium erinaceus*) cascading on hardwood |
-| 82 | Morel | Morel (*Morchella esculenta*) — honeycomb cap on hollow stem, spring forest floor |
-| 83 | Honey Mushroom | Honey mushroom (*Armillaria mellea*) cluster at a stump base |
-| 84 | Shaggy Mane | Shaggy mane (*Coprinus comatus*) in grass |
-| 85 | Deadly — Know These Cold (overview) | A single deadly hero (Destroying Angel) glowing white in dark woods — serious, dramatic (was a montage) |
-| 86 | Destroying Angel DEADLY | Destroying angel (*Amanita bisporigera*) — pure white, ominous in shadow |
-| 87 | Death Cap DEADLY | Death cap (*Amanita phalloides*) — greenish cap, dramatic |
-| 88 | Galerina DEADLY | *Galerina marginata* small brown cluster on wood — dramatic |
-| 89 | Jack-O'-Lantern TOXIC | Jack-o'-lantern (*Omphalotus illudens*) orange cluster, eerie glow |
-| 90 | False Morel TOXIC | False morel (*Gyromitra esculenta*) — brainy reddish cap, dramatic |
+| 75 | The Mycologist's Protocol | A single hen-of-the-woods at an oak base with a hand lens resting beside it (one subject, not a montage). `[CU · autumn]` |
+| 76 | Hen of the Woods | Overlapping grey fronds bursting from the base of a great oak, autumn leaves. `[MED · autumn]` |
+| 77 | Chicken of the Woods | Vivid orange-and-yellow shelves glowing on a dark mossy log. `[CU · summer]` |
+| 78 | Giant Puffball | A huge white sphere startling in a green meadow at dawn dew. `[MED · late summer dawn]` |
+| 79 | Chanterelle | Golden trumpets glowing on the dark mossy floor, one sunbeam finding them. `[CU · summer]` |
+| 80 | Oyster Mushroom | Tiered caps fanning up a dead trunk, soft side light, after rain. `[CU · autumn]` |
+| 81 | Lion's Mane | A cascade of white icicle-spines on a hardwood wound, dim forest. `[CU · autumn]` |
+| 82 | Morel | A honeycomb morel half-hidden in spring leaf litter near a dead elm. `[CU · spring]` |
+| 83 | Honey Mushroom | A dense honey-tan cluster swarming a stump base in low gold light. `[MED · autumn]` |
+| 84 | Shaggy Mane | A row of shaggy white caps through gravel at dusk, one deliquescing to ink. `[CU · autumn dusk]` |
+| 85 | Deadly — Know These Cold | A single Destroying Angel glowing ghost-white out of deep forest shadow. `[CU · summer]` |
+| 86 | Destroying Angel DEADLY | Pure white amanita rising from dark duff in faint cold light — lethal elegance. `[CU · summer]` |
+| 87 | Death Cap DEADLY | A greenish cap with its skirt and cup, half-shadowed, sinister calm. `[MED · summer]` |
+| 88 | Galerina DEADLY | A small brown cluster on a mossy log — deceptively ordinary, menacing light. `[CU · autumn]` |
+| 89 | Jack-O'-Lantern TOXIC | An orange cluster at a stump in near-dark, hinting at its eerie glow. `[CU · night · autumn]` |
+| 90 | False Morel TOXIC | A reddish-brown brain-like cap on the spring floor, ominous and isolated. `[CU · spring]` |
 
-### Chapter 6 — Terrain & Navigation
-| # | Entry | Hero subject |
+## Chapter 6 — Terrain & Navigation
+*Rhythm: the chapter's job is GRAND landscape and weather drama — punctuated by intimate navigation moments (compass on map, water from rock) so it doesn't become a postcard reel.*
+| # | Entry | Hero moment |
 |---|---|---|
-| 91 | The Glacial Inheritance | Cutaway/cross-section of glacially-carved New England terrain |
-| 92 | Ridgelines and How to Read Them | A mountain range and rocky ridgeline — reading the skyline |
-| 93 | How the Three Zones Read Underfoot | Boreal spruce-fir meeting alpine tundra |
-| 94 | Nor'easters | A nor'easter building — storm clouds, bent spruce, cold grey Atlantic |
-| 95 | Above-Treeline Weather (White Mountains) | The exposed White Mountain alpine zone under hostile weather |
-| 96 | Fog — Coastal Maine & Summit Fog | Rolling coastal/summit fog swallowing the forest |
-| 97 | Northern Boreal — Featureless Terrain | Endless featureless boreal forest — the art of not getting lost |
-| 98 | Alpine & Subalpine — Rules Above Treeline | Alpine tundra above treeline, krummholz, big sky |
-| 99 | Mixed Hardwood Corridor — Trail Junctions | Dense hardwood forest at a trail junction |
-| 100 | Finding Water by Zone | Alpine tundra + boreal forest with water sources |
-| 101 | Beaver Ponds and Giardia | A tannin-dark beaver pond with lodge — cautionary water-source mood (no pathogen imagery) |
-| 102 | River Crossings — Snowmelt Protocol | A snowmelt river crossing scene |
-| 103 | The Map and Compass Foundation | A mountain range + river — terrain for navigation |
-| 104 | Dead Reckoning in Dense Forest | Deep boreal forest, navigating blind |
-| 105 | Terrain Association Above Treeline | Rocky ridgeline + range — matching map to land |
-| 106 | When Technology Fails | Map-and-compass on a forested ridgeline, no GPS — expedition-journal mood |
-| 107 | Mud Season | A mountain range over a thawing wetland marsh |
-| 108 | Stick Season | Bare late-autumn hardwoods under mountains |
+| 91 | The Glacial Inheritance | A cinematic cutaway of a glacier-carved valley — the ice gone, the land it left. `[GRAND · diagram-cinematic]` |
+| 92 | Ridgelines | A serrated ridgeline receding in blue layers into haze. `[GRAND · hazy]` |
+| 93 | How the Three Zones Read Underfoot | Boots-eye: spruce duff meeting alpine lichen-rock at the treeline boundary. `[CU · midday]` |
+| 94 | Nor'easters | A nor'easter slamming a bent-spruce ridge, wind-driven snow, cold grey Atlantic. `[GRAND · storm · winter]` |
+| 95 | Above-Treeline Weather (Whites) | The Presidential Range armored in rime ice under a violent sky. `[GRAND · storm · winter]` |
+| 96 | Fog | Coastal/summit fog pouring over a ridge and swallowing the forest, one treetop adrift. `[GRAND · fog]` |
+| 97 | Northern Boreal | Endless identical spruce in flat fog, a faint game trail dissolving. `[MED · fog]` |
+| 98 | Alpine & Subalpine | A lone summit cairn above a sea of cloud at sunrise. `[GRAND · sunrise]` |
+| 99 | Mixed Hardwood Corridor | A leaf-strewn trail forking in dense autumn hardwoods, low sun through trunks. `[MED · autumn]` |
+| 100 | Finding Water by Zone | A clear spring trickling from mossy alpine rock into a pool. `[CU · summer]` |
+| 101 | Beaver Ponds & Giardia | A still tannin-dark beaver pond at dusk, lodge silhouetted — beautiful but cautionary. `[MED · dusk]` |
+| 102 | River Crossings (snowmelt) | Close on fast clear water surging around shin-deep legs and a pole, spray. `[CU · spring]` |
+| 103 | Map & Compass Foundation | A hand laying a compass on a topo map on a sunlit rock, ridgeline beyond. `[CU · day]` |
+| 104 | Dead Reckoning in Dense Forest | A figure sighting a bearing through dim crowded spruce. `[MED · overcast]` |
+| 105 | Terrain Association Above Treeline | Matching a distinct rocky peak to the map, wide alpine view. `[GRAND · day]` |
+| 106 | When Technology Fails | A dead phone pocketed, map-and-compass out, fog rolling into a junction. `[MED · fog dusk]` |
+| 107 | Mud Season | A thaw-soaked trail mirroring bare trees and a snow-streaked peak. `[MED · early spring]` |
+| 108 | Stick Season | Bare grey-brown November hardwoods under a cold mountain — the quiet between seasons. `[GRAND · late autumn overcast]` |
 
-### Chapter 7 — Survival & First Aid
-| # | Entry | Hero subject |
+## Chapter 7 — Survival & First Aid
+*Rhythm: human action and craft — tight CU on hands/fire/tools, opened by MED scene shots; one GRAND signaling beat.*
+| # | Entry | Hero moment |
 |---|---|---|
-| 109 | Survival Priorities (Rule of Threes) | A calm montage of the core survival elements (shelter/fire/water/signal) on a forest-floor field-study layout |
-| 110 | Shelter | A well-built debris-hut / lean-to against a fallen log in boreal forest |
-| 111 | Water | Collecting clear spring/stream water through an improvised filter |
-| 112 | Fire | A small campfire catching — tinder, kindling, ferro rod + knife |
-| 113 | Signaling | Three signal fires in a triangle in a clearing, mirror flash, mountain backdrop |
-| 114 | Wilderness First Aid | An improvised splint + first-aid kit laid out on a pack, forest setting |
-| 115 | Self-Rescue vs. Stay Put | A lone hiker deciding at a river crossing / junction, map in hand, ridgelines beyond |
-| 116 | White Mountain Specific — The AMC Factor | A White Mountain hut / alpine trail scene |
+| 109 | Survival Priorities (Rule of Threes) | A calm forest-floor field study of the four lifelines — shelter, fire, water, signal — laid out together. `[MED · day]` |
+| 110 | Shelter | A finished debris-hut packed with leaf litter against a fallen log at dusk, a small fire glowing nearby. `[MED · dusk]` |
+| 111 | Water | Hands collecting clear water through an improvised cloth filter at a mossy spring, droplets falling. `[CU · day]` |
+| 112 | Fire | A tinder bundle bursting into first flame in cupped hands, sparks, dim forest. `[CU · dusk]` |
+| 113 | Signaling | Three signal fires triangulated in a clearing at dusk, smoke rising, a mirror flash to a far ridge. `[GRAND · dusk]` |
+| 114 | Wilderness First Aid | Hands binding an improvised splint with cloth and a branch on the forest floor. `[CU · day]` |
+| 115 | Self-Rescue vs. Stay Put | A lone hiker paused at a river-crossing decision, map in hand, ridgelines beyond. `[MED · overcast]` |
+| 116 | White Mountain Specific (AMC) | A high alpine hut against a hostile dusk sky, one lit window, weather coming. `[MED · dusk]` |
 
-### Chapter 8 — Bushcraft & the Living Forest
-| # | Entry | Hero subject |
+## Chapter 8 — Bushcraft & the Living Forest
+*Rhythm: craft in action — mostly CU on the working hands/moment, broken by the GRAND "mindset" scene; close the book on a dramatic sky.*
+| # | Entry | Hero moment |
 |---|---|---|
-| 117 | Fire From the Land | A bow-drill friction set with a glowing coal dropped into a tinder bundle |
-| 118 | Shelter From the Land | Cutaway of a natural debris-hut shelter — frame, ribbing, leaf insulation |
-| 119 | Water From the Land | Transpiration bag on foliage + birch sap tap dripping into a container |
-| 120 | Food From the Land — Emergency Botany | Emergency wild edibles (cattail, acorns, greens, berries, roots) as a foraging study |
-| 121 | First Aid From the Land | Medicinal plants (plantain, yarrow, pine resin) + a crushed-leaf poultice |
-| 122 | Cordage and Tools From the Land | Hands twisting bark fiber (dogbane/basswood) into cordage |
-| 123 | The Bushcraft Mindset | Boreal forest meeting an open meadow — the living forest |
-| 124 | Batoning — Dry Wood in Wet Conditions | Splitting a log with a knife + wooden baton to reach dry inner wood |
-| 125 | Essential Knots | A study of bushcraft knots (bowline, clove hitch, taut-line, lashing) in natural cordage |
-| 126 | Wood Carving and Camp Tools | Whittling a spoon / try-stick, carved camp implements on a block |
-| 127 | Reading Weather From the Land | A sky-reading study — cloud types, wind in the trees, an advancing front |
+| 117 | Fire From the Land | A bow-drill set the instant the ember drops glowing into the tinder, smoke curling. `[CU · forest]` |
+| 118 | Shelter From the Land | A cutaway of a natural debris-hut: ridgepole, ribbing, thick leaf insulation. `[MED · diagram-cinematic]` |
+| 119 | Water From the Land | A clear transpiration bag fogged with droplets over green leaves, sun behind. `[CU · day]` |
+| 120 | Food From the Land | A foraged spread on a flat rock: cattail, acorns, greens, berries, roots. `[CU · day]` |
+| 121 | First Aid From the Land | A crushed plantain/yarrow poultice pressed to a forearm, leaves beside. `[CU · day]` |
+| 122 | Cordage & Tools From the Land | Hands twisting bark fiber into tight cordage, raw strands fraying. `[CU · day]` |
+| 123 | The Bushcraft Mindset | A lone figure at a small fire at dusk where boreal forest meets open meadow — at home in the wild. `[GRAND · dusk]` |
+| 124 | Batoning | A knife driven through a split log by a wooden baton, dry inner wood exposed, chips flying. `[CU · day]` |
+| 125 | Essential Knots | Four knots tied in natural cordage on weathered wood, clean study, raking light. `[CU · day]` |
+| 126 | Wood Carving & Camp Tools | Hands whittling a spoon, curls of shaving falling, carved tools on a block. `[CU · day]` |
+| 127 | Reading Weather From the Land | A sky study — high cirrus giving way to a building storm front over the range, wind in the trees. `[GRAND · changing sky]` |
 
 ---
+
+## Sequence / rhythm audit (reading order)
+- **Chapter openers are GRAND** (zones vista, ramp carpet, white pine, hen-of-woods at the oak, glacial valley) — each chapter starts with a "wow" wide shot, then tightens.
+- **Scale alternates by design.** Animals interleave GRAND behavior beats (moose, eagle, peregrine) with MED action and CU intimacy (loon, frog, tick) so no two neighbors match.
+- **Season + time of day rotate** across the whole book: dawn/dusk/night, spring growth → summer → autumn fire → winter snow, fog/rain/storm/snowfall — the set never sits in one mood.
+- **Behavior coverage:** feeding (bear, moose, porcupine), hunting (coyote, bobcat, peregrine), climbing (fisher), flying (owl, eagle), swimming (beaver, otter, loon), defending (skunk, rattlesnake), nesting (eagle), seasonal coat (hare, lynx), life cycle (wood frog). No "standing portrait" survives.
+
+### Flagged risks + the fix (for your call)
+1. **Plants 37–52 run CU-heavy** (botanical detail is intimate by nature). *Fix applied:* a GRAND opener (36) + MED field shots interspersed (39, 44, 45, 53). If it still feels samey, we can promote 2–3 more to MED "edge/field" framings.
+2. **Deadly fungi 85–90 are all CU** — intentional (tight + cold = menace), but six in a row. *Fix option:* push one (e.g. Death Cap, 87, already MED) wider, or insert a MED "deadly trio in dark woods" establishing shot at 85.
+3. **Survival/Bushcraft (109–127) lean CU "hands at work."** *Fix applied:* GRAND beats at 113 (signaling) and 123 (mindset) + the closing sky (127) to lift the rhythm.
+4. **Trees** have no behavior — carried entirely by **season/weather/scale variety** (spring birch, autumn maple/tamarack, winter beech/fir, storm-sky pine). Watch that we don't render four "lone tree, blue sky" in a row; tags enforce the spread.
 
 ## Summary
-- **Total hero renders:** **127 body entries + 4 section images** (Title, Introduction,
-  Glossary, About) = **~131**. Index gets no image (skipped in reflow).
-- **By chapter:** 1=11 · 2=24 · 3=26 · 4=13 · 5=16 · 6=18 · 7=8 · 8=11.
-- **Subjects are real data** (from the entries layer + manifest `cleanSubject`/
-  `imageSubject`). ~10 entries already carry detailed cinematic briefs (Loon, Eagle,
-  Barred Owl, Lynx, Rattlesnake, Snapping Turtle, Wood Frog) — keep those verbatim.
-- **Warning/montage entries:** rendered as the **single strongest subject**, dramatically
-  — not a multi-specimen safety plate (those were print-page constructs).
-- **Art-director note:** the per-entry subject is locked from data; the cinematic scene
-  framing (light, season, behavior) can be refined per render before generation.
+- **127 body heroes + 4 section images** (Title, Intro, Glossary, About). Index omitted.
+- **Scale mix (approx):** GRAND ~22 · MED ~45 · CU ~60 — weighted to intimate moments, with grand beats spaced for impact.
+- **Every entry is a moment, not an object;** warnings are single dramatic subjects, not montages; habitats are iconic ecosystem scenes.
+- **Per-render scene is now production-strong;** the only thing left before generation is your sign-off (and the technical prompt-writing, which is the *next* step — not done here).
 
-*Design only — nothing rendered, no spend. The next phase (`entry_assets`) is where these
-attach to entries and get generated render-once, reviewed, and reused across every edition.*
+*Design only — no rendering, no prompts, no spend.*
