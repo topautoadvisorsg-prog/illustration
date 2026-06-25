@@ -6,12 +6,16 @@ import ProductionConsole from "@/ProductionConsole";
 
 /**
  * The operator sees ONE publishing system: the Production Console, which drives
- * the validated whole-page AI pipeline. The legacy layered/Paged.js workbench
- * remains reachable only as an internal "Legacy tools" view, never the default
- * operator path.
+ * the validated whole-page AI pipeline. The legacy "Publishing Platform"
+ * workbench (App.js) is NOT shown by default and has NO visible entry point — it
+ * stays reachable only as a deliberate backdoor via the `?legacy=1` URL param
+ * (advanced/dev use), pending its post-launch teardown. This keeps a first-time
+ * operator from wandering into the redundant, broken legacy UI.
  */
 function Root() {
-  const [legacy, setLegacy] = useState(false);
+  const [legacy, setLegacy] = useState(
+    () => new URLSearchParams(window.location.search).get("legacy") === "1",
+  );
   if (legacy) {
     return (
       <div>
@@ -25,7 +29,8 @@ function Root() {
       </div>
     );
   }
-  return <ProductionConsole onExitToLegacy={() => setLegacy(true)} />;
+  // No onExitToLegacy → the Console renders no "Legacy tools" button.
+  return <ProductionConsole />;
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
