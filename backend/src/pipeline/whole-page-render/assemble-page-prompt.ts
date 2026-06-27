@@ -182,7 +182,7 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
   const continuationStudy =
     spec.pageType === 'CONTINUATION' || spec.pageType === 'COMPACTED'
       ? [
-          'CONTINUATION STUDY — this page continues an entry whose subject already received its main field-guide portrait on the opening page. Do NOT repeat that portrait\'s pose, angle, or composition. Instead depict the SAME subject from a DIFFERENT, complementary perspective that adds new understanding: a different behavior, a habitat or environmental context, a life stage, movement, an anatomical or structural detail, track/sign, or an interaction with its ecosystem. Keep the exact same Cinematic Naturalist style, palette, and scientific accuracy — only the chosen study and viewpoint change, so a reader turning the page learns something new rather than seeing the same picture twice.',
+          'CONTINUATION STUDY — this page continues an entry whose subject already received its main field-guide portrait on the opening page. Do NOT repeat that portrait\'s pose, angle, or composition. Instead depict the SAME subject from a DIFFERENT, complementary perspective that adds new understanding: a different behavior, a habitat or environmental context, a life stage, movement, an anatomical or structural detail, track/sign, or an interaction with its ecosystem. Keep the exact same illustration style, palette, and scientific accuracy as this edition\'s established look — only the chosen study and viewpoint change, so a reader turning the page learns something new rather than seeing the same picture twice.',
           '',
         ]
       : [];

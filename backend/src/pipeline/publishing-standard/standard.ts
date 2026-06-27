@@ -167,8 +167,13 @@ export const ILLUSTRATION_DNA = {
     "John James Audubon, Ernest Thompson Seton, Pierre-Joseph Redouté's botanical plates, and hand-colored 19th-century chromolithograph field-guide plates.",
   lineWork:
     'Confident, expressive, organic pen-and-ink linework — sometimes precise and diagnostic, sometimes loose and gestural. Hand-drawn, never mechanical, never traced, never vector.',
+  // COLOUR MODE — this is the single colour authority for the edition. It owns
+  // HOW any colour mentioned in a subject is rendered, so the shared subject layer
+  // stays style-neutral (a future B&W / Vintage / Kids edition swaps ONLY this
+  // directive — e.g. "monochrome ink wash, translate all hues to tonal value" —
+  // without touching subjects, composition, or behaviour). For the colour edition:
   colorDiscipline:
-    'Rich, saturated vintage pigment — full-bodied watercolor and gouache washes with deep, luminous, confident color, like a freshly hand-colored chromolithograph plate. Strong and vivid, NEVER faded, washed-out, muted, or pale. The saturation is that of historic printed pigment — bold but warm and natural, never neon, never digital RGB glow, never over-processed.',
+    'COLOUR EDITION — render every subject in its accurate, true-to-life NATURAL colour. Rich, saturated vintage pigment — full-bodied watercolor and gouache washes with deep, luminous, confident color, like a freshly hand-colored chromolithograph plate. Strong and vivid, NEVER faded, washed-out, muted, or pale. The saturation is that of historic printed pigment — bold but warm and natural, never neon, never digital RGB glow, never over-processed.',
   mood: 'Contemplative, reverent, grounded in the natural world; collected, hand-bound, kept in a leather satchel.',
   naturalistPrecision:
     'Anatomically accurate to field-guide standard — habitat, gill structure, bark texture, leaf venation, track patterns, and proportional scale rendered correctly. Naturalist precision is the foundation; the painterly handling is the surface.',
