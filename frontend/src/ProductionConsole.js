@@ -1176,12 +1176,10 @@ function KindlePreview({ report, onExport, busy }) {
             <span style={{ fontSize: 12, color: C.muted }}>{curIdx >= 0 ? `${curIdx + 1} of ${flat.length}` : ""}</span>
             <button style={{ ...S.ghost, margin: 0, opacity: curIdx >= flat.length - 1 ? 0.4 : 1 }} disabled={curIdx >= flat.length - 1} onClick={() => go(1)}>Next →</button>
           </div>
-          {/* image-placement marker, never invisible */}
+          {/* Hero shown exactly as the reader sees it: full column width (matches the
+              EPUB's img.hero max-width:100%). No caption/box — those were preview-only. */}
           {entry && entry.heroSrc ? (
-            <div style={{ marginBottom: 12 }}>
-              <img src={heroUrl(entry.heroSrc)} alt={entry.heroAlt || entry.title} style={{ display: "block", maxWidth: "100%", maxHeight: 340, margin: "0 auto", borderRadius: 8, border: `1px solid ${C.line}` }} />
-              <div style={{ textAlign: "center", fontSize: 11.5, color: C.muted, marginTop: 4 }}>🖼 Hero illustration — appears before the title</div>
-            </div>
+            <img src={heroUrl(entry.heroSrc)} alt={entry.heroAlt || entry.title} style={{ display: "block", width: "100%", height: "auto", marginBottom: 12 }} />
           ) : entry ? (
             <div style={{ border: `1px dashed ${C.line}`, borderRadius: 8, padding: "8px 10px", marginBottom: 12, color: C.muted, fontSize: 12.5, background: C.panel }}>
               🖼 Hero illustration slot — appears <b>before the title</b>. (No image mapped for this entry yet.)
