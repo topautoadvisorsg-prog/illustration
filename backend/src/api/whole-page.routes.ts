@@ -29,7 +29,10 @@ import {
   type WholePageRenderRow,
 } from '../db/repositories/whole-page-render.repo.js';
 import { getProjectStorage } from '../services/storage/project-storage.js';
-import { getPaginatedPageById } from '../db/repositories/pagination.repo.js';
+import { getPaginatedPageById, listPaginatedPagesForProject } from '../db/repositories/pagination.repo.js';
+import { getProject } from '../db/repositories/projects.repo.js';
+import { ProjectConfigSchema } from '@wildlands/shared';
+import { composePaperbackGuidePreview } from '../pipeline/print-prep/paperback-preview.js';
 import {
   buildPreviewPackageForPage,
   buildProofPackageForRender,
@@ -145,6 +148,30 @@ export async function registerWholePageRoutes(app: FastifyInstance): Promise<voi
       return reply.send(buf);
     } catch {
       return reply.code(404).send({ error: 'Not Found', message: 'Artifact not found.', statusCode: 404 });
+    }
+  });
+
+  // ── Paperback cover preview (KDP guidelines over the wrap art) ───────────
+  // Returns a PNG of the paperback wrap at its exact dimensions (7x10, Premium
+  // Color spine from the live page count) with the bleed/trim/safe/spine/barcode
+  // guides drawn on, so the operator can check fit in the console. Read-only.
+  app.get('/api/projects/:projectId/cover/paperback-preview', async (request, reply) => {
+    const parsed = ProjectParamsSchema.safeParse(request.params);
+    if (!parsed.success) return reply.code(400).send({ error: 'Bad Request', message: 'Invalid projectId.', statusCode: 400 });
+    try {
+      const project = await getProject(parsed.data.projectId);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'project_not_found', statusCode: 404 });
+      const coverPath = ProjectConfigSchema.parse(project.config).publishing.coverAssetPath;
+      if (!coverPath) return reply.code(404).send({ error: 'Not Found', message: 'No cover art set for this project.', statusCode: 404 });
+      const art = await getProjectStorage().readProjectFile(coverPath);
+      const pageCount = (await listPaginatedPagesForProject(parsed.data.projectId)).length || 24;
+      const png = await composePaperbackGuidePreview(art, { pageCount });
+      reply.header('content-type', 'image/png');
+      reply.header('cache-control', 'no-store');
+      return reply.send(png);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.code(500).send({ error: 'Internal Server Error', message: `Paperback preview failed: ${message}`, statusCode: 500 });
     }
   });
 
