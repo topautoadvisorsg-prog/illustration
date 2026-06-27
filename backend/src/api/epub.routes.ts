@@ -15,8 +15,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { assembleProjectModel, buildKindleEpub } from '../pipeline/stage-8-epub/build-epub.js';
+import { loadHeroPlan, heroAssembleInputForPreview } from '../pipeline/stage-8-epub/hero-plan.js';
+import { getProjectStorage } from '../services/storage/project-storage.js';
 
 const ProjectParamsSchema = z.object({ projectId: z.string().uuid() });
+const HeroParamsSchema = z.object({ projectId: z.string().uuid(), heroId: z.string().regex(/^[A-Za-z0-9]{1,8}$/) });
 
 export async function registerEpubRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/projects/:projectId/export/kindle-epub', async (request, reply) => {
@@ -53,7 +56,9 @@ export async function registerEpubRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'Bad Request', message: 'Invalid projectId.', statusCode: 400 });
     }
     try {
-      const { model, meta, fileName, entrySource } = await assembleProjectModel(parsed.data.projectId);
+      const plan = await loadHeroPlan(parsed.data.projectId);
+      const heroes = heroAssembleInputForPreview(plan, parsed.data.projectId);
+      const { model, meta, fileName, entrySource } = await assembleProjectModel(parsed.data.projectId, { heroes });
       return reply.send({
         fileName,
         entrySource,
@@ -80,6 +85,8 @@ export async function registerEpubRoutes(app: FastifyInstance): Promise<void> {
             words: e.words,
             heroPlacement: e.heroPlacement,
             heroIncluded: e.heroIncluded,
+            heroSrc: e.heroSrc,
+            heroAlt: e.heroAlt,
           })),
         })),
       });
@@ -89,6 +96,26 @@ export async function registerEpubRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(404).send({ error: 'Not Found', message, statusCode: 404 });
       }
       return reply.code(500).send({ error: 'Internal Server Error', message: `EPUB preview failed: ${message}`, statusCode: 500 });
+    }
+  });
+
+  // Serve a single Kindle-optimized hero JPEG for the in-console preview thumbnails.
+  // Reads from project storage (R2 in prod). heroId is constrained to a short
+  // alphanumeric token (e.g. 012, 00I, FRONT) so it cannot traverse paths.
+  app.get('/api/projects/:projectId/export/kindle-epub/hero/:heroId', async (request, reply) => {
+    const parsed = HeroParamsSchema.safeParse(request.params);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Bad Request', message: 'Invalid hero id.', statusCode: 400 });
+    }
+    try {
+      const buf = await getProjectStorage().readProjectFile(
+        `${parsed.data.projectId}/heroes/kindle/hero_${parsed.data.heroId}.jpg`,
+      );
+      reply.header('content-type', 'image/jpeg');
+      reply.header('cache-control', 'public, max-age=86400');
+      return reply.send(buf);
+    } catch {
+      return reply.code(404).send({ error: 'Not Found', message: 'Hero image not found.', statusCode: 404 });
     }
   });
 }

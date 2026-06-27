@@ -11,6 +11,7 @@
  *   frontispiece → the book's opening-illustration description
  */
 import { getProjectStorage } from '../../services/storage/project-storage.js';
+import type { HeroAssembleInput, HeroRef } from './assemble-epub.js';
 
 export interface HeroEntryPlan { heroId: string; kindleKey: string; alt: string; }
 export interface HeroPlan {
@@ -83,5 +84,23 @@ export async function loadHeroPlan(projectId: string): Promise<HeroPlan> {
     sections,
     frontispiece,
     counts: { entries: entries.size, sections: sections.size, frontispiece: Boolean(frontispiece) },
+  };
+}
+
+/** Build the assembler's hero input for the in-CONSOLE PREVIEW: each <img src>
+ *  points at the hero-serving route (the live backend streams the JPEG from R2).
+ *  Returns undefined when nothing is imported (preview stays text-only). */
+export function heroAssembleInputForPreview(plan: HeroPlan, projectId: string): HeroAssembleInput | undefined {
+  if (plan.entries.size === 0 && plan.sections.size === 0 && !plan.frontispiece) return undefined;
+  const url = (heroId: string) => `/api/projects/${projectId}/export/kindle-epub/hero/${heroId}`;
+  const map = (src: Map<string, HeroEntryPlan>): Map<string, HeroRef> => {
+    const out = new Map<string, HeroRef>();
+    for (const [k, h] of src) out.set(k, { src: url(h.heroId), alt: h.alt });
+    return out;
+  };
+  return {
+    entries: map(plan.entries),
+    sections: map(plan.sections),
+    frontispiece: plan.frontispiece ? { src: url(plan.frontispiece.heroId), alt: plan.frontispiece.alt } : undefined,
   };
 }

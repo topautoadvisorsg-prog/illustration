@@ -1117,8 +1117,11 @@ function KindlePreview({ report, onExport, busy }) {
         <Stat label="Cover" value={ip.coverIncluded ? "Included" : "None"} />
       </div>
       <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>
-        Images: cover {ip.coverIncluded ? "included" : "not found"} · interior entry images <b>not included in v1</b>
-        {" "}({st.omittedImages ?? 0} future hero illustrations, one per entry, would appear {String(ip.plannedHeroPlacement || "BEFORE_ENTRY_TITLE").replace(/_/g, " ").toLowerCase()}).
+        {ip.heroMode === "ON" ? (
+          <>Images: cover {ip.coverIncluded ? "included" : "not found"} · <b>{st.heroesEmbedded ?? 0} hero illustrations embedded</b> (one before each entry title{ip.entriesAwaitingHero ? `; ${ip.entriesAwaitingHero} entr${ip.entriesAwaitingHero === 1 ? "y" : "ies"} still without one` : ", full coverage"}).</>
+        ) : (
+          <>Images: cover {ip.coverIncluded ? "included" : "not found"} · interior entry images <b>not included in v1</b>{" "}({st.omittedImages ?? 0} future hero illustrations, one per entry, would appear {String(ip.plannedHeroPlacement || "BEFORE_ENTRY_TITLE").replace(/_/g, " ").toLowerCase()}).</>
+        )}
       </div>
       {Array.isArray(st.skipped) && st.skipped.length > 0 && (
         <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Omitted (not meaningful in reflow): {st.skipped.join(", ")}</div>
@@ -1150,7 +1153,7 @@ function KindlePreview({ report, onExport, busy }) {
                       const activeEntry = i === ci && ei === j;
                       return (
                         <div key={j} onClick={() => select(i, j)} style={{ padding: "4px 8px", borderRadius: 6, cursor: "pointer", background: activeEntry ? C.field : "transparent", fontSize: 12.5 }}>
-                          {e.title}{!e.heroIncluded && <span style={{ color: C.muted }}> · no image (v1)</span>}
+                          {e.title}{e.heroIncluded ? <span style={{ color: C.muted }}> · 🖼</span> : <span style={{ color: C.muted }}> · no image</span>}
                         </div>
                       );
                     })}
@@ -1170,9 +1173,14 @@ function KindlePreview({ report, onExport, busy }) {
             <button style={{ ...S.ghost, margin: 0, opacity: curIdx >= flat.length - 1 ? 0.4 : 1 }} disabled={curIdx >= flat.length - 1} onClick={() => go(1)}>Next →</button>
           </div>
           {/* image-placement marker, never invisible */}
-          {entry ? (
+          {entry && entry.heroSrc ? (
+            <div style={{ marginBottom: 12 }}>
+              <img src={`${BACKEND}${entry.heroSrc}`} alt={entry.heroAlt || entry.title} style={{ display: "block", maxWidth: "100%", maxHeight: 340, margin: "0 auto", borderRadius: 8, border: `1px solid ${C.line}` }} />
+              <div style={{ textAlign: "center", fontSize: 11.5, color: C.muted, marginTop: 4 }}>🖼 Hero illustration — appears before the title</div>
+            </div>
+          ) : entry ? (
             <div style={{ border: `1px dashed ${C.line}`, borderRadius: 8, padding: "8px 10px", marginBottom: 12, color: C.muted, fontSize: 12.5, background: C.panel }}>
-              🖼 Hero illustration slot — would appear <b>before the title</b>. Future / post-proof; <b>not included in this v1 export</b>.
+              🖼 Hero illustration slot — appears <b>before the title</b>. (No image mapped for this entry yet.)
             </div>
           ) : chapter?.kind === "TITLE" && ip.coverIncluded ? (
             <div style={{ border: `1px dashed ${C.line}`, borderRadius: 8, padding: "8px 10px", marginBottom: 12, color: C.muted, fontSize: 12.5, background: C.panel }}>
@@ -1188,7 +1196,7 @@ function KindlePreview({ report, onExport, busy }) {
           ) : (
             <>
               <h2 style={{ margin: "0 0 8px" }}>{chapter?.title}</h2>
-              <div style={{ lineHeight: 1.55, fontSize: 15 }} dangerouslySetInnerHTML={{ __html: chapter?.content || "<p style='color:#7a6f57'>(no readable text on this page)</p>" }} />
+              <div style={{ lineHeight: 1.55, fontSize: 15 }} dangerouslySetInnerHTML={{ __html: (chapter?.content || "<p style='color:#7a6f57'>(no readable text on this page)</p>").replace(/src="\/api\//g, `src="${BACKEND}/api/`) }} />
             </>
           )}
         </div>
