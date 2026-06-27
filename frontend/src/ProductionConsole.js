@@ -1078,6 +1078,10 @@ const KIND_META = {
  */
 function KindlePreview({ report, onExport, busy }) {
   const chapters = report.chapters || [];
+  // <img> can't send the Authorization header, so the hero-serving route is
+  // reached with the shared-password query param (?k=…) the gate also accepts.
+  const pw = sessionStorage.getItem("wl_pw") || "";
+  const heroUrl = (src) => `${BACKEND}${src}${pw ? `?k=${encodeURIComponent(pw)}` : ""}`;
   const [ci, setCi] = useState(0);
   const [ei, setEi] = useState(chapters[0]?.entries ? 0 : null);
   const chapter = chapters[ci] || null;
@@ -1175,7 +1179,7 @@ function KindlePreview({ report, onExport, busy }) {
           {/* image-placement marker, never invisible */}
           {entry && entry.heroSrc ? (
             <div style={{ marginBottom: 12 }}>
-              <img src={`${BACKEND}${entry.heroSrc}`} alt={entry.heroAlt || entry.title} style={{ display: "block", maxWidth: "100%", maxHeight: 340, margin: "0 auto", borderRadius: 8, border: `1px solid ${C.line}` }} />
+              <img src={heroUrl(entry.heroSrc)} alt={entry.heroAlt || entry.title} style={{ display: "block", maxWidth: "100%", maxHeight: 340, margin: "0 auto", borderRadius: 8, border: `1px solid ${C.line}` }} />
               <div style={{ textAlign: "center", fontSize: 11.5, color: C.muted, marginTop: 4 }}>🖼 Hero illustration — appears before the title</div>
             </div>
           ) : entry ? (
@@ -1196,7 +1200,7 @@ function KindlePreview({ report, onExport, busy }) {
           ) : (
             <>
               <h2 style={{ margin: "0 0 8px" }}>{chapter?.title}</h2>
-              <div style={{ lineHeight: 1.55, fontSize: 15 }} dangerouslySetInnerHTML={{ __html: (chapter?.content || "<p style='color:#7a6f57'>(no readable text on this page)</p>").replace(/src="\/api\//g, `src="${BACKEND}/api/`) }} />
+              <div style={{ lineHeight: 1.55, fontSize: 15 }} dangerouslySetInnerHTML={{ __html: (chapter?.content || "<p style='color:#7a6f57'>(no readable text on this page)</p>").replace(/src="\/api\/([^"]*)"/g, `src="${BACKEND}/api/$1${pw ? `?k=${encodeURIComponent(pw)}` : ""}"`) }} />
             </>
           )}
         </div>
