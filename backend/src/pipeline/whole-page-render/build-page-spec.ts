@@ -39,6 +39,10 @@ export interface BuildPageSpecInput {
   imageSubject: string;
   badgeContext?: { hazard: string[]; region: string; source: string };
   pageRolePolicy?: PageRolePolicy;
+  /** Edition's Style DNA id (from the Style DNA registry). Omitted → the default
+   *  Color profile, so existing renders are byte-identical. A future edition
+   *  passes e.g. 'bw-naturalist' here and ONLY the style swaps. */
+  styleDnaId?: string;
 }
 
 /** Pick the largest text-safe zone — the actual reading field for this layout. */
@@ -256,7 +260,7 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
       // Standard), assembled with PALETTE-token colours — NOT the legacy
       // free-text masterStyleBlockText config blob (which carried contradictory
       // paper/text/composition rules from the dead clean-art pipeline).
-      masterStyleBlock: assembleIllustrationDna(),
+      masterStyleBlock: assembleIllustrationDna(input.styleDnaId),
       subject: subjectPackage,
     },
     pageText: {

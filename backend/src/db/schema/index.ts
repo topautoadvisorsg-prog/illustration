@@ -443,3 +443,34 @@ export const entries = pgTable(
     projectOrderIdx: index('entries_project_reading_order_idx').on(table.projectId, table.readingOrder),
   }),
 );
+
+// ─── EDITIONS (One Book → Many Editions) ──────────────────────────────────
+// An edition selects the Style DNA + surface palette/paper + format for ONE
+// rendering of the shared manuscript. The shared layer (manuscript, breakdown,
+// pagination, entries, layouts, prompts, metadata) is inherited — only the
+// edition fields below change between Color / B&W / Vintage / Kids. The existing
+// book is backfilled as the default Color edition. Adding an edition is a ROW,
+// not a code change (styleDnaId comes from the Style DNA registry).
+export const editions = pgTable(
+  'editions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    editionKey: text('edition_key').notNull(), // 'color', 'bw', 'vintage', 'kids'
+    label: text('label').notNull(),
+    styleDnaId: text('style_dna_id').notNull(), // id in the Style DNA registry
+    // Surface overrides. NULL = inherit from the Style DNA profile (the registry).
+    paperType: text('paper_type'), // 'premium-color' | 'standard-bw' | 'cream-bw' | ...
+    paletteOverride: jsonb('palette_override'), // { paperHex, inkHex } | null
+    trimOverride: jsonb('trim_override'), // { widthIn, heightIn, bleedIn } | null
+    formatSettings: jsonb('format_settings'), // edition-specific export knobs | null
+    isDefault: boolean('is_default').default(false).notNull(),
+    status: text('status').default('active').notNull(), // active | archived
+    ...timestamps,
+  },
+  (table) => ({
+    projectKeyIdx: uniqueIndex('editions_project_key_idx').on(table.projectId, table.editionKey),
+  }),
+);
