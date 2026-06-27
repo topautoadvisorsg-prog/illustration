@@ -12,7 +12,7 @@ import {
   PALETTE,
   STANDARD_VERSION,
   assembleIllustrationDna,
-} from '../pipeline/publishing-standard/standard.js';
+} from '../pipeline/publishing-standard/index.js';
 
 describe('Standard version', () => {
   it('is v1.2', () => {

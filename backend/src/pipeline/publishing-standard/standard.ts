@@ -187,25 +187,10 @@ export const ILLUSTRATION_DNA = {
   ],
 } as const;
 
-/**
- * Assemble the Illustration-DNA prompt fragment. The ONLY place colour values
- * enter is via PALETTE tokens (Rule Zero) — this function interpolates the
- * token hex; it never hardcodes one.
- */
-export function assembleIllustrationDna(): string {
-  return [
-    ILLUSTRATION_DNA.medium,
-    `Aesthetic: ${ILLUSTRATION_DNA.mood} Reference points: ${ILLUSTRATION_DNA.referenceArtists}`,
-    `LINE WORK: ${ILLUSTRATION_DNA.lineWork} Line colour is the Standard sepia ink.`,
-    `COLOUR: ${ILLUSTRATION_DNA.colorDiscipline} Whites are the parchment paper itself, never bright paper-white. Accents are drawn from the Standard palette.`,
-    `DETAIL: ${ILLUSTRATION_DNA.naturalistPrecision}`,
-    `LIGHT: ${ILLUSTRATION_DNA.lighting}`,
-    `PAPER: ${ILLUSTRATION_DNA.paperTexture}`,
-    `EDGES: ${ILLUSTRATION_DNA.edgeTreatment}`,
-    // Negatives consolidated into the prompt's HARD NEGATIVES block (anti-style
-    // is no longer appended here); palette hex lives once in the prompt header.
-  ].join('\n');
-}
+// `assembleIllustrationDna()` now lives in the STYLE DNA REGISTRY (`style-dna.ts`),
+// which resolves the edition's profile. The Color profile sources its values from
+// the `ILLUSTRATION_DNA` block above, so the default output is byte-identical. A
+// new edition (B&W, Vintage, Kids) = register a profile there, not edit this file.
 
 // ─── 5. BADGE SYSTEM (v1.1) ───────────────────────────────────────────────
 // Three families. Badges are DETERMINISTIC OVERLAYS stamped by print-prep —
