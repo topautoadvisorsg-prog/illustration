@@ -1,0 +1,11 @@
+import { ProjectConfigSchema } from '@wildlands/shared';
+import { getProject } from '../src/db/repositories/projects.repo.js';
+import { assembleProjectModel } from '../src/pipeline/stage-8-epub/build-epub.js';
+import { P } from './_project.js';
+const cfg = ProjectConfigSchema.parse((await getProject(P))!.config);
+console.log('publishing.series =', JSON.stringify(cfg.publishing.series));
+const { model, meta } = await assembleProjectModel(P);
+console.log('meta.series =', JSON.stringify(meta.series));
+const title = model.chapters.find((c) => c.kind === 'TITLE');
+console.log('TITLE page content:\n', title?.content);
+process.exit(0);
