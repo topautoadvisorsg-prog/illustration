@@ -6,13 +6,13 @@
  * below print quality for the highest-stakes asset. This composes the cover
  * deterministically with sharp + pdf-lib (the same toolchain the interior
  * print-prep uses): Lanczos-upscale the wrap art onto the 300-DPI full-wrap
- * canvas, stamp the engine-reserved barcode box, and embed the PNG into a PDF at
- * the exact physical wrap size with NO JPEG and NO downscale.
+ * canvas and embed the PNG into a PDF at the exact physical wrap size with NO
+ * JPEG and NO downscale.
  *
- * Composition is unchanged from buildCoverHtml's art path: the AI bakes ALL
- * cover typography (title / subtitle / author / spine / back copy) INTO the wrap
- * illustration; the only engine-stamped element is the barcode reserve box, kept
- * here at the same geometry (back panel, 2 × 1.2 in).
+ * The engine stamps NOTHING: the AI bakes ALL cover typography (title / subtitle
+ * / author / spine / back copy) INTO the wrap illustration, and KDP/Amazon prints
+ * the barcode itself on the back cover — so we never reserve a barcode box (that
+ * placeholder used to land on the printed proof).
  */
 
 import sharp from 'sharp';
@@ -33,22 +33,16 @@ export interface CoverComposeResult {
   artNativeHeightPx: number;
 }
 
-// Barcode reserve geometry — mirrors buildCoverHtml exactly:
-//   .back  { width: trim.width + bleed; padding: bleed + 0.4in; }
-//   .barcode { width: 2in; height: 1.2in; align-self: flex-end; }  (top-right of back panel)
-const BARCODE_W_IN = 2;
-const BARCODE_H_IN = 1.2;
-const PANEL_PAD_EXTRA_IN = 0.4;
-
 /**
  * Deterministic cover composition. Testable on a fixture buffer: no DB, no
  * storage, no network. `dims` is the resolved full-wrap geometry
  * (computeCoverDimensions), so the print file and the validation always share
- * one wrap size.
+ * one wrap size. `config` is accepted for signature stability (callers pass the
+ * project config) but no longer read — the engine stamps nothing onto the art.
  */
 export async function composeCoverPrint(
   coverArtPng: Buffer,
-  config: ProjectConfig,
+  _config: ProjectConfig,
   dims: CoverDimensions,
 ): Promise<CoverComposeResult> {
   const dpi = SPACING.printDpi;
@@ -65,29 +59,9 @@ export async function composeCoverPrint(
     .resize({ width: canvasW, height: canvasH, fit: 'cover', position: 'centre', kernel: 'lanczos3' })
     .toBuffer();
 
-  // 2. Engine-reserved barcode box on the back (left) panel, top-right, matching
-  //    buildCoverHtml's geometry computed from the same dims + constants.
-  const bleed = config.trimSize.bleedIn;
-  const backWidthIn = config.trimSize.widthIn + bleed;
-  const padIn = bleed + PANEL_PAD_EXTRA_IN;
-  const boxLeftIn = backWidthIn - padIn - BARCODE_W_IN;
-  const boxTopIn = padIn;
-  const L = Math.round(boxLeftIn * dpi);
-  const T = Math.round(boxTopIn * dpi);
-  const W = Math.round(BARCODE_W_IN * dpi);
-  const H = Math.round(BARCODE_H_IN * dpi);
-  const stroke = Math.max(1, Math.round(dpi / 300));
-  const fontPx = Math.round((8 / 72) * dpi); // 8pt label, as in buildCoverHtml
-  const barcodeSvg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}">` +
-    `<rect x="${L}" y="${T}" width="${W}" height="${H}" fill="#ffffff" stroke="#999999" stroke-width="${stroke}"/>` +
-    `<text x="${L + W / 2}" y="${T + H / 2}" text-anchor="middle" dominant-baseline="middle" ` +
-    `font-family="sans-serif" font-size="${fontPx}" fill="#555555">ISBN barcode area</text>` +
-    `</svg>`;
-  const overlay = await sharp(Buffer.from(barcodeSvg)).png().toBuffer();
-
+  // 2. No engine overlay — the art is the whole cover. Amazon prints the barcode
+  //    on the back cover itself, so we reserve nothing.
   const pngBuffer = await sharp(art)
-    .composite([{ input: overlay, left: 0, top: 0 }])
     .withMetadata({ density: dpi })
     .png()
     .toBuffer();

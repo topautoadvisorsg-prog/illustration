@@ -1,7 +1,7 @@
 /**
- * Cover Print-Prep test — exercises the real sharp upscale + barcode stamp +
- * pdf-lib embed on a fixture, no DB and no image-gen spend. Guards the 300-DPI
- * output contract for the full-wrap cover.
+ * Cover Print-Prep test — exercises the real sharp upscale + pdf-lib embed on a
+ * fixture, no DB and no image-gen spend. Guards the 300-DPI output contract for
+ * the full-wrap cover (the engine stamps nothing onto the art).
  */
 
 import { describe, expect, it } from 'vitest';
