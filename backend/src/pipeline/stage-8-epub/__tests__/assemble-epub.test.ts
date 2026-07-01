@@ -33,10 +33,10 @@ describe('assembleEpubModel', () => {
     const model = assembleEpubModel(baseInput([]));
     const title = model.chapters[0];
     expect(title?.beforeToc).toBe(true);
-    // Title is the chapter `title` (the packer renders it as the page heading);
-    // content carries subtitle/author/series so the title is not double-rendered.
+    // Auto-prepend is OFF, so the title <h1> lives in the content (alongside
+    // subtitle/author/series). The chapter `title` is the head/TOC title.
     expect(title?.title).toBe('THE WILDLANDS');
-    expect(title?.content).not.toContain('<h1>');
+    expect(title?.content).toContain('<h1>THE WILDLANDS</h1>');
     expect(title?.content).toContain('Wade Brannock');
     expect(title?.content).toContain('New England');
   });

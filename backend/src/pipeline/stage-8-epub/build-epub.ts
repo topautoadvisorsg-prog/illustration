@@ -32,6 +32,7 @@ import { listEntriesForProject } from '../../db/repositories/entries.repo.js';
 import { getProjectStorage } from '../../services/storage/project-storage.js';
 import { assembleEpubModel, type EpubMeta, type EpubModel, type EpubSourcePage, type HeroAssembleInput, type HeroRef } from './assemble-epub.js';
 import { loadHeroPlan } from './hero-plan.js';
+import { toRoman } from '../publishing-standard/index.js';
 
 /** Minimal reader-theme-friendly CSS — relative units only (no fixed px) so
  *  Kindle reflow is never broken. The device controls fonts/colors. */
@@ -40,14 +41,28 @@ const EPUB_CSS = [
   'h2 { font-size: 1.3em; margin: 1.2em 0 0.2em; }',
   'h3 { font-size: 1.1em; margin: 1em 0 0.2em; }',
   'h4 { font-size: 1em; font-weight: bold; margin: 0.8em 0 0.2em; }',
+  // ORPHAN CONTROL — a heading/sub-heading must never strand at the bottom of a
+  // Kindle screen away from the text it introduces. break-after:avoid glues each
+  // heading to the block that follows it, so it rolls to the next screen WITH its
+  // paragraph; break-inside:avoid stops a heading from splitting. Reflowable, so
+  // this fixes every device/font-size at once (no per-"page" edits possible).
+  'h1, h2, h3, h4, h5, h6 { page-break-after: avoid; break-after: avoid; -webkit-column-break-after: avoid; page-break-inside: avoid; break-inside: avoid; }',
   'p { margin: 0 0 0.7em; line-height: 1.5; }',
-  'p.sci { font-style: italic; margin: 0 0 0.8em; }',
+  // Keep the scientific-name byline with its entry title (never split the two).
+  'p.sci { font-style: italic; margin: 0 0 0.8em; page-break-before: avoid; break-before: avoid; }',
   'p.subtitle { font-size: 1.1em; font-style: italic; }',
   'p.author { font-size: 1.1em; margin-top: 1em; }',
   'section.entry { margin: 0 0 1.5em; }',
-  // Hero illustrations: responsive, never overflow the reader column, centered,
-  // with breathing room above the heading they precede.
-  'img.hero { display: block; max-width: 100%; height: auto; margin: 0.5em auto 0.8em; }',
+  // Hero illustrations: responsive, centered. max-height caps a tall plate so its
+  // header (and the first lines) always have room on the SAME screen instead of
+  // the title being shoved to the next page. height:auto keeps the aspect ratio.
+  'img.hero { display: block; max-width: 100%; max-height: 85vh; height: auto; width: auto; margin: 0.5em auto 0.8em; }',
+  // hero--break: this entry's illustration opens its OWN screen (Kindle honors
+  // page-break-before reliably; it ignores keep-together rules half the time). The
+  // header flows directly beneath it, so image + heading always land together.
+  // Applied to every entry EXCEPT the first in a chapter (that flows under the
+  // chapter title), so chapter-opener headings are never stranded.
+  'img.hero--break { margin-top: 0; page-break-before: always; break-before: page; }',
 ].join('\n');
 
 export interface BuildEpubResult {
@@ -68,9 +83,11 @@ function resolveMeta(project: NonNullable<Awaited<ReturnType<typeof getProject>>
   const title = pub.title || project.title;
   const subtitle = pub.subtitle || project.subtitle || undefined;
   const authors = pub.authors && pub.authors.length ? pub.authors : [project.authorName];
+  // Branding is "<Series> — Series <Roman>" (matches the cover, e.g. "THE
+  // WILDLANDS — SERIES I"), NOT "Volume N".
   const seriesName = pub.series
     ? pub.series.volumeNumber
-      ? `${pub.series.name} — Volume ${pub.series.volumeNumber}`
+      ? `${pub.series.name} — Series ${toRoman(pub.series.volumeNumber)}`
       : pub.series.name
     : undefined;
   const description = pub.bookDescription?.blurb || subtitle;
@@ -275,7 +292,9 @@ export async function buildKindleEpub(projectId: string): Promise<BuildEpubResul
     cover: coverFileUrl,
     tocTitle: 'Contents',
     version: 3,
-    prependChapterTitles: true,
+    // OFF: each chapter now renders its own <h1> inside content (assemble-epub),
+    // so the frontispiece can be image-only with no heading printed over the art.
+    prependChapterTitles: false,
     css: EPUB_CSS,
   };
 

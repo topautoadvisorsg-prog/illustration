@@ -92,6 +92,11 @@ export interface EpubEntry {
   heroSrc?: string;
   /** Alt text for the hero (present when heroIncluded). */
   heroAlt?: string;
+  /** True when this entry's hero should open on its own screen (page-break-before),
+   *  so the illustration travels with its header instead of stranding on the
+   *  previous entry's page. Set for every entry EXCEPT the first in a chapter (that
+   *  one flows right under the chapter title, so the heading is never stranded). */
+  heroBreak?: boolean;
 }
 
 /** One EPUB chapter = one XHTML file. `content` is a body fragment (no <html>). */
@@ -100,6 +105,8 @@ export interface EpubChapter {
   content: string;
   /** Front matter before the TOC (title page, copyright). */
   beforeToc?: boolean;
+  /** Keep this page out of the navigation TOC (e.g. the opening illustration). */
+  excludeFromToc?: boolean;
   /** Section classification for the preview UI. */
   kind: EpubChapterKind;
   /** Present for BODY chapters: the structured entries (click-through + image plan). */
@@ -176,7 +183,7 @@ function bySpineThenKey(a: EpubSourcePage, b: EpubSourcePage): number {
 
 /** Build one entry (opener + continuations already concatenated) as structured
  *  parts: title, optional scientific name, and the body XHTML. */
-function buildEntry(title: string, rawText: string, scientificNameOverride?: string, hero?: HeroRef): EpubEntry {
+function buildEntry(title: string, rawText: string, scientificNameOverride?: string, hero?: HeroRef, breakBefore = false): EpubEntry {
   // Prefer the entries-layer scientific name when supplied; else extract from the
   // body exactly as before (the entries value was itself backfilled this way, so
   // the output is identical with or without the entries layer).
@@ -192,18 +199,28 @@ function buildEntry(title: string, rawText: string, scientificNameOverride?: str
     heroIncluded: Boolean(hero),
     heroSrc: hero?.src,
     heroAlt: hero?.alt,
+    heroBreak: Boolean(hero) && breakBefore,
   };
 }
 
-/** A reflowable hero <img>: max-width responsive, never baked text, with alt. */
-function heroImg(src: string, alt: string): string {
-  return `<img class="hero" src="${escapeXml(src)}" alt="${escapeXml(alt)}"/>`;
+/** A reflowable hero <img>: max-width responsive, never baked text, with alt.
+ *  When `breakBefore` is set the image opens its own screen (hero--break) so it
+ *  travels with the header beneath it. */
+function heroImg(src: string, alt: string, breakBefore = false): string {
+  const cls = breakBefore ? 'hero hero--break' : 'hero';
+  return `<img class="${cls}" src="${escapeXml(src)}" alt="${escapeXml(alt)}"/>`;
+}
+
+/** A chapter heading rendered INTO the content (the EPUB packer's auto-prepend is
+ *  off, so each chapter owns its <h1> — this lets the frontispiece be image-only). */
+function heading(text: string): string {
+  return `<h1>${escapeXml(text)}</h1>`;
 }
 
 /** Pack a structured entry into the EPUB XHTML fragment (hero + title + sci + body). */
 function entryToXhtml(e: EpubEntry): string {
   const parts: string[] = [];
-  if (e.heroSrc) parts.push(heroImg(e.heroSrc, e.heroAlt ?? e.title)); // BEFORE_TITLE
+  if (e.heroSrc) parts.push(heroImg(e.heroSrc, e.heroAlt ?? e.title, e.heroBreak)); // BEFORE_TITLE
   parts.push(`<h2>${escapeXml(e.title)}</h2>`);
   if (e.scientificName) parts.push(`<p class="sci"><em>${escapeXml(e.scientificName)}</em></p>`);
   parts.push(e.bodyHtml);
@@ -228,21 +245,29 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
   let entryCount = 0;
   let heroesEmbedded = 0;
 
-  // ── 1. Title page (synthesized from metadata; beforeToc) ──
-  // The EPUB packer prepends the chapter `title` as the page <h1>, so the title
-  // is NOT repeated in `content` here (that double-rendered it). Publisher lives
-  // on the copyright page, not the title page. The opening illustration (reused
-  // FM_001 half-title) sits on this page beneath the title — a separate art-only
-  // page can't be valid (it needs a non-empty <title>, which would print a stray
-  // heading over the art), so it lives here instead.
-  const frontispieceImg = heroes?.frontispiece ? heroImg(heroes.frontispiece.src, heroes.frontispiece.alt) : '';
-  if (heroes?.frontispiece) heroesEmbedded += 1;
+  // ── 0. Frontispiece — the opening illustration on its OWN page (image only). ──
+  // A non-empty <title> keeps EPUBCheck happy (it's the head title, not shown);
+  // excludeFromToc keeps it out of the nav; auto-prepend is OFF so NO heading
+  // prints over the art. The title page follows on the next screen.
+  if (heroes?.frontispiece) {
+    chapters.push({
+      kind: 'TITLE',
+      beforeToc: true,
+      excludeFromToc: true,
+      title: meta.title,
+      content: heroImg(heroes.frontispiece.src, heroes.frontispiece.alt),
+    });
+    heroesEmbedded += 1;
+  }
+
+  // ── 1. Title page (synthesized from metadata; beforeToc). Auto-prepend is off,
+  //       so the title <h1> lives in the content here. ──
   chapters.push({
     kind: 'TITLE',
     beforeToc: true,
     title: meta.title,
     content: [
-      frontispieceImg,
+      heading(meta.title),
       meta.subtitle ? `<p class="subtitle">${escapeXml(meta.subtitle)}</p>` : '',
       meta.authors.length ? `<p class="author">${escapeXml(meta.authors.join(', '))}</p>` : '',
       meta.series ? `<p class="series">${escapeXml(meta.series)}</p>` : '',
@@ -260,7 +285,7 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
   if (copyright.length) {
     const text = joinPageText(copyright);
     const blocks = markdownToBlocks(stripReadingFieldMetadata(text));
-    chapters.push({ kind: 'COPYRIGHT', beforeToc: true, title: 'Copyright', content: blocksToHtml(blocks) });
+    chapters.push({ kind: 'COPYRIGHT', beforeToc: true, title: 'Copyright', content: heading('Copyright') + '\n' + blocksToHtml(blocks) });
   }
 
   // ── 3. Introduction (INTRODUCTION + INTRODUCTION_CONT, grouped & ordered) ──
@@ -271,7 +296,7 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
     const text = joinPageText(intro);
     const blocks = markdownToBlocks(stripReadingFieldMetadata(text));
     const introHero = heroes?.sections.get('INTRODUCTION');
-    const content = (introHero ? heroImg(introHero.src, introHero.alt) + '\n' : '') + blocksToHtml(blocks);
+    const content = heading('Introduction') + '\n' + (introHero ? heroImg(introHero.src, introHero.alt) + '\n' : '') + blocksToHtml(blocks);
     if (introHero) heroesEmbedded += 1;
     chapters.push({ kind: 'INTRODUCTION', title: 'Introduction', content });
     totalWords += wordCount(text);
@@ -304,7 +329,9 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
       if (!title) warnings.push(`${chapterTitle}: an entry (${key}) has no title — shown as "Untitled".`);
       if (!raw.trim()) warnings.push(`${chapterTitle}: entry "${title || key}" has no body text.`);
       const entryHero = heroes?.entries.get(key);
-      const entry = buildEntry(title || 'Untitled', raw, scientificNames?.get(key), entryHero);
+      // First built entry flows under the chapter title (no break → heading never
+      // stranded); every later entry's hero opens its own screen with its header.
+      const entry = buildEntry(title || 'Untitled', raw, scientificNames?.get(key), entryHero, entries.length > 0);
       if (entry.heroIncluded) heroesEmbedded += 1;
       entries.push(entry);
       totalWords += entry.words;
@@ -314,7 +341,7 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
       chapters.push({
         kind: 'BODY',
         title: chapterTitle,
-        content: entries.map(entryToXhtml).join('\n'),
+        content: heading(chapterTitle) + '\n' + entries.map(entryToXhtml).join('\n'),
         entries,
       });
       bodyChapters += 1;
@@ -327,14 +354,14 @@ export function assembleEpubModel(input: EpubAssembleInput): EpubModel {
     const blocks = markdownToBlocks(stripReadingFieldMetadata(joinPageText(glossary)));
     const gHero = heroes?.sections.get('GLOSSARY');
     if (gHero) heroesEmbedded += 1;
-    chapters.push({ kind: 'GLOSSARY', title: 'Glossary', content: (gHero ? heroImg(gHero.src, gHero.alt) + '\n' : '') + blocksToHtml(blocks) });
+    chapters.push({ kind: 'GLOSSARY', title: 'Glossary', content: heading('Glossary') + '\n' + (gHero ? heroImg(gHero.src, gHero.alt) + '\n' : '') + blocksToHtml(blocks) });
   }
   const about = back.filter((p) => p.frontMatterType === 'ABOUT_SERIES').sort(bySpineThenKey);
   if (about.length) {
     const blocks = markdownToBlocks(stripReadingFieldMetadata(joinPageText(about)));
     const aHero = heroes?.sections.get('ABOUT');
     if (aHero) heroesEmbedded += 1;
-    chapters.push({ kind: 'ABOUT', title: 'About the Series', content: (aHero ? heroImg(aHero.src, aHero.alt) + '\n' : '') + blocksToHtml(blocks) });
+    chapters.push({ kind: 'ABOUT', title: 'About the Series', content: heading('About the Series') + '\n' + (aHero ? heroImg(aHero.src, aHero.alt) + '\n' : '') + blocksToHtml(blocks) });
   }
   for (const p of back) {
     const t = p.frontMatterType ?? '';
