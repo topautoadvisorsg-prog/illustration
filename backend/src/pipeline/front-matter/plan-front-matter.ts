@@ -230,6 +230,28 @@ function sectionParagraphs(markdown: string): string[] {
   return markdownToBlocks(markdown).map((b) => b.text);
 }
 
+/**
+ * Standard "About the Series" copy — the platform default so EVERY Wildlands book
+ * ships with it automatically (its own interior back-matter page), never re-typed
+ * per book and never able to regress to a throwaway one-liner. Region-agnostic
+ * except the review call-out, which fills `{region}` from the book's subtitle. A
+ * book may still override by supplying its own `series.description`. Markdown, so
+ * it flows through the exact same sectionParagraphs path a config string does —
+ * identical rendering in print and EPUB.
+ */
+function standardSeriesDescription(region?: string): string {
+  const place = region && region.trim() ? `${region.trim()}'s` : 'these';
+  return [
+    'THE WILDLANDS is a collection of premium wilderness field guides dedicated to the landscapes, wildlife, plants, fungi, history, and survival knowledge of the world’s great wild places.',
+    'Each volume explores a specific region in extraordinary detail — from its mountains, forests, rivers, and coastlines to the species that inhabit them and the knowledge required to understand them safely and respectfully.',
+    'Blending scientific accuracy, traditional fieldcraft, natural history, and museum-quality illustration, THE WILDLANDS is designed for explorers, outdoor enthusiasts, lifelong learners, and collectors who wish to develop a deeper connection with the natural world.',
+    'Whether carried into the wilderness or studied from a favorite chair at home, each volume serves as a timeless companion to one of Earth’s remarkable landscapes.',
+    '## Continue the Journey',
+    `If this volume deepened your understanding of ${place} wild places, please consider leaving an honest review where you purchased it.`,
+    'Your support helps independent publishing continue creating future volumes of THE WILDLANDS series, and preserves the knowledge of landscapes, wildlife, plants, fungi, and traditional wilderness skills for future generations.',
+  ].join('\n\n');
+}
+
 /** Split paragraphs into TEXT_PAGEs by the composer's own line capacity. */
 function splitTextPages(
   paragraphs: string[],
@@ -500,9 +522,9 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     // Series names often already include the leading article (e.g. "The Wildlands").
     // Strip it before prepending "the" so the heading/body never read "the The …".
     const bareSeries = meta.series.name.replace(/^the\s+/i, '');
-    const desc = meta.series.description
-      ? sectionParagraphs(meta.series.description)
-      : [`${meta.resolvedTitle} is part of the ${bareSeries} series.`];
+    // Prefer a book's own description; otherwise fall back to the STANDARD series
+    // copy (region filled from the subtitle) so every book has it automatically.
+    const desc = sectionParagraphs(meta.series.description ?? standardSeriesDescription(meta.resolvedSubtitle));
     pushBack(
       { kind: 'TEXT_PAGE', frontMatterType: 'ABOUT_SERIES', pageLabel: null, compose: { heading: `About the ${bareSeries} Series`, paragraphs: desc }, auditText: desc.join('\n\n') },
       true,
