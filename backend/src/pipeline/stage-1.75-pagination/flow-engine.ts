@@ -239,6 +239,15 @@ function sectionHeadingExtraChars(block: WorkingBlock): number {
  */
 const JOIN_SEPARATOR_CHARS = 1;
 
+/**
+ * Keep-with-next: a section heading must never be the last thing on a page,
+ * stranded above the paragraph it introduces (the operator's "orphaned heading"
+ * defect). When a heading fits but leaves fewer than this many body lines of
+ * capacity beneath it, break BEFORE the heading so it moves to the next page
+ * with its body. Zero instances today; this is the preventive guard.
+ */
+const MIN_LINES_AFTER_HEADING = 2;
+
 function pushToken(block: WorkingBlock, token: StreamToken): void {
   if (token.kind === 'entry-start') return; // titles never enter the body text
   if (block.textChunks.length > 0) block.charsUsed += JOIN_SEPARATOR_CHARS;
@@ -441,6 +450,27 @@ export function flowEngine(input: FlowEngineInput, entryMeta: EntryMetaMap): Flo
     // The '\n\n' separator joinMarkdown will insert before this chunk (every
     // chunk after the first) — counted so the page never finalizes over capacity.
     const joinCost = open.textChunks.length > 0 ? JOIN_SEPARATOR_CHARS : 0;
+
+    // Keep-with-next guard. A section heading that fits BUT would leave too
+    // little room for the paragraph it introduces gets pushed to a continuation,
+    // so the heading is never stranded alone at the foot of a page. Skip when the
+    // block is already fresh/empty (a heading at the very top of a page always
+    // keeps its body room — guarding it would loop forever).
+    if (token.kind === 'section-heading' && open.textChunks.length > 0) {
+      const costWithHeading = open.charsUsed + joinCost + token.chars + overhead;
+      const bodyLinesLeft = Math.floor(
+        (open.capacityChars - costWithHeading) / Math.max(1, open.charsPerLine),
+      );
+      if (costWithHeading <= open.capacityChars && bodyLinesLeft < MIN_LINES_AFTER_HEADING) {
+        const continuingEntry = open.currentBodyEntryKey;
+        closeAndPushBlock();
+        const next = openContinuationBlock(continuingEntry);
+        if (!next) continue; // entry meta missing — already warned above
+        pushToken(next, token);
+        continue;
+      }
+    }
+
     if (open.charsUsed + joinCost + token.chars + overhead <= open.capacityChars) {
       pushToken(open, token);
       continue;

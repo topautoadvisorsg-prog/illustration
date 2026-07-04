@@ -506,7 +506,7 @@ export interface SubjectPackage {
 }
 
 // Deterministic supporting-element vocabulary (small studies for the ORANGE zones),
-// keyed to subject/title keywords. New-England wilderness motifs only.
+// keyed to subject/title keywords. Region-neutral wilderness motifs.
 const SUPPORTING_VOCAB: Array<{ test: RegExp; items: string[] }> = [
   { test: /moose|deer|bear|lynx|fox|otter|beaver|animal|wildlife|track|scat/i, items: ['Animal tracks', 'Pine branch', 'Wetland grasses'] },
   { test: /river|stream|brook|water|crossing|falls/i, items: ['River stones', 'Fern cluster', 'Moss-covered log'] },
@@ -520,12 +520,12 @@ const DEFAULT_SUPPORTING = ['Fern cluster', 'Pinecone', 'Moss-covered log'];
 
 const ENVIRONMENT_VOCAB: Array<{ test: RegExp; env: string }> = [
   { test: /boreal|black spruce|balsam|bog|tamarack|north(ern)?\b/i, env: 'Northern boreal forest and wetland' },
-  { test: /alpine|treeline|presidential|summit|tundra|above treeline/i, env: 'Alpine zone above treeline' },
-  { test: /hardwood|sugar maple|birch|beech|deciduous/i, env: 'Temperate New England hardwood forest' },
-  { test: /river|stream|brook|wetland|marsh|water|crossing/i, env: 'New England river corridor and woodland' },
-  { test: /mountain|ridge|granite|rocky|geology|valley|bones of the land/i, env: 'New England mountain terrain' },
+  { test: /alpine|treeline|summit|tundra|above treeline/i, env: 'Alpine zone above treeline' },
+  { test: /hardwood|sugar maple|birch|beech|deciduous/i, env: 'Temperate hardwood forest' },
+  { test: /river|stream|brook|wetland|marsh|water|crossing/i, env: 'River corridor and woodland' },
+  { test: /mountain|ridge|granite|rocky|geology|valley|bones of the land/i, env: 'Mountain terrain' },
 ];
-const DEFAULT_ENVIRONMENT = 'Temperate New England woodland';
+const DEFAULT_ENVIRONMENT = 'Temperate woodland';
 
 /** Derive the SUBJECT PACKAGE deterministically from the page (no manuscript prose). */
 export function deriveSubjectPackage(page: PageManifest): SubjectPackage {

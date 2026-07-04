@@ -3,7 +3,7 @@
  *
  * The breakdown parser keeps ONLY `# CHAPTER N` H1s and silently drops every
  * other heading (documented: BREAKDOWN_MISSING_PAGES.md §7). Real manuscripts
- * put front matter under EITHER level — the New England manuscript uses
+ * put front matter under EITHER level — e.g. a manuscript with
  * `## INTRODUCTION` / `## DISCLAIMER` (H2) beneath a title H1 — so recovery
  * scans the PRE-FIRST-CHAPTER region for recognized headings at H1 or H2.
  *

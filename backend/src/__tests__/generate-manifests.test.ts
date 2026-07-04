@@ -119,8 +119,21 @@ The region is built on ancient granite bedrock. Glacial ice carved the deep vall
     expect(bones?.imageSubject.toLowerCase()).not.toContain('bones of the land');
     // Page context yields depictable terrain subjects (granite/glacial/mountain).
     expect(bones?.imageSubject.toLowerCase()).toMatch(/granite|glacial|mountain|ridge|bedrock|outcrop/);
-    // Still wrapped with the terrain content-type framing.
-    expect(bones?.imageSubject).toContain('New England terrain feature:');
+    // Still wrapped with the terrain content-type framing — region-neutral by
+    // default (no hardcoded region baked into the image subject).
+    expect(bones?.imageSubject).toContain('terrain feature:');
+    expect(bones?.imageSubject).not.toContain('New England');
+
+    // Region is data-driven: when the project has a region subtitle, it prefixes
+    // the terrain/habitat subject (series-agnostic — any volume localizes itself).
+    const regional = ProjectConfigSchema.parse({
+      volume: 2,
+      title: 'The Wildlands',
+      subtitle: 'Canadian Rockies',
+      authorName: 'Wildlands',
+    });
+    const regionalBones = buildDeterministicManifestResult(outline, regional).chapters[0]?.entries[0];
+    expect(regionalBones?.imageSubject).toContain('Canadian Rockies terrain feature:');
   });
 
   it('falls back to a general landscape (never a raw chapter heading) when page + chapter lack a depictable subject', () => {

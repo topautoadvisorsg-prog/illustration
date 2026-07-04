@@ -31,17 +31,19 @@ function frontMatterType(row: PageRow): string {
   return ((row as { frontMatterType?: string | null }).frontMatterType ?? '').toUpperCase();
 }
 
-// The Introduction welcomes the reader into the WHOLE New England wilderness, so its
-// continuation pages rotate through foundational ecosystem themes (one per page,
-// distinct) rather than repeating a single forest texture. Indexed by the page's
-// numeric key so each intro continuation gets its own theme deterministically.
+// The Introduction welcomes the reader into the WHOLE wilderness region of the
+// book, so its continuation pages rotate through foundational ecosystem themes
+// (one per page, distinct) rather than repeating a single forest texture. Themes
+// are region-NEUTRAL; the caller localizes each with the book's region (subtitle)
+// so the same code serves any volume in the series. Indexed by the page's numeric
+// key so each intro continuation gets its own theme deterministically.
 const INTRO_FIELD_THEMES = [
-  'a mature bull moose standing in a misty New England wetland at dawn — reeds, still dark water, spruce-lined shore',
-  'an old-growth stand of towering white pine and red spruce, shafts of light through the high canopy, deep mossy forest floor',
-  'a close naturalist study of native New England plants and fungi — ferns, mosses, trilliums, and woodland mushrooms on the forest floor',
-  'New England mountain terrain and bare granite ridgelines under a wide sky, layered blue ridges receding into haze',
-  'a New England river, lake, and beaver wetland alive with wildlife — a wading heron, still reflections, a spruce-and-birch shoreline',
-  'seasonal New England wilderness atmosphere — autumn hardwoods giving way to the first snow, low transitional light through bare and evergreen trees',
+  'a large mammal at the water\'s edge in a misty wetland at dawn — reeds, still dark water, a conifer-lined shore',
+  'an old-growth stand of towering conifers, shafts of light through the high canopy, a deep mossy forest floor',
+  'a close naturalist study of native wildflowers, ferns, and woodland fungi across the forest floor',
+  'high mountain terrain and bare ridgelines under a wide sky, layered ridges receding into haze',
+  'a river, lake, and wetland alive with wildlife — a wading bird, still reflections, a conifer-and-birch shoreline',
+  'seasonal wilderness atmosphere — autumn colour giving way to the first snow, low transitional light through bare and evergreen trees',
 ];
 
 function introContinuationSubject(row: PageRow, subtitle: string): string {
@@ -199,7 +201,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
           layoutTemplate: 'LAYOUT_A_ILLUSTRATION',
           title: { kicker: '', number: '', name: '' },
           entryTitle: title,
-          imageSubject: `Full-bleed cinematic naturalist ENTRANCE PLATE — the reader's first step into the New England wilderness, before the title page. A complete, immersive scene in the book's Cinematic Naturalist DNA: New England boreal forest atmosphere, ancient white pine and spruce, ferns, moss, and fungi across the forest floor, subtle animal tracks or other signs of wildlife, atmospheric mist and natural light, museum-quality field-guide realism${subtitle ? ` of the ${subtitle} wilderness` : ''}. NO text, NO title, NO labels, NO typography anywhere on the page — pure illustration only. A distinct scene from the title page, not a repeat.`,
+          imageSubject: `Full-bleed cinematic naturalist ENTRANCE PLATE — the reader's first step into the wilderness, before the title page. A complete, immersive scene in the book's Cinematic Naturalist DNA: wild forest atmosphere, ancient conifers, ferns, moss, and fungi across the forest floor, subtle animal tracks or other signs of wildlife, atmospheric mist and natural light, museum-quality field-guide realism${subtitle ? ` of the ${subtitle} wilderness` : ''}. NO text, NO title, NO labels, NO typography anywhere on the page — pure illustration only. A distinct scene from the title page, not a repeat.`,
           allowsEmptyBody: true,
           renderBodyText: false,
         };
@@ -223,7 +225,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         // Operator QA (rebalance): a REAL, meaningful habitat study filling a
         // contained top band — substantial enough to balance the page (no dead
         // parchment), kept to the top band so it never crowds the reading text.
-        imageSubject: 'A full-bleed New England wilderness SCENE filling the ENTIRE page — northern woods (white pine and red spruce), a distant ridgeline or misty wetland, painted as a real field-guide illustration that runs off all four trim edges. Keep the strongest detail toward the TOP and the four CORNERS; keep the CENTRE calm and low-contrast so the centered reading text stays legible. Never a tiny sprig, never an ornament.',
+        imageSubject: `A full-bleed ${subtitle ? `${subtitle} ` : ''}wilderness SCENE filling the ENTIRE page — wild forest of tall conifers, a distant ridgeline or misty wetland, painted as a real field-guide illustration that runs off all four trim edges. Keep the strongest detail toward the TOP and the four CORNERS; keep the CENTRE calm and low-contrast so the centered reading text stays legible. Never a tiny sprig, never an ornament.`,
         allowsEmptyBody: false,
         renderBodyText: true,
       };
@@ -258,7 +260,7 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
         entryTitle: isSources ? 'Sources & Further Reading' : (seriesName || 'About the Series'),
         imageSubject: isSources
           ? 'Sources / further-reading page edge ornament only: thin engraved corner details framing a calm citations/references text block; quiet and scholarly'
-          : 'Atmospheric Cinematic Naturalist FIELD framing the About-the-Series text — a quiet emblematic New England wilderness vignette (distant layered ridgelines, spruce and white pine, ferns and a calm naturalist motif) enveloping the page margins and background as a premium series brand page that ties the volume to the wider series. CRITICAL READABILITY: keep the central reading column clean, light, and high-contrast so the series text stays clearly legible at about 11pt — the illustration envelops and frames the text, never a busy hero scene over it. Match the weight and finish of the book\'s introduction continuation pages — never a plain text placeholder.',
+          : `Atmospheric Cinematic Naturalist FIELD framing the About-the-Series text — a quiet emblematic ${subtitle ? `${subtitle} ` : ''}wilderness vignette (distant layered ridgelines, conifers, ferns and a calm naturalist motif) enveloping the page margins and background as a premium series brand page that ties the volume to the wider series. CRITICAL READABILITY: keep the central reading column clean, light, and high-contrast so the series text stays clearly legible at about 11pt — the illustration envelops and frames the text, never a busy hero scene over it. Match the weight and finish of the book's introduction continuation pages — never a plain text placeholder.`,
         allowsEmptyBody: false,
         renderBodyText: true,
       };

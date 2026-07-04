@@ -107,7 +107,6 @@ function isCategoryHeading(title: string): boolean {
       'EDIBLE',
       'DEADLY',
       'SURVIVAL TOPICS',
-      'MOST LIKELY EMERGENCIES IN NEW ENGLAND',
       'WILDERNESS FIRST AID ESSENTIALS',
       'DECISION FRAMEWORK',
     ].some((category) => normalized === category || normalized.startsWith(`${category} `))
@@ -205,7 +204,7 @@ export function parseManuscriptOutline(markdown: string): ManuscriptOutline {
         // OR it owns numbered children — so splitting does NOT depend on the section's
         // exact wording. This lets a new volume with differently named sections
         // (e.g. "LARGE MAMMALS: THE PREDATORS", "THE ROCKIES FORAGER'S FUNGI") split
-        // identically to New England's "MAMMALS"/"BIRDS", without adding each book's
+        // identically to Series One's "MAMMALS"/"BIRDS", without adding each book's
         // wording to isCategoryHeading. Category sections still emit ALL their children
         // (including unnumbered "### Hazard 1 —"); wording-agnostic splitting emits only
         // the numbered catalog children so prose subsections stay with their entry.

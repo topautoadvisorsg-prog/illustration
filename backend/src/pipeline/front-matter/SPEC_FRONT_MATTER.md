@@ -234,7 +234,7 @@ body rows.
 ## 10. Open questions for operator
 
 1. **Cover art subject** — for the Wild Lands cover, what's the default art
-   directive? (e.g. "sweeping New England wilderness panorama — mountains,
+   directive? (e.g. "sweeping <region> wilderness panorama — mountains,
    river, forest, the series' signature landscape.") I can set a sensible
    default and you tune later.
 

@@ -202,7 +202,7 @@ function chooseManifestTemplate(contentType: ContentType, wordCount: number): La
  * Depictable wilderness subjects for deterministic extraction. Each entry maps a
  * body/title keyword to a concrete VISUAL noun phrase the image model can draw.
  * Ordered by salience so ties resolve to the more iconic subject. Domain-tuned to
- * the New England field guide. No LLM — the manuscript analyst stays deterministic.
+ * a temperate-wilderness field guide. No LLM — the manuscript analyst stays deterministic.
  */
 const VISUAL_SUBJECT_TERMS: Array<{ term: RegExp; label: string }> = [
   // Geology / terrain
@@ -346,17 +346,21 @@ function imageSubjectFor(
   chapter: ManuscriptChapterOutline,
   entry: ManuscriptEntryOutline,
   contentType: ContentType,
+  region: string,
   scientificName?: string,
 ): string {
   const subject = deriveVisualSubject(chapter, entry, contentType, scientificName);
+  // Region prefix is data-driven from the project (never a hardcoded region), so
+  // every volume in the series localizes its own habitat/terrain subjects.
+  const regionPrefix = region ? `${region} ` : '';
 
   switch (contentType) {
     case 'WARNING_PAGE':
       return `field-guide safety illustration for ${subject}`;
     case 'HABITAT_OVERVIEW':
-      return `${subject} in the New England wilderness landscape`;
+      return `${subject} in the ${regionPrefix}wilderness landscape`;
     case 'TERRAIN_ANALYSIS':
-      return `New England terrain feature: ${subject}`;
+      return `${regionPrefix}terrain feature: ${subject}`;
     case 'CUTAWAY_ILLUSTRATION':
       return `cutaway illustration of ${subject}`;
     case 'PROGRESSION_STUDY':
@@ -370,7 +374,11 @@ function imageSubjectFor(
   }
 }
 
-function buildEntryManifest(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline): GeneratedEntry {
+function buildEntryManifest(
+  chapter: ManuscriptChapterOutline,
+  entry: ManuscriptEntryOutline,
+  region: string,
+): GeneratedEntry {
   const scientificName = extractScientificName(entry);
   const category = inferCategory(chapter, entry);
   const contentType = inferContentType(chapter, entry, category);
@@ -379,19 +387,26 @@ function buildEntryManifest(chapter: ManuscriptChapterOutline, entry: Manuscript
     scientificName,
     category,
     contentType,
-    imageSubject: imageSubjectFor(chapter, entry, contentType, scientificName),
+    imageSubject: imageSubjectFor(chapter, entry, contentType, region, scientificName),
     layoutTemplate: chooseManifestTemplate(contentType, entry.wordCount),
     bodyMarkdown: entry.bodyMarkdown,
   };
 }
 
+/** The book's region, data-driven from config (subtitle) — never a hardcoded
+ *  region. Feeds habitat/terrain image subjects so each volume localizes itself. */
+function regionFromConfig(config: ProjectConfig): string {
+  return (config.publishing.subtitle ?? config.subtitle ?? '').trim();
+}
+
 export function buildDeterministicManifestResult(outline: ManuscriptOutline, config: ProjectConfig): ManifestGenerationResult {
+  const region = regionFromConfig(config);
   return ManifestGenerationResultSchema.parse({
     bookTitle: config.title,
     chapters: outline.chapters.map((chapter) => ({
       chapterNumber: chapter.chapterNumber,
       chapterTitle: chapter.title,
-      entries: chapter.entries.map((entry) => buildEntryManifest(chapter, entry)),
+      entries: chapter.entries.map((entry) => buildEntryManifest(chapter, entry, region)),
     })),
   });
 }

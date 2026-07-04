@@ -658,7 +658,7 @@ export function buildCoverWrapPrompt(
               'back cover (left panel): the same scene continuing, calmer, with restrained negative space for back-cover copy and a clean lower-right barcode zone',
               'back cover: preserve calm negative space for publisher-set descriptive copy',
             ],
-            environment: 'a single continuous New England wilderness panorama wrapping back-to-front; archival painterly naturalist atmosphere; the Cinematic Naturalist DNA of the interior plates, scaled up to a premium collector cover — never a flat poster or graphic design',
+            environment: `a single continuous ${sceneSubject} wilderness panorama wrapping back-to-front; archival painterly naturalist atmosphere; the Cinematic Naturalist DNA of the interior plates, scaled up to a premium collector cover — never a flat poster or graphic design`,
             mood: 'premium, cinematic, atmospheric, cohesive, calm enough for system typography',
           }
         : {

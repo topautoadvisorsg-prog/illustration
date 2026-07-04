@@ -19,6 +19,7 @@ import { entriesToStream, type EntryBreakPolicy, type StreamToken } from './stre
 import { flowEngine, type EntryMeta, type EntryMetaMap } from './flow-engine.js';
 import { rebalanceEntries } from './entry-rebalance.js';
 import { tailRebalance } from './tail-rebalance.js';
+import { recoverUnderfilledPages } from './underfill-illustration.js';
 import { expandLayoutAPairs } from './layout-a-pair.js';
 import { PaginatedPageSchema, type PaginatedPage } from './types.js';
 
@@ -139,10 +140,17 @@ export function paginateProject(input: PaginateProjectInput): PaginateProjectRes
   // a future UI). The warning lets the operator know what could be improved.
   const rebalance = tailRebalance({ pages: entryRebalance.pages });
 
+  // Mid-book underfill recovery: any page still finalized as UNDERFILL after the
+  // rebalancers (its text could not be pulled back onto an already-full prior
+  // page) is converted to an illustration-dominant layout so the sparse text
+  // lives on a high-illustration page instead of leaving dead whitespace. Extends
+  // tail-rebalance (which only touches the book's last page) to the whole book.
+  const underfillRecovery = recoverUnderfilledPages({ pages: rebalance.pages, config: input.config });
+
   // Assign global 1-based printed page numbers across the whole book. This is
   // the orchestrator's job — the flow engine doesn't know the final order
   // until tail-rebalance has run.
-  const numbered = rebalance.pages.map((page, idx) => ({ ...page, plannedPageNumber: idx + 1 }));
+  const numbered = underfillRecovery.pages.map((page, idx) => ({ ...page, plannedPageNumber: idx + 1 }));
 
   // Layout A pair expansion: insert a facing-illustration page after each
   // Layout A text chain. No-op when no Layout A entries are present (flag off
@@ -154,7 +162,12 @@ export function paginateProject(input: PaginateProjectInput): PaginateProjectRes
   // pages table. Throws if any required field is missing or out of range.
   const validated = paired.map((p) => PaginatedPageSchema.parse(p));
 
-  const warnings = [...flowResult.warnings, ...entryRebalance.warnings, ...rebalance.warnings];
+  const warnings = [
+    ...flowResult.warnings,
+    ...entryRebalance.warnings,
+    ...rebalance.warnings,
+    ...underfillRecovery.warnings,
+  ];
 
   return {
     pages: validated,
