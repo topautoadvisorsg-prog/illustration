@@ -528,10 +528,15 @@ const ENVIRONMENT_VOCAB: Array<{ test: RegExp; env: string }> = [
 const DEFAULT_ENVIRONMENT = 'Temperate woodland';
 
 /** Derive the SUBJECT PACKAGE deterministically from the page (no manuscript prose). */
-export function deriveSubjectPackage(page: PageManifest): SubjectPackage {
+export function deriveSubjectPackage(page: PageManifest, region?: string): SubjectPackage {
   const hay = `${page.entryTitle} ${page.imageSubject}`;
   const supporting = (SUPPORTING_VOCAB.find((v) => v.test.test(hay))?.items ?? DEFAULT_SUPPORTING).slice(0, 3);
-  const environment = ENVIRONMENT_VOCAB.find((v) => v.test.test(hay))?.env ?? DEFAULT_ENVIRONMENT;
+  const habitat = ENVIRONMENT_VOCAB.find((v) => v.test.test(hay))?.env ?? DEFAULT_ENVIRONMENT;
+  // Region-scope the habitat so the illustrated backdrop reads as THIS book's
+  // region (data-driven from the project subtitle), not a generic woodland. The
+  // habitat vocab stays region-neutral; the region is prefixed at use.
+  const r = (region ?? '').trim();
+  const environment = r ? `${r} — ${habitat}` : habitat;
   const harsh = isDangerPage(page) || /hazard|winter|hypothermia|storm|cold|exposed|spruce trap|disorientation/i.test(hay);
   const mood = harsh
     ? 'Cold, stark, exposed wilderness; flat overcast light'

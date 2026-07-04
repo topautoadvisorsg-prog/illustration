@@ -120,7 +120,8 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
     layoutTemplate: layout,
     warnings: [],
   };
-  const subjectPackage = deriveSubjectPackage(fauxManifest);
+  const region = (input.config.publishing.subtitle ?? input.config.subtitle ?? '').trim();
+  const subjectPackage = deriveSubjectPackage(fauxManifest, region);
 
   // Strip the metadata header, then parse markdown → typed plain-text blocks.
   const bodyBlocks = policy.renderBodyText
