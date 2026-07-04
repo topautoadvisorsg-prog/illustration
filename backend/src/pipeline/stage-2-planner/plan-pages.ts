@@ -508,7 +508,9 @@ export interface SubjectPackage {
 // Deterministic supporting-element vocabulary (small studies for the ORANGE zones),
 // keyed to subject/title keywords. Region-neutral wilderness motifs.
 const SUPPORTING_VOCAB: Array<{ test: RegExp; items: string[] }> = [
-  { test: /moose|deer|bear|lynx|fox|otter|beaver|animal|wildlife|track|scat/i, items: ['Animal tracks', 'Pine branch', 'Wetland grasses'] },
+  // Aquatic subjects first, so a loon/trout/beaver gets water studies, not fern + pinecone.
+  { test: /loon|grebe|duck|merganser|goldeneye|teal|dipper|kingfisher|heron|trout|salmon|char\b|whitefish|grayling|\bfish\b|beaver|otter|muskrat|frog|amphibian|waterfowl|lake|river|stream|wetland|marsh/i, items: ['Reeds and rushes', 'River stones', 'Rippling water'] },
+  { test: /moose|deer|bear|lynx|fox|animal|wildlife|track|scat/i, items: ['Animal tracks', 'Pine branch', 'Wetland grasses'] },
   { test: /river|stream|brook|water|crossing|falls/i, items: ['River stones', 'Fern cluster', 'Moss-covered log'] },
   { test: /pine|spruce|fir|hemlock|tree|forest|understory|woodland|hardwood|maple|birch/i, items: ['Fern cluster', 'Pinecone', 'Moss-covered log'] },
   { test: /mountain|alpine|ridge|summit|treeline|rocky|boulder|granite|geology|terrain|valley/i, items: ['Lichen-covered rock', 'Hardy alpine shrub', 'Weathered granite'] },
@@ -522,7 +524,12 @@ const ENVIRONMENT_VOCAB: Array<{ test: RegExp; env: string }> = [
   { test: /boreal|black spruce|balsam|bog|tamarack|north(ern)?\b/i, env: 'Northern boreal forest and wetland' },
   { test: /alpine|treeline|summit|tundra|above treeline/i, env: 'Alpine zone above treeline' },
   { test: /hardwood|sugar maple|birch|beech|deciduous/i, env: 'Temperate hardwood forest' },
-  { test: /river|stream|brook|wetland|marsh|water|crossing/i, env: 'River corridor and woodland' },
+  // Aquatic: water topics AND aquatic ANIMALS (loons, dippers, waterfowl, all
+  // trout/char/whitefish/grayling, beaver/otter/muskrat, amphibians). These name
+  // no water keyword themselves, so without listing them a loon or a lake trout
+  // defaults to woodland. Sits BEFORE the mountain rule so "Mountain Whitefish"
+  // reads as water, not terrain.
+  { test: /river|stream|brook|creek|wetland|marsh|lake|pond|water|crossing|falls|loon|grebe|duck|merganser|goldeneye|teal|dipper|kingfisher|heron|trout|salmon|char\b|whitefish|grayling|minnow|sucker|\bfish\b|beaver|otter|muskrat|frog|toad|salamander|newt|amphibian|waterfowl/i, env: 'Mountain lake, river, and wetland' },
   { test: /mountain|ridge|granite|rocky|geology|valley|bones of the land/i, env: 'Mountain terrain' },
 ];
 const DEFAULT_ENVIRONMENT = 'Temperate woodland';

@@ -1,6 +1,6 @@
 ﻿import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema, type PageManifest } from '@wildlands/shared';
-import { countPageWords, escalateForOverflow, planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
+import { countPageWords, deriveSubjectPackage, escalateForOverflow, planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 
 const baseConfig = ProjectConfigSchema.parse({
   brand: 'THE_WILDLANDS',
@@ -276,5 +276,34 @@ describe('escalateForOverflow (Phase 2 overflow auto-routing)', () => {
 
   it('returns null when already at the highest-capacity general layout', () => {
     expect(escalateForOverflow('LAYOUT_2_TEXT_HEAVY', 5000)).toBeNull();
+  });
+});
+
+describe('deriveSubjectPackage — aquatic habitat mapping', () => {
+  const mk = (entryTitle: string, imageSubject: string) => page({ entryTitle, imageSubject });
+  const aquatic: Array<[string, string]> = [
+    ['28. Common Loon', 'Common Loon (Gavia immer)'],
+    ['31. Lake Trout', 'Lake Trout (Salvelinus namaycush)'],
+    ['27. American Dipper', 'American Dipper (Cinclus mexicanus)'],
+    ['19. Beaver', 'Beaver (Castor canadensis)'],
+    ['32. Mountain Whitefish', 'Mountain Whitefish (Prosopium williamsoni)'],
+  ];
+  it('maps aquatic animals to water, not woodland/mountain terrain', () => {
+    for (const [t, s] of aquatic) {
+      const env = deriveSubjectPackage(mk(t, s)).environment.toLowerCase();
+      expect(env).toMatch(/lake|river|wetland|water/);
+      expect(env).not.toMatch(/woodland|mountain terrain/);
+    }
+  });
+  it('gives aquatic subjects water supporting studies, not fern/pinecone', () => {
+    const sup = deriveSubjectPackage(mk('28. Common Loon', 'Common Loon (Gavia immer)')).supporting.join(' ').toLowerCase();
+    expect(sup).toMatch(/reed|river stone|water|rush|rippl/);
+  });
+  it('region-prefixes the habitat when a region is passed', () => {
+    expect(deriveSubjectPackage(mk('28. Common Loon', 'Common Loon'), 'Canadian Rockies').environment).toContain('Canadian Rockies');
+  });
+  it('leaves terrestrial animals on land', () => {
+    const env = deriveSubjectPackage(mk('1. Grizzly Bear', 'Grizzly Bear (Ursus arctos horribilis)')).environment.toLowerCase();
+    expect(env).not.toMatch(/lake|wetland/);
   });
 });
