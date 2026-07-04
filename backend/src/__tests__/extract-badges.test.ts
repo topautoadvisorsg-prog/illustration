@@ -50,6 +50,24 @@ describe('extractBinomial — reads the body first line', () => {
       'Ursus arctos horribilis',
     );
   });
+  it('parses PAIRED binomials for dual-species entries', () => {
+    expect(extractBinomial('***Boletus edulis / Boletus rubriceps*** | Subalpine | **EDIBLE**\n...')).toBe(
+      'Boletus edulis / Boletus rubriceps',
+    );
+    expect(extractBinomial('***Cicuta maculata / C. douglasii*** | Montane | **DEADLY TOXIC**\n...')).toBe(
+      'Cicuta maculata / C. douglasii',
+    );
+    expect(extractBinomial('***Amanita ocreata / A. bisporigera* group** | Montane\n...')).toBe(
+      'Amanita ocreata / A. bisporigera',
+    );
+  });
+  it('never grabs a bold TAGLINE as the binomial', () => {
+    // The real binomial has a slash; the old extractor scanned forward and grabbed
+    // the "**The two everyone mixes up**" tagline. It must read the header binomial.
+    expect(
+      extractBinomial('***Callospermophilus lateralis / Neotamias minimus*** | Subalpine | **The two everyone mixes up**\n...'),
+    ).toBe('Callospermophilus lateralis / Neotamias minimus');
+  });
   it('returns null when no binomial', () => {
     expect(extractBinomial('To walk the wilds of New England...')).toBeNull();
   });

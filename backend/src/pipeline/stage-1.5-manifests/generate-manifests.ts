@@ -26,6 +26,7 @@ import {
   type ProjectConfig,
 } from '@wildlands/shared';
 import { persistManifests, type PageSeed } from '../../db/repositories/manifests.repo.js';
+import { extractBinomial } from '../subject-badges/extract-badges.js';
 import { logger } from '../../lib/logger.js';
 import {
   assertUsableManuscriptOutline,
@@ -81,9 +82,11 @@ function cleanDisplayTitle(title: string): string {
 }
 
 function extractScientificName(entry: ManuscriptEntryOutline): string | undefined {
-  const candidate = `${entry.title}\n${entry.bodyMarkdown.slice(0, 360)}`;
-  const match = candidate.match(/\*\(?([A-Z][a-z]+(?:\s+(?:[a-z][a-z.-]+|spp\.|var\.)){1,4})\)?\*/);
-  return match?.[1];
+  // Single source of truth with the render byline: the header binomial from the
+  // body's first line (handles bold-italic, trinomials, and PAIRED binomials, and
+  // never grabs a bold tagline). Avoids the old regex that mis-read dual-species
+  // headers (e.g. stored "The two everyone mixes up" as the scientific name).
+  return extractBinomial(entry.bodyMarkdown) ?? undefined;
 }
 
 // Danger is a property of the entry's PURPOSE, recognized from its TITLE — where the
