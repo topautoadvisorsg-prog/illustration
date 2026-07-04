@@ -504,14 +504,14 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   // About the Author — verbatim → facts → OMIT (never invent).
   if (meta.authorBio?.verbatim) {
     pushBack(
-      { kind: 'TEXT_PAGE', frontMatterType: 'ABOUT_AUTHOR', pageLabel: null, compose: { heading: aboutAuthorHeading(meta.resolvedAuthors), paragraphs: sectionParagraphs(meta.authorBio.verbatim) }, auditText: meta.authorBio.verbatim },
+      { kind: 'TEXT_PAGE', frontMatterType: 'ABOUT_AUTHOR', pageLabel: null, compose: { heading: aboutAuthorHeading(meta.resolvedAuthors), paragraphs: sectionParagraphs(meta.authorBio.verbatim) }, auditText: meta.authorBio.verbatim, aiRendered: true },
       true,
     );
   } else if (meta.authorBio?.facts?.length) {
     // Deterministic structuring: facts typeset as clean lines. (AI polish is
     // a v1.1 refinement — facts are never altered or extended here.)
     pushBack(
-      { kind: 'TEXT_PAGE', frontMatterType: 'ABOUT_AUTHOR', pageLabel: null, compose: { heading: aboutAuthorHeading(meta.resolvedAuthors), paragraphs: meta.authorBio.facts }, auditText: meta.authorBio.facts.join('\n') },
+      { kind: 'TEXT_PAGE', frontMatterType: 'ABOUT_AUTHOR', pageLabel: null, compose: { heading: aboutAuthorHeading(meta.resolvedAuthors), paragraphs: meta.authorBio.facts }, auditText: meta.authorBio.facts.join('\n'), aiRendered: true },
       true,
     );
   } else {
@@ -526,7 +526,7 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     // copy (region filled from the subtitle) so every book has it automatically.
     const desc = sectionParagraphs(meta.series.description ?? standardSeriesDescription(meta.resolvedSubtitle));
     pushBack(
-      { kind: 'TEXT_PAGE', frontMatterType: 'ABOUT_SERIES', pageLabel: null, compose: { heading: `About the ${bareSeries} Series`, paragraphs: desc }, auditText: desc.join('\n\n') },
+      { kind: 'TEXT_PAGE', frontMatterType: 'ABOUT_SERIES', pageLabel: null, compose: { heading: `About the ${bareSeries} Series`, paragraphs: desc }, auditText: desc.join('\n\n'), aiRendered: true },
       true,
     );
   } else {
