@@ -42,6 +42,14 @@ describe('extractBinomial — reads the body first line', () => {
   it('parses *Genus* spp.', () => {
     expect(extractBinomial('*Morchella* spp. | ⚠️\n...')).toBe('Morchella spp.');
   });
+  it('parses ***bold-italic Genus species*** (Series Two emphasis style)', () => {
+    expect(extractBinomial('***Mentha arvensis*** | Montane\n...')).toBe('Mentha arvensis');
+  });
+  it('parses a ***trinomial*** / subspecies (e.g. grizzly)', () => {
+    expect(extractBinomial('***Ursus arctos horribilis*** | Montane, Subalpine, Alpine\n...')).toBe(
+      'Ursus arctos horribilis',
+    );
+  });
   it('returns null when no binomial', () => {
     expect(extractBinomial('To walk the wilds of New England...')).toBeNull();
   });
@@ -107,6 +115,14 @@ describe('stripReadingFieldMetadata — header never renders as prose', () => {
     const out = stripReadingFieldMetadata(body);
     expect(out.startsWith('The wild turkey')).toBe(true);
     expect(out).not.toContain('Meleagris');
+    expect(out).not.toContain('|');
+  });
+
+  it('strips a ***bold-italic*** trinomial header (Series Two grizzly)', () => {
+    const body = '***Ursus arctos horribilis*** | Montane, Subalpine, Alpine | **The animal that defines this landscape**\n\nYou come around a bend in the trail through a stand of buffaloberry.';
+    const out = stripReadingFieldMetadata(body);
+    expect(out.startsWith('You come around a bend')).toBe(true);
+    expect(out).not.toContain('Ursus');
     expect(out).not.toContain('|');
   });
 

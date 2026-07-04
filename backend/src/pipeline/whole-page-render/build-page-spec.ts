@@ -172,7 +172,10 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
   // it in the body and must NOT get a duplicate subtitle. Concept/section/topic
   // openers have no header binomial → no subtitle.
   const firstBodyLine = (pageRow.readingFieldText ?? '').split('\n')[0]?.trim() ?? '';
-  const hasBinomialHeader = /^\*[^*\n]+\*[^|\n]*\|/.test(firstBodyLine);
+  // Accept 1–3 asterisks: italic `*Binomial* |` (New England) OR bold-italic
+  // `***Binomial*** |` (Canadian Rockies). A format-strict single-asterisk gate
+  // silently dropped the byline on every Series Two species opener.
+  const hasBinomialHeader = /^\*{1,3}[^*\n]+\*{1,3}[^|\n]*\|/.test(firstBodyLine);
   const entryBinomial =
     pageType === 'INTERIOR' && hasBinomialHeader
       ? extractBinomial(pageRow.readingFieldText ?? '') ?? undefined

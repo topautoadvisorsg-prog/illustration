@@ -129,6 +129,17 @@ If any guide line, dashed line, rectangle, or blueprint element appears in the a
     // every other page.
     `- Do not add page numbers, captions, watermarks, signatures, ${spec.pageType === 'COPYRIGHT_PAGE' ? '' : 'copyright text, '}folios, or running heads unless explicitly listed in \`decorativeElements\`.`,
   );
+  // BOTTOM-ANCHOR GUARDRAIL (operator) — universal text protection. The image
+  // model tends to run body text down to the bottom trim, where it is cut off. A
+  // subject-matched illustration anchoring the bottom band forces the text up and
+  // away. Subject-matched WITH latitude (the model picks the specific element) and
+  // bleed-aware (atmospheric support, not precious detail). Text-bearing pages
+  // only — a pure-illustration page has no body text to protect.
+  if (rendersCriticalText(spec)) {
+    lines.push(
+      "- BOTTOM ANCHOR (hard constraint — text protection): anchor a REAL illustration across the BOTTOM band of the page, running full-width and bleeding off the bottom edge. Its purpose is functional: it holds the body text UP and away from the bottom edge so no line of text ever reaches the trim/bleed and gets cut off. Draw this bottom illustration from THIS page's own subject — the species, its habitat, its tracks and sign, foliage, or terrain, whatever fits the entry — you choose the specific element and compose it naturally; it is subject illustration, NOT a decorative swag, ornament band, border, or frame. TWO rules, both absolute: (a) the illustration OWNS the bottom band and the body text STOPS ABOVE it — text must NEVER enter the bottom band or cross the safe line; and (b) this bottom band sits in the bleed and WILL be trimmed at the edge, so keep it ATMOSPHERIC and SUPPORTING — never place the main subject, its face, or any essential detail in it, and put nothing there that cannot survive being cut.",
+    );
+  }
   return lines.join('\n');
 }
 
