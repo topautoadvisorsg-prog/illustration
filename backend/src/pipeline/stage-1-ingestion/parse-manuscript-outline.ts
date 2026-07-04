@@ -200,10 +200,22 @@ export function parseManuscriptOutline(markdown: string): ManuscriptOutline {
         const directBody = markdown.slice(directBodyStart, directBodyEnd).trim();
         const hasDirectBody = countWords(directBody) >= 30;
         const category = isCategoryHeading(h2.title);
+        // Numbered "### N." children are catalog entries (one species/plant/tree per
+        // plate). A section splits into per-child entries when it is a known category
+        // OR it owns numbered children — so splitting does NOT depend on the section's
+        // exact wording. This lets a new volume with differently named sections
+        // (e.g. "LARGE MAMMALS: THE PREDATORS", "THE ROCKIES FORAGER'S FUNGI") split
+        // identically to New England's "MAMMALS"/"BIRDS", without adding each book's
+        // wording to isCategoryHeading. Category sections still emit ALL their children
+        // (including unnumbered "### Hazard 1 —"); wording-agnostic splitting emits only
+        // the numbered catalog children so prose subsections stay with their entry.
+        const numberedChildH3s = childH3s.filter((h3) => /^\d+[.)]/.test(h3.title.trim()));
+        const childEntries = category ? childH3s : numberedChildH3s;
+        const splitsIntoChildren = childEntries.length > 0;
 
         return [
-          ...(category ? (hasDirectBody ? [h2] : []) : [h2]),
-          ...(category ? childH3s : []),
+          ...(splitsIntoChildren ? (hasDirectBody ? [h2] : []) : [h2]),
+          ...childEntries,
         ];
       }),
       ...directH3Headings,

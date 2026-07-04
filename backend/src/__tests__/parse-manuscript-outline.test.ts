@@ -128,6 +128,75 @@ Tall evergreen with needles in bundles of five.`);
     expect(outline.warnings).toEqual([]);
   });
 
+  it('splits numbered ### N. children under oddly-worded ## sections (non-New-England wording)', () => {
+    // Guard against the Series Two regression: entry-splitting must NOT depend on a
+    // hardcoded list of section names. A future volume (e.g. Series 3, Southern
+    // Appalachians) will use yet another set of ## heading names; numbered "### N."
+    // children must still each become their own catalog entry, and unnumbered ###
+    // (e.g. "### Hazard 1: Bears") must stay a subsection, not an entry.
+    const outline = parseManuscriptOutline(`# CHAPTER 1 - KNOW YOUR REGION
+
+## What Actually Gets People in Trouble Here
+
+This overview stays a single page because it is prose, not a catalog. It has more than thirty words of real body text describing the regional hazards before the individual subsections begin, so it must remain one standalone topic page.
+
+### Hazard 1: Bears
+
+Bears are a serious hazard in this range and demand respect and distance.
+
+### Hazard 2: Cold
+
+Cold kills in any season above treeline.
+
+# CHAPTER 2 - ANIMALS
+
+## LARGE MAMMALS: THE PREDATORS
+
+### 1. Grizzly Bear
+
+The great bear of the range.
+
+### 2. Grey Wolf
+
+Pack hunter of the high country.
+
+## THE RANGE'S HOOFED MAMMALS
+
+### 3. Bighorn Sheep
+
+Cliff dweller of the front ranges.
+
+# CHAPTER 5 - FUNGI & MUSHROOMS
+
+## THE ROCKIES FORAGER'S FUNGI
+
+### 1. Pine Mushroom
+
+Prized autumn edible of the conifer duff.
+
+### 2. Chanterelle
+
+Golden, false-gilled, and fragrant.`);
+
+    expect(outline.chapters.map((chapter) => chapter.chapterNumber)).toEqual([1, 2, 5]);
+    // Ch1: prose topic stays ONE page; its unnumbered "Hazard" subheadings do not split.
+    expect(outline.chapters[0]?.entries.map((entry) => entry.title)).toEqual([
+      'What Actually Gets People in Trouble Here',
+    ]);
+    // Ch2: both oddly-worded sections split their numbered children one entry each.
+    expect(outline.chapters[1]?.entries.map((entry) => entry.title)).toEqual([
+      '1. Grizzly Bear',
+      '2. Grey Wolf',
+      '3. Bighorn Sheep',
+    ]);
+    // Ch5: differently-worded fungi section also splits per species.
+    expect(outline.chapters[2]?.entries.map((entry) => entry.title)).toEqual([
+      '1. Pine Mushroom',
+      '2. Chanterelle',
+    ]);
+    expect(outline.warnings).toEqual([]);
+  });
+
   it('rejects generated manifests that change chapter metadata', () => {
     const outline = parseManuscriptOutline(`# CHAPTER 1 - Forest Floor
 
