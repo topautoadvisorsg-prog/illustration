@@ -195,3 +195,24 @@ describe('chooseSimplifiedLayout — entry openers lead with a strong illustrati
     expect(pick.template).toMatch(/^LAYOUT_B_IMAGE_/);
   });
 });
+
+describe('chooseSimplifiedLayout — title-fit geometry gate (7x10)', () => {
+  const cfg7x10 = ProjectConfigSchema.parse({
+    volume: 1, title: 'T', authorName: 'A',
+    trimSize: { widthIn: 7, heightIn: 10, bleedIn: 0.125 },
+  });
+  // chapterNumber 1 + pageNumber 1 → rotation (1*3+1)%3 = 1 → LAYOUT_B_IMAGE_RIGHT (a SIDE variant).
+  const sideEntry = (entryTitle: string) =>
+    makeEntry({ chapterNumber: 1, pageNumber: 1, entryTitle, contentType: 'SPECIES_PROFILE', bodyMarkdown: 'x' });
+
+  it('routes a long title off the side column to full-width IMAGE_TOP', () => {
+    expect(chooseSimplifiedLayout(sideEntry('24. Grey Jay / Canada Jay'), cfg7x10).template).toBe('LAYOUT_B_IMAGE_TOP');
+  });
+  it('routes a long compound title (&) to full-width', () => {
+    expect(chooseSimplifiedLayout(sideEntry('18. Golden-mantled Ground Squirrel & Least Chipmunk'), cfg7x10).template).toBe('LAYOUT_B_IMAGE_TOP');
+  });
+  it('keeps a short title on its rotated side layout', () => {
+    expect(chooseSimplifiedLayout(sideEntry('16. Pika'), cfg7x10).template).toBe('LAYOUT_B_IMAGE_RIGHT');
+    expect(chooseSimplifiedLayout(sideEntry('8. Elk / Wapiti'), cfg7x10).template).toBe('LAYOUT_B_IMAGE_RIGHT');
+  });
+});

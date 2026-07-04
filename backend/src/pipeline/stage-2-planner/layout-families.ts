@@ -132,6 +132,37 @@ function strongImageVariantFor(entry: PageManifest): LayoutTemplateId {
   return STRONG_IMAGE_VARIANTS[(entry.chapterNumber * 3 + entry.pageNumber) % STRONG_IMAGE_VARIANTS.length]!;
 }
 
+// ── Title-fit geometry gate ────────────────────────────────────────────────
+// A side-image opener (LAYOUT_B_IMAGE_LEFT/RIGHT) gives the title only a ~half-
+// width column. A long title overruns that column and its last letters push into
+// the trim rail (observed on "GREY JAY / CANADA JAY"). Route any opener whose
+// title will not fit its side column at the MINIMUM readable title size to the
+// full-width-title variant (IMAGE_TOP) instead. Purely geometric: compound titles
+// (&, /) simply carry more glyphs, so they weight toward the check without being a
+// special trigger; short titles that fit keep their side layout for variety.
+
+/** Below this a display page-title no longer reads as a heading. */
+const MIN_TITLE_PT = 18;
+/** Avg glyph advance as a fraction of point size for the Caslon-class caps title. */
+const TITLE_GLYPH_ADVANCE = 0.58;
+/** The title/text column of a 50/50 side-image layout (after the image half + gutter). */
+const SIDE_COLUMN_FRACTION = 0.47;
+/** Standard page margin (in) for this publishing standard. */
+const PAGE_MARGIN_IN = 0.5;
+
+/** The rendered heading: the entry title with any "N." catalog ordinal stripped. */
+function displayTitle(entry: PageManifest): string {
+  return (entry.entryTitle ?? '').replace(/^\s*\d+[.)]\s*/, '').trim();
+}
+
+/** Geometry gate: does the title fit a side-image column on one line at the
+ *  minimum readable title size? */
+function titleFitsSideColumn(entry: PageManifest, trimWidthIn: number): boolean {
+  const titleWidthIn = displayTitle(entry).length * (MIN_TITLE_PT / 72) * TITLE_GLYPH_ADVANCE;
+  const sideColumnWidthIn = (trimWidthIn - 2 * PAGE_MARGIN_IN) * SIDE_COLUMN_FRACTION;
+  return titleWidthIn <= sideColumnWidthIn;
+}
+
 /**
  * Choose a simplified layout for an entry OPENER. Pure — no I/O. Operator-forced
  * templates short-circuit this entirely (handled upstream). Continuation pages
@@ -149,8 +180,7 @@ function strongImageVariantFor(entry: PageManifest): LayoutTemplateId {
  */
 export function chooseSimplifiedLayout(
   entry: PageManifest,
-  // _config is kept for future per-project tuning of variant defaults; unused for v1.
-  _config: ProjectConfig,
+  config: ProjectConfig,
 ): SimplifiedLayout {
   if (isDangerPage(entry) || entry.contentType === 'WARNING_PAGE') {
     return {
@@ -171,11 +201,19 @@ export function chooseSimplifiedLayout(
 
   // Every other entry opener leads with a strong illustration, regardless of
   // length. Overflow text flows to text-heavy continuation pages.
-  const template = strongImageVariantFor(entry);
+  const rotated = strongImageVariantFor(entry);
+  // Geometry gate: a side-image variant whose title won't fit its half-width
+  // column at minimum readable size is routed to the full-width-title variant so
+  // the title never runs into the trim rail. Short titles keep their side variant.
+  const isSide = rotated === 'LAYOUT_B_IMAGE_LEFT' || rotated === 'LAYOUT_B_IMAGE_RIGHT';
+  const routedForTitle = isSide && !titleFitsSideColumn(entry, config.trimSize.widthIn);
+  const template = routedForTitle ? 'LAYOUT_B_IMAGE_TOP' : rotated;
   const words = countWords(entry.bodyMarkdown);
   return {
     family: 'B',
     template,
-    reason: `Entry opener (${entry.contentType ?? 'subject'}, ${words} words) — strong illustration layout (${template}); overflow text flows to text-heavy continuations.`,
+    reason: routedForTitle
+      ? `Entry opener (${entry.contentType ?? 'subject'}, ${words} words) — long title "${displayTitle(entry)}" would not fit the ${rotated} side column at min readable size; routed to LAYOUT_B_IMAGE_TOP (full-width title).`
+      : `Entry opener (${entry.contentType ?? 'subject'}, ${words} words) — strong illustration layout (${template}); overflow text flows to text-heavy continuations.`,
   };
 }
