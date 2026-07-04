@@ -214,6 +214,12 @@ export const pages = pgTable(
     totalParts: integer('total_parts').default(1).notNull(),
     pageRole: pageRoleEnum('page_role').default('opener').notNull(),
     carriesSubject: boolean('carries_subject').default(true).notNull(),
+    // Per-PAGE image subject override (Stage 1.75 underfill recovery). A Type B
+    // illustration-dominant continuation carries a DISTINCT secondary study of its
+    // species (a different angle/detail from the opener). The render reads this as
+    // a per-page override so the page never duplicates the opener's plate. Null for
+    // ordinary pages, which fall back to the entry manifest's subject.
+    imageSubject: text('image_subject'),
     compactedEntryKeys: jsonb('compacted_entry_keys'),
     readingFieldText: text('reading_field_text'),
     readingFieldChars: integer('reading_field_chars'),

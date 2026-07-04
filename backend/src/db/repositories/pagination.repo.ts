@@ -67,6 +67,9 @@ export async function persistPaginatedPages(
         totalParts: p.totalParts,
         pageRole: p.pageRole,
         carriesSubject: p.carriesSubject,
+        // Per-page subject override (Type B illustration-dominant continuations
+        // carry a distinct secondary study). Null for ordinary pages.
+        imageSubject: p.imageSubject,
         compactedEntryKeys: p.compactedEntryKeys,
         readingFieldText: p.readingFieldText,
         readingFieldChars: p.readingFieldChars,

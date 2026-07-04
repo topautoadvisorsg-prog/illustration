@@ -93,10 +93,19 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
   // continuations. Absent for almost every page, so the shared entry subject is used.
   const pageOverride = pageRow.pageKey !== entryKey ? entryMeta.get(pageRow.pageKey) : undefined;
   const entryTitle = meta?.entryTitle || pageRolePolicy.entryTitle;
+  // Per-PAGE subject on the pagination row. A Type B illustration-dominant
+  // continuation (pageRole continuation + carriesSubject) carries a DISTINCT
+  // secondary study of its species so the page never duplicates the opener's
+  // plate. Gated to that exact case so openers — which also persist their subject
+  // on the row — keep using the fresh entry manifest, not the paginated snapshot.
+  const rowSubject = (pageRow as { imageSubject?: string | null }).imageSubject ?? undefined;
+  const perPageStudy =
+    pageRow.pageRole === 'continuation' && pageRow.carriesSubject && rowSubject ? rowSubject : undefined;
   // Standard v1.1: prefer the clean subject. Warnings live in badges, never here.
   const imageSubject =
     pageOverride?.cleanSubject ||
     pageOverride?.imageSubject ||
+    perPageStudy ||
     meta?.cleanSubject ||
     meta?.imageSubject ||
     pageRolePolicy.imageSubject;

@@ -106,7 +106,9 @@ function reconstructPaginatedPage(
     pageRole: row.pageRole as PageRole,
     carriesSubject: row.carriesSubject,
     compactedEntryKeys: (row.compactedEntryKeys as string[] | null) ?? null,
-    imageSubject: row.carriesSubject ? (primary?.imageSubject ?? null) : null,
+    imageSubject: row.carriesSubject
+      ? ((row as { imageSubject?: string | null }).imageSubject ?? primary?.imageSubject ?? null)
+      : null,
     layoutTemplate,
     readingFieldText: row.readingFieldText ?? '',
     readingFieldChars: row.readingFieldChars ?? 0,
@@ -428,7 +430,9 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
           pageRole: row.pageRole,
           carriesSubject: row.carriesSubject,
           compactedEntryKeys: row.compactedEntryKeys ?? null,
-          imageSubject: row.carriesSubject ? (primary?.imageSubject ?? null) : null,
+          imageSubject: row.carriesSubject
+      ? ((row as { imageSubject?: string | null }).imageSubject ?? primary?.imageSubject ?? null)
+      : null,
           fitStatus: row.fitStatus,
           previewApproved: row.previewApproved,
           previewApprovedAt: row.previewApprovedAt,

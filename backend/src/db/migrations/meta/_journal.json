@@ -71,6 +71,13 @@
       "when": 1782572396772,
       "tag": "0009_overconfident_moira_mactaggert",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783185123750,
+      "tag": "0010_page_image_subject",
+      "breakpoints": true
     }
   ]
 }
