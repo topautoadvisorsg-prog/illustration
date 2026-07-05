@@ -186,6 +186,7 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
     ? [
         'PAGE BODY — render every block below IN ORDER, as its type ("heading" = bold serif section heading, "subheading" = smaller bold heading, "paragraph" = body prose).',
         'Render the provided text EXACTLY: do not add, remove, translate, summarize, or reorder any words. The text is already plain — never print the block labels, the words "type"/"text", braces, or any markdown (#/*/_).',
+        'SPELL EVERY WORD LETTER-FOR-LETTER exactly as written: do not drop, add, transpose, duplicate, or substitute any letter, and use only normal upright letters — no garbled, warped, superscript, or invented glyphs. Every rendered word must be a correctly spelled copy of the source word. Proofread the baked text before finishing; misspelled or corrupted words make the page unusable.',
         `TEXT SIZE — set the body text at ${spec.typographyDNA.bodyPt}pt at this trim (about ${spec.typographyDNA.bodyMeasureChars ?? 70} characters per line). This is the MAXIMUM: never render it larger, and never enlarge it to fill empty space. If the copy does not all fit, size it DOWN to the smallest still-clearly-readable book size until every line fits — the text only ever sizes down, never up. (Placement and the safe area are governed by TEXT SAFETY below.)`,
         '```json',
         JSON.stringify(spec.pageText.bodyBlocks, null, 2),
