@@ -306,4 +306,23 @@ describe('deriveSubjectPackage — aquatic habitat mapping', () => {
     const env = deriveSubjectPackage(mk('1. Grizzly Bear', 'Grizzly Bear (Ursus arctos horribilis)')).environment.toLowerCase();
     expect(env).not.toMatch(/lake|wetland/);
   });
+  it('uses a Rockies-appropriate default biome for keyword-less subjects in the Rockies', () => {
+    // Grizzly names no biome keyword → falls to the region default, which for the
+    // Canadian Rockies must be montane/subalpine conifer, NOT New England woodland.
+    const env = deriveSubjectPackage(
+      mk('1. Grizzly Bear', 'Grizzly Bear (Ursus arctos horribilis)'),
+      'CANADIAN ROCKIES',
+    ).environment.toLowerCase();
+    expect(env).toContain('canadian rockies');
+    expect(env).toMatch(/montane|subalpine|conifer/);
+    expect(env).not.toMatch(/temperate woodland/);
+  });
+  it('keeps the woodland default for regions without an override', () => {
+    // New England (and any unlisted region) is unchanged by the region default.
+    const env = deriveSubjectPackage(
+      mk('1. White-tailed Deer', 'White-tailed Deer (Odocoileus virginianus)'),
+      'NEW ENGLAND',
+    ).environment.toLowerCase();
+    expect(env).toContain('temperate woodland');
+  });
 });

@@ -532,13 +532,30 @@ const ENVIRONMENT_VOCAB: Array<{ test: RegExp; env: string }> = [
   { test: /river|stream|brook|creek|wetland|marsh|lake|pond|water|crossing|falls|loon|grebe|duck|merganser|goldeneye|teal|dipper|kingfisher|heron|trout|salmon|char\b|whitefish|grayling|minnow|sucker|\bfish\b|beaver|otter|muskrat|frog|toad|salamander|newt|amphibian|waterfowl/i, env: 'Mountain lake, river, and wetland' },
   { test: /mountain|ridge|granite|rocky|geology|valley|bones of the land/i, env: 'Mountain terrain' },
 ];
+// Region-neutral fallback for a subject that names NO biome keyword. This is the
+// New England default; other regions override it below via the region default.
 const DEFAULT_ENVIRONMENT = 'Temperate woodland';
+
+// Region-appropriate DEFAULT biome for keyword-less subjects (the majority of
+// animal entries: bear, wolf, elk, marmot…). Keyed by a substring of the project
+// region (the book subtitle). Without this, every keyword-less Rockies species
+// fell through to New England's "Temperate woodland" — the wrong forest type for
+// two-thirds of the book. The habitat VOCAB stays region-neutral; only the
+// fallback is region-scoped. Unlisted regions keep DEFAULT_ENVIRONMENT unchanged.
+const REGION_DEFAULT_ENVIRONMENT: Array<{ test: RegExp; env: string }> = [
+  { test: /rock(y|ies)|canadian rock|alberta|banff|jasper/i, env: 'Montane and subalpine conifer forest' },
+];
+function defaultEnvironmentForRegion(region?: string): string {
+  const r = (region ?? '').trim();
+  if (!r) return DEFAULT_ENVIRONMENT;
+  return REGION_DEFAULT_ENVIRONMENT.find((v) => v.test.test(r))?.env ?? DEFAULT_ENVIRONMENT;
+}
 
 /** Derive the SUBJECT PACKAGE deterministically from the page (no manuscript prose). */
 export function deriveSubjectPackage(page: PageManifest, region?: string): SubjectPackage {
   const hay = `${page.entryTitle} ${page.imageSubject}`;
   const supporting = (SUPPORTING_VOCAB.find((v) => v.test.test(hay))?.items ?? DEFAULT_SUPPORTING).slice(0, 3);
-  const habitat = ENVIRONMENT_VOCAB.find((v) => v.test.test(hay))?.env ?? DEFAULT_ENVIRONMENT;
+  const habitat = ENVIRONMENT_VOCAB.find((v) => v.test.test(hay))?.env ?? defaultEnvironmentForRegion(region);
   // Region-scope the habitat so the illustrated backdrop reads as THIS book's
   // region (data-driven from the project subtitle), not a generic woodland. The
   // habitat vocab stays region-neutral; the region is prefixed at use.
