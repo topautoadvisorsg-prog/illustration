@@ -68,7 +68,9 @@ free; only **Render & Review** (step 7) spends (page renders + cover artwork).
      cover (portrait 1600×2560)** side by side, with trim/safe + spine-fold QA overlays.
    - **Interior pages** — one finished, text-baked image per page: **Preview** (free;
      shows the exact text the AI will print), **Render** (paid; re-click to retry a
-     FAILED page), **Approve for book** / **Reject**.
+     FAILED page), **AI review text** (cheap automated text-fidelity check — see
+     below, run it before Approve), **Approve for book** / **Reject**, **Upload
+     image** (no-spend manual escape hatch — see below).
    - **Kindle eBook — preview & export** — reflowable EPUB from the real text
      (structure tree, actual reflowable text, per-entry hero-image slots [future],
      build report, export). No spend.
@@ -78,6 +80,57 @@ free; only **Render & Review** (step 7) spends (page renders + cover artwork).
    cover PDF + an in-page preview. Paperback = same interior + paperback wrap.
 
 Operator SOP with screen-by-screen detail: `WILDLANDS_OPERATOR_MANUAL.md` (repo root).
+
+## AI text review (cheap QA assist, not a substitute for a real check)
+
+`gpt-image-2` occasionally bakes a typo into a page's text (it's a much higher-
+stakes failure mode than art quality, since a misspelled word in a printed book
+is just wrong). Instead of an operator eyeballing every word of every page,
+**"AI review text"** (per-page button in Render & Review, once a page is
+RENDERED) calls a cheap vision-capable chat model — `OPENAI_REVIEW_MODEL` in
+`.env`, currently `gpt-4o` — to compare the baked text against the literal
+source and flag mismatches. One call costs a small fraction of an image
+generation. Code: `services/openai/text-review.ts`,
+`POST /api/whole-page-render/:renderId/ai-review`.
+
+**Known limitation — read before trusting a "pass":** the reviewer reads the
+page semantically, not pixel-by-pixel, so it can silently "autocorrect" a
+subtle transposition in a common word (e.g. it will happily transcribe
+`cinmanon` as `cinnamon` because that's what it expects to see, even though
+the pixels are wrong). It reliably catches grosser errors — garbled words,
+dropped/duplicated words, wrong words entirely — but a `pass: true` is not a
+guarantee of zero typos. Do not hard-gate Approve on it; treat it as a fast
+first pass, and still skim the page yourself before Approve on anything going
+to final print. `gpt-4o-mini` was tried first and was worse (missed a
+confirmed real typo, invented a false positive on a clean page) — if
+`OPENAI_REVIEW_MODEL` is ever downgraded for cost, expect accuracy to drop
+with it.
+
+## Manual image upload (no-spend escape hatch)
+
+**"Upload image"** (every page card in Render & Review) registers an
+operator-supplied PNG as a real render version for that page — no OpenAI
+image-generation spend. Everything downstream (AI review, Approve, print-prep,
+select-for-book) works on it exactly like a normal render afterward. Use it
+when:
+- OpenAI billing/credits are exhausted and `Render` does nothing (check
+  Railway logs or the render's `errorMessage` for `Billing hard limit has
+  been reached` — that's the tell).
+- You hand-corrected an image outside the pipeline (any image editor, or by
+  asking Claude/an operator to use OpenAI's `images.edit` endpoint with a
+  precise transparent-mask over just the bad word — far more reliable than a
+  full-page regeneration, which tends to trade one typo for a different one
+  elsewhere on the page. There's no dedicated script for this in the repo
+  today; it was done ad hoc via `services/openai/openai.ts`'s pattern during
+  development — worth formalizing into a script if it comes up often).
+- Testing a prompt manually in a separate chat tool and want to bring the
+  result into the real book — just confirm the wording is the actual page
+  text first (a generic chat surface will often paraphrase instead of
+  reproducing the literal source, which makes the result unusable even if it
+  looks good).
+
+Code: `POST /api/whole-page-render/:pageId/upload-manual` (base64 PNG in the
+JSON body; `frontend`'s `uploadManualRender` reads the file via `FileReader`).
 
 ## Cover / interior synchronization (production gate)
 
@@ -126,6 +179,10 @@ A project is a **temporary production workspace**. The intended lifecycle:
 - Whole-page render via OpenAI **`gpt-image-2`** (text baked into the image;
   spend-gated; dependency-injected so tests never call the paid API), with
   preview / render / approve / reject / print-prep per page.
+- Cheap automated AI text-fidelity review per page (`gpt-4o` chat-vision call)
+  and a no-spend manual image upload path, for when generation is blocked or
+  needs a hand correction — see "AI text review" and "Manual image upload"
+  above.
 - **300 DPI** interior print-prep (sharp Lanczos) and **300 DPI** full-wrap cover
   (direct lossless embed); KDP-shaped interior + cover PDFs.
 - Cover/interior synchronization export gate.
@@ -170,7 +227,67 @@ yarn workspace @wildlands/backend run test     # vitest
 yarn workspace frontend build
 ```
 
-Run locally: `yarn workspace @wildlands/backend dev` · `yarn workspace frontend dev`.
+## Run it yourself, no Claude required
+
+Two processes, two terminals, from the repo root:
+
+```bash
+# Terminal 1 — backend (Fastify API on :8001, reads backend/../.env)
+cd backend
+yarn install        # first time only
+yarn dev             # tsx watch src/index.ts
+
+# Terminal 2 — frontend (Operator Console on :3000)
+cd frontend
+yarn install        # first time only
+yarn dev             # craco start
+```
+
+Open `http://localhost:3000`, log in with the `CONSOLE_PASSWORD` value from
+`.env`.
+
+**Important:** the frontend defaults to the **deployed Railway backend**
+(`DEFAULT_BACKEND_URL` in `ProductionConsole.js`), not your local one — so
+running the frontend alone points at production data. To actually exercise a
+local backend change before it's deployed, set the override when starting the
+frontend:
+
+```bash
+REACT_APP_BACKEND_URL=http://localhost:8001 yarn dev
+```
+
+(PowerShell: `$env:REACT_APP_BACKEND_URL="http://localhost:8001"; yarn dev`)
+
+### Key `.env` values (see `.env.example` for the full list)
+
+| Variable | What it's for |
+|---|---|
+| `PROJECT_ID` | Which book the `backend/scripts/` operator scripts run against — scripts fail loudly if unset, never silently default. |
+| `DATABASE_URL`, `SUPABASE_*` | Postgres + Supabase Storage. |
+| `OPENAI_API_KEY`, `OPENAI_IMAGE_MODEL` | Page-image generation (`gpt-image-2`) — the expensive calls. |
+| `OPENAI_REVIEW_MODEL` | The cheap text-QA reviewer (see "AI text review" above) — safe to swap for cost/accuracy tradeoffs. |
+| `CONSOLE_PASSWORD` | Single shared password gating the whole API (no user accounts). Unset = open API, dev only. |
+| `WHOLE_PAGE_RENDER_ENABLED` | Master flag for the whole-page pipeline; routes 503 when false. |
+
+### Operator scripts (`backend/scripts/`)
+
+One-off/reusable tools for direct DB + storage access, bypassing the UI —
+useful when doing bulk QA or debugging a specific page. Run with
+`node ../node_modules/tsx/dist/cli.mjs scripts/<name>.ts <args>` from
+`backend/`. Worth knowing:
+
+- `_review_chapter.ts CH02` — pulls every rendered page image + the DB's
+  ground-truth text for a chapter into a scratch folder, for a manual
+  typo sweep.
+- `_qa_rerender.ts <pageKey>` — triggers one real render for a page (same
+  paid call the UI's Render button makes) — always one at a time, this repo
+  has already had one billing-limit incident from a batch job firing several
+  generations concurrently.
+- `_qa_listversions.ts <pageKey>` / `_qa_pull.ts` / `_qa_pullversion.ts` —
+  inspect and download a page's render history.
+- `_qa_billingcheck.ts` / `_qa_failcheck.ts CH02` — find FAILED renders and
+  their error messages project-wide or per chapter (the July 2026 billing
+  incident silently orphaned 15 pages this way — worth an occasional sweep).
 
 ## Deploy / Railway notes
 
@@ -184,4 +301,3 @@ Run locally: `yarn workspace @wildlands/backend dev` · `yarn workspace frontend
   bundle hash (`curl <frontend>/ | grep main.<hash>.js`).
 - API POSTs need a JSON body — send `{}` for bodyless actions.
 - `whole-page-render/:pageId` takes the page **UUID**, not the page key.
-```

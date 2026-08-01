@@ -102,6 +102,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [assembly, setAssembly] = useState(null);
   const [epubReport, setEpubReport] = useState(null); // Kindle EPUB build report (preview endpoint)
   const [status, setStatus] = useState({}); // real backend progress for the step checkmarks
+  const [reviewResults, setReviewResults] = useState({}); // renderId -> { pass, issues, model } from AI text review
   const [authed, setAuthed] = useState(false); // shared-password gate
   const [authReady, setAuthReady] = useState(false); // initial stored-password check done
 
@@ -423,6 +424,31 @@ export default function ProductionConsole({ onExitToLegacy }) {
     await api(`/api/whole-page-render/${renderId}/reject`, { method: "POST", body: JSON.stringify({ reason: "operator rejected" }) });
     await loadRenders();
     return { notice: "Page rejected — render it again to try a new version." };
+  });
+
+  // Cheap AI text-fidelity check (chat-vision call, not another image generation).
+  // Compares the baked text against the source and flags mismatches — the operator
+  // still clicks Approve themselves, this just does the word-by-word reading for them.
+  const aiReviewRender = (renderId) => run("AI reviewing text (cheap)", async () => {
+    const d = await api(`/api/whole-page-render/${renderId}/ai-review`, { method: "POST", body: "{}" });
+    setReviewResults((prev) => ({ ...prev, [renderId]: d }));
+    return { notice: d.pass ? "AI review: text looks correct." : `AI review found ${d.issues.length} issue(s) — see below.` };
+  });
+
+  // Manual image upload — the escape hatch when OpenAI generation is blocked
+  // (billing limit, outage) or the operator hand-corrected an image outside the
+  // pipeline. Registers it as a real render version; approve/print-prep/select
+  // all work on it afterward exactly like a normal render.
+  const uploadManualRender = (pageId, file) => run("Uploading image (no spend)", async () => {
+    const imageBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const d = await api(`/api/whole-page-render/${pageId}/upload-manual`, { method: "POST", body: JSON.stringify({ imageBase64 }) });
+    await loadRenders();
+    return { notice: `Uploaded as v${d.render?.version} — review and approve it below.` };
   });
 
   const genCover = () => run("Generating cover (paid)", async () => {
@@ -794,6 +820,11 @@ export default function ProductionConsole({ onExitToLegacy }) {
                           <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
                             <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => previewPage(m.pageId, m.imagePath).catch(() => {})}>Preview</button>
                             <button style={{ ...S.btn("spend"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderPage(m.pageId).catch(() => {})}>Render</button>
+                            <label style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px", cursor: "pointer" }} title="Register your own PNG as this page's render — no OpenAI spend. Use when generation is blocked or you hand-corrected an image.">
+                              Upload image
+                              <input type="file" accept="image/png" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadManualRender(m.pageId, f).catch(() => {}); }} />
+                            </label>
+                            {m.status === "RENDERED" && m.renderId && <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => aiReviewRender(m.renderId).catch(() => {})} title="Cheap AI text-check — compares the baked text against the source before you approve">AI review text</button>}
                             {m.status === "RENDERED" && m.renderId && <button style={{ ...S.btn("ok"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => approveForBook(m.renderId).catch(() => {})}>Approve for book</button>}
                             {m.status === "RENDERED" && m.renderId && <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => rejectRender(m.renderId).catch(() => {})}>Reject</button>}
                             {m.approvedForBook && <span style={{ ...S.pill(C.green), alignSelf: "center" }}>✓ approved</span>}
@@ -801,6 +832,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
                               ? <span style={{ ...S.pill(C.green), alignSelf: "center" }}>✓ print-ready</span>
                               : <span style={{ ...S.pill("#b8860b"), alignSelf: "center" }} title="Approved but not yet print-prepped — run print-prep before Build Book">⚠ needs print-prep</span>)}
                           </div>
+                          {m.renderId && reviewResults[m.renderId] && (
+                            <div style={{ marginTop: 5, padding: 6, borderRadius: 5, fontSize: 11, background: reviewResults[m.renderId].pass ? "#e8f3e6" : "#fbeaea", color: reviewResults[m.renderId].pass ? "#2f6b2f" : "#a33" }}>
+                              {reviewResults[m.renderId].pass
+                                ? "✓ AI review: text matches source."
+                                : <>⚠ AI review found issues:<ul style={{ margin: "4px 0 0 16px", padding: 0 }}>{reviewResults[m.renderId].issues.map((iss, i) => <li key={i}>{iss}</li>)}</ul></>}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

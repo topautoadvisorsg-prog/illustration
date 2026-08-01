@@ -17,7 +17,30 @@
  */
 
 import { PALETTE, WILDLANDS_STANDARD } from '../publishing-standard/index.js';
-import type { WholePageSpec } from './types.js';
+import type { BodyBlockDTO, WholePageSpec } from './types.js';
+
+// TEXT-FIDELITY RISK CALLOUT — OpenAI's own gpt-image prompting guidance says to
+// spell out long/uncommon words letter-by-letter rather than trust the model to
+// copy them verbatim. Long words (>=9 letters) are the model's own documented
+// risk threshold; word LENGTH is a generic, page-agnostic proxy we can compute
+// from any body text, unlike a hand-curated word list. Applied automatically to
+// every page so the fix scales to books we haven't written yet.
+function extractRiskyWords(bodyBlocks: BodyBlockDTO[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const block of bodyBlocks) {
+    const matches = block.text.match(/[A-Za-z']+/g) ?? [];
+    for (const word of matches) {
+      const letters = word.replace(/'/g, '');
+      const key = letters.toLowerCase();
+      if (letters.length >= 9 && !seen.has(key)) {
+        seen.add(key);
+        out.push(word);
+      }
+    }
+  }
+  return out;
+}
 
 // CORE IDENTITY — stated ONCE. The Wild Lands identity, the single-plate
 // composition principle, and the parchment/ink palette live here and nowhere
@@ -137,7 +160,7 @@ If any guide line, dashed line, rectangle, or blueprint element appears in the a
   // only — a pure-illustration page has no body text to protect.
   if (rendersCriticalText(spec)) {
     lines.push(
-      "- BOTTOM ANCHOR (hard constraint — text protection): anchor a REAL illustration across the BOTTOM band of the page, running full-width and bleeding off the bottom edge. Its purpose is functional: it holds the body text UP and away from the bottom edge so no line of text ever reaches the trim/bleed and gets cut off. Draw this bottom illustration from THIS page's own subject — the species, its habitat, its tracks and sign, foliage, or terrain, whatever fits the entry — you choose the specific element and compose it naturally; it is subject illustration, NOT a decorative swag, ornament band, border, or frame. TWO rules, both absolute: (a) the illustration OWNS the bottom band and the body text STOPS ABOVE it — text must NEVER enter the bottom band or cross the safe line; and (b) this bottom band sits in the bleed and WILL be trimmed at the edge, so keep it ATMOSPHERIC and SUPPORTING — never place the main subject, its face, or any essential detail in it, and put nothing there that cannot survive being cut.",
+      "- BOTTOM ANCHOR (hard constraint — text protection): anchor a REAL illustration across the BOTTOM band of the page, running full-width and bleeding off the bottom edge. Its purpose is functional: it holds the body text UP and away from the bottom edge so no line of text ever reaches the trim/bleed and gets cut off. Draw this bottom illustration from THIS page's own subject — the species, its habitat, its tracks and sign, foliage, or terrain, whatever fits the entry — you choose the specific element and compose it naturally; it is subject illustration, NOT a decorative swag, ornament band, border, or frame. Render it as ONE continuous illustrated scene, like the rest of the page's artwork — NEVER a collage or grid of separate labeled specimen studies, insets, or vignettes. The illustration carries NO text of any kind: no caption, no label, no scientific name, no italic tag under any element — only the body-text reading field renders words. TWO rules, both absolute: (a) the illustration OWNS the bottom band and the body text STOPS ABOVE it — text must NEVER enter the bottom band or cross the safe line; and (b) this bottom band sits in the bleed and WILL be trimmed at the edge, so keep it ATMOSPHERIC and SUPPORTING — never place the main subject, its face, or any essential detail in it, and put nothing there that cannot survive being cut.",
       // TOP ANCHOR — mirror of the bottom anchor. Without it the top of the page is
       // bare parchment and the title/text drift up against the top safe line. An
       // atmospheric top fills that space and holds the type down and in.
@@ -182,15 +205,21 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
   // Every page in this path bakes its own text into the image (the cover is the
   // sole exception and uses the dedicated assembleCoverPrompt — it never reaches
   // here). The single, strongest text-fidelity statement lives HERE and nowhere else.
+  const riskyWords = rendersCriticalText(spec) ? extractRiskyWords(spec.pageText.bodyBlocks) : [];
   const bodySection = rendersCriticalText(spec)
     ? [
         'PAGE BODY — render every block below IN ORDER, as its type ("heading" = bold serif section heading, "subheading" = smaller bold heading, "paragraph" = body prose).',
         'Render the provided text EXACTLY: do not add, remove, translate, summarize, or reorder any words. The text is already plain — never print the block labels, the words "type"/"text", braces, or any markdown (#/*/_).',
-        'SPELL EVERY WORD LETTER-FOR-LETTER exactly as written: do not drop, add, transpose, duplicate, or substitute any letter, and use only normal upright letters — no garbled, warped, superscript, or invented glyphs. Every rendered word must be a correctly spelled copy of the source word. Proofread the baked text before finishing; misspelled or corrupted words make the page unusable.',
+        'SPELL EVERY WORD LETTER-FOR-LETTER exactly as written: do not drop, add, transpose, duplicate, or substitute any letter, and use only normal upright letters — no garbled, warped, superscript, or invented glyphs. Every rendered word must be a correctly spelled copy of the source word. Before finishing, PROOFREAD THE BAKED TEXT AGAINST THE SOURCE BLOCKS BELOW THREE SEPARATE TIMES, word by word — once for missing/added words, once for letter-level spelling, once for duplicated or reordered words. A page with even one misspelled word is unusable and must be corrected before the page is considered finished.',
         `TEXT SIZE — set the body text at ${spec.typographyDNA.bodyPt}pt at this trim (about ${spec.typographyDNA.bodyMeasureChars ?? 70} characters per line). This is the MAXIMUM: never render it larger, and never enlarge it to fill empty space. If the copy does not all fit, size it DOWN to the smallest still-clearly-readable book size until every line fits — the text only ever sizes down, never up. (Placement and the safe area are governed by TEXT SAFETY below.)`,
         '```json',
         JSON.stringify(spec.pageText.bodyBlocks, null, 2),
         '```',
+        ...(riskyWords.length > 0
+          ? [
+              `SPELL-OUT CHECK — these words from the text above are long and easy to mis-key; verify each one letter-by-letter before finishing: ${riskyWords.map((w) => `"${w}" (${w.toUpperCase().split('').join('-')})`).join(', ')}.`,
+            ]
+          : []),
       ]
     : [
         'TEXT POLICY — render no readable text for this page role.',
