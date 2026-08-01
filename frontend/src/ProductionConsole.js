@@ -103,6 +103,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [epubReport, setEpubReport] = useState(null); // Kindle EPUB build report (preview endpoint)
   const [status, setStatus] = useState({}); // real backend progress for the step checkmarks
   const [reviewResults, setReviewResults] = useState({}); // renderId -> { pass, issues, model } from AI text review
+  const [promptReviewResults, setPromptReviewResults] = useState({}); // pageId -> { pass, issues, model } from pre-flight prompt review (no spend)
   const [authed, setAuthed] = useState(false); // shared-password gate
   const [authReady, setAuthReady] = useState(false); // initial stored-password check done
 
@@ -401,6 +402,16 @@ export default function ProductionConsole({ onExitToLegacy }) {
     // the text package — lets the operator SEE a rendered page (e.g. the index) large.
     setPreview({ ...d, _imagePath: imagePath || null, _cb: Date.now() });
     return { notice: `Preview ready for ${d.authority?.entryTitle || pageId} (no spend).` };
+  });
+
+  // Pre-flight sanity check on the ASSEMBLED PROMPT — before any spend. Catches
+  // subject/entry mismatches, truncated or garbled body text, and placeholder
+  // content before the operator commits to a paid render. One explicit call,
+  // never auto-triggered, never retried.
+  const reviewPromptPage = (pageId) => run("Reviewing prompt (no spend)", async () => {
+    const d = await api(`/api/whole-page-render/page/${pageId}/review-prompt`, { method: "POST", body: "{}" });
+    setPromptReviewResults((prev) => ({ ...prev, [pageId]: d }));
+    return { notice: d.pass ? "Prompt review: looks correct." : `Prompt review found ${d.issues.length} issue(s) — see below.` };
   });
 
   const renderPage = (pageId) => run("Rendering page (paid)", async () => {
@@ -819,6 +830,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
                           </div>
                           <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
                             <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => previewPage(m.pageId, m.imagePath).catch(() => {})}>Preview</button>
+                            <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => reviewPromptPage(m.pageId).catch(() => {})} title="No-spend pre-flight check: does the subject match the entry, is the body text intact — before you commit to a paid render">Review prompt</button>
                             <button style={{ ...S.btn("spend"), margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => renderPage(m.pageId).catch(() => {})}>Render</button>
                             <label style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px", cursor: "pointer" }} title="Register your own PNG as this page's render — no OpenAI spend. Use when generation is blocked or you hand-corrected an image.">
                               Upload image
@@ -832,6 +844,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
                               ? <span style={{ ...S.pill(C.green), alignSelf: "center" }}>✓ print-ready</span>
                               : <span style={{ ...S.pill("#b8860b"), alignSelf: "center" }} title="Approved but not yet print-prepped — run print-prep before Build Book">⚠ needs print-prep</span>)}
                           </div>
+                          {promptReviewResults[m.pageId] && (
+                            <div style={{ marginTop: 5, padding: 6, borderRadius: 5, fontSize: 11, background: promptReviewResults[m.pageId].pass ? "#e8f3e6" : "#fbeaea", color: promptReviewResults[m.pageId].pass ? "#2f6b2f" : "#a33" }}>
+                              {promptReviewResults[m.pageId].pass
+                                ? "✓ Prompt review: subject + text look correct (no spend yet)."
+                                : <>⚠ Prompt review found issues (before any spend):<ul style={{ margin: "4px 0 0 16px", padding: 0 }}>{promptReviewResults[m.pageId].issues.map((iss, i) => <li key={i}>{iss}</li>)}</ul></>}
+                            </div>
+                          )}
                           {m.renderId && reviewResults[m.renderId] && (
                             <div style={{ marginTop: 5, padding: 6, borderRadius: 5, fontSize: 11, background: reviewResults[m.renderId].pass ? "#e8f3e6" : "#fbeaea", color: reviewResults[m.renderId].pass ? "#2f6b2f" : "#a33" }}>
                               {reviewResults[m.renderId].pass

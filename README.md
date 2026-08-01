@@ -67,10 +67,11 @@ free; only **Render & Review** (step 7) spends (page renders + cover artwork).
      page count. Shows the **print front cover (7×10)** and the **Kindle front
      cover (portrait 1600×2560)** side by side, with trim/safe + spine-fold QA overlays.
    - **Interior pages** — one finished, text-baked image per page: **Preview** (free;
-     shows the exact text the AI will print), **Render** (paid; re-click to retry a
-     FAILED page), **AI review text** (cheap automated text-fidelity check — see
-     below, run it before Approve), **Approve for book** / **Reject**, **Upload
-     image** (no-spend manual escape hatch — see below).
+     shows the exact text the AI will print), **Review prompt** (free pre-flight
+     sanity check — run it *before* Render, see below), **Render** (paid; re-click
+     to retry a FAILED page), **AI review text** (cheap automated text-fidelity
+     check — see below, run it before Approve), **Approve for book** / **Reject**,
+     **Upload image** (no-spend manual escape hatch — see below).
    - **Kindle eBook — preview & export** — reflowable EPUB from the real text
      (structure tree, actual reflowable text, per-entry hero-image slots [future],
      build report, export). No spend.
@@ -80,6 +81,25 @@ free; only **Render & Review** (step 7) spends (page renders + cover artwork).
    cover PDF + an in-page preview. Paperback = same interior + paperback wrap.
 
 Operator SOP with screen-by-screen detail: `WILDLANDS_OPERATOR_MANUAL.md` (repo root).
+
+## Prompt pre-flight review (before you spend anything)
+
+**"Review prompt"** (every page card, works even before the page has ever been
+rendered) checks the assembled spec BEFORE any paid image call — does the
+illustration subject actually match the entry title, is the body text intact
+(not truncated, duplicated, or placeholder), nothing internally contradictory.
+It's a text-only chat completion (no image involved), so it costs a fraction
+even of the post-render AI text review below. Code:
+`services/openai/prompt-review.ts`,
+`POST /api/whole-page-render/page/:pageId/review-prompt`.
+
+Like every other AI-calling action in this pipeline it is **strictly one
+explicit call, triggered only by the operator clicking the button** — nothing
+in this codebase auto-retries or auto-loops a paid or even a free OpenAI call
+on its own; confirmed by reading `createAndRunRender` (one row per explicit
+call) and the OpenAI client config (`maxRetries: 0` — even the SDK's own
+transient-error retry is off). A failed render just sits at `FAILED` with its
+error message until an operator explicitly acts on it again.
 
 ## AI text review (cheap QA assist, not a substitute for a real check)
 
@@ -179,10 +199,13 @@ A project is a **temporary production workspace**. The intended lifecycle:
 - Whole-page render via OpenAI **`gpt-image-2`** (text baked into the image;
   spend-gated; dependency-injected so tests never call the paid API), with
   preview / render / approve / reject / print-prep per page.
-- Cheap automated AI text-fidelity review per page (`gpt-4o` chat-vision call)
-  and a no-spend manual image upload path, for when generation is blocked or
-  needs a hand correction — see "AI text review" and "Manual image upload"
-  above.
+- No-spend prompt pre-flight review, cheap automated post-render AI
+  text-fidelity review (`gpt-4o` chat-vision call), and a no-spend manual
+  image upload path for when generation is blocked or needs a hand
+  correction — see "Prompt pre-flight review", "AI text review", and "Manual
+  image upload" above. Confirmed zero auto-retry anywhere in the render
+  pipeline (one explicit call per attempt, `maxRetries: 0` at the OpenAI
+  client too).
 - **300 DPI** interior print-prep (sharp Lanczos) and **300 DPI** full-wrap cover
   (direct lossless embed); KDP-shaped interior + cover PDFs.
 - Cover/interior synchronization export gate.

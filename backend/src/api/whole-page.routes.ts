@@ -41,6 +41,7 @@ import {
 } from '../services/render-proof/build-package.js';
 import { prepareRender } from '../pipeline/whole-page-render/render-whole-page.js';
 import { reviewRenderedText } from '../services/openai/text-review.js';
+import { reviewPromptSanity } from '../services/openai/prompt-review.js';
 import { WILDLANDS_STANDARD } from '../pipeline/publishing-standard/index.js';
 import sharp from 'sharp';
 
@@ -222,6 +223,36 @@ export async function registerWholePageRoutes(app: FastifyInstance): Promise<voi
       return reply
         .code(500)
         .send({ error: 'Internal Error', message: `Preview package build failed: ${message}`, statusCode: 500 });
+    }
+  });
+
+  // ── Prompt sanity pre-flight (NO SPEND) ──────────────────────────────────
+  // Runs BEFORE the operator commits to a paid render: does the spec actually
+  // make sense (subject matches the entry, body text intact, nothing
+  // contradictory)? One explicit call, no loop, no auto-retry — same
+  // discipline as every other spend-adjacent action in this pipeline.
+  app.post('/api/whole-page-render/page/:pageId/review-prompt', async (request, reply) => {
+    if (flagOff()) return reply.code(503).send(flagDisabledResponse());
+    const { pageId } = PageParamsSchema.parse(request.params);
+    try {
+      const pkg = await buildPreviewPackageForPage(pageId);
+      const subject = pkg.input.specJson.illustrationDNA?.subject;
+      const illustrationSubject = subject
+        ? [subject.primary, subject.environment].filter(Boolean).join(' — ')
+        : '(no subject — non-illustrated page role)';
+      const result = await reviewPromptSanity({
+        entryTitle: pkg.authority.entryTitle,
+        illustrationSubject,
+        bodyText: pkg.authority.sourceText,
+      });
+      return result;
+    } catch (e) {
+      const message = (e as Error).message;
+      if (message.startsWith('page_not_found:') || message.startsWith('project_not_found:')) {
+        return reply.code(404).send({ error: 'Not Found', message: 'Page not found.', statusCode: 404 });
+      }
+      request.log.error({ err: e }, 'review-prompt failed');
+      return reply.code(500).send({ error: 'Internal Server Error', message: `Prompt review failed: ${message}`, statusCode: 500 });
     }
   });
 
