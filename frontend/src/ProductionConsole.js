@@ -853,17 +853,23 @@ export default function ProductionConsole({ onExitToLegacy }) {
                               : <span style={{ ...S.pill("#b8860b"), alignSelf: "center" }} title="Approved but not yet print-prepped — run print-prep before Build Book">⚠ needs print-prep</span>)}
                           </div>
                           {promptReviewResults[m.pageId] && (
-                            <div style={{ marginTop: 5, padding: 6, borderRadius: 5, fontSize: 11, background: promptReviewResults[m.pageId].pass ? "#e8f3e6" : "#fbeaea", color: promptReviewResults[m.pageId].pass ? "#2f6b2f" : "#a33" }}>
-                              {promptReviewResults[m.pageId].pass
-                                ? "✓ Prompt review: subject + text look correct (no spend yet)."
-                                : <>⚠ Prompt review found issues (before any spend):<ul style={{ margin: "4px 0 0 16px", padding: 0 }}>{promptReviewResults[m.pageId].issues.map((iss, i) => <li key={i}>{iss}</li>)}</ul></>}
+                            <div style={{ marginTop: 5, padding: 6, borderRadius: 5, fontSize: 11, background: promptReviewResults[m.pageId].pass ? "#e8f3e6" : "#fbeaea", color: promptReviewResults[m.pageId].pass ? "#2f6b2f" : "#a33", position: "relative" }}>
+                              <button onClick={() => setPromptReviewResults((prev) => { const n = { ...prev }; delete n[m.pageId]; return n; })} title="Dismiss" style={{ position: "absolute", top: 4, right: 6, border: "none", background: "none", cursor: "pointer", fontSize: 12, color: "inherit", opacity: 0.6, padding: 0 }}>✕</button>
+                              <div style={{ paddingRight: 16 }}>
+                                {promptReviewResults[m.pageId].pass
+                                  ? "✓ Prompt review: subject + text look correct (no spend yet)."
+                                  : <>⚠ Prompt review found issues (before any spend):<ul style={{ margin: "4px 0 0 16px", padding: 0 }}>{promptReviewResults[m.pageId].issues.map((iss, i) => <li key={i}>{iss}</li>)}</ul><div style={{ marginTop: 4, fontStyle: "italic", opacity: 0.85 }}>Advisory only — this does not block Render. The reviewer can be wrong (e.g. flagging a deliberate stylistic contrast as a mismatch); use your judgment, then dismiss (✕) or Render anyway.</div></>}
+                              </div>
                             </div>
                           )}
                           {m.renderId && reviewResults[m.renderId] && (
-                            <div style={{ marginTop: 5, padding: 6, borderRadius: 5, fontSize: 11, background: reviewResults[m.renderId].pass ? "#e8f3e6" : "#fbeaea", color: reviewResults[m.renderId].pass ? "#2f6b2f" : "#a33" }}>
-                              {reviewResults[m.renderId].pass
-                                ? "✓ AI review: text matches source."
-                                : <>⚠ AI review found issues:<ul style={{ margin: "4px 0 0 16px", padding: 0 }}>{reviewResults[m.renderId].issues.map((iss, i) => <li key={i}>{iss}</li>)}</ul></>}
+                            <div style={{ marginTop: 5, padding: 6, borderRadius: 5, fontSize: 11, background: reviewResults[m.renderId].pass ? "#e8f3e6" : "#fbeaea", color: reviewResults[m.renderId].pass ? "#2f6b2f" : "#a33", position: "relative" }}>
+                              <button onClick={() => setReviewResults((prev) => { const n = { ...prev }; delete n[m.renderId]; return n; })} title="Dismiss" style={{ position: "absolute", top: 4, right: 6, border: "none", background: "none", cursor: "pointer", fontSize: 12, color: "inherit", opacity: 0.6, padding: 0 }}>✕</button>
+                              <div style={{ paddingRight: 16 }}>
+                                {reviewResults[m.renderId].pass
+                                  ? "✓ AI review: text matches source."
+                                  : <>⚠ AI review found issues:<ul style={{ margin: "4px 0 0 16px", padding: 0 }}>{reviewResults[m.renderId].issues.map((iss, i) => <li key={i}>{iss}</li>)}</ul><div style={{ marginTop: 4, fontStyle: "italic", opacity: 0.85 }}>Advisory only — this does not block Approve. Look at the actual page yourself before deciding; then dismiss (✕) or Approve anyway.</div></>}
+                              </div>
                             </div>
                           )}
                         </div>
