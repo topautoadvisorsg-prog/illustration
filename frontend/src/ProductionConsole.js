@@ -554,9 +554,17 @@ export default function ProductionConsole({ onExitToLegacy }) {
       </aside>
 
       <main style={S.main}>
-        {busy && <div style={{ ...S.pill(C.orange), marginBottom: 10 }}>⏳ {busy}…</div>}
-        {error && <div style={{ ...S.card, borderColor: C.red, color: C.red, marginTop: 0 }}>⚠ {error}</div>}
-        {notice && !error && <div style={{ ...S.card, borderColor: C.green, marginTop: 0 }}>{notice}</div>}
+        {/* Sticky so the result of an action is visible no matter how far down
+            the page the operator has scrolled — this grid runs to hundreds of
+            cards, and a banner that only appeared at the very top of the page
+            was invisible for virtually every click made mid-list. */}
+        {(busy || error || notice) && (
+          <div style={{ position: "sticky", top: 0, zIndex: 50, background: C.paper, paddingBottom: 8, marginBottom: 2 }}>
+            {busy && <div style={{ ...S.pill(C.orange), marginBottom: 10 }}>⏳ {busy}…</div>}
+            {error && <div style={{ ...S.card, borderColor: C.red, color: C.red, marginTop: 0 }}>⚠ {error}</div>}
+            {notice && !error && <div style={{ ...S.card, borderColor: C.green, marginTop: 0 }}>{notice}</div>}
+          </div>
+        )}
 
         {step === "project" && (
           <Panel title="Project" sub="Open an existing book or create a new one.">
