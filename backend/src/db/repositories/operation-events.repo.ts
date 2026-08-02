@@ -7,6 +7,7 @@
 import { desc, gte, sql } from 'drizzle-orm';
 import { getDb } from '../client.js';
 import { operationEvents } from '../schema/index.js';
+import { windowSince } from '../../lib/time-window.js';
 
 export interface OperationEvent {
   operation: string;
@@ -39,7 +40,7 @@ export interface OperationTimingReport {
 
 export async function getOperationTimingReport(windowHours = 24): Promise<OperationTimingReport> {
   const db = getDb();
-  const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
+  const since = windowSince(windowHours);
 
   const rows = await db
     .select({

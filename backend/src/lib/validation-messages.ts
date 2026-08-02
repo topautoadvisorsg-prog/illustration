@@ -1,6 +1,6 @@
 import type { ZodIssue } from 'zod';
 import type { ApiErrorField } from '@wildlands/shared';
-import { ERROR_CODES, codeForFieldPath } from './error-codes.js';
+import { ERROR_CODES, codeForFieldPath, lastStringSegment } from './error-codes.js';
 
 /**
  * Zod issue -> operator-facing field label/message/code. This is the ONLY
@@ -40,8 +40,8 @@ function pathKey(path: Array<string | number>): string {
 export function labelForPath(path: Array<string | number>): string {
   const key = pathKey(path);
   if (FIELD_LABELS[key]) return FIELD_LABELS[key];
-  const lastSegment = [...path].reverse().find((p) => typeof p === 'string');
-  return lastSegment ? humanize(String(lastSegment)) : 'This field';
+  const lastSegment = lastStringSegment(path);
+  return lastSegment ? humanize(lastSegment) : 'This field';
 }
 
 /** Turns one Zod issue into a plain sentence — never the schema path or issue code. */

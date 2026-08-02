@@ -17,6 +17,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 const DEFAULT_BACKEND_URL = "https://wildlandsbackend-production.up.railway.app";
 const BACKEND = process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND_URL;
 
+// The "no error" shape for errorState — see its declaration in ProductionConsole for why
+// the translated-error fields live in one object instead of five parallel useState calls.
+const EMPTY_ERROR_STATE = { message: "", fields: [], action: null, code: "", correlationId: "" };
+
 // ── tiny styling system (self-contained; no dependency on the legacy design kit)
 const C = {
   ink: "#2e2417",
@@ -163,11 +167,13 @@ function roman(n) {
 export default function ProductionConsole({ onExitToLegacy }) {
   const [step, setStep] = useState("project");
   const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-  const [errorFields, setErrorFields] = useState([]); // [{path,label,message,errorCode}] from the backend's error-translation layer
-  const [errorAction, setErrorAction] = useState(null); // { type:'navigate', target, label }
-  const [errorCode, setErrorCode] = useState(""); // stable "WL-####" code — support/logs reference, not the main message
-  const [errorCorrelationId, setErrorCorrelationId] = useState(""); // ties a recovery-click/success telemetry event back to this occurrence
+  // Everything the centralized error-translation layer (docs/ERROR_HANDLING_STANDARD.md)
+  // gives us about the current error, as one unit — message, per-field
+  // highlights, the recovery action, the support-facing code, and the
+  // telemetry correlation id all change together (every write site sets all
+  // five at once; there's no case where just one changes independently), so
+  // they live in one state object instead of five parallel useState calls.
+  const [errorState, setErrorState] = useState(EMPTY_ERROR_STATE);
   const [notice, setNotice] = useState("");
   // Set when the operator clicks a recovery action's button; cleared by the
   // very next run() outcome (success -> "recovery succeeded" telemetry,
@@ -256,7 +262,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   }, [checkAuth]);
 
   const run = useCallback(async (label, fn) => {
-    setBusy(label); setError(""); setErrorFields([]); setErrorAction(null); setErrorCode(""); setErrorCorrelationId(""); setNotice("");
+    setBusy(label); setErrorState(EMPTY_ERROR_STATE); setNotice("");
     try {
       const r = await fn();
       if (r && r.notice) setNotice(r.notice);
@@ -272,11 +278,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
       return r;
     }
     catch (e) {
-      setError(e.message || String(e));
-      setErrorFields(Array.isArray(e.fields) ? e.fields : []);
-      setErrorAction(e.action || null);
-      setErrorCode(e.errorCode || "");
-      setErrorCorrelationId(e.correlationId || "");
+      setErrorState({
+        message: e.message || String(e),
+        fields: Array.isArray(e.fields) ? e.fields : [],
+        action: e.action || null,
+        code: e.errorCode || "",
+        correlationId: e.correlationId || "",
+      });
       pendingRecoveryRef.current = null;
       throw e;
     }
@@ -774,37 +782,37 @@ export default function ProductionConsole({ onExitToLegacy }) {
             the page the operator has scrolled — this grid runs to hundreds of
             cards, and a banner that only appeared at the very top of the page
             was invisible for virtually every click made mid-list. */}
-        {(busy || error || notice) && (
+        {(busy || errorState.message || notice) && (
           <div style={{ position: "sticky", top: 0, zIndex: 50, background: C.paper, paddingBottom: 8, marginBottom: 2 }}>
             {busy && <div style={{ ...S.pill(C.orange), marginBottom: 10 }}>⏳ {busy}…</div>}
-            {error && (
+            {errorState.message && (
               <div style={{ ...S.card, borderColor: C.red, color: C.red, marginTop: 0 }}>
-                ⚠ {error}
-                {errorCode && <span title="Reference this code if you need to report the issue." style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 600, color: C.muted, letterSpacing: 0.3 }}>{errorCode}</span>}
-                {errorAction && errorAction.type === "navigate" && (
+                ⚠ {errorState.message}
+                {errorState.code && <span title="Reference this code if you need to report the issue." style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 600, color: C.muted, letterSpacing: 0.3 }}>{errorState.code}</span>}
+                {errorState.action && errorState.action.type === "navigate" && (
                   <div>
-                    {errorAction.explanation && <div style={{ fontSize: 12.5, marginTop: 6, marginBottom: 2 }}>{errorAction.explanation}</div>}
+                    {errorState.action.explanation && <div style={{ fontSize: 12.5, marginTop: 6, marginBottom: 2 }}>{errorState.action.explanation}</div>}
                     <button
                       style={{ ...S.btn(), background: C.red, marginTop: 6, marginRight: 0 }}
                       onClick={() => {
                         // Recovery-success telemetry (docs/ERROR_HANDLING_STANDARD.md):
                         // fire-and-forget "clicked", then arm the pending-recovery
                         // ref so the next run() outcome can report whether it worked.
-                        if (errorCorrelationId) {
-                          pendingRecoveryRef.current = errorCorrelationId;
-                          api("/api/diagnostics/recovery-event", { method: "POST", body: JSON.stringify({ correlationId: errorCorrelationId, kind: "clicked" }) }).catch(() => {});
+                        if (errorState.correlationId) {
+                          pendingRecoveryRef.current = errorState.correlationId;
+                          api("/api/diagnostics/recovery-event", { method: "POST", body: JSON.stringify({ correlationId: errorState.correlationId, kind: "clicked" }) }).catch(() => {});
                         }
-                        setStep(errorAction.target); setError(""); setErrorFields([]); setErrorAction(null); setErrorCode(""); setErrorCorrelationId("");
+                        setStep(errorState.action.target); setErrorState(EMPTY_ERROR_STATE);
                       }}
                     >
-                      {errorAction.label} →
+                      {errorState.action.label} →
                     </button>
-                    {errorAction.docLink && <a href={errorAction.docLink} target="_blank" rel="noreferrer" style={{ marginLeft: 8, fontSize: 12, color: C.red }}>Learn more ↗</a>}
+                    {errorState.action.docLink && <a href={errorState.action.docLink} target="_blank" rel="noreferrer" style={{ marginLeft: 8, fontSize: 12, color: C.red }}>Learn more ↗</a>}
                   </div>
                 )}
               </div>
             )}
-            {notice && !error && <div style={{ ...S.card, borderColor: C.green, marginTop: 0 }}>{notice}</div>}
+            {notice && !errorState.message && <div style={{ ...S.card, borderColor: C.green, marginTop: 0 }}>{notice}</div>}
           </div>
         )}
 
@@ -835,14 +843,14 @@ export default function ProductionConsole({ onExitToLegacy }) {
             </div>
             <div style={S.card}>
               <b>Create new</b>
-              <LabeledInput label="Book title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} error={fieldError(errorFields, "title")} />
+              <LabeledInput label="Book title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} error={fieldError(errorState.fields, "title")} />
               {/* Progressive validation: flagged the instant it matches, not after Create is clicked — duplicate
                   titles are still allowed (see the disambiguating subtitle/author/date above), this is just a heads-up. */}
               {form.title.trim() && projects.some((p) => p.title.trim().toLowerCase() === form.title.trim().toLowerCase()) && (
                 <div style={{ color: C.orange, fontSize: 12, marginTop: 4 }}>A project named "{form.title.trim()}" already exists. You can still create another — just double-check this isn't an accidental duplicate.</div>
               )}
-              <LabeledInput label="Subtitle" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} error={fieldError(errorFields, "subtitle")} />
-              <LabeledInput label="Author / pen name" value={form.author} onChange={(v) => setForm({ ...form, author: v })} error={fieldError(errorFields, "authorName")} />
+              <LabeledInput label="Subtitle" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} error={fieldError(errorState.fields, "subtitle")} />
+              <LabeledInput label="Author / pen name" value={form.author} onChange={(v) => setForm({ ...form, author: v })} error={fieldError(errorState.fields, "authorName")} />
               <button style={S.btn()} onClick={() => createProject().then(() => setStep("manuscript")).catch(() => {})}>Create project →</button>
             </div>
           </Panel>
@@ -892,10 +900,10 @@ export default function ProductionConsole({ onExitToLegacy }) {
             <Guard project={project} setStep={setStep} />
             {project && (
               <div style={S.card}>
-                <LabeledInput label="Book title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} error={fieldError(errorFields, "title")} />
-                <LabeledInput label="Subtitle / region" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} error={fieldError(errorFields, "subtitle")} />
+                <LabeledInput label="Book title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} error={fieldError(errorState.fields, "title")} />
+                <LabeledInput label="Subtitle / region" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} error={fieldError(errorState.fields, "subtitle")} />
                 <LabeledInput label="Cover description line" value={form.coverDescription} onChange={(v) => setForm({ ...form, coverDescription: v })} />
-                <LabeledInput label="Author / pen name (comma-separate co-authors)" value={form.author} onChange={(v) => setForm({ ...form, author: v })} error={fieldError(errorFields, "authorName")} />
+                <LabeledInput label="Author / pen name (comma-separate co-authors)" value={form.author} onChange={(v) => setForm({ ...form, author: v })} error={fieldError(errorState.fields, "authorName")} />
                 <LabeledInput label="Series name" value={form.series} onChange={(v) => setForm({ ...form, series: v })} />
                 <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 600 }}>Volume
                   <input type="number" min="1" step="1" style={S.input} value={form.volume} onChange={(e) => setForm({ ...form, volume: e.target.value })} />

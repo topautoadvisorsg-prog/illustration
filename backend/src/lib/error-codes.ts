@@ -43,8 +43,18 @@ const FIELD_ERROR_CODES: Record<string, string> = {
   subtitle: ERROR_CODES.FIELD_INVALID_SUBTITLE,
 };
 
+/** A Zod issue's `path` mixes string keys and numeric array indices (e.g.
+ *  `['chapters', 0, 'entries']`) — this finds the last (most specific) *named*
+ *  segment, skipping indices. Shared by codeForFieldPath below and
+ *  validation-messages.ts's labelForPath, which both need the same "what
+ *  field is this really about" answer. */
+export function lastStringSegment(path: Array<string | number>): string | undefined {
+  const found = [...path].reverse().find((p) => typeof p === 'string');
+  return found === undefined ? undefined : String(found);
+}
+
 /** Maps a dot-joined field path (e.g. "config.authorName") to its stable code. */
 export function codeForFieldPath(path: Array<string | number>): string {
-  const lastSegment = [...path].reverse().find((p) => typeof p === 'string');
-  return (lastSegment && FIELD_ERROR_CODES[String(lastSegment)]) || ERROR_CODES.FIELD_GENERIC;
+  const lastSegment = lastStringSegment(path);
+  return (lastSegment && FIELD_ERROR_CODES[lastSegment]) || ERROR_CODES.FIELD_GENERIC;
 }

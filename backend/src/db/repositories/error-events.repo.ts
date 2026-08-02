@@ -13,6 +13,7 @@ import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { getDb } from '../client.js';
 import { errorEvents, recoveryEvents } from '../schema/index.js';
 import type { TranslatedErrorEvent } from '../../lib/error-handler.js';
+import { windowSince } from '../../lib/time-window.js';
 
 export async function recordErrorEvent(event: TranslatedErrorEvent): Promise<void> {
   const db = getDb();
@@ -61,7 +62,7 @@ export interface ErrorFrequencyReport {
  *  notification infrastructure in this app to schedule one against. */
 export async function getErrorFrequencyReport(windowHours = 24): Promise<ErrorFrequencyReport> {
   const db = getDb();
-  const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
+  const since = windowSince(windowHours);
 
   const [totalRow] = await db
     .select({ count: sql<number>`count(*)::int` })

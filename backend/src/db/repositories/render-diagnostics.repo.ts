@@ -9,9 +9,10 @@
  *   - "approval time" = decidedAt - createdAt, which IS a real, purpose-built
  *     timestamp (decidedAt is set exactly when an operator approves/rejects).
  */
-import { sql } from 'drizzle-orm';
+import { and, gte, isNotNull, sql } from 'drizzle-orm';
 import { getDb } from '../client.js';
 import { wholePageRenders } from '../schema/index.js';
+import { windowSince } from '../../lib/time-window.js';
 
 export interface RenderDiagnostics {
   windowHours: number;
@@ -25,7 +26,7 @@ export interface RenderDiagnostics {
 
 export async function getRenderDiagnostics(windowHours = 24): Promise<RenderDiagnostics> {
   const db = getDb();
-  const since = sql`now() - (${windowHours} || ' hours')::interval`;
+  const since = windowSince(windowHours);
 
   const [totalsRow] = await db
     .select({
@@ -33,21 +34,21 @@ export async function getRenderDiagnostics(windowHours = 24): Promise<RenderDiag
       failed: sql<number>`count(*) filter (where ${wholePageRenders.status} = 'FAILED')::int`,
     })
     .from(wholePageRenders)
-    .where(sql`${wholePageRenders.createdAt} >= ${since}`);
+    .where(gte(wholePageRenders.createdAt, since));
 
   const [renderTimeRow] = await db
     .select({
       avgSeconds: sql<number | null>`avg(extract(epoch from (${wholePageRenders.updatedAt} - ${wholePageRenders.createdAt})))`,
     })
     .from(wholePageRenders)
-    .where(sql`${wholePageRenders.status} IN ('RENDERED','APPROVED') AND ${wholePageRenders.updatedAt} >= ${since}`);
+    .where(and(sql`${wholePageRenders.status} IN ('RENDERED','APPROVED')`, gte(wholePageRenders.updatedAt, since)));
 
   const [approvalTimeRow] = await db
     .select({
       avgSeconds: sql<number | null>`avg(extract(epoch from (${wholePageRenders.decidedAt} - ${wholePageRenders.createdAt})))`,
     })
     .from(wholePageRenders)
-    .where(sql`${wholePageRenders.decidedAt} IS NOT NULL AND ${wholePageRenders.decidedAt} >= ${since}`);
+    .where(and(isNotNull(wholePageRenders.decidedAt), gte(wholePageRenders.decidedAt, since)));
 
   return {
     windowHours,

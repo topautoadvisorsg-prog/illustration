@@ -60,12 +60,10 @@ export interface ErrorRegistryEntry {
   severity: ErrorSeverity;
 }
 
-function entry(e: ErrorRegistryEntry): ErrorRegistryEntry {
-  return e;
-}
-
+// Every value here is already checked against ErrorRegistryEntry by this
+// Record's own type — no per-entry wrapper function needed for that.
 export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
-  [ERROR_CODES.FIELD_GENERIC]: entry({
+  [ERROR_CODES.FIELD_GENERIC]: {
     code: ERROR_CODES.FIELD_GENERIC,
     title: 'Field Invalid (Unmapped)',
     friendlyMessage: '<Field> is invalid.',
@@ -74,8 +72,8 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Fix the highlighted field. If this shows up often for the same field, mint it a real code.',
     step: 'project',
     severity: 'validation',
-  }),
-  [ERROR_CODES.FIELD_REQUIRED_TITLE]: entry({
+  },
+  [ERROR_CODES.FIELD_REQUIRED_TITLE]: {
     code: ERROR_CODES.FIELD_REQUIRED_TITLE,
     title: 'Missing Title',
     friendlyMessage: 'Title is required.',
@@ -83,8 +81,8 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Enter a book title.',
     step: 'project',
     severity: 'validation',
-  }),
-  [ERROR_CODES.FIELD_REQUIRED_AUTHOR_NAME]: entry({
+  },
+  [ERROR_CODES.FIELD_REQUIRED_AUTHOR_NAME]: {
     code: ERROR_CODES.FIELD_REQUIRED_AUTHOR_NAME,
     title: 'Missing Author',
     friendlyMessage: 'Author / pen name is required.',
@@ -92,8 +90,8 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Enter an author name.',
     step: 'project',
     severity: 'validation',
-  }),
-  [ERROR_CODES.FIELD_INVALID_VOLUME]: entry({
+  },
+  [ERROR_CODES.FIELD_INVALID_VOLUME]: {
     code: ERROR_CODES.FIELD_INVALID_VOLUME,
     title: 'Invalid Volume',
     friendlyMessage: 'Volume must be a positive number.',
@@ -101,8 +99,8 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Set Volume to a whole number of 1 or more.',
     step: 'setup',
     severity: 'validation',
-  }),
-  [ERROR_CODES.FIELD_INVALID_SUBTITLE]: entry({
+  },
+  [ERROR_CODES.FIELD_INVALID_SUBTITLE]: {
     code: ERROR_CODES.FIELD_INVALID_SUBTITLE,
     title: 'Invalid Subtitle',
     friendlyMessage: 'Subtitle is invalid.',
@@ -110,9 +108,9 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Fix or clear the Subtitle field.',
     step: 'project',
     severity: 'validation',
-  }),
+  },
 
-  [ERROR_CODES.INVALID_MANUSCRIPT_STRUCTURE]: entry({
+  [ERROR_CODES.INVALID_MANUSCRIPT_STRUCTURE]: {
     code: ERROR_CODES.INVALID_MANUSCRIPT_STRUCTURE,
     title: 'Invalid Manuscript Structure',
     friendlyMessage: 'The manuscript could not be converted into a valid book structure. Check the chapter and entry formatting and try again.',
@@ -120,8 +118,8 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Return to Manuscript, re-check the required structure card, and re-upload.',
     step: 'breakdown',
     severity: 'structural',
-  }),
-  [ERROR_CODES.NO_CHAPTERS_DETECTED]: entry({
+  },
+  [ERROR_CODES.NO_CHAPTERS_DETECTED]: {
     code: ERROR_CODES.NO_CHAPTERS_DETECTED,
     title: 'No Chapters Detected',
     friendlyMessage: 'This manuscript doesn\'t contain any chapters. Mark each chapter with a top-level "# Chapter Title" heading before running Breakdown.',
@@ -129,8 +127,8 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Return to Manuscript and add at least one "# Chapter Title" heading.',
     step: 'manuscript',
     severity: 'structural',
-  }),
-  [ERROR_CODES.NO_ENTRIES_DETECTED]: entry({
+  },
+  [ERROR_CODES.NO_ENTRIES_DETECTED]: {
     code: ERROR_CODES.NO_ENTRIES_DETECTED,
     title: 'No Entries Detected',
     friendlyMessage: 'This manuscript doesn\'t contain any entries. Mark each entry with a "### Entry Title" heading inside its chapter before running Breakdown.',
@@ -138,8 +136,8 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Return to Manuscript and add at least one "### Entry Title" heading inside a chapter.',
     step: 'manuscript',
     severity: 'structural',
-  }),
-  [ERROR_CODES.EMPTY_CHAPTER]: entry({
+  },
+  [ERROR_CODES.EMPTY_CHAPTER]: {
     code: ERROR_CODES.EMPTY_CHAPTER,
     title: 'Empty Chapter',
     friendlyMessage: 'Chapter <N> ("<title>") doesn\'t contain any entries. Each chapter needs at least one "### Entry Title" heading before Breakdown can continue.',
@@ -147,9 +145,9 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Return to Manuscript and add at least one "### Entry Title" heading to the named chapter.',
     step: 'breakdown',
     severity: 'structural',
-  }),
+  },
 
-  [ERROR_CODES.MANUSCRIPT_FORMAT_GENERIC]: entry({
+  [ERROR_CODES.MANUSCRIPT_FORMAT_GENERIC]: {
     code: ERROR_CODES.MANUSCRIPT_FORMAT_GENERIC,
     title: 'Manuscript Format Problem (Unclassified)',
     friendlyMessage: 'The uploaded manuscript could not be read.',
@@ -157,8 +155,8 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Re-check the file and re-upload; if this keeps happening, mint a specific code for the actual cause.',
     step: 'manuscript',
     severity: 'structural',
-  }),
-  [ERROR_CODES.UNSUPPORTED_MANUSCRIPT_FORMAT]: entry({
+  },
+  [ERROR_CODES.UNSUPPORTED_MANUSCRIPT_FORMAT]: {
     code: ERROR_CODES.UNSUPPORTED_MANUSCRIPT_FORMAT,
     title: 'Unsupported Manuscript Format',
     friendlyMessage: 'e.g. "Uploaded text file is empty." / "No selectable text found in the PDF (it may be scanned images)."',
@@ -166,8 +164,8 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Upload a non-empty .md/.markdown/.txt/.docx/.pdf with real, selectable text.',
     step: 'manuscript',
     severity: 'validation',
-  }),
-  [ERROR_CODES.MANUSCRIPT_MISSING]: entry({
+  },
+  [ERROR_CODES.MANUSCRIPT_MISSING]: {
     code: ERROR_CODES.MANUSCRIPT_MISSING,
     title: 'No Manuscript On File',
     friendlyMessage: 'No manuscript on file. Upload one before running Breakdown. / Stored manuscript file is missing. Re-upload the manuscript.',
@@ -175,9 +173,9 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'Go to Manuscript and upload (or re-upload) the manuscript.',
     step: 'breakdown',
     severity: 'structural',
-  }),
+  },
 
-  [ERROR_CODES.UNCLASSIFIED]: entry({
+  [ERROR_CODES.UNCLASSIFIED]: {
     code: ERROR_CODES.UNCLASSIFIED,
     title: 'Unclassified Validation Error',
     friendlyMessage: 'The request was invalid. / Please fix the highlighted fields.',
@@ -185,7 +183,7 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     recovery: 'No specific recovery — if this code appears in telemetry, find the throw site and give it a real code.',
     step: 'any',
     severity: 'system',
-  }),
+  },
 };
 
 /** All registry entries, for iteration (docs generation, tests). */

@@ -14,9 +14,10 @@
  */
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { hasZodFastifySchemaValidationErrors } from 'fastify-type-provider-zod';
 import { ZodError } from 'zod';
+import type { ApiErrorAction, ApiErrorField } from '@wildlands/shared';
 import { UserFacingError } from './user-facing-error.js';
 import { issuesToFields, summaryMessage, summaryErrorCode } from './validation-messages.js';
 import { ERROR_CODES } from './error-codes.js';
@@ -80,6 +81,33 @@ function logTranslatedError(
   return event;
 }
 
+/** The one JSON shape every translated error responds with — see ApiErrorSchema
+ *  (shared). Pulled out so the three branches below (UserFacingError, Fastify
+ *  schema validation, raw ZodError safety net) build it identically instead
+ *  of repeating the same object literal with minor variations. */
+function sendTranslated(
+  reply: FastifyReply,
+  args: {
+    statusCode: number;
+    errorTitle: string;
+    message: string;
+    errorCode: string;
+    correlationId: string;
+    fields?: ApiErrorField[];
+    action?: ApiErrorAction;
+  },
+): void {
+  reply.code(args.statusCode).send({
+    error: args.errorTitle,
+    message: args.message,
+    statusCode: args.statusCode,
+    fields: args.fields,
+    action: args.action,
+    errorCode: args.errorCode,
+    correlationId: args.correlationId,
+  });
+}
+
 /**
  * Registers the centralized error handler on `app`. `sink` is called once per
  * translated error (in addition to the always-on structured log) — server.ts
@@ -90,14 +118,14 @@ export function registerErrorHandler(app: FastifyInstance, sink: TranslatedError
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof UserFacingError) {
       const event = logTranslatedError(request, error.errorCode, error.statusCode, sink);
-      reply.code(error.statusCode).send({
-        error: error.code,
-        message: error.message,
+      sendTranslated(reply, {
         statusCode: error.statusCode,
-        fields: error.fields,
-        action: error.action,
+        errorTitle: error.code,
+        message: error.message,
         errorCode: error.errorCode,
         correlationId: event.correlationId,
+        fields: error.fields,
+        action: error.action,
       });
       return;
     }
@@ -107,13 +135,13 @@ export function registerErrorHandler(app: FastifyInstance, sink: TranslatedError
       const fields = issuesToFields(issues);
       const errorCode = summaryErrorCode(fields, ERROR_CODES.FIELD_GENERIC);
       const event = logTranslatedError(request, errorCode, 400, sink);
-      reply.code(400).send({
-        error: 'Validation Error',
-        message: summaryMessage(fields),
+      sendTranslated(reply, {
         statusCode: 400,
-        fields,
+        errorTitle: 'Validation Error',
+        message: summaryMessage(fields),
         errorCode,
         correlationId: event.correlationId,
+        fields,
       });
       return;
     }
@@ -122,13 +150,13 @@ export function registerErrorHandler(app: FastifyInstance, sink: TranslatedError
       const fields = issuesToFields(error.issues);
       const errorCode = summaryErrorCode(fields, ERROR_CODES.UNCLASSIFIED);
       const event = logTranslatedError(request, errorCode, 400, sink);
-      reply.code(400).send({
-        error: 'Validation Error',
-        message: summaryMessage(fields),
+      sendTranslated(reply, {
         statusCode: 400,
-        fields,
+        errorTitle: 'Validation Error',
+        message: summaryMessage(fields),
         errorCode,
         correlationId: event.correlationId,
+        fields,
       });
       return;
     }
