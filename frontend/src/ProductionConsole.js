@@ -641,6 +641,15 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const renderPage = (pageId) => run("Rendering page (paid)", async () => {
     const d = await api(`/api/whole-page-render/${pageId}`, { method: "POST", body: "{}" });
     await loadRenders();
+    // A render call returns HTTP 200 even when the underlying generation
+    // failed (e.g. an OpenAI billing/quota error) — see renderAll's comment
+    // above. Surfacing that as a green success notice ("Rendered v1
+    // (FAILED)") is exactly the kind of raw-status-leak this app's error
+    // layer exists to prevent, so a non-success status is thrown instead,
+    // routing it through the same red banner as any other error.
+    if (d.status !== "RENDERED" && d.status !== "APPROVED") {
+      throw new Error(d.render?.errorMessage || `Render failed (status: ${d.status}).`);
+    }
     return { notice: `Rendered v${d.version} (${d.status}).` };
   });
 
