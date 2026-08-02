@@ -28,6 +28,7 @@ import {
 import { persistManifests, type PageSeed } from '../../db/repositories/manifests.repo.js';
 import { extractBinomial } from '../subject-badges/extract-badges.js';
 import { logger } from '../../lib/logger.js';
+import { UserFacingError } from '../../lib/user-facing-error.js';
 import {
   assertUsableManuscriptOutline,
   parseManuscriptOutline,
@@ -404,14 +405,43 @@ function regionFromConfig(config: ProjectConfig): string {
 
 export function buildDeterministicManifestResult(outline: ManuscriptOutline, config: ProjectConfig): ManifestGenerationResult {
   const region = regionFromConfig(config);
-  return ManifestGenerationResultSchema.parse({
+  const draft = {
     bookTitle: config.title,
     chapters: outline.chapters.map((chapter) => ({
       chapterNumber: chapter.chapterNumber,
       chapterTitle: chapter.title,
       entries: chapter.entries.map((entry) => buildEntryManifest(chapter, entry, region)),
     })),
-  });
+  };
+
+  const parsed = ManifestGenerationResultSchema.safeParse(draft);
+  if (parsed.success) return parsed.data;
+
+  // We have the manuscript outline right here, so translate the single most
+  // common failure — a chapter with zero "### Entry Title" headings — into a
+  // specific, actionable message instead of letting the raw ZodError (a
+  // JSON-dumped issues array) reach the operator. See UserFacingError.
+  const emptyChapterIssue = parsed.error.issues.find(
+    (issue) => issue.code === 'too_small' && issue.path[0] === 'chapters' && issue.path[2] === 'entries',
+  );
+  if (emptyChapterIssue) {
+    const chapterIndex = Number(emptyChapterIssue.path[1]);
+    const chapter = outline.chapters[chapterIndex];
+    const chapterLabel = chapter ? `Chapter ${chapter.chapterNumber} ("${chapter.title}")` : 'One of the chapters';
+    throw new UserFacingError(
+      `${chapterLabel} doesn't contain any entries. Each chapter needs at least one "### Entry Title" heading before Breakdown can continue.`,
+      {
+        code: 'Empty Chapter',
+        statusCode: 400,
+        action: { type: 'navigate', target: 'manuscript', label: 'Return to Manuscript' },
+      },
+    );
+  }
+
+  throw new UserFacingError(
+    'The manuscript could not be converted into a valid book structure. Check the chapter and entry formatting and try again.',
+    { code: 'Invalid Manuscript Structure', statusCode: 400, action: { type: 'navigate', target: 'manuscript', label: 'Return to Manuscript' } },
+  );
 }
 
 export async function generateManifests(input: GenerateManifestsInput): Promise<GenerateManifestsResult> {

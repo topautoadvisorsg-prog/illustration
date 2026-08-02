@@ -8,6 +8,8 @@
  * Output: parsed outline used for validation and Stage 2 planning signals.
  */
 
+import { UserFacingError } from '../../lib/user-facing-error.js';
+
 export interface ManuscriptSectionOutline {
   title: string;
   lineStart: number;
@@ -279,10 +281,16 @@ export function parseManuscriptOutline(markdown: string): ManuscriptOutline {
 
 export function assertUsableManuscriptOutline(outline: ManuscriptOutline): void {
   if (outline.chapters.length === 0) {
-    throw new Error('NO_CHAPTERS_DETECTED: manuscript must include at least one # chapter heading.');
+    throw new UserFacingError(
+      'This manuscript doesn\'t contain any chapters. Mark each chapter with a top-level "# Chapter Title" heading before running Breakdown.',
+      { code: 'No Chapters Detected', statusCode: 400, action: { type: 'navigate', target: 'manuscript', label: 'Return to Manuscript' } },
+    );
   }
   if (outline.totalEntries === 0) {
-    throw new Error('NO_ENTRIES_DETECTED: manuscript must include at least one ## entry heading.');
+    throw new UserFacingError(
+      'This manuscript doesn\'t contain any entries. Mark each entry with a "### Entry Title" heading inside its chapter before running Breakdown.',
+      { code: 'No Entries Detected', statusCode: 400, action: { type: 'navigate', target: 'manuscript', label: 'Return to Manuscript' } },
+    );
   }
 }
 

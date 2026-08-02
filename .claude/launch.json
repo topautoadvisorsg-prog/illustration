@@ -6,6 +6,12 @@
       "runtimeExecutable": "corepack",
       "runtimeArgs": ["yarn", "--cwd", "frontend", "dev"],
       "port": 3000
+    },
+    {
+      "name": "wildlands-backend",
+      "runtimeExecutable": "corepack",
+      "runtimeArgs": ["yarn", "--cwd", "backend", "dev"],
+      "port": 8001
     }
   ]
 }

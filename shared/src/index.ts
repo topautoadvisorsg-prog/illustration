@@ -686,6 +686,8 @@ export const ProjectSchema = z.object({
   brand: BrandSchema,
   audience: AudienceSchema,
   title: z.string(),
+  subtitle: z.string().nullable(),
+  authorName: z.string().nullable(),
   status: ProjectStatusSchema,
   manuscriptPath: z.string().nullable(),
   createdAt: z.string(),
@@ -984,12 +986,36 @@ export const CreateKnowledgeLinkRequestSchema = z.object({
   note: z.string().optional(),
 });
 
+/** One field-level validation problem, translated into operator-facing language. */
+export const ApiErrorFieldSchema = z.object({
+  /** Dot-joined path into the request body, e.g. "config.authorName". */
+  path: z.string(),
+  /** Human label matching the on-screen field, e.g. "Author / pen name". */
+  label: z.string(),
+  /** Plain-English sentence, never a schema path or raw Zod message. */
+  message: z.string(),
+});
+
+/** Optional follow-up the UI can offer the operator (e.g. "Return to Manuscript"). */
+export const ApiErrorActionSchema = z.object({
+  type: z.literal('navigate'),
+  target: z.string(),
+  label: z.string(),
+});
+
 export const ApiErrorSchema = z.object({
   error: z.string(),
   message: z.string(),
   statusCode: z.number().int(),
+  /** Per-field problems, when the error can be pinned to specific inputs. */
+  fields: z.array(ApiErrorFieldSchema).optional(),
+  /** A suggested next step for the operator, when one applies. */
+  action: ApiErrorActionSchema.optional(),
 });
 
+export type ApiErrorField = z.infer<typeof ApiErrorFieldSchema>;
+export type ApiErrorAction = z.infer<typeof ApiErrorActionSchema>;
+export type ApiError = z.infer<typeof ApiErrorSchema>;
 export type Brand = z.infer<typeof BrandSchema>;
 export type Audience = z.infer<typeof AudienceSchema>;
 export type Edition = z.infer<typeof EditionSchema>;

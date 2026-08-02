@@ -209,6 +209,8 @@ function toContract(row: ProjectRow) {
     brand: row.brand,
     audience: row.audience,
     title: row.title,
+    subtitle: row.subtitle,
+    authorName: row.authorName,
     status: row.status,
     manuscriptPath: row.manuscriptPath,
     createdAt: row.createdAt.toISOString(),
@@ -1127,6 +1129,45 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           warnings: outline.warnings,
         },
       };
+    },
+  );
+
+  const ManuscriptContentResponseSchema = z.object({
+    manuscript: z.string(),
+    relativePath: z.string(),
+  });
+
+  app.get(
+    '/api/projects/:id/manuscript',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        response: { 200: ManuscriptContentResponseSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      if (!project.manuscriptPath) {
+        return reply.code(404).send({ error: 'Not Found', message: 'No manuscript on file.', statusCode: 404 });
+      }
+
+      const { getProjectStorage } = await import('../services/storage/project-storage.js');
+      let buf: Buffer;
+      try {
+        buf = await getProjectStorage().readProjectFile(project.manuscriptPath);
+      } catch (error) {
+        if (isNativeError(error) && 'code' in error && error.code === 'ENOENT') {
+          return reply.code(404).send({
+            error: 'Not Found',
+            message: 'Stored manuscript file is missing. Re-upload the manuscript.',
+            statusCode: 404,
+          });
+        }
+        throw error;
+      }
+      return { manuscript: buf.toString('utf8'), relativePath: project.manuscriptPath };
     },
   );
 

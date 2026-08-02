@@ -12,7 +12,7 @@
  * readable text" assumptions — the AI bakes each finished page.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const DEFAULT_BACKEND_URL = "https://wildlandsbackend-production.up.railway.app";
 const BACKEND = process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND_URL;
@@ -60,6 +60,73 @@ const STEPS = [
   { key: "assemble", label: "8 · Build Book", purpose: "Assemble approved pages + cover into print-ready files (300+ DPI)." },
 ];
 
+// COPYRIGHT_PAGE, DISCLAIMER, and DEDICATION are typeset deterministically at
+// Build time (Step 6) — never sent to the AI illustrator — so they already
+// show APPROVED the moment a fresh project reaches Step 7, with no operator
+// action taken. Everything else (including Glossary/Index/Resources, which
+// LOOK like reference pages too) goes through real AI rendering and needs
+// the normal render/approve flow. Matches plan-front-matter.ts's `aiRendered`
+// / reference-section split — see the "no manual approval" note below.
+const DETERMINISTIC_FRONT_MATTER_TYPES = new Set(["COPYRIGHT_PAGE", "DISCLAIMER", "DEDICATION"]);
+function isDeterministicPage(pageKey) {
+  const type = String(pageKey || "").replace(/^(FM|BM)_\d+_/, "");
+  return DETERMINISTIC_FRONT_MATTER_TYPES.has(type);
+}
+
+const FRONT_BACK_MATTER_LABELS = {
+  INTRODUCTION: "Introduction",
+  GLOSSARY: "Glossary",
+  INDEX: "Index",
+  ABOUT_AUTHOR: "About the Author",
+  ABOUT_SERIES: "About the Series",
+  RESOURCES: "Resources",
+  BACK_COVER_COPY: "Back Cover Copy",
+};
+
+const MANUSCRIPT_TEMPLATE = `# CHAPTER 1: KNOW YOUR REGION
+
+Optional chapter introduction text. It's stored but not turned into its own page — only "###" entries below become pages.
+
+### First Entry Title
+
+Body text for this entry. Every chapter needs at least one "###" entry like this before Breakdown can run.
+
+### Second Entry Title
+
+More body text — one page per entry.
+
+# CHAPTER 2: SECOND CHAPTER TITLE
+
+### Another Entry Title
+
+Body text for this chapter's entry.
+
+# GLOSSARY
+
+**Term.** Definition of the term.
+
+**Another Term.** Definition of the term.
+`;
+
+function downloadTextFile(filename, text) {
+  const blob = new Blob([text], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Backend field paths are dot-joined and nested (e.g. "config.authorName");
+// match on the last segment so a form doesn't need to know the exact nesting.
+function fieldError(fields, key) {
+  const hit = (fields || []).find((f) => f.path === key || f.path.endsWith(`.${key}`));
+  return hit ? hit.message : undefined;
+}
+
 function statusColor(s) {
   const k = String(s || "").toUpperCase();
   if (k === "APPROVED" || k === "RENDERED") return C.green;
@@ -81,6 +148,8 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [step, setStep] = useState("project");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [errorFields, setErrorFields] = useState([]); // [{path,label,message}] from the backend's error-translation layer
+  const [errorAction, setErrorAction] = useState(null); // { type:'navigate', target, label }
   const [notice, setNotice] = useState("");
 
   const [projects, setProjects] = useState([]);
@@ -117,7 +186,16 @@ export default function ProductionConsole({ onExitToLegacy }) {
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
-    if (!res.ok) throw new Error((data && (data.message || data.error)) || `${res.status} ${res.statusText}`);
+    if (!res.ok) {
+      // Backend's centralized error handler sends { message, fields, action } —
+      // never raw JSON/schema paths. Attach fields/action to the thrown Error so
+      // callers can highlight the specific input and offer the suggested action
+      // instead of just dumping the message string.
+      const err = new Error((data && (data.message || data.error)) || `${res.status} ${res.statusText}`);
+      if (data && Array.isArray(data.fields)) err.fields = data.fields;
+      if (data && data.action) err.action = data.action;
+      throw err;
+    }
     return data;
   }, []);
 
@@ -151,20 +229,62 @@ export default function ProductionConsole({ onExitToLegacy }) {
   }, [checkAuth]);
 
   const run = useCallback(async (label, fn) => {
-    setBusy(label); setError(""); setNotice("");
+    setBusy(label); setError(""); setErrorFields([]); setErrorAction(null); setNotice("");
     try { const r = await fn(); if (r && r.notice) setNotice(r.notice); return r; }
-    catch (e) { setError(e.message || String(e)); throw e; }
+    catch (e) {
+      setError(e.message || String(e));
+      setErrorFields(Array.isArray(e.fields) ? e.fields : []);
+      setErrorAction(e.action || null);
+      throw e;
+    }
     finally { setBusy(""); }
   }, []);
 
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
   const loadProjects = useCallback(() => run("Loading projects", async () => {
     const d = await api("/api/projects");
     const list = Array.isArray(d) ? d : d.projects || [];
     setProjects(list);
+    setProjectsLoaded(true);
     return { notice: `${list.length} project(s).` };
   }), [api, run]);
 
-  useEffect(() => { if (authed) loadProjects().catch(() => {}); }, [authed, loadProjects]);
+  useEffect(() => { if (authed) loadProjects().catch(() => setProjectsLoaded(true)); }, [authed, loadProjects]);
+
+  // Restore the operator's place after a browser reload — without this, an
+  // accidental refresh mid-session (long render sessions especially) sends
+  // them all the way back to the Project screen with no memory of which book
+  // or step they were on. Runs once, right after the project list has loaded
+  // for the first time (even if it's empty); a real project switch afterward
+  // is a deliberate operator action, not something to auto-restore over.
+  // `placeSettledRef` is shared with the persist effect below so it never
+  // writes/clears localStorage before this restore attempt has happened —
+  // otherwise the initial `project === null` render would wipe the saved
+  // value before it's ever read (only reproduces under StrictMode's dev-only
+  // double-effect-invocation, but the guard is correct either way).
+  const placeSettledRef = useRef(false);
+  useEffect(() => {
+    if (placeSettledRef.current || project || !projectsLoaded) return;
+    placeSettledRef.current = true;
+    try {
+      const saved = JSON.parse(localStorage.getItem("wl_last_place") || "null");
+      if (saved && saved.projectId) {
+        const found = projects.find((p) => p.id === saved.projectId);
+        if (found) {
+          setProject(found);
+          if (saved.step) setStep(saved.step);
+        }
+      }
+    } catch { /* corrupt/old localStorage value — ignore, start fresh */ }
+  }, [projectsLoaded, projects, project]);
+
+  // Persist the active project + step on every change so the restore above
+  // has somewhere to read from.
+  useEffect(() => {
+    if (!placeSettledRef.current) return;
+    if (project?.id) localStorage.setItem("wl_last_place", JSON.stringify({ projectId: project.id, step }));
+    else localStorage.removeItem("wl_last_place");
+  }, [project?.id, step]);
 
   // Step checkmarks reflect the project's REAL state (not just what was clicked
   // this session): manifests => breakdown, CH pages => paginate, FM/BM pages =>
@@ -228,6 +348,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
         backAuthorBio: bd.authorBio ?? "",
       });
     }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [project?.id, api]);
+
+  // Restore the previously uploaded manuscript into Step 2's textarea whenever
+  // the active project changes — without this, navigating back after a
+  // successful upload (e.g. because Breakdown failed) shows an empty textarea
+  // and looks like the uploaded text was lost.
+  useEffect(() => {
+    if (!project?.id) { setManuscript(""); setManuscriptName(""); return undefined; }
+    let cancelled = false;
+    api(`/api/projects/${project.id}/manuscript`).then((d) => {
+      if (cancelled || !d) return;
+      setManuscript(d.manuscript || "");
+      setManuscriptName((d.relativePath || "").split("/").pop() || "");
+    }).catch(() => { if (!cancelled) { setManuscript(""); setManuscriptName(""); } });
     return () => { cancelled = true; };
   }, [project?.id, api]);
 
@@ -584,7 +719,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
         {(busy || error || notice) && (
           <div style={{ position: "sticky", top: 0, zIndex: 50, background: C.paper, paddingBottom: 8, marginBottom: 2 }}>
             {busy && <div style={{ ...S.pill(C.orange), marginBottom: 10 }}>⏳ {busy}…</div>}
-            {error && <div style={{ ...S.card, borderColor: C.red, color: C.red, marginTop: 0 }}>⚠ {error}</div>}
+            {error && (
+              <div style={{ ...S.card, borderColor: C.red, color: C.red, marginTop: 0 }}>
+                ⚠ {error}
+                {errorAction && errorAction.type === "navigate" && (
+                  <div>
+                    <button
+                      style={{ ...S.btn(), background: C.red, marginTop: 10, marginRight: 0 }}
+                      onClick={() => { setStep(errorAction.target); setError(""); setErrorFields([]); setErrorAction(null); }}
+                    >
+                      {errorAction.label} →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             {notice && !error && <div style={{ ...S.card, borderColor: C.green, marginTop: 0 }}>{notice}</div>}
           </div>
         )}
@@ -595,23 +744,30 @@ export default function ProductionConsole({ onExitToLegacy }) {
               <b>Open existing</b>
               <div style={{ marginTop: 8 }}>
                 {projects.length === 0 && <span style={{ color: C.muted }}>No projects yet.</span>}
-                {projects.map((p) => (
-                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                    <button style={{ ...(project?.id === p.id ? S.btn("ok") : S.ghost), margin: 0, flex: 1, textAlign: "left" }} onClick={() => { setProject(p); setNotice(`Opened “${p.title}”.`); }}>
-                      {p.title} <span style={{ color: project?.id === p.id ? "#fff" : C.muted, fontSize: 11 }}>· {p.status}</span>
-                    </button>
-                    <button title={`Delete “${p.title}”`} style={{ ...S.ghost, margin: 0, color: C.red, borderColor: C.red, padding: "6px 10px", fontSize: 11 }}
-                      onClick={() => { if (window.confirm(`Permanently delete “${p.title}” and ALL its pages, renders, and cover? This cannot be undone.`)) deleteProject(p).catch(() => {}); }}>✕</button>
-                  </div>
-                ))}
+                {projects.map((p) => {
+                  const active = project?.id === p.id;
+                  const detailBits = [p.subtitle, p.authorName, p.createdAt ? new Date(p.createdAt).toLocaleDateString() : null].filter(Boolean);
+                  return (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                      <button style={{ ...(active ? S.btn("ok") : S.ghost), margin: 0, flex: 1, textAlign: "left", display: "block" }} onClick={() => { setProject(p); setNotice(`Opened “${p.title}”.`); }}>
+                        <div>{p.title} <span style={{ ...S.pill(active ? "rgba(255,255,255,0.25)" : C.muted), marginLeft: 4 }}>{p.status}</span></div>
+                        {detailBits.length > 0 && (
+                          <div style={{ color: active ? "rgba(255,255,255,0.85)" : C.muted, fontSize: 11.5, marginTop: 2 }}>{detailBits.join(" · ")}</div>
+                        )}
+                      </button>
+                      <button title={`Delete “${p.title}”`} style={{ ...S.ghost, margin: 0, color: C.red, borderColor: C.red, padding: "6px 10px", fontSize: 11 }}
+                        onClick={() => { if (window.confirm(`Permanently delete “${p.title}” and ALL its pages, renders, and cover? This cannot be undone.`)) deleteProject(p).catch(() => {}); }}>✕</button>
+                    </div>
+                  );
+                })}
               </div>
               <button style={S.ghost} onClick={() => loadProjects().catch(() => {})}>↻ Refresh</button>
             </div>
             <div style={S.card}>
               <b>Create new</b>
-              <LabeledInput label="Book title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} />
-              <LabeledInput label="Subtitle" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} />
-              <LabeledInput label="Author / pen name" value={form.author} onChange={(v) => setForm({ ...form, author: v })} />
+              <LabeledInput label="Book title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} error={fieldError(errorFields, "title")} />
+              <LabeledInput label="Subtitle" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} error={fieldError(errorFields, "subtitle")} />
+              <LabeledInput label="Author / pen name" value={form.author} onChange={(v) => setForm({ ...form, author: v })} error={fieldError(errorFields, "authorName")} />
               <button style={S.btn()} onClick={() => createProject().then(() => setStep("manuscript")).catch(() => {})}>Create project →</button>
             </div>
           </Panel>
@@ -621,12 +777,30 @@ export default function ProductionConsole({ onExitToLegacy }) {
           <Panel title="Manuscript" sub="Paste or drop the master manuscript (Markdown). This is the source of truth for breakdown, pagination, and the glossary.">
             <Guard project={project} setStep={setStep} />
             {project && (
-              <div style={S.card}>
-                <DropZone onText={(t, n) => { setManuscript(t); setManuscriptName(n); }} />
-                <textarea style={{ ...S.input, minHeight: 200, fontFamily: "monospace", fontSize: 12 }} value={manuscript} placeholder="# Chapter 1 …" onChange={(e) => setManuscript(e.target.value)} />
-                <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{manuscript.length.toLocaleString()} chars{manuscriptName ? ` · ${manuscriptName}` : ""}</div>
-                <button style={S.btn()} onClick={() => upload().then(() => setStep("setup")).catch(() => {})}>Upload manuscript →</button>
-              </div>
+              <>
+                <div style={S.card}>
+                  <b>Required structure</b>
+                  <ul style={{ fontSize: 13, color: C.ink, marginTop: 8, paddingLeft: 20, lineHeight: 1.6 }}>
+                    <li><code>{"# CHAPTER 1: TITLE"}</code> — one top-level heading per chapter.</li>
+                    <li><code>{"### Entry Title"}</code> — one per page, inside its chapter. <b>Every chapter needs at least one</b> — a chapter with none fails Breakdown.</li>
+                    <li><code>{"# GLOSSARY"}</code> — optional, top-level, recognized automatically.</li>
+                  </ul>
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+                    Index and back-matter resources are generated by the platform — don't add them to the manuscript.
+                  </div>
+                  <details style={{ marginTop: 10 }}>
+                    <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600, color: C.blue }}>Show example</summary>
+                    <pre style={{ whiteSpace: "pre-wrap", fontSize: 11.5, background: "#fff", padding: 10, borderRadius: 6, marginTop: 8, border: `1px solid ${C.line}` }}>{MANUSCRIPT_TEMPLATE}</pre>
+                  </details>
+                  <button style={S.ghost} onClick={() => downloadTextFile("manuscript-template.md", MANUSCRIPT_TEMPLATE)}>⭳ Download template (.md)</button>
+                </div>
+                <div style={S.card}>
+                  <DropZone onText={(t, n) => { setManuscript(t); setManuscriptName(n); }} />
+                  <textarea style={{ ...S.input, minHeight: 200, fontFamily: "monospace", fontSize: 12 }} value={manuscript} placeholder="# Chapter 1 …" onChange={(e) => setManuscript(e.target.value)} />
+                  <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{manuscript.length.toLocaleString()} chars{manuscriptName ? ` · ${manuscriptName}` : ""}</div>
+                  <button style={S.btn()} onClick={() => upload().then(() => setStep("setup")).catch(() => {})}>Upload manuscript →</button>
+                </div>
+              </>
             )}
           </Panel>
         )}
@@ -636,10 +810,10 @@ export default function ProductionConsole({ onExitToLegacy }) {
             <Guard project={project} setStep={setStep} />
             {project && (
               <div style={S.card}>
-                <LabeledInput label="Book title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} />
-                <LabeledInput label="Subtitle / region" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} />
+                <LabeledInput label="Book title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} error={fieldError(errorFields, "title")} />
+                <LabeledInput label="Subtitle / region" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} error={fieldError(errorFields, "subtitle")} />
                 <LabeledInput label="Cover description line" value={form.coverDescription} onChange={(v) => setForm({ ...form, coverDescription: v })} />
-                <LabeledInput label="Author / pen name (comma-separate co-authors)" value={form.author} onChange={(v) => setForm({ ...form, author: v })} />
+                <LabeledInput label="Author / pen name (comma-separate co-authors)" value={form.author} onChange={(v) => setForm({ ...form, author: v })} error={fieldError(errorFields, "authorName")} />
                 <LabeledInput label="Series name" value={form.series} onChange={(v) => setForm({ ...form, series: v })} />
                 <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 600 }}>Volume
                   <input type="number" min="1" step="1" style={S.input} value={form.volume} onChange={(e) => setForm({ ...form, volume: e.target.value })} />
@@ -735,7 +909,16 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     <div style={{ marginTop: 12, fontSize: 13 }}>
                       <div><b>Front:</b> {(matter.frontPages || []).map((p) => p.kind).join(", ")}</div>
                       <div style={{ marginTop: 6 }}><b>Back:</b> {(matter.backPages || []).map((p) => p.kind).join(", ")}</div>
-                      {(matter.omitted || []).length > 0 && <div style={{ marginTop: 6, color: C.muted }}>Omitted: {matter.omitted.map((o) => o.page).join(", ")}</div>}
+                      {(matter.omitted || []).length > 0 && (
+                        <div style={{ marginTop: 6 }}>
+                          <b>Omitted:</b>
+                          <ul style={{ margin: "4px 0 0", paddingLeft: 18, color: C.muted }}>
+                            {matter.omitted.map((o) => (
+                              <li key={o.page}><b style={{ color: C.ink }}>{FRONT_BACK_MATTER_LABELS[o.page] || o.page}</b> — {o.reason}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -855,10 +1038,15 @@ export default function ProductionConsole({ onExitToLegacy }) {
                             ? <img alt={m.pageKey} src={`${fileUrl(m.imagePath)}&v=${m.version || 0}`} loading="lazy" decoding="async" onClick={() => previewPage(m.pageId, m.imagePath).catch(() => {})} title="Tap to preview" style={{ width: "100%", borderRadius: 4, display: "block", cursor: "pointer" }} />
                             : <div onClick={() => previewPage(m.pageId, null).catch(() => {})} title="Tap to preview" style={{ height: 110, background: "#f0ead6", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: 11, cursor: "pointer" }}>not rendered</div>}
                           <div style={{ fontSize: 11, marginTop: 6, fontWeight: 700, wordBreak: "break-all" }}>{m.pageKey}</div>
-                          <div style={{ marginTop: 4, display: "flex", gap: 5, alignItems: "center" }}>
+                          <div style={{ marginTop: 4, display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
                             <span style={S.pill(statusColor(m.status))}>{m.status}</span>
                             <span style={{ fontSize: 10, color: C.muted }}>{m.section}</span>
                           </div>
+                          {isDeterministicPage(m.pageKey) && (
+                            <div title="This page is generated deterministically (typeset, not AI-rendered) and requires no manual approval." style={{ fontSize: 10, color: C.muted, marginTop: 3, fontStyle: "italic" }}>
+                              auto-approved — typeset, not AI-rendered
+                            </div>
+                          )}
                           <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
                             <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => previewPage(m.pageId, m.imagePath).catch(() => {})}>Preview</button>
                             <button style={{ ...S.ghost, margin: 0, fontSize: 11, padding: "4px 8px" }} onClick={() => reviewPromptPage(m.pageId).catch(() => {})} title="No-spend pre-flight check: does the subject match the entry, is the body text intact — before you commit to a paid render">Review prompt</button>
@@ -1322,8 +1510,13 @@ function StepRun({ title, sub, project, setStep, actionLabel, onRun, result }) {
     </Panel>
   );
 }
-function LabeledInput({ label, value, onChange }) {
-  return (<label style={{ display: "block", marginTop: 10, fontSize: 13, fontWeight: 600 }}>{label}<input style={S.input} value={value} onChange={(e) => onChange(e.target.value)} /></label>);
+function LabeledInput({ label, value, onChange, error }) {
+  return (
+    <label style={{ display: "block", marginTop: 10, fontSize: 13, fontWeight: 600 }}>{label}
+      <input style={{ ...S.input, ...(error ? { border: `2px solid ${C.red}` } : {}) }} value={value} onChange={(e) => onChange(e.target.value)} />
+      {error ? <span style={{ display: "block", fontWeight: 400, color: C.red, fontSize: 12, marginTop: 3 }}>{error}</span> : null}
+    </label>
+  );
 }
 function LabeledTextarea({ label, value, onChange, rows = 4, hint }) {
   return (

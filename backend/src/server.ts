@@ -7,8 +7,12 @@ import {
   serializerCompiler,
   validatorCompiler,
   jsonSchemaTransform,
+  hasZodFastifySchemaValidationErrors,
 } from 'fastify-type-provider-zod';
+import { ZodError } from 'zod';
 import { getEnv } from './env.js';
+import { UserFacingError } from './lib/user-facing-error.js';
+import { issuesToFields, summaryMessage } from './lib/validation-messages.js';
 import { registerHealthRoutes } from './api/health.routes.js';
 import { registerProjectRoutes } from './api/projects.routes.js';
 import { registerPageRoutes } from './api/pages.routes.js';
@@ -32,6 +36,53 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+
+  // Centralized error-translation layer. Without this, Fastify's default
+  // handler sends raw Zod validation output straight to the operator (schema
+  // paths like "body/config/authorName", or — for a manually-thrown ZodError
+  // that escapes a route handler — a JSON-dumped issues array). Every path
+  // below ends in a plain sentence per field, never a schema path, raw JSON,
+  // or stack trace. Routes that already reply with a structured error via
+  // `reply.code().send(...)` never reach this handler at all — it only
+  // catches thrown/uncaught errors.
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof UserFacingError) {
+      reply.code(error.statusCode).send({
+        error: error.code,
+        message: error.message,
+        statusCode: error.statusCode,
+        fields: error.fields,
+        action: error.action,
+      });
+      return;
+    }
+
+    if (hasZodFastifySchemaValidationErrors(error)) {
+      const issues = error.validation.map((v) => v.params.issue);
+      const fields = issuesToFields(issues);
+      reply.code(400).send({
+        error: 'Validation Error',
+        message: summaryMessage(fields),
+        statusCode: 400,
+        fields,
+      });
+      return;
+    }
+
+    if (error instanceof ZodError) {
+      const fields = issuesToFields(error.issues);
+      reply.code(400).send({
+        error: 'Validation Error',
+        message: summaryMessage(fields),
+        statusCode: 400,
+        fields,
+      });
+      return;
+    }
+
+    request.log.error(error);
+    reply.send(error);
+  });
 
   await app.register(cors, {
     origin: true,
