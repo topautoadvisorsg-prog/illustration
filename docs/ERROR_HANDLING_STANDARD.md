@@ -58,44 +58,104 @@ validation failures and runs every issue through the same field-label +
 message-formatting logic in `validation-messages.ts`, attaching a code
 automatically via `codeForFieldPath`.
 
-## 3. What the operator sees vs. what's logged
+## 3. What the operator sees vs. what's logged vs. what's queryable
 
 - **Operator sees:** the plain-English `message`, the highlighted field (if
   any), and the recovery button (if any) — never the code prominently, never
   a schema path, never raw JSON. The frontend does show the code in small
   muted text next to the error banner, purely so it's reportable to support.
 - **Logs get:** every translated error is logged as a structured
-  `translated_validation_error` event (`backend/src/server.ts`,
-  `logTranslatedError`) with the code, request path/method, project id (when
-  present in the route params), status code, and running app version. This is
-  the "which error, how often, which step" telemetry — check these logs
-  before assuming a confusing validation message is a one-off; if the same
-  code shows up constantly, that's a UX problem to fix upstream (progressive
-  validation, better manuscript guidance, etc.), not something to just keep
-  translating politely forever.
+  `translated_validation_error` event (`backend/src/lib/error-handler.ts`)
+  with the code, request path/method, project id (when present in the route
+  params), status code, running app version, and a `correlationId` unique to
+  that occurrence.
+- **The database gets** the same event, persisted to `error_events`
+  (`backend/src/db/repositories/error-events.repo.ts`) — this is what backs
+  the diagnostics page (§6), not just ephemeral logs. When the operator
+  clicks a recovery action, the frontend posts a `recovery_events` row
+  tagged `clicked` with that same `correlationId`; the very next action's
+  outcome (success or not) posts `succeeded` if it worked. This is a simple
+  "did the next thing work" heuristic, not a full session trace — good
+  enough to catch a recovery button that isn't actually helping.
+
+Check `GET /api/diagnostics/errors` (or the diagnostics page, §6) before
+assuming a confusing validation message is a one-off; if the same code shows
+up constantly, that's a UX problem to fix upstream (progressive validation,
+better manuscript guidance, etc.), not something to just keep translating
+politely forever.
 
 ## 4. Recovery over failure
 
 Every `UserFacingError` should ask "what does the operator do next?" before
-it's written. If the answer is a specific screen, attach:
+it's written. If the answer is a specific screen, attach the standardized
+action shape:
 ```ts
-action: { type: 'navigate', target: '<step-key>', label: 'Button text' }
+action: {
+  type: 'navigate',
+  target: '<step-key>',     // required — destination
+  label: 'Button text',     // required — what the button says
+  explanation: '...',       // optional — only when the top-level `message`
+                             // doesn't already make the next step obvious
+  docLink: 'https://...',   // optional — reserved for when operator docs
+                             // have a public home; unused today
+}
 ```
-The frontend's sticky error banner renders this generically for any error,
-anywhere in the app — you don't need new frontend code to wire up a new
-recovery button, just attach the action server-side.
+In practice most of our messages are already written to double as their own
+explanation ("Chapter 1 doesn't contain any entries... before Breakdown can
+continue" is both the *what* and the *why*), so `explanation` stays empty
+most of the time — don't restate the message, only add it when the action
+needs its own justification distinct from the error message.
 
-## 5. Files
+The frontend's sticky error banner renders all of this generically for any
+error, anywhere in the app — you don't need new frontend code to wire up a
+new recovery button, explanation, or doc link, just attach it server-side.
+
+## 6. Error registry, tests, and the diagnostics page
+
+- **Error registry** (`backend/src/lib/error-registry.ts`) — every code's
+  title, friendly message, technical cause, recovery description, workflow
+  step, and severity, in one place. `backend/scripts/generate-error-registry-doc.ts`
+  generates `docs/ERROR_REGISTRY.md` from it — edit the registry, re-run the
+  script, never hand-edit that doc.
+- **Regression tests** (`backend/src/lib/__tests__/error-handling.test.ts`) —
+  run against a minimal Fastify instance (no live DB): every registry entry
+  has all required fields, every `ERROR_CODES` value has a registry entry, a
+  thrown `UserFacingError` produces the right status/body/correlationId,
+  Fastify schema validation never leaks a schema path or the raw Zod issue
+  shape, an uncaught `ZodError` gets the same treatment, and a truly generic
+  uncaught error never puts a `.stack` in the response body. Run with
+  `yarn workspace @wildlands/backend test`.
+- **Diagnostics page** (`frontend/src/DiagnosticsPanel.js`, reached via
+  `?diagnostics=1`) — an internal-only read of `GET /api/diagnostics/errors`
+  and `GET /api/diagnostics/renders`: total errors, top codes, top paths
+  (a proxy for "which step," since the backend doesn't know the frontend's
+  step key), recovery click/success rate, render failures, and approximate
+  render/approval times. On-demand, not a scheduled/emailed report — there's
+  no notification infrastructure in this app to schedule one against.
+
+## 7. Files
 
 - `backend/src/lib/user-facing-error.ts` — the `UserFacingError` class. The
   only sanctioned way to produce a user-facing error.
-- `backend/src/lib/error-codes.ts` — the code registry.
+- `backend/src/lib/error-codes.ts` — the code registry's stable identifiers.
+- `backend/src/lib/error-registry.ts` — the full metadata behind each code.
 - `backend/src/lib/validation-messages.ts` — Zod issue → field label + plain
   English message + code, shared by both the Fastify-schema-validation path
   and the raw-`ZodError` safety net.
-- `backend/src/server.ts` — the single `app.setErrorHandler()` that all of
-  the above flows through, plus the telemetry log call.
+- `backend/src/lib/error-handler.ts` — `registerErrorHandler(app, sink)`, the
+  actual `app.setErrorHandler()` wiring; extracted from `server.ts` so it's
+  testable without a live DB. `sink` is how telemetry persistence plugs in.
+- `backend/src/db/repositories/error-events.repo.ts` — persists translated
+  errors + recovery click/succeeded events; computes the frequency/recovery
+  aggregate report.
+- `backend/src/db/repositories/render-diagnostics.repo.ts` — render
+  count/failure/timing aggregates for the diagnostics page.
+- `backend/src/api/diagnostics.routes.ts` — the two `GET` aggregate
+  endpoints plus `POST /api/diagnostics/recovery-event`.
+- `backend/src/server.ts` — calls `registerErrorHandler`, wiring its sink to
+  `recordErrorEvent`.
 - `frontend/src/ProductionConsole.js` — `api()` attaches `fields` / `action`
-  / `errorCode` from any non-OK response onto the thrown `Error`; the sticky
-  banner and `LabeledInput` consume them generically. A new backend error
-  with a code + action needs zero new frontend code to render correctly.
+  / `errorCode` / `correlationId` from any non-OK response onto the thrown
+  `Error`; the sticky banner and `LabeledInput` consume them generically. A
+  new backend error with a code + action needs zero new frontend code to
+  render correctly. The recovery button posts the click/succeeded events.

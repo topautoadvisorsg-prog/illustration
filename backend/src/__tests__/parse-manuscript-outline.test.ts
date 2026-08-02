@@ -4,6 +4,8 @@ import {
   parseManuscriptOutline,
   validateGeneratedChaptersAgainstOutline,
 } from '../pipeline/stage-1-ingestion/parse-manuscript-outline.js';
+import { UserFacingError } from '../lib/user-facing-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 
 describe('parseManuscriptOutline', () => {
   it('extracts chapters, entries, sections, source lines, and word counts', () => {
@@ -46,7 +48,17 @@ Tall marsh plant with edible shoots.`);
 
   it('fails manuscripts with no usable chapter/entry structure', () => {
     const outline = parseManuscriptOutline('## Loose Entry\n\nNo chapter.');
-    expect(() => assertUsableManuscriptOutline(outline)).toThrow('NO_CHAPTERS_DETECTED');
+    // assertUsableManuscriptOutline throws a UserFacingError with a plain-
+    // English message (see docs/ERROR_HANDLING_STANDARD.md) instead of the
+    // old coded "NO_CHAPTERS_DETECTED: ..." string — check the stable
+    // errorCode instead of matching on message wording.
+    try {
+      assertUsableManuscriptOutline(outline);
+      expect.unreachable('expected assertUsableManuscriptOutline to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(UserFacingError);
+      expect((err as UserFacingError).errorCode).toBe(ERROR_CODES.NO_CHAPTERS_DETECTED);
+    }
   });
 
   it('ignores headings inside fenced code blocks', () => {

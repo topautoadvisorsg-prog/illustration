@@ -57,12 +57,16 @@ describe('ingestManuscript', () => {
   });
 
   it('rejects markdown without a chapter and entry outline', async () => {
+    // assertUsableManuscriptOutline throws a UserFacingError with a plain-
+    // English message (see docs/ERROR_HANDLING_STANDARD.md), not the old
+    // coded "NO_CHAPTERS_DETECTED: ..." string — match on the actual
+    // operator-facing wording instead.
     await expect(
       ingestManuscript({
         projectId: '11111111-1111-4111-8111-111111111111',
         filename: 'chapter-1.md',
         markdown: 'Loose notes without headings.',
       }),
-    ).rejects.toThrow('NO_CHAPTERS_DETECTED');
+    ).rejects.toThrow(/doesn't contain any chapters/);
   });
 });

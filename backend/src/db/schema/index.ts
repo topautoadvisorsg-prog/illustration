@@ -480,3 +480,47 @@ export const editions = pgTable(
     projectKeyIdx: uniqueIndex('editions_project_key_idx').on(table.projectId, table.editionKey),
   }),
 );
+
+// ─── Error-handling telemetry (docs/ERROR_HANDLING_STANDARD.md) ───────────
+// One row per translated user-facing error. `projectId` is a plain column,
+// deliberately WITHOUT a foreign key: telemetry must still record (and must
+// survive) an invalid/nonexistent id or a project that's later deleted — it's
+// a log, not a relation. `correlationId` ties a later recovery-clicked/
+// recovery-succeeded row (recoveryEvents) back to the specific error that
+// prompted it.
+export const errorEvents = pgTable(
+  'error_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    correlationId: uuid('correlation_id').notNull(),
+    errorCode: text('error_code').notNull(),
+    method: text('method').notNull(),
+    path: text('path').notNull(),
+    projectId: uuid('project_id'),
+    statusCode: integer('status_code').notNull(),
+    appVersion: text('app_version').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    errorCodeIdx: index('error_events_error_code_idx').on(table.errorCode),
+    createdAtIdx: index('error_events_created_at_idx').on(table.createdAt),
+    correlationIdIdx: index('error_events_correlation_id_idx').on(table.correlationId),
+  }),
+);
+
+// One row per recovery-flow milestone: the operator clicked a recovery
+// action's button ('clicked'), or the next action they took after that
+// succeeded ('succeeded'). No FK to error_events — correlationId is the join
+// key, looked up at query time; keeps this insert-only and dependency-free.
+export const recoveryEvents = pgTable(
+  'recovery_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    correlationId: uuid('correlation_id').notNull(),
+    kind: text('kind').notNull(), // 'clicked' | 'succeeded'
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    correlationIdIdx: index('recovery_events_correlation_id_idx').on(table.correlationId),
+  }),
+);

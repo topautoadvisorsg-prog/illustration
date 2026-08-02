@@ -108,6 +108,22 @@ Body text for this chapter's entry.
 **Another Term.** Definition of the term.
 `;
 
+// Coarse client-side echo of the server's assertUsableManuscriptOutline rule
+// (backend/src/pipeline/stage-1-ingestion/parse-manuscript-outline.ts) — a
+// real chapter with zero entries still won't be caught until Breakdown (that
+// needs the actual outline parser), but the two structural basics — "is
+// there a chapter heading at all," "is there an entry heading anywhere" —
+// are cheap to approximate instantly, catching the same mistake before a
+// round trip to the server.
+function manuscriptStructureHint(text) {
+  if (!text || !text.trim()) return null;
+  const hasChapterHeading = /^#(?!#)[ \t]*\S/m.test(text);
+  if (!hasChapterHeading) return "No chapter heading detected yet — add \"# CHAPTER 1: TITLE\" before uploading.";
+  const hasEntryHeading = /^###(?!#)[ \t]*\S/m.test(text);
+  if (!hasEntryHeading) return "No entry headings detected yet — add \"### Entry Title\" inside a chapter before uploading.";
+  return null;
+}
+
 function downloadTextFile(filename, text) {
   const blob = new Blob([text], { type: "text/markdown" });
   const url = URL.createObjectURL(blob);
@@ -151,7 +167,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [errorFields, setErrorFields] = useState([]); // [{path,label,message,errorCode}] from the backend's error-translation layer
   const [errorAction, setErrorAction] = useState(null); // { type:'navigate', target, label }
   const [errorCode, setErrorCode] = useState(""); // stable "WL-####" code — support/logs reference, not the main message
+  const [errorCorrelationId, setErrorCorrelationId] = useState(""); // ties a recovery-click/success telemetry event back to this occurrence
   const [notice, setNotice] = useState("");
+  // Set when the operator clicks a recovery action's button; cleared by the
+  // very next run() outcome (success -> "recovery succeeded" telemetry,
+  // failure -> silently dropped, no explicit "failed" event). This is a
+  // simple "did the NEXT action work" heuristic, not a full session trace.
+  const pendingRecoveryRef = useRef(null);
 
   const [projects, setProjects] = useState([]);
   const [project, setProject] = useState(null); // active project object
@@ -189,14 +211,16 @@ export default function ProductionConsole({ onExitToLegacy }) {
     try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
     if (!res.ok) {
       // Backend's centralized error handler sends { message, fields, action,
-      // errorCode } — never raw JSON/schema paths. Attach these to the thrown
-      // Error so callers can highlight the specific input, offer the
-      // suggested action, and (errorCode) give the operator something
-      // reportable without exposing schema internals.
+      // errorCode, correlationId } — never raw JSON/schema paths. Attach
+      // these to the thrown Error so callers can highlight the specific
+      // input, offer the suggested action, give the operator something
+      // reportable (errorCode), and tie a recovery-click/success telemetry
+      // event back to this specific occurrence (correlationId).
       const err = new Error((data && (data.message || data.error)) || `${res.status} ${res.statusText}`);
       if (data && Array.isArray(data.fields)) err.fields = data.fields;
       if (data && data.action) err.action = data.action;
       if (data && data.errorCode) err.errorCode = data.errorCode;
+      if (data && data.correlationId) err.correlationId = data.correlationId;
       throw err;
     }
     return data;
@@ -232,17 +256,32 @@ export default function ProductionConsole({ onExitToLegacy }) {
   }, [checkAuth]);
 
   const run = useCallback(async (label, fn) => {
-    setBusy(label); setError(""); setErrorFields([]); setErrorAction(null); setErrorCode(""); setNotice("");
-    try { const r = await fn(); if (r && r.notice) setNotice(r.notice); return r; }
+    setBusy(label); setError(""); setErrorFields([]); setErrorAction(null); setErrorCode(""); setErrorCorrelationId(""); setNotice("");
+    try {
+      const r = await fn();
+      if (r && r.notice) setNotice(r.notice);
+      // "Did the next action after a recovery click actually work" — the
+      // measurement docs/ERROR_HANDLING_STANDARD.md's recovery-success
+      // telemetry is built on. Only the FIRST outcome after a click counts,
+      // success or not, so it never gets credited to a later unrelated action.
+      if (pendingRecoveryRef.current) {
+        const cid = pendingRecoveryRef.current;
+        pendingRecoveryRef.current = null;
+        api("/api/diagnostics/recovery-event", { method: "POST", body: JSON.stringify({ correlationId: cid, kind: "succeeded" }) }).catch(() => {});
+      }
+      return r;
+    }
     catch (e) {
       setError(e.message || String(e));
       setErrorFields(Array.isArray(e.fields) ? e.fields : []);
       setErrorAction(e.action || null);
       setErrorCode(e.errorCode || "");
+      setErrorCorrelationId(e.correlationId || "");
+      pendingRecoveryRef.current = null;
       throw e;
     }
     finally { setBusy(""); }
-  }, []);
+  }, [api]);
 
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const loadProjects = useCallback(() => run("Loading projects", async () => {
@@ -744,12 +783,23 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 {errorCode && <span title="Reference this code if you need to report the issue." style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 600, color: C.muted, letterSpacing: 0.3 }}>{errorCode}</span>}
                 {errorAction && errorAction.type === "navigate" && (
                   <div>
+                    {errorAction.explanation && <div style={{ fontSize: 12.5, marginTop: 6, marginBottom: 2 }}>{errorAction.explanation}</div>}
                     <button
-                      style={{ ...S.btn(), background: C.red, marginTop: 10, marginRight: 0 }}
-                      onClick={() => { setStep(errorAction.target); setError(""); setErrorFields([]); setErrorAction(null); setErrorCode(""); }}
+                      style={{ ...S.btn(), background: C.red, marginTop: 6, marginRight: 0 }}
+                      onClick={() => {
+                        // Recovery-success telemetry (docs/ERROR_HANDLING_STANDARD.md):
+                        // fire-and-forget "clicked", then arm the pending-recovery
+                        // ref so the next run() outcome can report whether it worked.
+                        if (errorCorrelationId) {
+                          pendingRecoveryRef.current = errorCorrelationId;
+                          api("/api/diagnostics/recovery-event", { method: "POST", body: JSON.stringify({ correlationId: errorCorrelationId, kind: "clicked" }) }).catch(() => {});
+                        }
+                        setStep(errorAction.target); setError(""); setErrorFields([]); setErrorAction(null); setErrorCode(""); setErrorCorrelationId("");
+                      }}
                     >
                       {errorAction.label} →
                     </button>
+                    {errorAction.docLink && <a href={errorAction.docLink} target="_blank" rel="noreferrer" style={{ marginLeft: 8, fontSize: 12, color: C.red }}>Learn more ↗</a>}
                   </div>
                 )}
               </div>
@@ -823,6 +873,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
                   <DropZone onText={(t, n) => { setManuscript(t); setManuscriptName(n); }} />
                   <textarea style={{ ...S.input, minHeight: 200, fontFamily: "monospace", fontSize: 12 }} value={manuscript} placeholder="# Chapter 1 …" onChange={(e) => setManuscript(e.target.value)} />
                   <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{manuscript.length.toLocaleString()} chars{manuscriptName ? ` · ${manuscriptName}` : ""}</div>
+                  {/* Progressive validation (docs/ERROR_HANDLING_STANDARD.md): a coarse,
+                      client-side echo of assertUsableManuscriptOutline's rule, shown as
+                      they type — not a hard block, since a partial paste mid-edit
+                      shouldn't scold; it just gets ahead of the Breakdown-time failure. */}
+                  {manuscriptStructureHint(manuscript) && (
+                    <div style={{ color: C.orange, fontSize: 12, marginTop: 4 }}>⚠ {manuscriptStructureHint(manuscript)}</div>
+                  )}
                   <button style={S.btn()} onClick={() => upload().then(() => setStep("setup")).catch(() => {})}>Upload manuscript →</button>
                 </div>
               </>

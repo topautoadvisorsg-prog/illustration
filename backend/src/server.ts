@@ -3,19 +3,10 @@ import sensible from '@fastify/sensible';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
-import {
-  serializerCompiler,
-  validatorCompiler,
-  jsonSchemaTransform,
-  hasZodFastifySchemaValidationErrors,
-} from 'fastify-type-provider-zod';
-import { ZodError } from 'zod';
-import { createRequire } from 'node:module';
+import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod';
 import { getEnv } from './env.js';
-import { UserFacingError } from './lib/user-facing-error.js';
-import { issuesToFields, summaryMessage, summaryErrorCode } from './lib/validation-messages.js';
-import { ERROR_CODES } from './lib/error-codes.js';
-import { logger } from './lib/logger.js';
+import { registerErrorHandler } from './lib/error-handler.js';
+import { recordErrorEvent } from './db/repositories/error-events.repo.js';
 import { registerHealthRoutes } from './api/health.routes.js';
 import { registerProjectRoutes } from './api/projects.routes.js';
 import { registerPageRoutes } from './api/pages.routes.js';
@@ -25,36 +16,7 @@ import { registerWholePageRoutes } from './api/whole-page.routes.js';
 import { registerSubjectBadgeRoutes } from './api/subject-badges.routes.js';
 import { registerSupervisorRoutes } from './api/supervisor.routes.js';
 import { registerEpubRoutes } from './api/epub.routes.js';
-
-const require = createRequire(import.meta.url);
-// Read once at module load — used to tag every translated-error telemetry
-// log with the running build, per the "which app version" ask.
-const APP_VERSION = (require('../package.json') as { version?: string }).version ?? 'unknown';
-
-/** Structured log line for every translated user-facing error — the "which
- *  error, how often, which step, which project" telemetry. Deliberately just
- *  a structured pino log (searchable/aggregable in whatever log sink is
- *  already wired up) rather than new analytics infra. */
-function logTranslatedError(
-  request: { method: string; url: string; params: unknown },
-  errorCode: string,
-  statusCode: number,
-): void {
-  const params = request.params as Record<string, unknown> | undefined;
-  const projectId = typeof params?.id === 'string' ? params.id : undefined;
-  logger.info(
-    {
-      event: 'translated_validation_error',
-      errorCode,
-      method: request.method,
-      path: request.url.split('?')[0],
-      projectId,
-      statusCode,
-      appVersion: APP_VERSION,
-    },
-    'translated validation error',
-  );
-}
+import { registerDiagnosticsRoutes } from './api/diagnostics.routes.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -70,59 +32,12 @@ export async function buildServer(): Promise<FastifyInstance> {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  // Centralized error-translation layer. Without this, Fastify's default
-  // handler sends raw Zod validation output straight to the operator (schema
-  // paths like "body/config/authorName", or — for a manually-thrown ZodError
-  // that escapes a route handler — a JSON-dumped issues array). Every path
-  // below ends in a plain sentence per field, never a schema path, raw JSON,
-  // or stack trace. Routes that already reply with a structured error via
-  // `reply.code().send(...)` never reach this handler at all — it only
-  // catches thrown/uncaught errors.
-  app.setErrorHandler((error, request, reply) => {
-    if (error instanceof UserFacingError) {
-      logTranslatedError(request, error.errorCode, error.statusCode);
-      reply.code(error.statusCode).send({
-        error: error.code,
-        message: error.message,
-        statusCode: error.statusCode,
-        fields: error.fields,
-        action: error.action,
-        errorCode: error.errorCode,
-      });
-      return;
-    }
-
-    if (hasZodFastifySchemaValidationErrors(error)) {
-      const issues = error.validation.map((v) => v.params.issue);
-      const fields = issuesToFields(issues);
-      const errorCode = summaryErrorCode(fields, ERROR_CODES.FIELD_GENERIC);
-      logTranslatedError(request, errorCode, 400);
-      reply.code(400).send({
-        error: 'Validation Error',
-        message: summaryMessage(fields),
-        statusCode: 400,
-        fields,
-        errorCode,
-      });
-      return;
-    }
-
-    if (error instanceof ZodError) {
-      const fields = issuesToFields(error.issues);
-      const errorCode = summaryErrorCode(fields, ERROR_CODES.UNCLASSIFIED);
-      logTranslatedError(request, errorCode, 400);
-      reply.code(400).send({
-        error: 'Validation Error',
-        message: summaryMessage(fields),
-        statusCode: 400,
-        fields,
-        errorCode,
-      });
-      return;
-    }
-
-    request.log.error(error);
-    reply.send(error);
+  // Centralized error-translation layer — see docs/ERROR_HANDLING_STANDARD.md.
+  // `recordErrorEvent` persists each translated error for the frequency/
+  // recovery telemetry (error_events table); it's fire-and-forget and never
+  // throws into the response path (see its own try/catch).
+  registerErrorHandler(app, (event) => {
+    recordErrorEvent(event).catch(() => {});
   });
 
   await app.register(cors, {
@@ -186,6 +101,10 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Stage 8 — Kindle EPUB export. Read-only; builds a reflowable EPUB from the
   // existing structured book data. Does not touch the print pipeline.
   await registerEpubRoutes(app);
+  // Internal diagnostics — error/recovery telemetry aggregates for the
+  // operator diagnostics page. Same password gate as everything else; not a
+  // customer-facing surface.
+  await registerDiagnosticsRoutes(app);
 
   app.get('/', async () => ({
     service: 'wildlands-backend',

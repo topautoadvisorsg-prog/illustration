@@ -998,11 +998,25 @@ export const ApiErrorFieldSchema = z.object({
   errorCode: z.string().optional(),
 });
 
-/** Optional follow-up the UI can offer the operator (e.g. "Return to Manuscript"). */
+/**
+ * Optional follow-up the UI can offer the operator (e.g. "Return to Manuscript").
+ * Standardized shape every recoverable error should populate where it applies
+ * (see docs/ERROR_HANDLING_STANDARD.md): explanation (why this happened, in
+ * addition to the top-level message), destination (target + label, what
+ * happens when clicked), and an optional docLink for a longer explanation.
+ */
 export const ApiErrorActionSchema = z.object({
   type: z.literal('navigate'),
+  /** Step key (or route) the action navigates to. */
   target: z.string(),
+  /** Button text, e.g. "Return to Manuscript". */
   label: z.string(),
+  /** Optional one-line "why" shown alongside the button, when the top-level
+   *  message alone doesn't make the next step obvious. */
+  explanation: z.string().optional(),
+  /** Optional link to a longer explanation (docs site, standard doc). Not
+   *  used yet — reserved for when operator-facing docs exist online. */
+  docLink: z.string().optional(),
 });
 
 export const ApiErrorSchema = z.object({
@@ -1015,6 +1029,9 @@ export const ApiErrorSchema = z.object({
   action: ApiErrorActionSchema.optional(),
   /** Stable top-level code for this error — see docs/ERROR_HANDLING_STANDARD.md. */
   errorCode: z.string().optional(),
+  /** Unique per occurrence — ties a later "recovery clicked"/"recovery
+   *  succeeded" telemetry event back to this specific error. */
+  correlationId: z.string().optional(),
 });
 
 export type ApiErrorField = z.infer<typeof ApiErrorFieldSchema>;
