@@ -68,9 +68,18 @@ function rendersCriticalText(spec: WholePageSpec): boolean {
 }
 
 function promptHeader(spec: WholePageSpec): string {
-  // Every page on this path bakes its own text (the cover is the sole exception
-  // and uses assembleCoverPrompt — it never reaches here), so the standard
-  // text-rendering header always applies.
+  // Every page on this path bakes its own text, including the cover — there is
+  // no separate "publishing engine" step that adds typography afterward (see
+  // cover-print.ts, which only upscales the art and embeds it in a PDF).
+  if (spec.pageType === 'COVER_WRAP') {
+    return [
+      `You are rendering a complete, FINISHED, publishable collector-edition cover wrap under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version} — a museum-grade, vintage natural-history field guide in an expedition-journal aesthetic.`,
+      'It is ONE single, continuous full-bleed illustration across back cover, spine, and front cover, printed from a single plate: typography and illustration share the same parchment, period, and ink — never artwork with text pasted on top, never a blank cover awaiting text.',
+      'You bake ALL cover typography — front-cover title/subtitle/author/series, spine title/author, and back-cover copy — directly INTO this artwork yourself, exactly as specified below. Nothing is added after this image is generated.',
+      `The page paper is parchment ${PALETTE.parchment.hex}; all ink is warm sepia ${PALETTE.ink.hex} — never pure black, never colored.`,
+      'The specification below is authoritative — render it exactly as specified.',
+    ].join(' ');
+  }
   if (rendersCriticalText(spec)) return HEADER;
   return [
     `You are rendering the artwork layer for a publishable collector-edition ${spec.pageType.toLowerCase().replaceAll('_', ' ')} under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version}.`,
@@ -102,9 +111,12 @@ function hardConstraints(spec: WholePageSpec): string {
   }
   if (spec.pageType === 'COVER_WRAP') {
     lines.push(
-      '- COVER ARTWORK ONLY: create one continuous full-bleed illustration across back cover, spine, and front cover.',
-      '- Reserve calm composition zones for front-cover title/subtitle/author, back-cover copy, and optional spine typography. Keep the lower-right back-cover barcode zone visually quiet.',
-      '- Do not render letters, words, title text, author text, back-cover copy, spine text, barcode, ISBN, price box, or placeholder labels. The publishing engine adds those elements exactly.',
+      '- COVER ARTWORK: create one continuous full-bleed illustration across back cover, spine, and front cover, and bake the exact typography from PAGE TEXT — cover copy directly into that artwork as engraved book-cover lettering in the same warm sepia ink as the rest of the page — one integrated plate, never artwork with a blank space left for text, never a separate text panel or card.',
+      '- FRONT COVER: in the calm upper/central title-safe zone render the title (and subtitle/description line, if present) in stately engraved serif caps; in the smaller lower zone render the author line and series line, if present.',
+      '- SPINE: render the title (and author, if it fits) as a vertical strip of type sized to comfortably fit the spine width without crowding the trim.',
+      '- BACK COVER: render the back-cover copy as calm body-serif type in the readable negative space of the back panel, in the order given.',
+      '- Render every string in PAGE TEXT — cover copy EXACTLY, letter-for-letter: do not add, remove, translate, summarize, paraphrase, or reorder any word, and use only normal upright letters — no garbled, warped, or invented glyphs. Before finishing, PROOFREAD every baked word against PAGE TEXT — cover copy; a cover with even one misspelled or altered word is unusable.',
+      '- Keep the lower-right back-cover corner visually quiet and free of typography — Amazon/KDP prints the barcode there after press. Do not render a barcode, ISBN, or price box yourself.',
     );
   }
   if (spec.pageType === 'INTERIOR' && spec.pageText.title.name) {
@@ -186,7 +198,9 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
   //    is ONLY relevant to chapter openers and title pages — omit it elsewhere
   //    (a glossary/copyright page must never see "chapter kicker").
   //  - `decorativeInitial` only when a drop-cap is actually present.
+  //  - `titleHierarchy` (the front-cover title stack) also applies to the cover.
   const emitTitleFamily = spec.pageType === 'CHAPTER_OPENER' || spec.pageType === 'TITLE_PAGE';
+  const isCoverWrap = spec.pageType === 'COVER_WRAP';
   const {
     identity: _identity,
     noModernUi: _noModernUi,
@@ -199,12 +213,12 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
   const typographyDNA = {
     ...typoRest,
     ...(emitTitleFamily ? { titleFamily } : {}),
-    ...(rendersCriticalText(spec) ? { titleHierarchy } : {}),
+    ...(rendersCriticalText(spec) || isCoverWrap ? { titleHierarchy } : {}),
     ...(decorativeInitial != null ? { decorativeInitial } : {}),
   };
-  // Every page in this path bakes its own text into the image (the cover is the
-  // sole exception and uses the dedicated assembleCoverPrompt — it never reaches
-  // here). The single, strongest text-fidelity statement lives HERE and nowhere else.
+  // Every page in this path bakes its own text into the image, including the
+  // cover (see COVER_WRAP handling below) — the single, strongest text-fidelity
+  // statement for interior body text lives HERE and nowhere else.
   const riskyWords = rendersCriticalText(spec) ? extractRiskyWords(spec.pageText.bodyBlocks) : [];
   const bodySection = rendersCriticalText(spec)
     ? [
@@ -221,10 +235,14 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
             ]
           : []),
       ]
-    : [
-        'TEXT POLICY — render no readable text for this page role.',
-        'Keep typography-safe and reference-safe regions calm and naturally integrated into the artwork. Never draw a blank card, panel, label, frame, or cutout.',
-      ];
+    : isCoverWrap
+      ? [
+          'TEXT POLICY — this page bakes its own cover typography. Render the exact strings in PAGE TEXT — cover copy above, placed per the FRONT COVER / SPINE / BACK COVER constraints below. Keep every other zone of the artwork calm and naturally integrated — never a blank card, panel, label, or cutout waiting for text.',
+        ]
+      : [
+          'TEXT POLICY — render no readable text for this page role.',
+          'Keep typography-safe and reference-safe regions calm and naturally integrated into the artwork. Never draw a blank card, panel, label, frame, or cutout.',
+        ];
 
   // Continuation/compacted pages carry the SAME subject as the entry opener, but
   // must not reprint the opener's portrait — each page should teach something new.
@@ -252,6 +270,7 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
     block('READING-FIELD GEOMETRY (inches)', spec.readingFieldGeometry),
     '',
     ...(rendersCriticalText(spec) ? [block('PAGE TEXT — title', spec.pageText.title), ''] : []),
+    ...(isCoverWrap && spec.coverCopy ? [block('PAGE TEXT — cover copy (bake exactly, letter-for-letter)', spec.coverCopy), ''] : []),
     ...bodySection,
     '',
     block('DECORATIVE ELEMENTS', spec.decorativeElements),
