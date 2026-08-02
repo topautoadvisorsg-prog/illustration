@@ -35,12 +35,14 @@ const EnvSchema = z.object({
 
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_IMAGE_MODEL: z.string().default('gpt-image-2'),
-  // Vision-capable chat model for automated text QA on a rendered page — reads
-  // the image, compares baked text against the source, reports mismatches. A
-  // chat-completion call is still a fraction of an image-generation call's
-  // cost even on the full model, and gpt-4o-mini proved too inaccurate in
-  // testing (missed a confirmed real typo, invented a false positive).
-  OPENAI_REVIEW_MODEL: z.string().default('gpt-4o'),
+  // Vision-capable reasoning model for automated text/prompt QA (see
+  // services/openai/text-review.ts + prompt-review.ts). A chat-completion
+  // call is still a fraction of an image-generation call's cost even on a
+  // top-tier model. History: gpt-4o-mini was too inaccurate (missed a real
+  // typo, invented a false positive); gpt-4o improved but still produced a
+  // false positive reading a deliberate rhetorical contrast as a content
+  // contradiction; gpt-5.5 (Aug 2026) is the current upgrade attempt.
+  OPENAI_REVIEW_MODEL: z.string().default('gpt-5.5'),
 
   REPLICATE_API_TOKEN: z.string().default(''),
   REPLICATE_UPSCALE_MODEL: z.string().default('nightmareai/real-esrgan'),

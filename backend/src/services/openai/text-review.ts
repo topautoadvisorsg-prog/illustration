@@ -67,8 +67,10 @@ export async function reviewRenderedText(imagePngBuffer: Buffer, sourceText: str
         ],
       },
     ],
-    temperature: 0,
-    max_tokens: 3000,
+    // gpt-5.5 only supports its default temperature (1) — no low-temperature
+    // determinism knob on this model generation. Accepted tradeoff for the
+    // reasoning-quality improvement.
+    max_completion_tokens: 3000,
     response_format: { type: 'json_object' },
   });
 

@@ -38,9 +38,14 @@ Check for:
 1. SUBJECT MISMATCH — does the illustration subject actually match the entry title / species / topic? (e.g. an entry titled "Black Bear" whose illustration subject says "Wolverine" is wrong.)
 2. TRUNCATED OR BROKEN TEXT — does the body text look cut off mid-sentence, duplicated, or contain obvious data corruption (garbled characters, repeated blocks, JSON artifacts leaking into the prose)?
 3. EMPTY OR PLACEHOLDER CONTENT — placeholder text like "TODO", "Lorem ipsum", empty strings where real content is expected.
-4. INTERNAL CONTRADICTION — text that references a different animal/plant/region than what the entry claims to be about.
+4. WRONG-SUBJECT TEXT — the body text is actually ABOUT a different animal/plant/topic than the entry claims to be (e.g. an entry titled "Black Bear" whose body paragraphs describe wolf pack behavior throughout, with no bear content at all). This means the WRONG CONTENT got assigned to this page — a real data-pipeline bug.
 
-Do NOT flag: writing style, prompt length, illustration style choices, or anything that isn't a concrete, checkable defect from the list above. If everything looks consistent and complete, pass.
+CRITICAL — this is naturalist field-guide writing, and comparing or contrasting the entry's subject against OTHER species by name is a normal, deliberate, and frequent technique in this book, NOT a defect:
+- Identification sections routinely say things like "unlike black bears, grizzlies have..." — naming the OTHER animal is exactly how you teach the reader to tell two species apart. This is correct, not a mismatch.
+- Hooks and closing lines often open with a rhetorical contrast ("Everyone remembers the wolves. What they actually remember is the mosquito that ruined the evening.") to make a point about the ACTUAL subject. Mentioning the other animal is the literary device, not an error.
+- Only flag WRONG-SUBJECT TEXT when the entry's OWN topic is genuinely absent or when another subject has clearly and mistakenly REPLACED it as the actual content — never merely because another species/plant/place is named somewhere in the text. When in doubt because the text plausibly reads as a deliberate comparison or contrast, do NOT flag it — false alarms cost the operator time on every single page and erode trust in every future warning; only flag what you are confident is a genuine pipeline error.
+
+Do NOT flag: writing style, prompt length, illustration style choices, comparative/contrastive references to other species, or anything that isn't a concrete, checkable defect from the list above. If everything looks consistent and complete, pass.
 
 Respond with STRICT JSON only, no markdown fences:
 {"pass": boolean, "issues": ["specific defect, quoting the exact mismatched text"]}`;
@@ -67,8 +72,10 @@ export async function reviewPromptSanity(input: {
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userContent },
     ],
-    temperature: 0,
-    max_tokens: 1000,
+    // gpt-5.5 only supports its default temperature (1) — no low-temperature
+    // determinism knob on this model generation. Accepted tradeoff for the
+    // reasoning-quality improvement.
+    max_completion_tokens: 1000,
     response_format: { type: 'json_object' },
   });
 

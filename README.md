@@ -93,6 +93,25 @@ even of the post-render AI text review below. Code:
 `services/openai/prompt-review.ts`,
 `POST /api/whole-page-render/page/:pageId/review-prompt`.
 
+**Result banners are advisory, not a gate — and dismissible.** Both this
+check and the post-render "AI review text" say explicitly when they find
+something that they do not block the next action (Render / Approve still
+work regardless), and both have a ✕ to clear a result once you've read it and
+decided. Nothing in this pipeline is designed to leave you at a dead end — if
+a review flags something, look at the actual page yourself, use your
+judgment, then dismiss and move on either way.
+
+**Caught and fixed one real false-positive class:** the "internal
+contradiction" check originally flagged ANY mention of a different
+species/subject as a mismatch — but naming another animal for comparison
+("unlike black bears, grizzlies have...") or rhetorical contrast is normal,
+constant, and deliberate in this book's writing. `prompt-review.ts`'s system
+prompt now explicitly carves that out; only flag when the entry's own topic
+is genuinely absent or replaced, not merely referenced. Worth remembering if
+tuning this prompt further: false positives here cost real operator trust —
+a reviewer that cries wolf gets ignored, including on the pages where it's
+actually right.
+
 Like every other AI-calling action in this pipeline it is **strictly one
 explicit call, triggered only by the operator clicking the button** — nothing
 in this codebase auto-retries or auto-loops a paid or even a free OpenAI call
@@ -107,24 +126,36 @@ error message until an operator explicitly acts on it again.
 stakes failure mode than art quality, since a misspelled word in a printed book
 is just wrong). Instead of an operator eyeballing every word of every page,
 **"AI review text"** (per-page button in Render & Review, once a page is
-RENDERED) calls a cheap vision-capable chat model — `OPENAI_REVIEW_MODEL` in
-`.env`, currently `gpt-4o` — to compare the baked text against the literal
+RENDERED) calls a vision-capable chat model — `OPENAI_REVIEW_MODEL` in
+`.env`, currently `gpt-5.5` — to compare the baked text against the literal
 source and flag mismatches. One call costs a small fraction of an image
 generation. Code: `services/openai/text-review.ts`,
 `POST /api/whole-page-render/:renderId/ai-review`.
 
 **Known limitation — read before trusting a "pass":** the reviewer reads the
 page semantically, not pixel-by-pixel, so it can silently "autocorrect" a
-subtle transposition in a common word (e.g. it will happily transcribe
-`cinmanon` as `cinnamon` because that's what it expects to see, even though
-the pixels are wrong). It reliably catches grosser errors — garbled words,
-dropped/duplicated words, wrong words entirely — but a `pass: true` is not a
-guarantee of zero typos. Do not hard-gate Approve on it; treat it as a fast
-first pass, and still skim the page yourself before Approve on anything going
-to final print. `gpt-4o-mini` was tried first and was worse (missed a
-confirmed real typo, invented a false positive on a clean page) — if
-`OPENAI_REVIEW_MODEL` is ever downgraded for cost, expect accuracy to drop
-with it.
+subtle transposition in a common word — confirmed still true even on
+`gpt-5.5`: it transcribed the known-bad `cinmanon` render as `cinnamon`
+because that's what it expects a word spelled that closely to "cinnamon" to
+be, even though the actual pixels are wrong. This is a structural limit of
+using a language-vision model as an OCR proofreader (it reads intent, not
+letter-shapes), not something a model-version upgrade fixes — a literal OCR
+engine might catch this specific failure mode better, at the cost of
+introducing its own noise on the stylized serif type this book uses. It
+reliably catches grosser errors — garbled words, dropped/duplicated words,
+wrong words entirely — but a `pass: true` is not a guarantee of zero typos.
+Do not hard-gate Approve on it; treat it as a fast first pass, and still skim
+the page yourself before Approve on anything going to final print.
+
+Model history, for whoever tunes this next: `gpt-4o-mini` → too inaccurate
+(missed a confirmed real typo, invented a false positive on a clean page).
+`gpt-4o` → better, but produced a false positive on `prompt-review.ts`
+specifically (see below). `gpt-5.5` → current, fixed that false-positive
+class; the semantic-autocorrect limitation above is unrelated and still
+open. Upgrading required two API-shape changes, not just a model-name swap:
+`max_tokens` → `max_completion_tokens`, and `temperature` is no longer
+settable (only the model's default is accepted) — expect similar shape
+changes on the next upgrade too.
 
 ## Manual image upload (no-spend escape hatch)
 
@@ -200,7 +231,7 @@ A project is a **temporary production workspace**. The intended lifecycle:
   spend-gated; dependency-injected so tests never call the paid API), with
   preview / render / approve / reject / print-prep per page.
 - No-spend prompt pre-flight review, cheap automated post-render AI
-  text-fidelity review (`gpt-4o` chat-vision call), and a no-spend manual
+  text-fidelity review (`gpt-5.5` chat-vision call), and a no-spend manual
   image upload path for when generation is blocked or needs a hand
   correction — see "Prompt pre-flight review", "AI text review", and "Manual
   image upload" above. Confirmed zero auto-retry anywhere in the render
