@@ -29,6 +29,7 @@ import { persistManifests, type PageSeed } from '../../db/repositories/manifests
 import { extractBinomial } from '../subject-badges/extract-badges.js';
 import { logger } from '../../lib/logger.js';
 import { UserFacingError } from '../../lib/user-facing-error.js';
+import { ERROR_CODES } from '../../lib/error-codes.js';
 import {
   assertUsableManuscriptOutline,
   parseManuscriptOutline,
@@ -432,6 +433,7 @@ export function buildDeterministicManifestResult(outline: ManuscriptOutline, con
       `${chapterLabel} doesn't contain any entries. Each chapter needs at least one "### Entry Title" heading before Breakdown can continue.`,
       {
         code: 'Empty Chapter',
+        errorCode: ERROR_CODES.EMPTY_CHAPTER,
         statusCode: 400,
         action: { type: 'navigate', target: 'manuscript', label: 'Return to Manuscript' },
       },
@@ -440,7 +442,12 @@ export function buildDeterministicManifestResult(outline: ManuscriptOutline, con
 
   throw new UserFacingError(
     'The manuscript could not be converted into a valid book structure. Check the chapter and entry formatting and try again.',
-    { code: 'Invalid Manuscript Structure', statusCode: 400, action: { type: 'navigate', target: 'manuscript', label: 'Return to Manuscript' } },
+    {
+      code: 'Invalid Manuscript Structure',
+      errorCode: ERROR_CODES.INVALID_MANUSCRIPT_STRUCTURE,
+      statusCode: 400,
+      action: { type: 'navigate', target: 'manuscript', label: 'Return to Manuscript' },
+    },
   );
 }
 

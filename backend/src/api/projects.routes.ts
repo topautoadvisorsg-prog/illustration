@@ -31,6 +31,8 @@ import { callChat } from '../services/claude/claude.js';
 import { ingestManuscript } from '../pipeline/stage-1-ingestion/ingest-manuscript.js';
 import { UnsupportedManuscriptError } from '../pipeline/stage-1-ingestion/extract-manuscript.js';
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
+import { UserFacingError } from '../lib/user-facing-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
 import { previewProjectPagination } from '../pipeline/stage-6-layout/pagination-preview.js';
@@ -1111,7 +1113,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         }));
       } catch (err) {
         if (isManuscriptUserError(err)) {
-          return reply.code(400).send({ error: 'Bad Request', message: err.message, statusCode: 400 });
+          throw new UserFacingError(err.message, { code: 'Bad Request', errorCode: ERROR_CODES.UNSUPPORTED_MANUSCRIPT_FORMAT, statusCode: 400 });
         }
         throw err;
       }
@@ -1188,10 +1190,11 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
 
       if (!project.manuscriptPath) {
-        return reply.code(400).send({
-          error: 'Bad Request',
-          message: 'No manuscript on file. Upload one first.',
+        throw new UserFacingError('No manuscript on file. Upload one before running Breakdown.', {
+          code: 'No Manuscript',
+          errorCode: ERROR_CODES.MANUSCRIPT_MISSING,
           statusCode: 400,
+          action: { type: 'navigate', target: 'manuscript', label: 'Go to Manuscript' },
         });
       }
 
@@ -1201,10 +1204,11 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         buf = await getProjectStorage().readProjectFile(project.manuscriptPath);
       } catch (error) {
         if (isNativeError(error) && 'code' in error && error.code === 'ENOENT') {
-          return reply.code(404).send({
-            error: 'Not Found',
-            message: 'Stored manuscript file is missing. Re-upload the manuscript before generating manifests.',
+          throw new UserFacingError('Stored manuscript file is missing. Re-upload the manuscript before generating manifests.', {
+            code: 'Manuscript Missing',
+            errorCode: ERROR_CODES.MANUSCRIPT_MISSING,
             statusCode: 404,
+            action: { type: 'navigate', target: 'manuscript', label: 'Re-upload Manuscript' },
           });
         }
         throw error;

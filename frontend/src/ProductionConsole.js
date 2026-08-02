@@ -148,8 +148,9 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [step, setStep] = useState("project");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [errorFields, setErrorFields] = useState([]); // [{path,label,message}] from the backend's error-translation layer
+  const [errorFields, setErrorFields] = useState([]); // [{path,label,message,errorCode}] from the backend's error-translation layer
   const [errorAction, setErrorAction] = useState(null); // { type:'navigate', target, label }
+  const [errorCode, setErrorCode] = useState(""); // stable "WL-####" code — support/logs reference, not the main message
   const [notice, setNotice] = useState("");
 
   const [projects, setProjects] = useState([]);
@@ -187,13 +188,15 @@ export default function ProductionConsole({ onExitToLegacy }) {
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
     if (!res.ok) {
-      // Backend's centralized error handler sends { message, fields, action } —
-      // never raw JSON/schema paths. Attach fields/action to the thrown Error so
-      // callers can highlight the specific input and offer the suggested action
-      // instead of just dumping the message string.
+      // Backend's centralized error handler sends { message, fields, action,
+      // errorCode } — never raw JSON/schema paths. Attach these to the thrown
+      // Error so callers can highlight the specific input, offer the
+      // suggested action, and (errorCode) give the operator something
+      // reportable without exposing schema internals.
       const err = new Error((data && (data.message || data.error)) || `${res.status} ${res.statusText}`);
       if (data && Array.isArray(data.fields)) err.fields = data.fields;
       if (data && data.action) err.action = data.action;
+      if (data && data.errorCode) err.errorCode = data.errorCode;
       throw err;
     }
     return data;
@@ -229,12 +232,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
   }, [checkAuth]);
 
   const run = useCallback(async (label, fn) => {
-    setBusy(label); setError(""); setErrorFields([]); setErrorAction(null); setNotice("");
+    setBusy(label); setError(""); setErrorFields([]); setErrorAction(null); setErrorCode(""); setNotice("");
     try { const r = await fn(); if (r && r.notice) setNotice(r.notice); return r; }
     catch (e) {
       setError(e.message || String(e));
       setErrorFields(Array.isArray(e.fields) ? e.fields : []);
       setErrorAction(e.action || null);
+      setErrorCode(e.errorCode || "");
       throw e;
     }
     finally { setBusy(""); }
@@ -406,6 +410,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
   }
 
   const createProject = () => run("Creating project", async () => {
+    // Progressive validation: catch the two required-field mistakes locally,
+    // in ~0ms, using the exact same {fields, errorCode} shape the backend's
+    // centralized error layer sends — so the UI renders identically whether
+    // the check ran here or on the server. Saves a round trip on the most
+    // common mistake instead of waiting on a network error to say the same
+    // thing. See docs/ERROR_HANDLING_STANDARD.md.
+    const fieldErrors = [];
+    if (!form.title.trim()) fieldErrors.push({ path: "title", label: "Title", message: "Title is required.", errorCode: "WL-1001" });
+    if (!form.author.trim()) fieldErrors.push({ path: "authorName", label: "Author / pen name", message: "Author / pen name is required.", errorCode: "WL-1002" });
+    if (fieldErrors.length > 0) {
+      const err = new Error(fieldErrors.length === 1 ? fieldErrors[0].message : "Please fix the highlighted fields.");
+      err.fields = fieldErrors;
+      err.errorCode = fieldErrors.length === 1 ? fieldErrors[0].errorCode : "WL-1000";
+      throw err;
+    }
     const d = await api("/api/projects", { method: "POST", body: JSON.stringify({ config: cleanConfig() }) });
     setProject(d.project); setProjects((c) => [d.project, ...c.filter((p) => p.id !== d.project.id)]);
     return { notice: `Created “${d.project.title}”.` };
@@ -722,11 +741,12 @@ export default function ProductionConsole({ onExitToLegacy }) {
             {error && (
               <div style={{ ...S.card, borderColor: C.red, color: C.red, marginTop: 0 }}>
                 ⚠ {error}
+                {errorCode && <span title="Reference this code if you need to report the issue." style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 600, color: C.muted, letterSpacing: 0.3 }}>{errorCode}</span>}
                 {errorAction && errorAction.type === "navigate" && (
                   <div>
                     <button
                       style={{ ...S.btn(), background: C.red, marginTop: 10, marginRight: 0 }}
-                      onClick={() => { setStep(errorAction.target); setError(""); setErrorFields([]); setErrorAction(null); }}
+                      onClick={() => { setStep(errorAction.target); setError(""); setErrorFields([]); setErrorAction(null); setErrorCode(""); }}
                     >
                       {errorAction.label} →
                     </button>
@@ -766,6 +786,11 @@ export default function ProductionConsole({ onExitToLegacy }) {
             <div style={S.card}>
               <b>Create new</b>
               <LabeledInput label="Book title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} error={fieldError(errorFields, "title")} />
+              {/* Progressive validation: flagged the instant it matches, not after Create is clicked — duplicate
+                  titles are still allowed (see the disambiguating subtitle/author/date above), this is just a heads-up. */}
+              {form.title.trim() && projects.some((p) => p.title.trim().toLowerCase() === form.title.trim().toLowerCase()) && (
+                <div style={{ color: C.orange, fontSize: 12, marginTop: 4 }}>A project named "{form.title.trim()}" already exists. You can still create another — just double-check this isn't an accidental duplicate.</div>
+              )}
               <LabeledInput label="Subtitle" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} error={fieldError(errorFields, "subtitle")} />
               <LabeledInput label="Author / pen name" value={form.author} onChange={(v) => setForm({ ...form, author: v })} error={fieldError(errorFields, "authorName")} />
               <button style={S.btn()} onClick={() => createProject().then(() => setStep("manuscript")).catch(() => {})}>Create project →</button>

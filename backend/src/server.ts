@@ -10,9 +10,12 @@ import {
   hasZodFastifySchemaValidationErrors,
 } from 'fastify-type-provider-zod';
 import { ZodError } from 'zod';
+import { createRequire } from 'node:module';
 import { getEnv } from './env.js';
 import { UserFacingError } from './lib/user-facing-error.js';
-import { issuesToFields, summaryMessage } from './lib/validation-messages.js';
+import { issuesToFields, summaryMessage, summaryErrorCode } from './lib/validation-messages.js';
+import { ERROR_CODES } from './lib/error-codes.js';
+import { logger } from './lib/logger.js';
 import { registerHealthRoutes } from './api/health.routes.js';
 import { registerProjectRoutes } from './api/projects.routes.js';
 import { registerPageRoutes } from './api/pages.routes.js';
@@ -22,6 +25,36 @@ import { registerWholePageRoutes } from './api/whole-page.routes.js';
 import { registerSubjectBadgeRoutes } from './api/subject-badges.routes.js';
 import { registerSupervisorRoutes } from './api/supervisor.routes.js';
 import { registerEpubRoutes } from './api/epub.routes.js';
+
+const require = createRequire(import.meta.url);
+// Read once at module load — used to tag every translated-error telemetry
+// log with the running build, per the "which app version" ask.
+const APP_VERSION = (require('../package.json') as { version?: string }).version ?? 'unknown';
+
+/** Structured log line for every translated user-facing error — the "which
+ *  error, how often, which step, which project" telemetry. Deliberately just
+ *  a structured pino log (searchable/aggregable in whatever log sink is
+ *  already wired up) rather than new analytics infra. */
+function logTranslatedError(
+  request: { method: string; url: string; params: unknown },
+  errorCode: string,
+  statusCode: number,
+): void {
+  const params = request.params as Record<string, unknown> | undefined;
+  const projectId = typeof params?.id === 'string' ? params.id : undefined;
+  logger.info(
+    {
+      event: 'translated_validation_error',
+      errorCode,
+      method: request.method,
+      path: request.url.split('?')[0],
+      projectId,
+      statusCode,
+      appVersion: APP_VERSION,
+    },
+    'translated validation error',
+  );
+}
 
 export async function buildServer(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -47,12 +80,14 @@ export async function buildServer(): Promise<FastifyInstance> {
   // catches thrown/uncaught errors.
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof UserFacingError) {
+      logTranslatedError(request, error.errorCode, error.statusCode);
       reply.code(error.statusCode).send({
         error: error.code,
         message: error.message,
         statusCode: error.statusCode,
         fields: error.fields,
         action: error.action,
+        errorCode: error.errorCode,
       });
       return;
     }
@@ -60,22 +95,28 @@ export async function buildServer(): Promise<FastifyInstance> {
     if (hasZodFastifySchemaValidationErrors(error)) {
       const issues = error.validation.map((v) => v.params.issue);
       const fields = issuesToFields(issues);
+      const errorCode = summaryErrorCode(fields, ERROR_CODES.FIELD_GENERIC);
+      logTranslatedError(request, errorCode, 400);
       reply.code(400).send({
         error: 'Validation Error',
         message: summaryMessage(fields),
         statusCode: 400,
         fields,
+        errorCode,
       });
       return;
     }
 
     if (error instanceof ZodError) {
       const fields = issuesToFields(error.issues);
+      const errorCode = summaryErrorCode(fields, ERROR_CODES.UNCLASSIFIED);
+      logTranslatedError(request, errorCode, 400);
       reply.code(400).send({
         error: 'Validation Error',
         message: summaryMessage(fields),
         statusCode: 400,
         fields,
+        errorCode,
       });
       return;
     }

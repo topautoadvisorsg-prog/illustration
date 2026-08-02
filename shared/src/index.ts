@@ -994,6 +994,8 @@ export const ApiErrorFieldSchema = z.object({
   label: z.string(),
   /** Plain-English sentence, never a schema path or raw Zod message. */
   message: z.string(),
+  /** Stable code (e.g. "WL-1002") for logs/support/docs — see docs/ERROR_HANDLING_STANDARD.md. */
+  errorCode: z.string().optional(),
 });
 
 /** Optional follow-up the UI can offer the operator (e.g. "Return to Manuscript"). */
@@ -1011,6 +1013,8 @@ export const ApiErrorSchema = z.object({
   fields: z.array(ApiErrorFieldSchema).optional(),
   /** A suggested next step for the operator, when one applies. */
   action: ApiErrorActionSchema.optional(),
+  /** Stable top-level code for this error — see docs/ERROR_HANDLING_STANDARD.md. */
+  errorCode: z.string().optional(),
 });
 
 export type ApiErrorField = z.infer<typeof ApiErrorFieldSchema>;

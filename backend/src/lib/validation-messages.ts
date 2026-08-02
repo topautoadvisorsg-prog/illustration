@@ -1,7 +1,13 @@
 import type { ZodIssue } from 'zod';
 import type { ApiErrorField } from '@wildlands/shared';
+import { ERROR_CODES, codeForFieldPath } from './error-codes.js';
 
 /**
+ * Zod issue -> operator-facing field label/message/code. This is the ONLY
+ * place that should translate a Zod issue into English or pick its error
+ * code — see docs/ERROR_HANDLING_STANDARD.md. Don't inline this logic in a
+ * route; extend the maps/switches below instead.
+ *
  * Field-path -> operator-facing label, matching the exact wording used on
  * screen so a translated error and the form it's about clearly refer to the
  * same thing. Keyed by the dot-joined path with array indices stripped
@@ -79,6 +85,7 @@ export function issuesToFields(issues: ZodIssue[]): ApiErrorField[] {
       path: issue.path.map(String).join('.'),
       label,
       message: friendlyIssueMessage(issue, label),
+      errorCode: codeForFieldPath(issue.path),
     };
   });
 }
@@ -88,4 +95,11 @@ export function summaryMessage(fields: ApiErrorField[]): string {
   if (fields.length === 0) return 'The request was invalid.';
   if (fields.length === 1) return fields[0]!.message;
   return 'Please fix the highlighted fields.';
+}
+
+/** Top-level error code to pair with summaryMessage(): the single field's code
+ *  when there's exactly one, otherwise a generic fallback for the family. */
+export function summaryErrorCode(fields: ApiErrorField[], fallback: string = ERROR_CODES.UNCLASSIFIED): string {
+  if (fields.length === 1 && fields[0]!.errorCode) return fields[0]!.errorCode!;
+  return fallback;
 }
