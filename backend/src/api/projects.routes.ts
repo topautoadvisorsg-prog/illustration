@@ -33,6 +33,7 @@ import { UnsupportedManuscriptError } from '../pipeline/stage-1-ingestion/extrac
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
 import { UserFacingError } from '../lib/user-facing-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
+import { timeOperation } from '../lib/timing.js';
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
 import { previewProjectPagination } from '../pipeline/stage-6-layout/pagination-preview.js';
@@ -1217,7 +1218,9 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
 
       try {
         const config = parseProjectConfig(project);
-        const summary = await generateManifests({ projectId: id, manuscriptMarkdown: markdown, config, replace: force });
+        const summary = await timeOperation('breakdown', id, () =>
+          generateManifests({ projectId: id, manuscriptMarkdown: markdown, config, replace: force }),
+        );
         // Re-breakdown invalidates any prior plan + approvals (pages were deleted),
         // so clear the stale plan snapshot and chapter approvals.
         if (force && (config.planMeta || Object.keys(config.layoutApprovals ?? {}).length > 0 || config.pageQualityReview)) {

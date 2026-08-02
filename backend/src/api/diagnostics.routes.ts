@@ -8,9 +8,12 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getErrorFrequencyReport, recordRecoveryEvent } from '../db/repositories/error-events.repo.js';
 import { getRenderDiagnostics } from '../db/repositories/render-diagnostics.repo.js';
+import { getOperationTimingReport } from '../db/repositories/operation-events.repo.js';
+import { allErrorRegistryEntries, ERROR_REGISTRY_VERSION } from '../lib/error-registry.js';
 
 const ErrorFrequencyResponseSchema = z.object({
   windowHours: z.number(),
+  registryVersion: z.string(),
   totalErrors: z.number(),
   topCodes: z.array(z.object({ errorCode: z.string(), count: z.number() })),
   topPaths: z.array(z.object({ path: z.string(), count: z.number() })),
@@ -19,6 +22,21 @@ const ErrorFrequencyResponseSchema = z.object({
     succeeded: z.number(),
     successRate: z.number().nullable(),
   }),
+});
+
+const ErrorRegistryEntrySchema = z.object({
+  code: z.string(),
+  title: z.string(),
+  friendlyMessage: z.string(),
+  technicalCause: z.string(),
+  recovery: z.string(),
+  step: z.string(),
+  severity: z.string(),
+});
+
+const ErrorRegistryResponseSchema = z.object({
+  version: z.string(),
+  entries: z.array(ErrorRegistryEntrySchema),
 });
 
 const RenderDiagnosticsResponseSchema = z.object({
@@ -34,6 +52,16 @@ const RecoveryEventBodySchema = z.object({
   kind: z.enum(['clicked', 'succeeded']),
 });
 
+const OperationTimingResponseSchema = z.object({
+  windowHours: z.number(),
+  operations: z.array(z.object({
+    operation: z.string(),
+    count: z.number(),
+    avgDurationMs: z.number(),
+    successRate: z.number(),
+  })),
+});
+
 export async function registerDiagnosticsRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/api/diagnostics/errors',
@@ -45,8 +73,18 @@ export async function registerDiagnosticsRoutes(app: FastifyInstance): Promise<v
     },
     async (request) => {
       const { hours } = request.query as { hours?: number };
-      return getErrorFrequencyReport(hours ?? 24);
+      const report = await getErrorFrequencyReport(hours ?? 24);
+      return { ...report, registryVersion: ERROR_REGISTRY_VERSION };
     },
+  );
+
+  // The registry as JSON — the same data as docs/ERROR_REGISTRY.md, for
+  // future tooling/automation that wants to consume it programmatically
+  // instead of parsing markdown.
+  app.get(
+    '/api/diagnostics/registry',
+    { schema: { response: { 200: ErrorRegistryResponseSchema } } },
+    async () => ({ version: ERROR_REGISTRY_VERSION, entries: allErrorRegistryEntries() }),
   );
 
   app.get(
@@ -60,6 +98,23 @@ export async function registerDiagnosticsRoutes(app: FastifyInstance): Promise<v
     async (request) => {
       const { hours } = request.query as { hours?: number };
       return getRenderDiagnostics(hours ?? 24);
+    },
+  );
+
+  // Performance timing (backend/src/lib/timing.ts) — only Breakdown is
+  // instrumented today; other operations will show up here once they're
+  // wired up the same way (one timeOperation() call each).
+  app.get(
+    '/api/diagnostics/operations',
+    {
+      schema: {
+        querystring: z.object({ hours: z.coerce.number().int().positive().max(24 * 90).optional() }),
+        response: { 200: OperationTimingResponseSchema },
+      },
+    },
+    async (request) => {
+      const { hours } = request.query as { hours?: number };
+      return getOperationTimingReport(hours ?? 24);
     },
   );
 

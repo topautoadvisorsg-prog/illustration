@@ -1,9 +1,9 @@
-# Error Registry
+# Error Registry v1
 
 **Generated — do not hand-edit.** Source of truth: `backend/src/lib/error-registry.ts`.
 Regenerate with `backend/scripts/generate-error-registry-doc.ts` after changing the registry.
 
-Total codes: 13.
+Registry version: `v1` (bumped only on a breaking shape change — see docs/ERROR_HANDLING_STANDARD.md §1). Total codes: 13.
 
 ### WL-2000 — Invalid Manuscript Structure
 

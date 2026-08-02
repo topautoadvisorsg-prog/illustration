@@ -34,6 +34,7 @@ export default function DiagnosticsPanel() {
   const [hours, setHours] = useState(24);
   const [errors, setErrors] = useState(null);
   const [renders, setRenders] = useState(null);
+  const [operations, setOperations] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -52,8 +53,9 @@ export default function DiagnosticsPanel() {
     Promise.all([
       api(`/api/diagnostics/errors?hours=${hours}`),
       api(`/api/diagnostics/renders?hours=${hours}`),
+      api(`/api/diagnostics/operations?hours=${hours}`),
     ])
-      .then(([e, r]) => { setErrors(e); setRenders(r); })
+      .then(([e, r, o]) => { setErrors(e); setRenders(r); setOperations(o); })
       .catch((err) => setError(err.message))
       .finally(() => setBusy(false));
   }, [pw, hours, api]);
@@ -141,6 +143,38 @@ export default function DiagnosticsPanel() {
                   <div style={statBox}><div style={{ fontSize: 11, color: C.muted }}>Avg approval time</div><div style={{ fontSize: 20, fontWeight: 700 }}>{fmtSeconds(renders.avgApprovalSeconds)}</div></div>
                 </div>
                 <div style={{ marginTop: 8, fontSize: 11, color: C.muted }}>Render time is an approximation (row created→updated), not a precisely instrumented duration — see render-diagnostics.repo.ts. Approval time is exact (decidedAt − created).</div>
+              </>
+            )}
+          </div>
+
+          <div style={card}>
+            <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 10 }}>Operation timing</div>
+            {operations && (
+              <>
+                {operations.operations.length === 0 && <div style={{ color: C.muted, fontSize: 13 }}>None in this window.</div>}
+                {operations.operations.length > 0 && (
+                  <table style={{ fontSize: 13, borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ color: C.muted, fontSize: 11, textAlign: "left" }}>
+                        <th style={{ padding: "2px 14px 4px 0" }}>Operation</th>
+                        <th style={{ padding: "2px 14px 4px 0" }}>Count</th>
+                        <th style={{ padding: "2px 14px 4px 0" }}>Avg duration</th>
+                        <th style={{ padding: "2px 0 4px" }}>Success rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {operations.operations.map((r) => (
+                        <tr key={r.operation}>
+                          <td style={{ padding: "2px 14px 2px 0", fontFamily: "monospace" }}>{r.operation}</td>
+                          <td style={{ padding: "2px 14px 2px 0", fontWeight: 700 }}>{r.count}</td>
+                          <td style={{ padding: "2px 14px 2px 0", fontWeight: 700 }}>{r.avgDurationMs.toLocaleString()}ms</td>
+                          <td style={{ padding: "2px 0", fontWeight: 700, color: r.successRate < 0.9 ? C.red : C.green }}>{fmtPct(r.successRate)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                <div style={{ marginTop: 8, fontSize: 11, color: C.muted }}>Only Breakdown is instrumented today — pagination/render/review timing is follow-up work (see backend/src/lib/timing.ts).</div>
               </>
             )}
           </div>

@@ -85,6 +85,13 @@
       "when": 1785679441823,
       "tag": "0011_rainy_dark_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785683137164,
+      "tag": "0012_aromatic_dazzler",
+      "breakpoints": true
     }
   ]
 }

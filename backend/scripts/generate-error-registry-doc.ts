@@ -8,7 +8,7 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allErrorRegistryEntries } from '../src/lib/error-registry.js';
+import { allErrorRegistryEntries, ERROR_REGISTRY_VERSION } from '../src/lib/error-registry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT_PATH = path.join(__dirname, '..', '..', 'docs', 'ERROR_REGISTRY.md');
@@ -36,12 +36,12 @@ function main(): void {
   );
 
   const doc = [
-    '# Error Registry',
+    `# Error Registry ${ERROR_REGISTRY_VERSION}`,
     '',
     '**Generated — do not hand-edit.** Source of truth: `backend/src/lib/error-registry.ts`.',
     'Regenerate with `backend/scripts/generate-error-registry-doc.ts` after changing the registry.',
     '',
-    `Total codes: ${entries.length}.`,
+    `Registry version: \`${ERROR_REGISTRY_VERSION}\` (bumped only on a breaking shape change — see docs/ERROR_HANDLING_STANDARD.md §1). Total codes: ${entries.length}.`,
     '',
     ...entries.map(renderEntry),
   ].join('\n');

@@ -12,7 +12,41 @@ styling, or the field-highlighting behavior once fixes it everywhere, forever.
 
 ---
 
-## 1. The rule
+## 1. Platform stability — frozen contracts
+
+This is now foundational platform infrastructure, not a one-off fix. The
+following are **frozen contracts** — extend them, don't break them:
+
+- `UserFacingError` (constructor shape: `message`, `code`, `errorCode`,
+  `statusCode`, `fields`, `action`)
+- The Error Registry's entry shape (`code`, `title`, `friendlyMessage`,
+  `technicalCause`, `recovery`, `step`, `severity`) — see `ERROR_REGISTRY_VERSION`
+  below
+- Error codes (`WL-####`) — meaning never changes once assigned (already
+  the rule in §3; restated here because it's now a platform-wide guarantee)
+- The recovery action shape (`type`, `target`, `label`, `explanation`,
+  `docLink`)
+- The diagnostics API (`GET /api/diagnostics/errors`, `/renders`,
+  `/registry`, `POST /recovery-event`) — response shapes
+- Telemetry event shapes (`translated_validation_error` log event,
+  `error_events` / `recovery_events` table columns)
+- Correlation IDs — one per translated-error occurrence, carried through the
+  response, the recovery-click event, and the recovery-succeeded event
+
+**If new functionality is needed, add a new optional field, a new endpoint,
+or a new code family — don't rename, remove, or repurpose an existing one.**
+A genuine breaking change (renaming a field, changing what a code means,
+changing a response shape) is possible but should be rare and deliberate,
+not a side effect of an unrelated feature.
+
+**Error Registry versioning:** `ERROR_REGISTRY_VERSION` (`backend/src/lib/error-registry.ts`)
+is bumped only when the registry's *shape* changes in a breaking way — never
+just for adding new codes (that's normal, ongoing growth, not a version
+bump). It's echoed in `docs/ERROR_REGISTRY.md`'s header and in the
+`GET /api/diagnostics/errors` / `/registry` responses, so support docs,
+telemetry, and tooling can all key off the same version.
+
+## 2. The rule
 
 **Nothing you write should ever call `reply.code(4xx).send({ message: "..." })`
 by hand for a condition an operator caused (bad input, missing prerequisite,
@@ -25,7 +59,7 @@ not found" from a stale link) — there's no field to highlight and no action to
 offer. Everything else — a missing prerequisite, invalid structure, bad
 format, blocked operation — goes through `UserFacingError`.
 
-## 2. How to add a new error
+## 3. How to add a new error
 
 1. **Pick or mint a code** in `backend/src/lib/error-codes.ts`. Codes are
    grouped by family (`WL-1xxx` field validation, `WL-2xxx` manuscript
@@ -58,7 +92,7 @@ validation failures and runs every issue through the same field-label +
 message-formatting logic in `validation-messages.ts`, attaching a code
 automatically via `codeForFieldPath`.
 
-## 3. What the operator sees vs. what's logged vs. what's queryable
+## 4. What the operator sees vs. what's logged vs. what's queryable
 
 - **Operator sees:** the plain-English `message`, the highlighted field (if
   any), and the recovery button (if any) — never the code prominently, never
@@ -71,20 +105,20 @@ automatically via `codeForFieldPath`.
   that occurrence.
 - **The database gets** the same event, persisted to `error_events`
   (`backend/src/db/repositories/error-events.repo.ts`) — this is what backs
-  the diagnostics page (§6), not just ephemeral logs. When the operator
+  the diagnostics page (§7), not just ephemeral logs. When the operator
   clicks a recovery action, the frontend posts a `recovery_events` row
   tagged `clicked` with that same `correlationId`; the very next action's
   outcome (success or not) posts `succeeded` if it worked. This is a simple
   "did the next thing work" heuristic, not a full session trace — good
   enough to catch a recovery button that isn't actually helping.
 
-Check `GET /api/diagnostics/errors` (or the diagnostics page, §6) before
+Check `GET /api/diagnostics/errors` (or the diagnostics page, §7) before
 assuming a confusing validation message is a one-off; if the same code shows
 up constantly, that's a UX problem to fix upstream (progressive validation,
 better manuscript guidance, etc.), not something to just keep translating
 politely forever.
 
-## 4. Recovery over failure
+## 5. Recovery over failure
 
 Every `UserFacingError` should ask "what does the operator do next?" before
 it's written. If the answer is a specific screen, attach the standardized
@@ -110,7 +144,21 @@ The frontend's sticky error banner renders all of this generically for any
 error, anywhere in the app — you don't need new frontend code to wire up a
 new recovery button, explanation, or doc link, just attach it server-side.
 
-## 6. Error registry, tests, and the diagnostics page
+## 6. Architectural boundary — the one rule that keeps this consistent
+
+**No frontend component creates its own user-facing validation message. No
+route manually builds a user-facing error.** Everything flows through this
+framework: `UserFacingError` + the error registry on the backend, the
+generic `api()`/banner/`LabeledInput` handling on the frontend. See
+`docs/ERROR_HANDLING_ARCHITECTURE.md` for how a request actually flows
+through every layer, end to end.
+
+This is the boundary that makes "fix the wording once, it's fixed
+everywhere" (the promise at the top of this doc) actually true — the moment
+a component starts building its own error string, that guarantee breaks for
+that one spot, and usually spreads from there.
+
+## 7. Error registry, tests, and the diagnostics page
 
 - **Error registry** (`backend/src/lib/error-registry.ts`) — every code's
   title, friendly message, technical cause, recovery description, workflow
@@ -133,7 +181,7 @@ new recovery button, explanation, or doc link, just attach it server-side.
   render/approval times. On-demand, not a scheduled/emailed report — there's
   no notification infrastructure in this app to schedule one against.
 
-## 7. Files
+## 8. Files
 
 - `backend/src/lib/user-facing-error.ts` — the `UserFacingError` class. The
   only sanctioned way to produce a user-facing error.
@@ -150,8 +198,9 @@ new recovery button, explanation, or doc link, just attach it server-side.
   aggregate report.
 - `backend/src/db/repositories/render-diagnostics.repo.ts` — render
   count/failure/timing aggregates for the diagnostics page.
-- `backend/src/api/diagnostics.routes.ts` — the two `GET` aggregate
-  endpoints plus `POST /api/diagnostics/recovery-event`.
+- `backend/src/api/diagnostics.routes.ts` — the `GET` aggregate/registry
+  endpoints (`/errors`, `/renders`, `/registry`) plus
+  `POST /api/diagnostics/recovery-event`.
 - `backend/src/server.ts` — calls `registerErrorHandler`, wiring its sink to
   `recordErrorEvent`.
 - `frontend/src/ProductionConsole.js` — `api()` attaches `fields` / `action`
@@ -159,3 +208,25 @@ new recovery button, explanation, or doc link, just attach it server-side.
   `Error`; the sticky banner and `LabeledInput` consume them generically. A
   new backend error with a code + action needs zero new frontend code to
   render correctly. The recovery button posts the click/succeeded events.
+- `docs/ERROR_HANDLING_ARCHITECTURE.md` — the end-to-end request/validation/
+  telemetry/recovery/diagnostics flow, for anyone building on this platform
+  who wants the full picture before writing code.
+
+## 9. Before merging a new feature onto this platform
+
+Answer these before it ships — if the honest answer is "no" and there's no
+good reason, it isn't done yet:
+
+- [ ] Does it use `UserFacingError` / the centralized framework for every
+      user-facing error, instead of a hand-rolled message?
+- [ ] Does it emit telemetry (flows through `registerErrorHandler`'s sink,
+      or has its own reason not to)?
+- [ ] Does it have a recovery action where one genuinely applies?
+- [ ] Does it show up in diagnostics if it's the kind of thing worth
+      tracking (a new error family, a new failure mode operators should see
+      trending)?
+- [ ] Is it covered by regression tests (registry completeness, response
+      shape, no-leak guarantees, or a real end-to-end scenario)?
+- [ ] Is `docs/ERROR_REGISTRY.md` regenerated and is this doc (or
+      `ERROR_HANDLING_ARCHITECTURE.md`) updated if the change touches how the
+      framework itself works, not just which codes exist?

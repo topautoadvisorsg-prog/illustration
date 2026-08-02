@@ -1,6 +1,17 @@
 import { ERROR_CODES } from './error-codes.js';
 
 /**
+ * Registry format version — NOT a code family, and not bumped when codes are
+ * added (adding entries is normal, ongoing growth). Bump it only on a
+ * breaking change to the registry's SHAPE (an ErrorRegistryEntry field is
+ * renamed, removed, or changes meaning) — the kind of change that could
+ * break something reading docs/ERROR_REGISTRY.md or the diagnostics API
+ * programmatically. See docs/ERROR_HANDLING_STANDARD.md §1 (frozen
+ * contracts) before touching this.
+ */
+export const ERROR_REGISTRY_VERSION = 'v1';
+
+/**
  * The single source of truth for every WL-#### code's metadata — what it
  * means, why it fires, how an operator recovers, and how severe it is. This
  * is what docs/ERROR_REGISTRY.md is generated FROM (see

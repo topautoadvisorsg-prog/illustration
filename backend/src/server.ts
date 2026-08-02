@@ -7,6 +7,8 @@ import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from 'fast
 import { getEnv } from './env.js';
 import { registerErrorHandler } from './lib/error-handler.js';
 import { recordErrorEvent } from './db/repositories/error-events.repo.js';
+import { setOperationEventSink } from './lib/timing.js';
+import { recordOperationEvent } from './db/repositories/operation-events.repo.js';
 import { registerHealthRoutes } from './api/health.routes.js';
 import { registerProjectRoutes } from './api/projects.routes.js';
 import { registerPageRoutes } from './api/pages.routes.js';
@@ -38,6 +40,13 @@ export async function buildServer(): Promise<FastifyInstance> {
   // throws into the response path (see its own try/catch).
   registerErrorHandler(app, (event) => {
     recordErrorEvent(event).catch(() => {});
+  });
+
+  // Performance-timing telemetry (backend/src/lib/timing.ts) — same
+  // fire-and-forget pattern as the error sink above, reusing the pipeline
+  // for operation duration/success instead of translated errors.
+  setOperationEventSink((event) => {
+    recordOperationEvent(event).catch(() => {});
   });
 
   await app.register(cors, {

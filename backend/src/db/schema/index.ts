@@ -524,3 +524,24 @@ export const recoveryEvents = pgTable(
     correlationIdIdx: index('recovery_events_correlation_id_idx').on(table.correlationId),
   }),
 );
+
+// Performance telemetry — one row per timed pipeline operation (see
+// backend/src/lib/timing.ts). Same "plain column, no FK" reasoning as
+// error_events: this is a log, and must survive a project being deleted.
+// Only Breakdown is instrumented today (docs/ERROR_HANDLING_ARCHITECTURE.md);
+// pagination/render/review are follow-up work, not attempted wholesale here.
+export const operationEvents = pgTable(
+  'operation_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    operation: text('operation').notNull(),
+    projectId: uuid('project_id'),
+    durationMs: integer('duration_ms').notNull(),
+    success: boolean('success').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    operationIdx: index('operation_events_operation_idx').on(table.operation),
+    createdAtIdx: index('operation_events_created_at_idx').on(table.createdAt),
+  }),
+);
