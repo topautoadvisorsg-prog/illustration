@@ -389,11 +389,34 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return { notice: `${merged.length} pages · ${rd.bookReady || 0} book-ready · ${pending} not rendered.` };
   }), [api, project, run]);
 
+  // A render call returns HTTP 200 even when the underlying generation failed
+  // (status: "FAILED" in the body, e.g. billing limit) — it's not an error the
+  // pipeline is guarding against per-page, it succeeded at recording the
+  // failure. So this loop tracks real success/failure itself, and — this is
+  // the important part — STOPS after a run of consecutive failures instead of
+  // blindly working through the rest of the backlog: 3 failures in a row is
+  // almost always a systemic block (billing, outage), not 3 unlucky pages,
+  // and burning through the other 150 pending pages the same way just
+  // produces 150 more FAILED rows for nothing.
+  const CONSECUTIVE_FAILURE_STOP = 3;
   const renderAll = (filter) => run("Rendering all pending pages (paid)", async () => {
     const pending = (renders?.merged || []).filter((m) => m.status === "NOT RENDERED" && filter(m));
-    for (const m of pending) await api(`/api/whole-page-render/${m.pageId}`, { method: "POST", body: "{}" });
+    let ok = 0, failed = 0, consecutiveFailed = 0, stoppedEarly = false;
+    let lastError = "";
+    for (const m of pending) {
+      const d = await api(`/api/whole-page-render/${m.pageId}`, { method: "POST", body: "{}" });
+      if (d.status === "RENDERED" || d.status === "APPROVED") { ok++; consecutiveFailed = 0; }
+      else { failed++; consecutiveFailed++; lastError = d.render?.errorMessage || d.status || "unknown"; }
+      if (consecutiveFailed >= CONSECUTIVE_FAILURE_STOP) { stoppedEarly = true; break; }
+    }
     await loadRenders();
-    return { notice: `Rendered ${pending.length} page(s).` };
+    const attempted = ok + failed;
+    const notice = stoppedEarly
+      ? `Stopped after ${CONSECUTIVE_FAILURE_STOP} failures in a row (${ok} succeeded, ${failed} failed of ${attempted} attempted, ${pending.length - attempted} not tried). Last error: "${lastError}" — fix that before running the rest.`
+      : failed > 0
+        ? `Rendered ${ok} of ${pending.length} — ${failed} failed. Check the FAILED pages below.`
+        : `Rendered ${ok} page(s).`;
+    return { notice };
   });
 
   const previewPage = (pageId, imagePath) => run("Building no-spend preview", async () => {
