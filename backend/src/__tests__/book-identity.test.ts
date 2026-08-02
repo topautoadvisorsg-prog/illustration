@@ -31,9 +31,9 @@ function cfg(over: Record<string, unknown>) {
 const seriesRow = { section: 'BM', frontMatterType: 'ABOUT_SERIES', pageKey: 'BM_001_SERIES', layoutTemplate: null, pageRole: null, plannedPageNumber: 1, chapterNumber: 0 } as unknown as PageRow;
 
 describe('buildSeriesLine / toRoman (shared)', () => {
-  it('formats "[SERIES] — SERIES [Roman]" and stores volume as a number', () => {
-    expect(buildSeriesLine('The Wildlands Series', 3)).toBe('THE WILDLANDS SERIES — SERIES III');
-    expect(buildSeriesLine('The Ocean Collection', 1)).toBe('THE OCEAN COLLECTION — SERIES I');
+  it('formats "[SERIES]: SERIES [Roman]" and stores volume as a number', () => {
+    expect(buildSeriesLine('The Wildlands Series', 3)).toBe('THE WILDLANDS SERIES: SERIES III');
+    expect(buildSeriesLine('The Ocean Collection', 1)).toBe('THE OCEAN COLLECTION: SERIES I');
     expect(toRoman(4)).toBe('IV');
     expect(toRoman(9)).toBe('IX');
   });
@@ -130,7 +130,7 @@ describe('cover prompt is data-driven', () => {
   it('bakes the series line + cover description + region, never hardcoded New England', () => {
     const dims = computeCoverDimensions(wildlands, 200);
     const prompt = buildCoverWrapPrompt(wildlands, 200, dims);
-    expect(prompt).toContain('THE WILDLANDS SERIES — SERIES III');
+    expect(prompt).toContain('THE WILDLANDS SERIES: SERIES III');
     expect(prompt).toContain('A Field Guide to the Pacific Northwest Wilderness');
     expect(prompt).toContain('Pacific Northwest');
     expect(prompt).not.toContain('New England');
@@ -176,7 +176,7 @@ describe('cover prompt is data-driven', () => {
     });
     const dims = computeCoverDimensions(ocean, 120);
     const prompt = buildCoverWrapPrompt(ocean, 120, dims);
-    expect(prompt).toContain('THE OCEAN COLLECTION — SERIES I');
+    expect(prompt).toContain('THE OCEAN COLLECTION: SERIES I');
     expect(prompt).toContain('The Coral Reefs');
     expect(prompt).not.toContain('Wildlands');
     expect(prompt).not.toContain('New England');

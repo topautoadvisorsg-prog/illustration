@@ -609,7 +609,10 @@ export function buildCoverWrapPrompt(
   // source of truth from buildSeriesLine().
   const coverDescription = config.publishing.coverDescription ?? '';
   const coverArtDirection = (config.publishing.coverArtDirection ?? '').trim();
-  const seriesLine = buildSeriesLine(config.publishing.series?.name, config.volume) ?? undefined;
+  // series.volumeNumber is "book N in this series"; config.volume is an
+  // unrelated per-project field and must never drive the printed series line.
+  const seriesLine =
+    buildSeriesLine(config.publishing.series?.name, config.publishing.series?.volumeNumber ?? config.volume) ?? undefined;
   const sceneSubject = subtitle || title;
   const frontPanelXIn = config.trimSize.bleedIn + config.trimSize.widthIn + dims.spineIn;
   const spec: WholePageSpec = {

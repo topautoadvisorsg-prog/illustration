@@ -151,7 +151,12 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
               ? input.config.publishing.authors.join(', ')
               : input.config.authorName,
             // Same series line as the cover — one source of truth so they can't drift.
-            buildSeriesLine(input.config.publishing.series?.name, input.config.volume) ?? undefined,
+            // series.volumeNumber is "book N in this series"; config.volume is an
+            // unrelated per-project field and must never drive the printed series line.
+            buildSeriesLine(
+              input.config.publishing.series?.name,
+              input.config.publishing.series?.volumeNumber ?? input.config.volume,
+            ) ?? undefined,
           ].filter((x): x is string => Boolean(x))
         : pageType === 'INTRO_OPENER'
           ? [policy.title.name]
