@@ -133,7 +133,7 @@ export const WILDLANDS_AGENT_CONTRACTS: Record<WildlandsAgentId, WildlandsAgentC
       'Do not generate images or rewrite manuscript text.',
       'The image IS the page (full-bleed). Specify the image-priority zone (where focal visual content lives), the text-safe zone (where body text overlays readably), the typography zone (where the title sits on the artwork), and the 300-DPI pixel target for the full page.',
       'For text-heavy pages, keep the image-priority zone narrow (corner, edge, margin) so most of the artwork supports a generous text-safe zone.',
-      'For chapter openers and covers, reserve a calm typography zone so the layout-typeset title reads on the artwork; the image model still renders no readable text.',
+      'For chapter openers, covers, and title pages, reserve a calm typography zone so the title reads clearly on the artwork; the image model bakes that typography in itself — there is no separate layout-typeset pass.',
     ],
     requiredInputs: ['Approved layout template', 'Page geometry', 'Typography settings', 'Page subject', 'Body text context'],
     requiredOutputs: ['Image-priority zone position + share', 'Text-safe zone position + share', 'Typography zone position', '300-DPI pixel target for the full page', 'Bleed/crop guidance', 'Composition brief for the image generator'],

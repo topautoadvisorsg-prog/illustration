@@ -1,11 +1,12 @@
 ﻿/**
- * services/openai â€” typed wrapper around OpenAI image generation (gpt-image-2).
+ * services/openai — typed wrapper around OpenAI image generation (gpt-image-2).
  *
  * What it does: single entry point for image-generation calls. Returns the raw
  * PNG bytes. Pipeline code must never touch the SDK directly.
  *
- * Clean-art contract: the prompt is assembled by Stage 2 and must contain NO
- * instruction to render text â€” all typography is added later by the layout engine.
+ * The prompt is assembled upstream (whole-page-render/assemble-page-prompt.ts)
+ * and, for text-bearing pages, DOES instruct the model to bake real typography
+ * into the artwork — there is no separate layout engine that adds text later.
  */
 
 import OpenAI, { toFile } from 'openai';

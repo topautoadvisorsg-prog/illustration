@@ -63,8 +63,24 @@ const HARD_NEGATIVES = [
   '- No anthropomorphized animals, cartoon expressions, or whimsical fantasy elements.',
 ].join('\n');
 
+// COVER_WRAP and TITLE_PAGE (when it carries a title) bake their own
+// dedicated typographic text (see isCoverWrap/isTitlePage below) rather than
+// the generic PAGE BODY treatment, so they stay out of this function.
+// GLOSSARY_ORNAMENT/INDEX_ORNAMENT were removed from this exclusion — their
+// specs already carry real glossary/index text (build-page-spec.ts), so they
+// now render exactly like any other text-bearing page.
 function rendersCriticalText(spec: WholePageSpec): boolean {
-  return !['COVER_WRAP', 'TITLE_PAGE', 'GLOSSARY_ORNAMENT', 'INDEX_ORNAMENT'].includes(spec.pageType);
+  return !['COVER_WRAP', 'TITLE_PAGE'].includes(spec.pageType);
+}
+
+// The half-title shares pageType TITLE_PAGE but is an intentional pure-
+// illustration entrance plate (build-page-spec.ts gives it an EMPTY
+// titleHierarchy on purpose — see page-role-policy.ts's isHalfTitle branch).
+// Keying off "does this page actually have title text" rather than the raw
+// pageType lets the fix apply to real title pages without forcing text onto
+// the half-title.
+function hasTitlePageText(spec: WholePageSpec): boolean {
+  return spec.pageType === 'TITLE_PAGE' && spec.typographyDNA.titleHierarchy.length > 0;
 }
 
 function promptHeader(spec: WholePageSpec): string {
@@ -76,6 +92,15 @@ function promptHeader(spec: WholePageSpec): string {
       `You are rendering a complete, FINISHED, publishable collector-edition cover wrap under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version} — a museum-grade, vintage natural-history field guide in an expedition-journal aesthetic.`,
       'It is ONE single, continuous full-bleed illustration across back cover, spine, and front cover, printed from a single plate: typography and illustration share the same parchment, period, and ink — never artwork with text pasted on top, never a blank cover awaiting text.',
       'You bake ALL cover typography — front-cover title/subtitle/author/series, spine title/author, and back-cover copy — directly INTO this artwork yourself, exactly as specified below. Nothing is added after this image is generated.',
+      `The page paper is parchment ${PALETTE.parchment.hex}; all ink is warm sepia ${PALETTE.ink.hex} — never pure black, never colored.`,
+      'The specification below is authoritative — render it exactly as specified.',
+    ].join(' ');
+  }
+  if (hasTitlePageText(spec)) {
+    return [
+      `You are rendering a complete, FINISHED, publishable collector-edition title page under the Wild Lands Publishing Standard v${WILDLANDS_STANDARD.version} — a museum-grade, vintage natural-history field guide in an expedition-journal aesthetic.`,
+      'It is ONE single, integrated page printed from a single plate: typography and illustration share the same parchment, period, and ink — never artwork with text pasted on top, never a blank page awaiting text.',
+      'You bake the title-page typography — title, subtitle, author, and series line — directly INTO this artwork yourself, exactly as specified below. Nothing is added after this image is generated.',
       `The page paper is parchment ${PALETTE.parchment.hex}; all ink is warm sepia ${PALETTE.ink.hex} — never pure black, never colored.`,
       'The specification below is authoritative — render it exactly as specified.',
     ].join(' ');
@@ -105,9 +130,19 @@ function hardConstraints(spec: WholePageSpec): string {
     }
   }
   if (spec.pageType === 'TITLE_PAGE') {
-    lines.push(
-      '- TITLE PAGE ARTWORK: reserve a calm central title-safe region and a smaller lower imprint-safe region. Do not render title, subtitle, author, imprint, series, or any other readable text.',
-    );
+    if (hasTitlePageText(spec)) {
+      lines.push(
+        '- TITLE PAGE: bake the TITLE-PAGE typography directly into the artwork as engraved lettering in the same warm sepia ink as the rest of the page — one integrated plate, never a blank space left for text, never a separate text panel or card.',
+        `- Render, stacked and centered in the calm title-safe zone, in this order: ${spec.typographyDNA.titleHierarchy.map((s) => `"${s}"`).join(', ')}. The title reads largest and most dominant; each following line steps down in size beneath it, still clearly legible.`,
+        '- Render every string above EXACTLY, letter-for-letter: do not add, remove, translate, summarize, paraphrase, or reorder any word, and use only normal upright letters — no garbled, warped, or invented glyphs. Before finishing, PROOFREAD every baked word against TITLE-PAGE typography above; a title page with even one misspelled or altered word is unusable.',
+      );
+    } else {
+      // Half-title: intentionally empty titleHierarchy (see hasTitlePageText) —
+      // a pure cinematic entrance plate, no typography at all.
+      lines.push(
+        '- TITLE PAGE ARTWORK: reserve a calm central title-safe region and a smaller lower imprint-safe region. Do not render title, subtitle, author, imprint, series, or any other readable text — this page is a pure illustrated entrance plate.',
+      );
+    }
   }
   if (spec.pageType === 'COVER_WRAP') {
     lines.push(
@@ -207,6 +242,7 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
   //  - `titleHierarchy` (the front-cover title stack) also applies to the cover.
   const emitTitleFamily = spec.pageType === 'CHAPTER_OPENER' || spec.pageType === 'TITLE_PAGE';
   const isCoverWrap = spec.pageType === 'COVER_WRAP';
+  const isTitlePage = hasTitlePageText(spec);
   const {
     identity: _identity,
     noModernUi: _noModernUi,
@@ -219,7 +255,7 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
   const typographyDNA = {
     ...typoRest,
     ...(emitTitleFamily ? { titleFamily } : {}),
-    ...(rendersCriticalText(spec) || isCoverWrap ? { titleHierarchy } : {}),
+    ...(rendersCriticalText(spec) || isCoverWrap || isTitlePage ? { titleHierarchy } : {}),
     ...(decorativeInitial != null ? { decorativeInitial } : {}),
   };
   // Every page in this path bakes its own text into the image, including the
@@ -245,10 +281,14 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
       ? [
           'TEXT POLICY — this page bakes its own cover typography. Render the exact strings in PAGE TEXT — cover copy above, placed per the FRONT COVER / SPINE / BACK COVER constraints below. Keep every other zone of the artwork calm and naturally integrated — never a blank card, panel, label, or cutout waiting for text.',
         ]
-      : [
-          'TEXT POLICY — render no readable text for this page role.',
-          'Keep typography-safe and reference-safe regions calm and naturally integrated into the artwork. Never draw a blank card, panel, label, frame, or cutout.',
-        ];
+      : isTitlePage
+        ? [
+            'This page bakes its own title-page typography — render the exact strings in TITLE-PAGE typography above, stacked and centered per the TITLE PAGE constraints below. Keep every other zone of the artwork calm and naturally integrated — never a blank card, panel, label, or cutout waiting for text.',
+          ]
+        : [
+            'TEXT POLICY — render no readable text for this page role.',
+            'Keep typography-safe and reference-safe regions calm and naturally integrated into the artwork. Never draw a blank card, panel, label, frame, or cutout.',
+          ];
 
   // Continuation/compacted pages carry the SAME subject as the entry opener, but
   // must not reprint the opener's portrait — each page should teach something new.
@@ -277,6 +317,7 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
     '',
     ...(rendersCriticalText(spec) ? [block('PAGE TEXT — title', spec.pageText.title), ''] : []),
     ...(isCoverWrap && spec.coverCopy ? [block('PAGE TEXT — cover copy (bake exactly, letter-for-letter)', spec.coverCopy), ''] : []),
+    ...(isTitlePage ? [block('TITLE-PAGE typography (bake exactly, letter-for-letter)', titleHierarchy), ''] : []),
     ...bodySection,
     '',
     block('DECORATIVE ELEMENTS', spec.decorativeElements),
