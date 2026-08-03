@@ -579,16 +579,17 @@ export function toRoman(n: number): string {
 
 /**
  * The single source of truth for the series line printed on the cover, title
- * page, and series page: "[SERIES NAME]: SERIES [Roman]". Fully data-driven —
+ * page, and series page: "[SERIES NAME] — SERIES [Roman]". Fully data-driven —
  * returns null when no series name is set (nothing book-specific in code).
- * Uses a colon, not an em dash — printed cover/title-page typography should
- * read like ordinary book copy, not like AI-generated text.
+ * The em dash here is the established branding style (matches earlier
+ * volumes) — do not "fix" it to a colon. The no-em-dash rule applies to
+ * back-cover prose (blurb/bio paragraphs), not this short branding line.
  */
 export function buildSeriesLine(seriesName?: string | null, volume?: number | null): string | null {
   const name = (seriesName ?? '').trim();
   if (!name) return null;
   const roman = volume != null ? toRoman(volume) : '';
-  return roman ? `${name.toUpperCase()}: SERIES ${roman}` : name.toUpperCase();
+  return roman ? `${name.toUpperCase()} — SERIES ${roman}` : name.toUpperCase();
 }
 
 /**

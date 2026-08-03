@@ -83,8 +83,8 @@ function resolveMeta(project: NonNullable<Awaited<ReturnType<typeof getProject>>
   const title = pub.title || project.title;
   const subtitle = pub.subtitle || project.subtitle || undefined;
   const authors = pub.authors && pub.authors.length ? pub.authors : [project.authorName];
-  // Branding is "<Series>: Series <Roman>" (matches the cover, e.g. "THE
-  // WILDLANDS: SERIES I"), NOT "Volume N".
+  // Branding is "<Series> — Series <Roman>" (matches the cover, e.g. "THE
+  // WILDLANDS — SERIES I"), NOT "Volume N".
   const seriesName = pub.series
     ? pub.series.volumeNumber
       ? `${pub.series.name} — Series ${toRoman(pub.series.volumeNumber)}`
