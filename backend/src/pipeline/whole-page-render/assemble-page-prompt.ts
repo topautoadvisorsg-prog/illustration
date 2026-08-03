@@ -115,6 +115,12 @@ function hardConstraints(spec: WholePageSpec): string {
       '- FRONT COVER: in the calm upper/central title-safe zone render the title (and subtitle/description line, if present) in stately engraved serif caps; in the smaller lower zone render the author line and series line, if present.',
       '- SPINE: render the title (and author, if it fits) as a vertical strip of type sized to comfortably fit the spine width without crowding the trim.',
       '- BACK COVER: render the back-cover copy as calm body-serif type in the readable negative space of the back panel, in the order given.',
+      // Same functional purpose as the interior TOP ANCHOR (assemblePagePrompt
+      // only emits that for rendersCriticalText() pages, which excludes
+      // COVER_WRAP) — a back cover with a full blurb + feature list is exactly
+      // as text-heavy as an interior page and needs the same protection: an
+      // illustrated buffer holding the text down and away from the top trim.
+      '- BACK COVER TOP ANCHOR (hard constraint — text protection): leave a calm illustrated margin, sky, distant peaks, tree canopy, or whatever fits the scene, ABOVE where the back-cover text block begins, so the first line of text starts with real breathing room below the top trim and NEVER touches, crowds, or crosses it. Do not start the text at the very top edge of the panel. If the full back-cover copy does not fit with that top margin preserved, let the text block run further down toward the bottom of the panel instead (there is usually room there) rather than crowding the top.',
       '- Render every string in PAGE TEXT — cover copy EXACTLY, letter-for-letter: do not add, remove, translate, summarize, paraphrase, or reorder any word, and use only normal upright letters — no garbled, warped, or invented glyphs. Before finishing, PROOFREAD every baked word against PAGE TEXT — cover copy; a cover with even one misspelled or altered word is unusable.',
       '- Keep the lower-right back-cover corner visually quiet and free of typography — Amazon/KDP prints the barcode there after press. Do not render a barcode, ISBN, or price box yourself.',
     );
