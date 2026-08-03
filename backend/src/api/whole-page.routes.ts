@@ -41,6 +41,8 @@ import {
 } from '../services/render-proof/build-package.js';
 import { prepareRender } from '../pipeline/whole-page-render/render-whole-page.js';
 import { reviewRenderedText } from '../services/openai/text-review.js';
+import { deriveReviewSourceText } from '../pipeline/whole-page-render/review-source-text.js';
+import type { WholePageSpec } from '../pipeline/whole-page-render/types.js';
 import { reviewPromptSanity } from '../services/openai/prompt-review.js';
 import { WILDLANDS_STANDARD } from '../pipeline/publishing-standard/index.js';
 import sharp from 'sharp';
@@ -352,8 +354,8 @@ export async function registerWholePageRoutes(app: FastifyInstance): Promise<voi
       return reply.code(409).send({ error: 'Conflict', message: 'render_has_no_image', statusCode: 409 });
     }
     try {
-      const spec = existing.specJson as { pageText?: { body?: string } };
-      const sourceText = spec.pageText?.body ?? '';
+      const spec = existing.specJson as WholePageSpec;
+      const sourceText = deriveReviewSourceText(spec);
       if (!sourceText.trim()) {
         return { pass: true, issues: [], model: 'n/a', note: 'no body text on this page — nothing to check' };
       }
