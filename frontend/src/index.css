@@ -15,6 +15,16 @@ body {
     font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
+html,
+body,
+#root {
+    min-height: 100%;
+}
+
 @supports (font-variation-settings: normal) {
     body {
         font-family:
@@ -125,5 +135,47 @@ code,
         border-right-color: inherit;
         border-top-color: inherit;
         border-bottom-color: inherit;
+    }
+}
+
+@media (max-width: 760px) {
+    html,
+    body {
+        overflow-x: hidden;
+    }
+
+    .wl-console-main,
+    .wl-console-main * {
+        min-width: 0;
+    }
+
+    .wl-console-main img,
+    .wl-console-main iframe,
+    .wl-console-main canvas,
+    .wl-console-main video,
+    .wl-console-main pre,
+    .wl-console-main a {
+        max-width: 100%;
+    }
+
+    .wl-console-main iframe {
+        height: min(520px, 72vh) !important;
+    }
+
+    .wl-console-main table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .wl-step-nav {
+        overscroll-behavior-x: contain;
+        touch-action: pan-x pan-y;
+        scrollbar-width: thin;
+    }
+
+    .wl-step-nav::-webkit-scrollbar {
+        height: 4px;
     }
 }

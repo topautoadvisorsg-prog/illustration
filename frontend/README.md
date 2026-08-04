@@ -38,6 +38,19 @@ over-built workbench.
 - **Final file generation / download → Build & Export** (Build Book).
 - Setup → Setup. QA overlays → in the preview. Don't add a new tab per edition feature.
 
+## Mobile operator navigation
+
+The production console keeps the same eight-step workflow on mobile, but the
+desktop sidebar collapses into:
+
+- a sticky top step selector,
+- a horizontal step chip rail,
+- a fixed bottom Back / current step / Next dock.
+
+This is intentional. Long review pages can run hundreds of cards deep, so the
+operator must always have a visible way to get back to the workflow steps
+without scrolling to the top.
+
 ## Editions
 
 Hardcover, paperback, and Kindle are editions of the **same approved content**

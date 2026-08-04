@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 const DEFAULT_BACKEND_URL = "https://wildlandsbackend-production.up.railway.app";
 const BACKEND = process.env.REACT_APP_BACKEND_URL || DEFAULT_BACKEND_URL;
+const MOBILE_QUERY = "(max-width: 760px)";
 
 // The "no error" shape for errorState — see its declaration in ProductionConsole for why
 // the translated-error fields live in one object instead of five parallel useState calls.
@@ -140,6 +141,32 @@ function downloadTextFile(filename, text) {
   URL.revokeObjectURL(url);
 }
 
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+    return window.matchMedia(query).matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    const media = window.matchMedia(query);
+    const onChange = (event) => setMatches(event.matches);
+    setMatches(media.matches);
+    if (typeof media.addEventListener === "function") media.addEventListener("change", onChange);
+    else media.addListener(onChange);
+    return () => {
+      if (typeof media.removeEventListener === "function") media.removeEventListener("change", onChange);
+      else media.removeListener(onChange);
+    };
+  }, [query]);
+
+  return matches;
+}
+
+function shortStepLabel(label) {
+  return String(label || "").replace(/^\d+\s*[^A-Za-z0-9]+\s*/, "").replace("Build Front/Back Matter", "Matter").replace("Render & Review", "Review").replace("Build Book", "Export");
+}
+
 // Backend field paths are dot-joined and nested (e.g. "config.authorName");
 // match on the last segment so a form doesn't need to know the exact nesting.
 function fieldError(fields, key) {
@@ -204,6 +231,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [promptReviewResults, setPromptReviewResults] = useState({}); // pageId -> { pass, issues, model } from pre-flight prompt review (no spend)
   const [authed, setAuthed] = useState(false); // shared-password gate
   const [authReady, setAuthReady] = useState(false); // initial stored-password check done
+  const isMobile = useMediaQuery(MOBILE_QUERY);
 
   const api = useCallback(async (path, options = {}) => {
     const pw = sessionStorage.getItem("wl_pw") || "";
@@ -761,24 +789,44 @@ export default function ProductionConsole({ onExitToLegacy }) {
     assemble: !!assembly && !assembly.blocked,
   }), [project, status, breakdown, pagination, matter, renders, cover, assembly]);
 
+  const activeStepIndex = Math.max(0, STEPS.findIndex((st) => st.key === step));
+  const jumpToStep = (key) => {
+    setStep(key);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const goRelativeStep = (delta) => {
+    const next = STEPS[activeStepIndex + delta];
+    if (next) jumpToStep(next.key);
+  };
+  const shellStyle = isMobile ? { ...S.shell, display: "block", minHeight: "100dvh" } : S.shell;
+  const sideStyle = isMobile ? { ...S.side, width: "100%", height: "auto", maxHeight: "none", position: "sticky", top: 0, zIndex: 200, borderRight: "none", borderBottom: `1px solid ${C.line}`, padding: "11px 12px 9px", overflow: "visible" } : S.side;
+  const mainStyle = isMobile ? { ...S.main, width: "100%", maxWidth: "none", padding: "16px 12px 96px", boxSizing: "border-box" } : S.main;
+
   if (!authReady) return null; // brief: checking a stored password
   if (!authed) return <LoginScreen onLogin={doLogin} />;
 
   return (
-    <div style={S.shell}>
-      <aside style={S.side}>
+    <div style={shellStyle} className="wl-console-shell">
+      <aside style={sideStyle} className="wl-console-sidebar">
         <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 2 }}>Wild Lands</div>
-        <div style={{ color: C.muted, fontSize: 12, marginBottom: 16 }}>Operator Production Console</div>
+        <div style={{ color: C.muted, fontSize: 12, marginBottom: isMobile ? 8 : 16 }}>Operator Production Console</div>
+        {isMobile && (
+          <select aria-label="Jump to workflow step" value={step} onChange={(e) => jumpToStep(e.target.value)} style={{ ...S.input, marginTop: 0, marginBottom: 8, fontSize: 15 }}>
+            {STEPS.map((st) => <option key={st.key} value={st.key}>{st.label}</option>)}
+          </select>
+        )}
+        <nav className="wl-step-nav" aria-label="Publishing workflow steps" style={isMobile ? { display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollSnapType: "x proximity", paddingBottom: 4 } : undefined}>
         {STEPS.map((st) => (
-          <div key={st.key} style={S.step(step === st.key, doneFlags[st.key])} onClick={() => setStep(st.key)}>
+          <div key={st.key} style={isMobile ? { ...S.step(step === st.key, doneFlags[st.key]), flex: "0 0 auto", minWidth: 112, display: "block", marginBottom: 0, padding: "8px 10px", scrollSnapAlign: "start" } : S.step(step === st.key, doneFlags[st.key])} onClick={() => jumpToStep(st.key)}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={S.dot(doneFlags[st.key])}>{doneFlags[st.key] ? "✓" : ""}</span>
-              <span>{st.label}</span>
+              <span>{isMobile ? shortStepLabel(st.label) : st.label}</span>
             </div>
-            {st.purpose && <div style={{ fontSize: 11, color: C.muted, marginLeft: 24, marginTop: 3, lineHeight: 1.3 }}>{st.purpose}</div>}
+            {!isMobile && st.purpose && <div style={{ fontSize: 11, color: C.muted, marginLeft: 24, marginTop: 3, lineHeight: 1.3 }}>{st.purpose}</div>}
           </div>
         ))}
-        <div style={{ marginTop: 22, paddingTop: 14, borderTop: `1px solid ${C.line}`, fontSize: 12, color: C.muted }}>
+        </nav>
+        <div style={isMobile ? { marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.line}`, fontSize: 11.5, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } : { marginTop: 22, paddingTop: 14, borderTop: `1px solid ${C.line}`, fontSize: 12, color: C.muted }}>
           {project ? <>Active: <b style={{ color: C.ink }}>{project.title}</b></> : "No project open"}
         </div>
         {onExitToLegacy && (
@@ -786,13 +834,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
         )}
       </aside>
 
-      <main style={S.main}>
+      <main style={mainStyle} className="wl-console-main">
         {/* Sticky so the result of an action is visible no matter how far down
             the page the operator has scrolled — this grid runs to hundreds of
             cards, and a banner that only appeared at the very top of the page
             was invisible for virtually every click made mid-list. */}
         {(busy || errorState.message || notice) && (
-          <div style={{ position: "sticky", top: 0, zIndex: 50, background: C.paper, paddingBottom: 8, marginBottom: 2 }}>
+          <div style={{ position: isMobile ? "static" : "sticky", top: 0, zIndex: 50, background: C.paper, paddingBottom: 8, marginBottom: 2 }}>
             {busy && <div style={{ ...S.pill(C.orange), marginBottom: 10 }}>⏳ {busy}…</div>}
             {errorState.message && (
               <div style={{ ...S.card, borderColor: C.red, color: C.red, marginTop: 0 }}>
@@ -1305,6 +1353,15 @@ export default function ProductionConsole({ onExitToLegacy }) {
           </Panel>
         )}
         {zoom && <ZoomModal page={zoom} trim={trimSize(form.trim)} onClose={() => setZoom(null)} />}
+        {isMobile && (
+          <div className="wl-mobile-step-dock" aria-label="Mobile workflow navigation" style={{ position: "fixed", left: 10, right: 10, bottom: "calc(10px + env(safe-area-inset-bottom, 0px))", zIndex: 500, display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 12, border: `1px solid ${C.line}`, background: "rgba(251,247,234,0.98)", boxShadow: "0 8px 26px rgba(46,36,23,0.18)" }}>
+            <button type="button" disabled={activeStepIndex <= 0} onClick={() => goRelativeStep(-1)} style={{ ...S.ghost, margin: 0, padding: "8px 10px", opacity: activeStepIndex <= 0 ? 0.45 : 1 }}>Back</button>
+            <select aria-label="Current workflow step" value={step} onChange={(e) => jumpToStep(e.target.value)} style={{ ...S.input, marginTop: 0, flex: 1, minWidth: 0, fontSize: 13 }}>
+              {STEPS.map((st) => <option key={st.key} value={st.key}>{st.label}</option>)}
+            </select>
+            <button type="button" disabled={activeStepIndex >= STEPS.length - 1} onClick={() => goRelativeStep(1)} style={{ ...S.ghost, margin: 0, padding: "8px 10px", opacity: activeStepIndex >= STEPS.length - 1 ? 0.45 : 1 }}>Next</button>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -1382,18 +1439,19 @@ function PagePreview({ page, trim, onZoom }) {
 }
 
 function ZoomModal({ page, trim, onClose }) {
-  const W = 460;
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const W = isMobile ? 300 : 460;
   const fm = fitMeta(page.fitStatus);
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(20,16,8,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9000, padding: 24 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: C.panel, borderRadius: 12, padding: 20, maxHeight: "92vh", overflow: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(20,16,8,0.55)", display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "center", zIndex: 9000, padding: isMobile ? 10 : 24, overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.panel, borderRadius: 12, padding: isMobile ? 12 : 20, width: isMobile ? "100%" : undefined, maxHeight: isMobile ? "none" : "92vh", overflow: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
           <div><b>{page.pageKey}</b> · {page.layoutTemplate} · <span style={S.pill(fm.bg)}>{fm.text}</span></div>
           <button style={S.ghost} onClick={onClose}>Close ✕</button>
         </div>
-        <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
+        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 18, alignItems: "flex-start" }}>
           <PageLayout page={{ ...page, __w: trim.widthIn, __h: trim.heightIn }} width={W} />
-          <div style={{ fontSize: 13, minWidth: 200 }}>
+          <div style={{ fontSize: 13, minWidth: isMobile ? 0 : 200, width: isMobile ? "100%" : undefined }}>
             <div style={{ marginBottom: 8 }}><b>{page.entryTitle}</b></div>
             {page.fit && (
               <table style={{ fontSize: 13, borderCollapse: "collapse" }}><tbody>
@@ -1466,6 +1524,7 @@ const KIND_META = {
  */
 function KindlePreview({ report, onExport, busy }) {
   const chapters = report.chapters || [];
+  const isMobile = useMediaQuery(MOBILE_QUERY);
   // <img> can't send the Authorization header, so the hero-serving route is
   // reached with the shared-password query param (?k=…) the gate also accepts.
   const pw = sessionStorage.getItem("wl_pw") || "";
@@ -1526,9 +1585,9 @@ function KindlePreview({ report, onExport, busy }) {
       )}
 
       {/* Structure + reading panes */}
-      <div style={{ display: "flex", gap: 12, marginTop: 14, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 12, marginTop: 14, alignItems: "flex-start" }}>
         {/* left: structure tree */}
-        <div style={{ flex: "0 0 260px", maxHeight: 460, overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 8, background: "#fff", padding: 8 }}>
+        <div style={{ flex: isMobile ? "1 1 auto" : "0 0 260px", width: isMobile ? "100%" : undefined, maxHeight: isMobile ? 260 : 460, overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 8, background: "#fff", padding: 8 }}>
           {rows.map(({ c, i, g, showHeader }) => {
             const km = KIND_META[c.kind] || { label: c.kind, color: C.muted };
             const activeChapter = i === ci && ei == null;
@@ -1557,7 +1616,7 @@ function KindlePreview({ report, onExport, busy }) {
         </div>
 
         {/* right: reading pane — the ACTUAL text that goes into the EPUB */}
-        <div style={{ flex: 1, maxHeight: 460, overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 8, background: "#fff", padding: "14px 18px" }}>
+        <div style={{ flex: 1, width: isMobile ? "100%" : undefined, maxHeight: isMobile ? "none" : 460, overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 8, background: "#fff", padding: isMobile ? "12px" : "14px 18px" }}>
           {/* linear navigation — step through the book in reading order */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${C.line}` }}>
             <button style={{ ...S.ghost, margin: 0, opacity: curIdx <= 0 ? 0.4 : 1 }} disabled={curIdx <= 0} onClick={() => go(-1)}>← Prev</button>
