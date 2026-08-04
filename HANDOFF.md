@@ -1,5 +1,8 @@
 # Wildlands Interior — Agent Handoff
 
+> **This entire doc is about the New England book (project `66c1c69c-...`) and is stale as of 2026-08-02.**
+> **For the currently active book, THE WILDLANDS: CANADIAN ROCKIES (project `8c1e161a-...`), see [`docs/HANDOFF_EVERY_PAGE_ILLUSTRATED.md`](docs/HANDOFF_EVERY_PAGE_ILLUSTRATED.md) instead — its "SESSION UPDATE 2026-08-02" section at the top is the most current state of the project.**
+
 ## 🚫 RENDER SAFETY RULES (operator, NON-NEGOTIABLE — applies to EVERY agent/chat)
 Each page render costs money (~$0.09–$0.10) and a full-book re-render is ~$30. A prior session ran **390 render calls on a 275-page book** by re-rendering pages on its own. That must never recur. The rules:
 1. **Render each page EXACTLY ONCE per go.** No second pass, no auto-retry. A FAILED page is *reported*, not silently re-run.
