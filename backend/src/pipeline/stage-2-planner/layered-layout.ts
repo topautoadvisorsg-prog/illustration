@@ -177,6 +177,11 @@ export interface LayoutComposition {
 export const LAYOUT_TEMPLATE_COMPOSITION: Record<LayoutTemplateId, LayoutComposition> = {
   LAYOUT_1_STANDARD: { contentType: 'SPECIES_PROFILE', coverage: 40, architecture: 'FLOAT_LEFT' },
   LAYOUT_2_TEXT_HEAVY: { contentType: 'ENCYCLOPEDIA_ENTRY', coverage: 15, architecture: 'FLOAT_LEFT' },
+  // NOT IMPLEMENTED — see unimplemented-layouts.ts. Its intended architecture
+  // is BALANCED_BAND (a contained ~25% top band over a clean centered reading
+  // field), which does not exist; TOP_BAND below is a placeholder that does
+  // NOT produce the intended page. Production selection is blocked. Do not
+  // "fix" the failing LAYOUT_E tests by editing this line.
   LAYOUT_E_BAND_BALANCED: { contentType: 'SPECIES_PROFILE', coverage: 25, architecture: 'TOP_BAND' },
   LAYOUT_F_FULL_PAGE_CENTERED: { contentType: 'HABITAT_OVERVIEW', coverage: 100, architecture: 'FULL_PAGE' },
   LAYOUT_G_FRAMED_BANDS: { contentType: 'HABITAT_OVERVIEW', coverage: 40, architecture: 'TOP_BAND' },

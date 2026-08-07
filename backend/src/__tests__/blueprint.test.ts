@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildBlueprintSvg, renderBlueprintPng, BLUEPRINT_COMPOSITION_INSTRUCTION } from '../pipeline/stage-3-generation/blueprint.js';
+import { buildBlueprintSvg, renderBlueprintPng, BLUEPRINT_COMPOSITION_INSTRUCTION, COLORS } from '../pipeline/stage-3-generation/blueprint.js';
 import { directLayout } from '../pipeline/stage-6-layout/layout-director.js';
 import { computePageGeometry } from '../pipeline/stage-6-layout/page-geometry.js';
 
@@ -29,7 +29,11 @@ describe('layout blueprint', () => {
 
   it('marks supporting-art study zones ORANGE on scattered layouts', () => {
     const svg = buildBlueprintSvg(allocationFor('LAYOUT_7_SCATTERED_VIGNETTES'), 1024, 1536);
-    expect(svg).toContain('#E08A2E'); // ORANGE — SUPPORTING_IMAGE_ZONE
+    // Assert against the palette itself, not a copied hex. The literal here
+    // was #E08A2E, which stopped being the orange when `support` was
+    // deliberately darkened to #B5500A so the rail would read on parchment —
+    // the test then failed while verifying nothing about the blueprint.
+    expect(svg).toContain(COLORS.support);
   });
 
   it('rasterizes the blueprint SVG to a PNG buffer', async () => {

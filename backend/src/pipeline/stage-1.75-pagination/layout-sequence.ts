@@ -17,6 +17,7 @@
 import type { ContentType, LayoutTemplateId, PageManifest, ProjectConfig } from '@wildlands/shared';
 import { isDangerPage } from '../stage-2-planner/content-signals.js';
 import { chooseSimplifiedLayout } from '../stage-2-planner/layout-families.js';
+import { assertLayoutImplemented } from '../stage-2-planner/unimplemented-layouts.js';
 import { getEnv } from '../../env.js';
 import { countWords } from '../shared/markdown-text.js';
 
@@ -34,6 +35,19 @@ const CONTINUATION_TARGET_WORDS = 560;
  * swapping the opener layout).
  */
 export function preferredOpenerLayout(
+  entry: PageManifest,
+  config: ProjectConfig,
+): LayoutTemplateId {
+  // Fail closed: an unimplemented layout must never reach a real page. See
+  // unimplemented-layouts.ts — those templates exist in the enum but their
+  // rendering support was never built, so selecting one yields a malformed
+  // page instead of a clear failure.
+  const chosen = choosePreferredOpenerLayout(entry, config);
+  assertLayoutImplemented(chosen, `opener layout for entry "${entry.entryTitle || entry.pageId}"`);
+  return chosen;
+}
+
+function choosePreferredOpenerLayout(
   entry: PageManifest,
   config: ProjectConfig,
 ): LayoutTemplateId {

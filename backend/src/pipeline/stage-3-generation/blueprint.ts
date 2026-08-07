@@ -18,7 +18,12 @@ import type { BadgeSafeZone } from '../publishing-standard/badge-zones.js';
 // TITLE folds into RED. These colors exist ONLY in the blueprint — never in
 // the page. L-7.1 distinguishes RESERVED (yellow) from RENDER (red/blue/
 // orange) so the model never sees overlapping instructions.
-const COLORS = {
+// Exported so tests assert against the real palette instead of copying hex
+// literals. A copied literal DID go stale here: `support` was deliberately
+// darkened from #E08A2E to #B5500A because the rail was invisible on
+// parchment, and the test kept asserting the old value — failing while
+// verifying nothing.
+export const COLORS = {
   bg: '#ECE4CF', // parchment field
   image: '#2E6FB0', // STRONG BLUE — PRIMARY_IMAGE_ZONE (concentrate focal detail)
   field: '#9DBBD6', // LIGHT BLUE — BACKGROUND_ILLUSTRATION_FIELD (calm, whole-page)
