@@ -16,6 +16,14 @@ vi.mock('../env.js', async () => {
   return {
     ...actual,
     getEnv: () => ({ ...actual.getEnv(), WHOLE_PAGE_EXPERIMENT_ENABLED: false }),
+    // The route guard calls wholePageRenderEnabled(), NOT getEnv() directly.
+    // Spreading `actual` keeps the real implementation, which resolves getEnv
+    // through the module's own internal binding — so it never saw the override
+    // above and read the repo-root .env instead (where the flag is on for real
+    // render work). All ten "flag off" cases therefore failed on any machine
+    // actually configured to render. Override the guard itself so the suite is
+    // hermetic and does not depend on developer .env state.
+    wholePageRenderEnabled: () => false,
   };
 });
 
