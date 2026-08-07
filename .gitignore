@@ -126,3 +126,6 @@ ch01-*.txt
 # Prompt A/B + optimization experiment output (large regenerable PNG sets)
 backend/experiments/
 backend/scripts/experiments/
+
+# Test env (may hold a real test-DB URL) — template is .env.test.example
+.env.test

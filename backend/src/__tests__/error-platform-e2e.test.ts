@@ -13,18 +13,16 @@
  * needs a browser-level test tool, not a backend integration test pretending
  * to be one.
  *
- * Known characteristic, not a bug: these tests all pass reliably alone or in
- * a targeted subset. Under a full `vitest run` (all ~60 files in parallel
- * worker threads), the extra real network/DB round trips here occasionally
- * push an unrelated CPU-heavy test (sharp-based image composition in
- * cover-print.test.ts / print-prep.test.ts, or a DB-timing-sensitive guard
- * in pagination.routes.guards.test.ts) into a transient failure under
- * resource contention — a different one each run, never a repeatable logic
- * failure. server.test.ts already hits the same live DB the same way; this
- * file is more of the same pattern, not a new category of risk. If the full
- * suite needs to be flake-free under parallel execution, that's a test
- * runner concurrency/pool-tuning project of its own, not something to
- * improvise here.
+ * RESOLVED 2026-08-06 — the "known characteristic" previously described here
+ * (this file's real DB round trips intermittently knocking over unrelated
+ * CPU-heavy tests under parallel `vitest run`) was NOT an unavoidable test
+ * runner concurrency quirk. It was a symptom of these tests reaching a live
+ * production database at all. Once tests stopped inheriting the repo-root
+ * `.env` and this file began skipping without a dedicated test database,
+ * eight unrelated intermittent failures (buildLayoutSequence, flowEngine,
+ * paginateProject, preferredOpenerLayout x5) went green and stayed green.
+ * No pool tuning was required. Do not reintroduce production credentials
+ * here to "fix" a skip.
  */
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
@@ -36,6 +34,22 @@ import { getErrorFrequencyReport } from '../db/repositories/error-events.repo.js
 import { getOperationTimingReport } from '../db/repositories/operation-events.repo.js';
 
 const authHeaders = { Authorization: `Bearer ${process.env.CONSOLE_PASSWORD || ''}` };
+
+/**
+ * These tests create and delete real projects, so they need a real database.
+ * They must NEVER run against production. Tests no longer inherit the
+ * repo-root `.env` (see env.ts), so by default there is no database here and
+ * this whole file skips rather than failing — a skipped integration test is
+ * honest; a red one that only passes when pointed at production is not.
+ *
+ * To run them, put a DEDICATED test database in `.env.test`:
+ *   DATABASE_URL=postgresql://.../wildlands_test
+ *   CONSOLE_PASSWORD=whatever-you-like
+ * Never point this at the production database — every run writes and deletes.
+ */
+const dbUrl = process.env.DATABASE_URL ?? '';
+const HAS_TEST_DB = dbUrl.length > 0 && !/your_|example|placeholder/i.test(dbUrl);
+const describeDb = HAS_TEST_DB ? describe : describe.skip;
 
 async function createTestProject(app: FastifyInstance, title: string) {
   const res = await app.inject({
@@ -52,7 +66,7 @@ async function deleteTestProject(app: FastifyInstance, id: string) {
   await app.inject({ method: 'DELETE', url: `/api/projects/${id}`, headers: authHeaders });
 }
 
-describe('Create Project — complete workflow', () => {
+describeDb('Create Project — complete workflow', () => {
   it('rejects a blank author with a field-level translated error, then succeeds once fixed', async () => {
     const app = await buildServer();
     let projectId: string | undefined;
@@ -87,7 +101,7 @@ describe('Create Project — complete workflow', () => {
   });
 });
 
-describe('Manuscript/Breakdown — recovery flow', () => {
+describeDb('Manuscript/Breakdown — recovery flow', () => {
   it('WL-2003 on an empty chapter, with a Return-to-Manuscript action; fixing it and re-running Breakdown succeeds', async () => {
     const app = await buildServer();
     let projectId: string | undefined;
@@ -152,7 +166,7 @@ describe('Manuscript/Breakdown — recovery flow', () => {
   });
 });
 
-describe('Diagnostics endpoints — shape and registry integrity', () => {
+describeDb('Diagnostics endpoints — shape and registry integrity', () => {
   it('GET /api/diagnostics/errors returns a well-shaped report tagged with the registry version', async () => {
     const app = await buildServer();
     try {
@@ -200,7 +214,7 @@ describe('Diagnostics endpoints — shape and registry integrity', () => {
   });
 });
 
-describe('Telemetry event generation', () => {
+describeDb('Telemetry event generation', () => {
   it('a translated error increments the error_events count for its code within the reporting window', async () => {
     const app = await buildServer();
     try {
@@ -225,7 +239,7 @@ describe('Telemetry event generation', () => {
   });
 });
 
-describe('Performance timing (backend/src/lib/timing.ts)', () => {
+describeDb('Performance timing (backend/src/lib/timing.ts)', () => {
   it('a successful Breakdown records a "breakdown" operation_events row via GET /api/diagnostics/operations', async () => {
     const app = await buildServer();
     let projectId: string | undefined;

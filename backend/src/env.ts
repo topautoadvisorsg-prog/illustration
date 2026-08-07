@@ -14,8 +14,30 @@ import { z } from 'zod';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../');
+
+/**
+ * Environment isolation (platform requirement).
+ *
+ * Under test, the repo-root `.env` is NEVER loaded. It holds real production
+ * credentials — live Postgres, R2, OpenAI — and loading it during tests both
+ * (a) let the suite reach production services, and (b) made ~12 tests depend
+ * on the developer's local configuration, so they failed permanently on any
+ * machine actually set up to do render work. Standing failures like that hide
+ * real regressions.
+ *
+ * Test runs load `.env.example` (placeholder values, schema-valid by design)
+ * and then an optional `.env.test` for anything a test genuinely needs. A test
+ * that requires a live database must opt in explicitly and point at a
+ * DEDICATED test database — never production.
+ */
+const IS_TEST = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
+
 loadDotenv({ path: path.join(REPO_ROOT, '.env.example') });
-loadDotenv({ path: path.join(REPO_ROOT, '.env'), override: true });
+if (IS_TEST) {
+  loadDotenv({ path: path.join(REPO_ROOT, '.env.test'), override: true });
+} else {
+  loadDotenv({ path: path.join(REPO_ROOT, '.env'), override: true });
+}
 
 /** A placeholder value still using the .env.example template. */
 export function isPlaceholder(value: string | undefined): boolean {
