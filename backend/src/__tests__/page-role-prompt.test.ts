@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assemblePagePrompt } from '../pipeline/whole-page-render/assemble-page-prompt.js';
+import { chapterDisplayTitle } from '../pipeline/whole-page-render/build-page-spec.js';
 import { PAGE_TYPOGRAPHY_DNA } from '../pipeline/whole-page-render/typography-dna.js';
 import type { WholePageSpec } from '../pipeline/whole-page-render/types.js';
 
@@ -40,6 +41,36 @@ function makeSpec(pageType: WholePageSpec['pageType']): WholePageSpec {
 }
 
 describe('PageRole prompt text policy', () => {
+  it('chapter openers print only the authored title, never the redundant chapter label or number', () => {
+    expect(chapterDisplayTitle('CHAPTER 2: ANIMALS')).toBe('ANIMALS');
+    expect(chapterDisplayTitle('Chapter 5 — Fungi & Mushrooms')).toBe('FUNGI & MUSHROOMS');
+
+    const spec = makeSpec('CHAPTER_OPENER');
+    spec.pageText.title = { kicker: '', number: '', name: 'ANIMALS' };
+    spec.typographyDNA.titleHierarchy = ['ANIMALS'];
+    const prompt = assemblePagePrompt(spec);
+    expect(prompt).toContain('Chapter title reads EXACTLY "ANIMALS"');
+    expect(prompt).toContain('Do NOT add the word "CHAPTER"');
+    expect(prompt).toContain('exactly two balanced centered lines');
+    expect(prompt).not.toContain('oversized, dominant engraved Roman numeral');
+  });
+
+  it('never leaks the chapter kicker / Roman-numeral title stack into an opener prompt', () => {
+    // Regression: the shared TYPOGRAPHY.title.family string describes a three-tier
+    // "CHAPTER kicker / Roman numeral / name" stack. It used to be emitted verbatim
+    // as typographyDNA.titleFamily on chapter openers, directly contradicting the
+    // hard constraint that forbids printing "CHAPTER" or a numeral. The model split
+    // the difference and rendered BOTH, producing "CHAPTER / I / CHAPTER 1: NAME".
+    const spec = makeSpec('CHAPTER_OPENER');
+    spec.pageText.title = { kicker: '', number: '', name: 'ANIMALS' };
+    spec.typographyDNA.titleHierarchy = ['ANIMALS'];
+    const prompt = assemblePagePrompt(spec);
+    expect(prompt).not.toContain('CHAPTER kicker');
+    expect(prompt).not.toContain('Roman numeral as the dominant glyph');
+    expect(prompt).toContain('the chapter name only');
+    expect(prompt).toContain('No kicker word, no numeral');
+  });
+
   it('keeps verbatim body instructions for normal interior pages', () => {
     const prompt = assemblePagePrompt(makeSpec('INTERIOR'));
     expect(prompt).toContain('do not add, remove, translate, summarize, or reorder');

@@ -121,7 +121,7 @@ function hardConstraints(spec: WholePageSpec): string {
   const lines: string[] = ['HARD CONSTRAINTS — not negotiable:'];
   if (spec.pageType === 'CHAPTER_OPENER') {
     lines.push(
-      `- Title hierarchy reads EXACTLY, on three stacked, centered lines: "${spec.pageText.title.kicker}" (small, refined, tracked small-caps with hairline rules either side) — "${spec.pageText.title.number}" (oversized, dominant engraved Roman numeral, the visual anchor of the title block) — "${spec.pageText.title.name}" (stately serif caps, full width of the reading measure). Same warm printed-ink color throughout. Never colored, never a brand accent.`,
+      `- Chapter title reads EXACTLY "${spec.pageText.title.name}" in stately centered serif caps. Do NOT add the word "CHAPTER", a chapter number, or a Roman numeral. Use the SAME title treatment on every chapter opener. Keep it on one line when it fits; if the title must wrap, use exactly two balanced centered lines in normal reading order, with identical size, spacing, and alignment across both lines. Never split the title into unrelated top-and-bottom fragments.`,
     );
     if (spec.pageText.dropCap) {
       lines.push(
@@ -235,12 +235,21 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
   // Shape the Typography DNA that reaches the model:
   //  - `identity` lives in the header (core identity, stated once) — drop it.
   //  - `noModernUi` / `noInfographic` live in HARD NEGATIVES — drop them.
-  //  - `titleFamily` carries the chapter kicker / Roman-numeral hierarchy, which
-  //    is ONLY relevant to chapter openers and title pages — omit it elsewhere
-  //    (a glossary/copyright page must never see "chapter kicker").
+  //  - `titleFamily` is ONLY relevant to chapter openers and title pages — omit
+  //    it elsewhere (a glossary/copyright page must never see title-block prose).
+  //    NOTE: the shared TYPOGRAPHY.title.family string still describes the old
+  //    three-tier "CHAPTER kicker / Roman numeral / name" stack. That stack has
+  //    never shipped in this series (New England has no chapter-opener pages at
+  //    all), and the hard constraint below explicitly forbids printing the word
+  //    "CHAPTER", a chapter number, or a numeral. Sending both produced openers
+  //    that printed "CHAPTER / I / CHAPTER 1: KNOW YOUR REGION" — the model
+  //    obeyed the DNA and the constraint at the same time. Chapter openers get a
+  //    name-only description so the two signals agree.
   //  - `decorativeInitial` only when a drop-cap is actually present.
   //  - `titleHierarchy` (the front-cover title stack) also applies to the cover.
   const emitTitleFamily = spec.pageType === 'CHAPTER_OPENER' || spec.pageType === 'TITLE_PAGE';
+  const CHAPTER_OPENER_TITLE_FAMILY =
+    'Matching old-style serif, engraved roman caps. A SINGLE centered title line: the chapter name only, in stately full-width serif caps, optionally flanked by a thin hairline rule. No kicker word, no numeral, no secondary label above or below it.';
   const isCoverWrap = spec.pageType === 'COVER_WRAP';
   const isTitlePage = hasTitlePageText(spec);
   const {
@@ -254,7 +263,9 @@ export function assemblePagePrompt(spec: WholePageSpec): string {
   } = spec.typographyDNA;
   const typographyDNA = {
     ...typoRest,
-    ...(emitTitleFamily ? { titleFamily } : {}),
+    ...(emitTitleFamily
+      ? { titleFamily: spec.pageType === 'CHAPTER_OPENER' ? CHAPTER_OPENER_TITLE_FAMILY : titleFamily }
+      : {}),
     ...(rendersCriticalText(spec) || isCoverWrap || isTitlePage ? { titleHierarchy } : {}),
     ...(decorativeInitial != null ? { decorativeInitial } : {}),
   };
