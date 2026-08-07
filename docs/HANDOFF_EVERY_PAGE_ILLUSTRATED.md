@@ -8,6 +8,21 @@
 
 ## SESSION UPDATE 2026-08-04 — READ THIS FIRST (supersedes nothing below, adds to it)
 
+> **PUBLISHING HOLD — INCOMPLETE.** A source-to-live coverage audit found that all eight
+> standalone chapter openers and six manuscript back-matter sections were omitted by
+> pipeline parsing/planning. Do not call the current 249-page build publish-ready and do
+> not regenerate the cover until those pages are restored, fit-checked, paginated,
+> rendered, and reviewed. The parser/recovery regression is fixed in the working tree;
+> see the restoration status immediately below.
+>
+> **Restoration update:** production restoration is now applied and rendered once:
+> 14 front + 239 body + 16 back = **269 physical pages**. Body folios 1–239 and
+> back-matter folios 240–255 are continuous. The 24 affected renders (10 chapter
+> opening pages, 10 restored back-matter pages, Contents, and 3 Index pages) are
+> `RENDERED` and await the operator's API review/approval. Prompt fidelity is
+> 269/269 clean. The cover is intentionally stale at 249 pages and must remain so
+> until review is complete; regenerate it last for 269 pages.
+
 **Operator is stepping away for ~2 days.** OpenCodex may be working this repo autonomously during that window (its own subscription, separate from Claude). `7e47f22 "fix: improve mobile operator navigation"` on `main` was NOT made by this Claude session — check what it touched before assuming context. There's also a pile of untracked `backend/scripts/_*.ts` / `docs/NEW_BOOK_PARITY_PLAN.md` / `docs/SPEC_PROJECT_LIST_REGION_LABEL.md` files sitting uncommitted as of this write-up — not this session's, not reviewed, not touched. Don't assume they're safe to delete or ignore; ask the operator what they are before acting on them.
 
 ### NEXT ACTION — the literal prompt to hand whoever continues this

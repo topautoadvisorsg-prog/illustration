@@ -19,6 +19,8 @@ export interface ManuscriptSectionOutline {
 export interface ManuscriptEntryOutline {
   title: string;
   slug: string;
+  /** True only for prose directly beneath the chapter H1, before its first H2/H3. */
+  isChapterOpener: boolean;
   lineStart: number;
   lineEnd: number;
   startOffset: number;
@@ -223,11 +225,38 @@ export function parseManuscriptOutline(markdown: string): ManuscriptOutline {
       ...directH3Headings,
     ].filter((heading, index, all) => all.findIndex((candidate) => candidate.offset === heading.offset) === index);
 
+    const chapterHeadingLine = markdown.slice(chapterHeading.offset).split('\n', 1)[0] ?? '';
+    const openerStartOffset = chapterHeading.offset + chapterHeadingLine.length + 1;
+    const firstScopedHeading = chapterScopedHeadings[0];
+    const openerEndOffset = firstScopedHeading ? firstScopedHeading.offset - 1 : chapterEndOffset;
+    const openerMarkdown = markdown.slice(openerStartOffset, openerEndOffset).trim();
+    const openerEntry: ManuscriptEntryOutline | null = countWords(openerMarkdown) > 0
+      ? {
+          title: chapterHeading.title,
+          slug: `${slugify(chapterHeading.title)}-opener`,
+          isChapterOpener: true,
+          lineStart: chapterHeading.line,
+          lineEnd: firstScopedHeading ? firstScopedHeading.line - 1 : chapterEndLine,
+          startOffset: chapterHeading.offset,
+          endOffset: openerEndOffset,
+          wordCount: countWords(openerMarkdown),
+          bodyMarkdown: openerMarkdown,
+          sections: [],
+        }
+      : null;
+
+    // A chapter's opening prose is real content and always becomes an opener
+    // entry (that is the whole point of `openerEntry` — it used to be dropped
+    // silently, which cost this book all eight of its chapter-opening pages).
+    // But opener prose alone does NOT make a chapter structurally valid: a
+    // chapter with a paragraph and no entry headings is still a malformed
+    // manuscript, and the EMPTY_CHAPTER (WL-2003) gate exists to catch exactly
+    // that before Breakdown runs. Keep the prose, keep the guard.
     if (entryHeadings.length === 0) {
       warnings.push(`CHAPTER_WITHOUT_ENTRIES: chapter ${chapterNumber} has no usable entry headings.`);
     }
 
-    const entries = entryHeadings.map((entryHeading, entryIndex): ManuscriptEntryOutline => {
+    const headingEntries = entryHeadings.map((entryHeading, entryIndex): ManuscriptEntryOutline => {
       const nextEntry = entryHeadings.find((candidate, candidateIndex) => candidateIndex > entryIndex && candidate.offset > entryHeading.offset);
       const scopedEndHeading = chapterScopedHeadings.find((heading) => {
         if (heading.offset <= entryHeading.offset) return false;
@@ -251,6 +280,7 @@ export function parseManuscriptOutline(markdown: string): ManuscriptOutline {
       return {
         title: entryHeading.title,
         slug: slugify(entryHeading.title),
+        isChapterOpener: false,
         lineStart: entryHeading.line,
         lineEnd: entryEndLine,
         startOffset: entryHeading.offset,
@@ -260,6 +290,7 @@ export function parseManuscriptOutline(markdown: string): ManuscriptOutline {
         sections,
       };
     });
+    const entries = openerEntry ? [openerEntry, ...headingEntries] : headingEntries;
 
     chapters.push({
       chapterNumber,

@@ -6,6 +6,7 @@ import type { ManuscriptChapterOutline, ManuscriptEntryOutline, ManuscriptOutlin
 function entry(title: string, body: string): ManuscriptEntryOutline {
   return {
     title, slug: title.toLowerCase().replace(/\s+/g, '-'),
+    isChapterOpener: false,
     lineStart: 0, lineEnd: 0, startOffset: 0, endOffset: 0,
     wordCount: body.split(/\s+/).length, bodyMarkdown: body, sections: [],
   };
@@ -17,6 +18,30 @@ function outline(chapters: ManuscriptChapterOutline[]): ManuscriptOutline {
   return { chapters, totalEntries: chapters.reduce((s, c) => s + c.entries.length, 0), totalWords: 0, warnings: [] };
 }
 const cfg = ProjectConfigSchema.parse({ volume: 1, title: 'T', authorName: 'A' });
+
+describe('content-type - chapter openers', () => {
+  it('uses the dedicated opener content type and layout', () => {
+    const opener = entry('CHAPTER 5 - FUNGI & MUSHROOMS', 'Rain wakes the forest floor after a dry spell.');
+    opener.isChapterOpener = true;
+    // A real chapter always carries at least one entry alongside its opening
+    // prose — an opener-only chapter is the malformed shape the EMPTY_CHAPTER
+    // (WL-2003) guard rejects, so the fixture mirrors a real chapter.
+    const res = buildDeterministicManifestResult(
+      outline([
+        chapter(5, 'CHAPTER 5 - FUNGI & MUSHROOMS', [
+          opener,
+          entry('Morel (Morchella)', 'A honeycombed cap on a hollow stem, unmistakable when halved.'),
+        ]),
+      ]),
+      cfg,
+    );
+
+    expect(res.chapters[0]?.entries[0]).toMatchObject({
+      contentType: 'CHAPTER_OPENER',
+      layoutTemplate: 'LAYOUT_5_CHAPTER_OPENER',
+    });
+  });
+});
 
 describe('content-type — a species entry that mentions tracks is NOT a field-notes page', () => {
   it('Black Bear (mentions tracks/scat/sign in body) → ANIMAL_PROFILE with a strong portrait subject', () => {

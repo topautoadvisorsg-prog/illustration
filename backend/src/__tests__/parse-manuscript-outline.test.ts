@@ -46,6 +46,26 @@ Tall marsh plant with edible shoots.`);
     expect(outline.warnings).toEqual([]);
   });
 
+  it('preserves chapter-level prose as an explicit opener entry', () => {
+    const outline = parseManuscriptOutline(`# CHAPTER 5 - FUNGI & MUSHROOMS
+
+Rain changes the forest overnight. Fungi rise through the duff, carrying both
+food and danger, and the reader must learn to identify every specimen cold.
+
+## King Bolete
+
+A stout edible bolete of mature conifer forests.`);
+
+    const entries = outline.chapters[0]?.entries ?? [];
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({
+      title: 'CHAPTER 5 - FUNGI & MUSHROOMS',
+      isChapterOpener: true,
+    });
+    expect(entries[0]?.bodyMarkdown).toContain('Rain changes the forest overnight');
+    expect(entries[1]).toMatchObject({ title: 'King Bolete', isChapterOpener: false });
+  });
+
   it('fails manuscripts with no usable chapter/entry structure', () => {
     const outline = parseManuscriptOutline('## Loose Entry\n\nNo chapter.');
     // assertUsableManuscriptOutline throws a UserFacingError with a plain-

@@ -128,6 +128,7 @@ function inferContentType(
   entry: ManuscriptEntryOutline,
   category?: string,
 ): ContentType {
+  if (entry.isChapterOpener) return 'CHAPTER_OPENER';
   const text = signalText(chapter, entry);
   const title = entry.title.toLowerCase();
 
@@ -406,6 +407,29 @@ function regionFromConfig(config: ProjectConfig): string {
 
 export function buildDeterministicManifestResult(outline: ManuscriptOutline, config: ProjectConfig): ManifestGenerationResult {
   const region = regionFromConfig(config);
+
+  // EMPTY_CHAPTER (WL-2003) guard. This used to fall out of the schema for
+  // free: a chapter with no "### Entry" headings produced an empty `entries`
+  // array and Zod's `too_small` fired below. Chapter-opening prose is now
+  // carried as an opener entry (so it is never dropped again), which means
+  // `entries` is no longer empty for such a chapter and the schema check
+  // passes vacuously. Opener prose is content, not structure — a chapter still
+  // needs at least one REAL entry, so assert that explicitly and up front.
+  const chapterWithoutRealEntries = outline.chapters.find(
+    (chapter) => !chapter.entries.some((entry) => !entry.isChapterOpener),
+  );
+  if (chapterWithoutRealEntries) {
+    throw new UserFacingError(
+      `Chapter ${chapterWithoutRealEntries.chapterNumber} ("${chapterWithoutRealEntries.title}") doesn't contain any entries. Each chapter needs at least one "### Entry Title" heading before Breakdown can continue.`,
+      {
+        code: 'Empty Chapter',
+        errorCode: ERROR_CODES.EMPTY_CHAPTER,
+        statusCode: 400,
+        action: { type: 'navigate', target: 'manuscript', label: 'Return to Manuscript' },
+      },
+    );
+  }
+
   const draft = {
     bookTitle: config.title,
     chapters: outline.chapters.map((chapter) => ({

@@ -56,6 +56,14 @@ describe('PageRole policy', () => {
     expect(buildPageRolePolicy(row('INDEX'), config).pageType).toBe('INDEX_ORNAMENT');
   });
 
+  it('recognizes the dedicated chapter-opener layout as a chapter opener', () => {
+    const opener = row('BODY');
+    opener.section = 'BODY';
+    opener.pageRole = 'opener';
+    opener.layoutTemplate = 'LAYOUT_5_CHAPTER_OPENER';
+    expect(buildPageRolePolicy(opener, config).pageType).toBe('CHAPTER_OPENER');
+  });
+
   it('allows text-free ornament generation for glossary and index roles', () => {
     expect(isWholePageAiAllowedForRow(row('GLOSSARY'))).toBe(true);
     expect(isWholePageAiAllowedForRow(row('INDEX'))).toBe(true);

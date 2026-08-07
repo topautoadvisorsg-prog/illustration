@@ -49,7 +49,15 @@ import { REFERENCE_TYPOGRAPHY } from '../stage-6-layout/layout-profiles.js';
  * pages, so the planner creates their rows but does NOT deterministically
  * compose them (see the compose loop's reference skip).
  */
-const REFERENCE_FRONT_MATTER_TYPES = new Set(['GLOSSARY', 'INDEX', 'RESOURCES']);
+const REFERENCE_FRONT_MATTER_TYPES = new Set([
+  'GLOSSARY',
+  'INDEX',
+  'RESOURCES',
+  'LOOK_ALIKES',
+  'SEASONAL_CALENDAR',
+  'EMERGENCY_RESOURCES',
+  'EXPERT_REVIEWERS',
+]);
 function isReferenceSection(frontMatterType: string): boolean {
   return REFERENCE_FRONT_MATTER_TYPES.has(frontMatterType);
 }
@@ -296,26 +304,27 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   let introParagraphs: string[] = [];
   let disclaimerParagraphs: string[] = [];
   let glossaryParagraphs: string[] = [];
+  let recoveredSections: ReturnType<typeof recoverFrontMatterSections> = [];
   let disclaimerHeading = 'Disclaimer';
   if (project.manuscriptPath) {
     const manuscript = (await storage.readProjectFile(project.manuscriptPath)).toString('utf8');
-    const sections = recoverFrontMatterSections(manuscript);
-    const intro = pickIntroductionSection(sections);
+    recoveredSections = recoverFrontMatterSections(manuscript);
+    const intro = pickIntroductionSection(recoveredSections);
     if (intro) {
       introductionSource = `manuscript:${intro.kind}` as FrontMatterPlanReport['introductionSource'];
       introParagraphs = sectionParagraphs(intro.markdown);
     }
     // Dedication recovered from manuscript wins over metadata absence.
-    const ded = sections.find((s) => s.kind === 'DEDICATION');
+    const ded = recoveredSections.find((s) => s.kind === 'DEDICATION');
     if (ded && !meta.dedication) meta.dedication = ded.markdown;
     // Author-written disclaimer gets its own front page(s) — far too long
     // for the copyright block, and the author's text is authoritative.
-    const disc = sections.find((s) => s.kind === 'DISCLAIMER');
+    const disc = recoveredSections.find((s) => s.kind === 'DISCLAIMER');
     if (disc) {
       disclaimerHeading = disc.headingText.replace(/\b\w/g, (c) => c.toUpperCase());
       disclaimerParagraphs = sectionParagraphs(disc.markdown);
     }
-    const glossary = sections.find((s) => s.kind === 'GLOSSARY');
+    const glossary = recoveredSections.find((s) => s.kind === 'GLOSSARY');
     if (glossary) {
       glossaryParagraphs = sectionParagraphs(glossary.markdown);
     }
@@ -463,6 +472,31 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     backFolio += 1;
     back.push({ ...p, pageKey: '', section: 'BACK_MATTER', pageLabel: printedFolio ? String(backFolio) : null });
   };
+  const pushRecoveredReference = (
+    kind: 'LOOK_ALIKES' | 'SEASONAL_CALENDAR' | 'EMERGENCY_RESOURCES' | 'SOURCES' | 'EXPERT_REVIEWERS',
+    frontMatterType: string,
+  ): boolean => {
+    const section = recoveredSections.find((candidate) => candidate.kind === kind);
+    if (!section) return false;
+    const paragraphs = sectionParagraphs(section.markdown);
+    splitReferenceParagraphs(paragraphs, refCapacityChars).forEach((items, i) => {
+      pushBack(
+        {
+          kind: 'TEXT_PAGE',
+          frontMatterType,
+          pageLabel: null,
+          compose: { heading: i === 0 ? section.headingText : undefined, paragraphs: items },
+          auditText: items.join('\n\n'),
+        },
+        true,
+      );
+    });
+    return true;
+  };
+
+  pushRecoveredReference('LOOK_ALIKES', 'LOOK_ALIKES');
+  pushRecoveredReference('SEASONAL_CALENDAR', 'SEASONAL_CALENDAR');
+  pushRecoveredReference('EMERGENCY_RESOURCES', 'EMERGENCY_RESOURCES');
 
   if (glossaryParagraphs.length > 0) {
     const split = splitReferenceParagraphs(glossaryParagraphs, refCapacityChars);
@@ -482,6 +516,8 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     omitted.push({ page: 'GLOSSARY', reason: 'no glossary section found in manuscript' });
   }
 
+  const manuscriptSourcesAdded = pushRecoveredReference('SOURCES', 'RESOURCES');
+
   if (indexEntries.length > 0) {
     // The index is limited by column LINES, not characters (each entry is a line).
     const indexPages = splitReferenceIndex(indexEntries, referenceColumnLineCapacity(geometry.trimSize));
@@ -500,6 +536,8 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
   } else {
     omitted.push({ page: 'INDEX', reason: 'no body entry titles available for index' });
   }
+
+  pushRecoveredReference('EXPERT_REVIEWERS', 'EXPERT_REVIEWERS');
 
   // About the Author — verbatim → facts → OMIT (never invent).
   if (meta.authorBio?.verbatim) {
@@ -533,7 +571,7 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
     omitted.push({ page: 'ABOUT_SERIES', reason: 'no series metadata' });
   }
 
-  if (meta.additionalResources) {
+  if (!manuscriptSourcesAdded && meta.additionalResources) {
     // Sources / Further Reading is a REFERENCE section — paginate it with the
     // shared LAYOUT_REFERENCE capacity (two-column), not the single-column text
     // model, and let the AI render it two-column like the glossary/index.
@@ -551,7 +589,7 @@ export async function planFrontMatter(projectId: string, options: FrontMatterPla
         true,
       );
     });
-  } else {
+  } else if (!manuscriptSourcesAdded) {
     omitted.push({ page: 'RESOURCES', reason: 'no additionalResources metadata' });
   }
 

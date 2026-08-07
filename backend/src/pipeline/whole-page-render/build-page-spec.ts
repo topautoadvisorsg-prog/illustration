@@ -16,7 +16,7 @@ import type { LayoutAllocation, PlanningZone } from '../stage-6-layout/layout-di
 import { REFERENCE_TYPOGRAPHY } from '../stage-6-layout/layout-profiles.js';
 import type { PageGeometry } from '../stage-6-layout/page-geometry.js';
 import { deriveSubjectPackage } from '../stage-2-planner/plan-pages.js';
-import { assembleIllustrationDna, toRoman } from '../publishing-standard/index.js';
+import { assembleIllustrationDna } from '../publishing-standard/index.js';
 import { stripReadingFieldMetadata, extractBinomial } from '../subject-badges/extract-badges.js';
 import { markdownToBlocks, blocksToPlainText } from './markdown-blocks.js';
 import { buildPageRolePolicy, type PageRolePolicy } from './page-role-policy.js';
@@ -65,6 +65,10 @@ function inferReadingFieldAnchor(zone: PlanningZone | null): ReadingFieldGeometr
   if (zone.xPct >= 50) return 'RIGHT';
   if (zone.xPct + zone.widthPct <= 50) return 'LEFT';
   return 'CENTER';
+}
+
+export function chapterDisplayTitle(value: string): string {
+  return value.replace(/^chapter\s+\d+\s*[:—–-]?\s*/i, '').trim().toUpperCase();
 }
 
 
@@ -139,7 +143,7 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
     ((pageRow as { frontMatterType?: string | null }).frontMatterType ?? '').toUpperCase() === 'HALF_TITLE';
   const titleHierarchy =
     pageType === 'CHAPTER_OPENER'
-      ? ['CHAPTER', toRoman(pageRow.chapterNumber), entryTitle.toUpperCase()]
+      ? [chapterDisplayTitle(entryTitle)]
       : pageType === 'TITLE_PAGE'
         ? isHalfTitle
           ? [policy.title.name].filter((x): x is string => Boolean(x))
@@ -190,9 +194,9 @@ export function buildPageSpec(input: BuildPageSpecInput): WholePageSpec {
   const pageTitle =
     pageType === 'CHAPTER_OPENER'
       ? {
-          kicker: 'CHAPTER',
-          number: toRoman(pageRow.chapterNumber),
-          name: entryTitle.toUpperCase(),
+          kicker: '',
+          number: '',
+          name: chapterDisplayTitle(entryTitle),
         }
       : pageType === 'TITLE_PAGE' ||
           pageType === 'INTRO_OPENER' ||

@@ -20,7 +20,12 @@ export type RecoveredSectionKind =
   | 'FOREWORD'
   | 'DEDICATION'
   | 'DISCLAIMER'
-  | 'GLOSSARY';
+  | 'GLOSSARY'
+  | 'LOOK_ALIKES'
+  | 'SEASONAL_CALENDAR'
+  | 'EMERGENCY_RESOURCES'
+  | 'SOURCES'
+  | 'EXPERT_REVIEWERS';
 
 export interface RecoveredSection {
   kind: RecoveredSectionKind;
@@ -40,6 +45,11 @@ const RECOGNIZED: Array<{ kind: RecoveredSectionKind; pattern: RegExp }> = [
   { kind: 'DEDICATION', pattern: /^dedication\b/i },
   { kind: 'DISCLAIMER', pattern: /^disclaimer\b/i },
   { kind: 'GLOSSARY', pattern: /^glossary\b/i },
+  { kind: 'LOOK_ALIKES', pattern: /^look[- ]alikes?\b/i },
+  { kind: 'SEASONAL_CALENDAR', pattern: /^seasonal calendar\b/i },
+  { kind: 'EMERGENCY_RESOURCES', pattern: /^emergency resources\b/i },
+  { kind: 'SOURCES', pattern: /^sources?(?:\s*&|\s+and)?\s*(?:further reading)?\b/i },
+  { kind: 'EXPERT_REVIEWERS', pattern: /^(?:a note on )?expert reviewers?\b/i },
 ];
 
 interface Heading {

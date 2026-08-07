@@ -118,6 +118,52 @@ describe('recoverFrontMatterSections — the silently-dropped sections come back
     expect(glossary!.markdown).toContain('Erratic');
     expect(glossary!.markdown).toContain('Treeline');
   });
+
+  it('recovers every supported manuscript back-matter section instead of silently dropping it', () => {
+    const ms = [
+      '# CHAPTER 1 - X',
+      '',
+      'Body.',
+      '',
+      '# BACK MATTER',
+      '',
+      '## LOOK-ALIKES QUICK REFERENCE TABLE',
+      '',
+      'Confusion table.',
+      '',
+      '## SEASONAL CALENDAR',
+      '',
+      'Spring through winter.',
+      '',
+      '## EMERGENCY RESOURCES',
+      '',
+      'Emergency contacts.',
+      '',
+      '## GLOSSARY',
+      '',
+      'Terms.',
+      '',
+      '## SOURCES & FURTHER READING',
+      '',
+      'Authorities.',
+      '',
+      '## A NOTE ON EXPERT REVIEWERS',
+      '',
+      'High-consequence passages require qualified review.',
+      '',
+      'Final closing words.',
+    ].join('\n');
+
+    expect(recoverFrontMatterSections(ms).map((section) => section.kind)).toEqual([
+      'LOOK_ALIKES',
+      'SEASONAL_CALENDAR',
+      'EMERGENCY_RESOURCES',
+      'GLOSSARY',
+      'SOURCES',
+      'EXPERT_REVIEWERS',
+    ]);
+    expect(recoverFrontMatterSections(ms).at(-1)?.markdown).toContain('Final closing words');
+  });
 });
 
 describe('composer helpers', () => {

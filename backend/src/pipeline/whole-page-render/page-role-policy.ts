@@ -73,6 +73,10 @@ export function inferWholePageRole(row: PageRow, layoutTemplate: LayoutTemplateI
         return 'AUTHOR_PAGE';
       case 'ABOUT_SERIES':
       case 'RESOURCES':
+      case 'LOOK_ALIKES':
+      case 'SEASONAL_CALENDAR':
+      case 'EMERGENCY_RESOURCES':
+      case 'EXPERT_REVIEWERS':
         return 'SERIES_PAGE';
       case 'GLOSSARY':
         return 'GLOSSARY_ORNAMENT';
@@ -89,7 +93,10 @@ export function inferWholePageRole(row: PageRow, layoutTemplate: LayoutTemplateI
 
   if (row.pageRole === 'continuation') return 'CONTINUATION';
   if (row.pageRole === 'compacted') return 'COMPACTED';
-  if (row.pageRole === 'opener' && layoutTemplate === 'LAYOUT_13_FEATURE_BANNER') {
+  if (
+    row.pageRole === 'opener' &&
+    (layoutTemplate === 'LAYOUT_13_FEATURE_BANNER' || layoutTemplate === 'LAYOUT_5_CHAPTER_OPENER')
+  ) {
     return 'CHAPTER_OPENER';
   }
   return 'INTERIOR';
@@ -245,6 +252,15 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
       // = Sources / Further Reading (citations, trust); ABOUT_SERIES = the
       // series brand page.
       const isSources = frontMatterType(row) === 'RESOURCES';
+      const referenceHeadings: Record<string, string> = {
+        LOOK_ALIKES: 'LOOK-ALIKES QUICK REFERENCE',
+        SEASONAL_CALENDAR: 'SEASONAL CALENDAR',
+        EMERGENCY_RESOURCES: 'EMERGENCY RESOURCES',
+        EXPERT_REVIEWERS: 'A NOTE ON EXPERT REVIEWERS',
+      };
+      const referenceHeading = referenceHeadings[frontMatterType(row)];
+      const displayedReferenceHeading =
+        referenceHeading && row.pageRole === 'continuation' ? `${referenceHeading} — CONTINUED` : referenceHeading;
       // Data-driven series page — heading comes from the project's series field,
       // never a hardcoded brand. (RESOURCES rides this role but is Sources copy.)
       const seriesName = (config.publishing.series?.name ?? '').trim();
@@ -256,10 +272,10 @@ export function buildPageRolePolicy(row: PageRow, config: ProjectConfig): PageRo
       return {
         pageType,
         layoutTemplate,
-        title: { kicker: '', number: '', name: isSources ? 'SOURCES & FURTHER READING' : seriesHeading },
-        entryTitle: isSources ? 'Sources & Further Reading' : (seriesName || 'About the Series'),
-        imageSubject: isSources
-          ? 'Sources / further-reading page edge ornament only: thin engraved corner details framing a calm citations/references text block; quiet and scholarly'
+        title: { kicker: '', number: '', name: displayedReferenceHeading ?? (isSources ? 'SOURCES & FURTHER READING' : seriesHeading) },
+        entryTitle: displayedReferenceHeading ?? (isSources ? 'Sources & Further Reading' : (seriesName || 'About the Series')),
+        imageSubject: (isSources || referenceHeading)
+          ? `${referenceHeading ?? 'Sources / further-reading'} page edge ornament only: thin engraved corner details framing a calm reference text block; quiet, scholarly, and highly legible`
           : `Atmospheric Cinematic Naturalist FIELD framing the About-the-Series text — a quiet emblematic ${subtitle ? `${subtitle} ` : ''}wilderness vignette (distant layered ridgelines, conifers, ferns and a calm naturalist motif) enveloping the page margins and background as a premium series brand page that ties the volume to the wider series. CRITICAL READABILITY: keep the central reading column clean, light, and high-contrast so the series text stays clearly legible at about 11pt — the illustration envelops and frames the text, never a busy hero scene over it. Match the weight and finish of the book's introduction continuation pages — never a plain text placeholder.`,
         allowsEmptyBody: false,
         renderBodyText: true,
@@ -334,6 +350,10 @@ export function isWholePageAiAllowedForRow(row: PageRow): boolean {
     'ABOUT_AUTHOR',
     'ABOUT_SERIES',
     'RESOURCES',
+    'LOOK_ALIKES',
+    'SEASONAL_CALENDAR',
+    'EMERGENCY_RESOURCES',
+    'EXPERT_REVIEWERS',
     'GLOSSARY',
     'INDEX',
     'COPYRIGHT_PAGE',
