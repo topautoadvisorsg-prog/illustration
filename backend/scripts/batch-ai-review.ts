@@ -23,11 +23,14 @@
 import { getDb } from '../src/db/client.js';
 import { pages, wholePageRenders } from '../src/db/schema/index.js';
 import { and, eq, sql } from 'drizzle-orm';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** Durable results file, so a run survives a lost terminal or a piped stdout. */
+const REPORT_PATH = path.join(__dirname, '..', '..', 'ai-review-report.json');
 
 function loadConsolePassword(): string {
   const envPath = path.join(__dirname, '..', '..', '.env');
@@ -93,41 +96,122 @@ async function main() {
     console.error('usage: tsx scripts/batch-ai-review.ts <projectId> [pageKeyContains,comma,list]');
     process.exit(2);
   }
-  const filters = (process.argv[3] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const argv = process.argv.slice(3);
+  const onlyErrors = argv.includes('--only-errors');
+  const filters = (argv.find((a) => !a.startsWith('--')) ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const pw = loadConsolePassword();
 
-  const targets = await findLatestRenders(projectId, filters);
+  let targets = await findLatestRenders(projectId, filters);
+
+  // Resume mode: retry ONLY the pages that errored last run. An errored page
+  // was never checked — it is not a pass — so retrying just those, rather than
+  // re-reviewing the whole book, keeps a transient outage from costing a
+  // second full sweep.
+  if (onlyErrors) {
+    if (!existsSync(REPORT_PATH)) {
+      console.error(`--only-errors: no previous report at ${REPORT_PATH}. Run a full sweep first.`);
+      process.exit(2);
+    }
+    const prev = JSON.parse(readFileSync(REPORT_PATH, 'utf8')) as {
+      records?: Array<{ pageKey: string; outcome: string }>;
+    };
+    const errorKeys = new Set((prev.records ?? []).filter((r) => r.outcome === 'error').map((r) => r.pageKey));
+    if (errorKeys.size === 0) {
+      console.log('--only-errors: previous run had no errored pages. Nothing to retry.');
+      process.exit(0);
+    }
+    targets = targets.filter((t) => errorKeys.has(t.pageKey));
+    console.log(`--only-errors: retrying ${targets.length} page(s) that errored in the previous run.`);
+  }
   console.log(`Reviewing ${targets.length} page(s)${filters.length ? ` matching [${filters.join(', ')}]` : ''}, one at a time...\n`);
 
   let passed = 0;
   let failed = 0;
   let errored = 0;
   const failures: { pageKey: string; issues: string[] }[] = [];
+  // Durable per-page record. An earlier full sweep was effectively lost: its
+  // output was piped through `tail`, and 143 pages had errored transiently
+  // against a backend still recovering from a database outage — leaving no way
+  // to distinguish pages that were genuinely clean from pages never actually
+  // checked. Every run now writes its results to disk so it can be audited,
+  // resumed with --only-errors, and turned into a publication QA report.
+  type Outcome = 'pass' | 'fail' | 'error';
+  const records: Array<{ pageKey: string; renderId: string; outcome: Outcome; issues: string[]; error?: string }> = [];
 
   for (const t of targets) {
     process.stdout.write(`  ${t.pageKey} ... `);
     const result = await reviewOne(pw, t.renderId);
     if (result.error) {
       errored++;
+      records.push({ pageKey: t.pageKey, renderId: t.renderId, outcome: 'error', issues: [], error: result.error });
       console.log(`ERROR: ${result.error}`);
       continue;
     }
     if (result.pass) {
       passed++;
+      records.push({ pageKey: t.pageKey, renderId: t.renderId, outcome: 'pass', issues: [] });
       console.log('PASS' + (result.note ? ` (${result.note})` : ''));
     } else {
       failed++;
+      records.push({ pageKey: t.pageKey, renderId: t.renderId, outcome: 'fail', issues: result.issues });
       console.log(`FAIL — ${result.issues.length} issue(s)`);
       for (const issue of result.issues) console.log(`      - ${issue}`);
       failures.push({ pageKey: t.pageKey, issues: result.issues });
     }
   }
 
+  // Merge into any existing report rather than replacing it. A partial run
+  // (a filter, or --only-errors) must not erase results for pages it did not
+  // touch — otherwise resuming a failed sweep would silently discard the
+  // pages that already passed.
+  const merged = new Map<string, (typeof records)[number]>();
+  if (existsSync(REPORT_PATH)) {
+    try {
+      const prev = JSON.parse(readFileSync(REPORT_PATH, 'utf8')) as { projectId?: string; records?: typeof records };
+      if (prev.projectId === projectId) for (const r of prev.records ?? []) merged.set(r.pageKey, r);
+    } catch {
+      // Unreadable previous report is not fatal; this run's results still land.
+    }
+  }
+  for (const r of records) merged.set(r.pageKey, r);
+  const allRecords = Array.from(merged.values()).sort((a, b) => a.pageKey.localeCompare(b.pageKey));
+  const cumulative = {
+    total: allRecords.length,
+    passed: allRecords.filter((r) => r.outcome === 'pass').length,
+    failed: allRecords.filter((r) => r.outcome === 'fail').length,
+    errored: allRecords.filter((r) => r.outcome === 'error').length,
+  };
+
+  writeFileSync(
+    REPORT_PATH,
+    JSON.stringify(
+      {
+        projectId,
+        ranAt: new Date().toISOString(),
+        backend: BACKEND,
+        lastRun: { filters, onlyErrors, total: targets.length, passed, failed, errored },
+        cumulative,
+        records: allRecords,
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  );
+
   console.log(`\n${passed} passed, ${failed} failed, ${errored} errored, ${targets.length} total.`);
   if (failures.length > 0) {
     console.log('\nPages needing a look:');
-    for (const f of failures) console.log(`  - ${f.pageKey}: ${f.issues.length} issue(s)`);
+    for (const f of failures) {
+      console.log(`  - ${f.pageKey}: ${f.issues.length} issue(s)`);
+      for (const issue of f.issues) console.log(`      · ${issue}`);
+    }
   }
+  if (errored > 0) {
+    console.log(`\n${errored} page(s) ERRORED and were NOT checked. These are not passes.`);
+    console.log('  Re-run with --only-errors to retry just those against a healthy backend.');
+  }
+  console.log(`\nReport written to ${REPORT_PATH}`);
   process.exit(failed > 0 || errored > 0 ? 1 : 0);
 }
 

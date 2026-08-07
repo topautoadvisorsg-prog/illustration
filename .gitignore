@@ -129,3 +129,6 @@ backend/scripts/experiments/
 
 # Test env (may hold a real test-DB URL) — template is .env.test.example
 .env.test
+
+# AI text-review results (regenerable; can be large)
+ai-review-report.json
