@@ -122,3 +122,7 @@ preview-ch01p001.json
 railway-status-after-artifact.json
 supervisor-*.json
 ch01-*.txt
+
+# Prompt A/B + optimization experiment output (large regenerable PNG sets)
+backend/experiments/
+backend/scripts/experiments/
