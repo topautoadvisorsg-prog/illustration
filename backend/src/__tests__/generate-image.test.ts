@@ -8,6 +8,7 @@ import {
   nextImageVersion,
 } from '../pipeline/stage-3-generation/generate-image.js';
 import { LAYOUT_IMAGE_SHAPES, appendImageShapeInstruction, imageShapeForLayout } from '../pipeline/stage-3-generation/image-shape.js';
+import { LayoutTemplateIdSchema } from '@wildlands/shared';
 
 describe('assertGeneratable (Stage 3 spend gate)', () => {
   const ok = {
@@ -154,39 +155,16 @@ describe('assertLayoutApprovedForImageSpend', () => {
 });
 
 describe('layout-aware image shape mapping', () => {
+  // Derived from the canonical enum, NOT a hardcoded list. The literal list
+  // this replaced went stale the moment LAYOUT_E/F/G were added to the enum
+  // with shapes defined for them — the mapping was complete and correct, the
+  // test's copy of the list simply wasn't updated, so it failed while
+  // asserting nothing useful. Driving it off LayoutTemplateIdSchema means the
+  // real invariant ("every canonical template has a shape") is what gets
+  // checked, and adding a template can never silently skip its shape.
   it('defines a shape for every canonical layout template (legacy + simplified families)', () => {
-    expect(Object.keys(LAYOUT_IMAGE_SHAPES).sort()).toEqual([
-      'LAYOUT_10_FULL_PAGE_PLATE',
-      'LAYOUT_11_CONTINUOUS_LANDSCAPE_SPREAD',
-      'LAYOUT_12_DIAGNOSTIC_DIAGRAM',
-      'LAYOUT_13_FEATURE_BANNER',
-      'LAYOUT_14_SIDEBAR_FEATURE',
-      'LAYOUT_15_PROGRESSION_STUDY',
-      'LAYOUT_16_CUTAWAY_FEATURE',
-      'LAYOUT_1_STANDARD',
-      'LAYOUT_2_TEXT_HEAVY',
-      'LAYOUT_3_ILLUSTRATION_DOMINANT',
-      'LAYOUT_4_DANGER_WARNING',
-      'LAYOUT_5_CHAPTER_OPENER',
-      'LAYOUT_6_BACK_MATTER',
-      'LAYOUT_7_SCATTERED_VIGNETTES',
-      'LAYOUT_8_MARGIN_ILLUSTRATION',
-      'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
-      'LAYOUT_A_ILLUSTRATION',
-      'LAYOUT_A_TEXT',
-      'LAYOUT_B_IMAGE_BOTTOM',
-      'LAYOUT_B_IMAGE_LEFT',
-      'LAYOUT_B_IMAGE_RIGHT',
-      'LAYOUT_B_IMAGE_TOP',
-      'LAYOUT_C_CORNER_BOTTOM_LEFT',
-      'LAYOUT_C_CORNER_BOTTOM_RIGHT',
-      'LAYOUT_C_CORNER_TOP_LEFT',
-      'LAYOUT_C_CORNER_TOP_RIGHT',
-      'LAYOUT_D_PURE_TEXT',
-      'LAYOUT_FINE_PRINT',
-      'LAYOUT_REFERENCE',
-      'LAYOUT_TITLE_DISPLAY',
-    ]);
+    const canonical = [...LayoutTemplateIdSchema.options].sort();
+    expect(Object.keys(LAYOUT_IMAGE_SHAPES).sort()).toEqual(canonical);
   });
 
   it('maps wide banner layouts to landscape generation', () => {

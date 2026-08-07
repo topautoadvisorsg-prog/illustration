@@ -108,7 +108,11 @@ describe('PageRole prompt text policy', () => {
     expect(prompt).toContain('BLACK BEAR');
     expect(prompt).toContain('Ursus americanus');
     expect(prompt).toContain('ITALIC');
-    expect(prompt).toContain('scientific name');
+    // Match the byline instruction specifically. The bare phrase "scientific
+    // name" also occurs in the always-present TEXT SAFETY rule and in the
+    // BOTTOM ANCHOR negative ("no caption, no label, no scientific name"), so
+    // asserting on it proves nothing — it would pass with the byline removed.
+    expect(prompt).toContain('as the species byline');
   });
 
   it('adds no scientific-name byline when the opener has no binomial (concept/section opener)', () => {
@@ -116,7 +120,10 @@ describe('PageRole prompt text policy', () => {
     spec.pageText.title = { kicker: '', number: '', name: 'THE FORAGER’S CODE' };
     const prompt = assemblePagePrompt(spec);
     expect(prompt).toContain('ENTRY TITLE');
-    expect(prompt).not.toContain('scientific name');
+    // Same reasoning as the positive case above: assert the BYLINE is absent,
+    // not the substring "scientific name", which legitimately appears in
+    // unrelated always-on instructions and made this assertion unsatisfiable.
+    expect(prompt).not.toContain('as the species byline');
   });
 
   it('adds no ENTRY TITLE instruction when an interior page has no title (e.g. continuation-style)', () => {
