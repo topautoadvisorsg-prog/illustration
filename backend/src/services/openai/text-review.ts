@@ -25,6 +25,14 @@ export interface TextReviewResult {
   issues: string[];
   transcription?: string;
   model: string;
+  /**
+   * Token usage for THIS call. Reported so batch cost can be measured rather
+   * than assumed — the cost-control policy forbids calling an operation cheap
+   * without measuring it, and this review was run ~200 times on the assumption
+   * it was inexpensive. Image tokens dominate: a full-page render sent at
+   * detail:'high' is the bulk of promptTokens.
+   */
+  usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 }
 
 // Two-step (transcribe, then diff) instead of "just tell me what's wrong" —
@@ -88,5 +96,14 @@ export async function reviewRenderedText(imagePngBuffer: Buffer, sourceText: str
   const pass = typeof parsed.pass === 'boolean' ? parsed.pass : issues.length === 0;
   const transcription = typeof parsed.transcription === 'string' ? parsed.transcription : undefined;
 
-  return { pass, issues, transcription, model: env.OPENAI_REVIEW_MODEL };
+  const u = response.usage;
+  return {
+    pass,
+    issues,
+    transcription,
+    model: env.OPENAI_REVIEW_MODEL,
+    usage: u
+      ? { promptTokens: u.prompt_tokens ?? 0, completionTokens: u.completion_tokens ?? 0, totalTokens: u.total_tokens ?? 0 }
+      : undefined,
+  };
 }

@@ -79,7 +79,12 @@ function loadPrevious(projectId: string): Map<string, Record_> {
   return map;
 }
 
-async function reviewOne(renderId: string): Promise<{ outcome: Outcome; issues: string[]; error?: string }> {
+/** Running token totals, so a run can report measured cost instead of a guess. */
+const usageTotals = { promptTokens: 0, completionTokens: 0, calls: 0 };
+
+async function reviewOne(
+  renderId: string,
+): Promise<{ outcome: Outcome; issues: string[]; error?: string; usage?: { promptTokens: number; completionTokens: number } }> {
   const db = getDb();
   try {
     const [render] = await db.select().from(wholePageRenders).where(eq(wholePageRenders.id, renderId)).limit(1);
@@ -93,7 +98,16 @@ async function reviewOne(renderId: string): Promise<{ outcome: Outcome; issues: 
 
     const imageBuf = await getProjectStorage().readProjectFile(render.imagePath);
     const result = await reviewRenderedText(imageBuf, sourceText);
-    return { outcome: result.pass ? 'pass' : 'fail', issues: result.issues ?? [] };
+    if (result.usage) {
+      usageTotals.promptTokens += result.usage.promptTokens;
+      usageTotals.completionTokens += result.usage.completionTokens;
+      usageTotals.calls++;
+    }
+    return {
+      outcome: result.pass ? 'pass' : 'fail',
+      issues: result.issues ?? [],
+      usage: result.usage ? { promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens } : undefined,
+    };
   } catch (err) {
     return { outcome: 'error', issues: [], error: err instanceof Error ? err.message : String(err) };
   }
@@ -163,6 +177,18 @@ async function main() {
     failed: all.filter((r) => r.outcome === 'fail').length,
     errored: all.filter((r) => r.outcome === 'error').length,
   };
+
+  // Measured token usage. Cost per unit must come from data, never intuition.
+  if (usageTotals.calls > 0) {
+    const avgPrompt = Math.round(usageTotals.promptTokens / usageTotals.calls);
+    const avgCompletion = Math.round(usageTotals.completionTokens / usageTotals.calls);
+    console.log('\n--- MEASURED USAGE ---');
+    console.log(`  billed calls:        ${usageTotals.calls}`);
+    console.log(`  prompt tokens:       ${usageTotals.promptTokens} (avg ${avgPrompt}/page — image dominates this)`);
+    console.log(`  completion tokens:   ${usageTotals.completionTokens} (avg ${avgCompletion}/page)`);
+    console.log(`  total tokens:        ${usageTotals.promptTokens + usageTotals.completionTokens}`);
+    console.log('  Multiply by the model\'s per-token price for actual cost per page.');
+  }
 
   console.log(`\nThis run: ${passed} passed, ${failed} failed, ${errored} errored, ${targets.length} total.`);
   console.log(`Cumulative: ${cum.passed} passed, ${cum.failed} failed, ${cum.errored} errored, ${cum.total} pages.`);
