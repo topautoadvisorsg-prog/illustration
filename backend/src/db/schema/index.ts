@@ -61,6 +61,26 @@ export const pageSectionEnum = pgEnum('page_section', ['FRONT_MATTER', 'BODY', '
 export const fitStatusEnum = pgEnum('fit_status', ['PENDING', 'FITS', 'TIGHT', 'OVERFLOW', 'UNDERFILL']);
 // Pagination v1 — audit log of operator decisions on the Text-In-Reading-Field preview.
 export const pageApprovalDecisionEnum = pgEnum('page_approval_decision', ['APPROVED', 'REJECTED', 'RESET']);
+
+/**
+ * Outcome of a forensic review of ONE rendered page image.
+ * UNCERTAIN is first-class on purpose: the review prompt requires the reviewer
+ * to report doubt rather than resolve it, and collapsing doubt into APPROVED or
+ * ISSUE_FOUND would throw away the one signal that tells an operator to look.
+ */
+export const renderReviewStatusEnum = pgEnum('render_review_status', [
+  'APPROVED',
+  'ISSUE_FOUND',
+  'UNCERTAIN',
+]);
+
+/** How the verdict was produced. Kept explicit so a human verdict never has to
+ *  masquerade as a reviewer version to outrank an automated one. */
+export const renderReviewMethodEnum = pgEnum('render_review_method', [
+  'OPERATOR_MANUAL',
+  'AI_CHAT',
+  'AI_API',
+]);
 // Whole-page render (AI-first pipeline) — its own lifecycle, never shared with
 // the legacy illustration-only `image_status`. Many versions may be APPROVED;
 // exactly one per page may be approved_for_book + active.
@@ -188,6 +208,11 @@ export const projects = pgTable('projects', {
    *  re-reading both files. */
   manuscriptSanitized: boolean('manuscript_sanitized'),
   status: projectStatusEnum('status').default('DRAFT').notNull(),
+  /** Readable-word threshold at or above which a page routes to AI review.
+   *  Null uses the platform default (300). Per-project because the right
+   *  number depends on that book's own word-count distribution, and a book of
+   *  short field entries should not inherit a threshold tuned on long prose. */
+  highTextWordThreshold: integer('high_text_word_threshold'),
   ...timestamps,
 });
 
@@ -268,6 +293,28 @@ export const pages = pgTable(
     /** The folio EXACTLY as printed ('i', 'iv', '1', '203', or null for
      *  unprinted folios — half title / title / copyright / blanks). */
     pageLabel: text('page_label'),
+    // ── Review routing (services/review-routing/policy.ts) ──
+    // MEASURED content, distinct from readingFieldWords/Chars: those come from
+    // readingFieldText, which still carries markdown and a metadata header line
+    // (habitat, tagline) that is never printed. These count only the title and
+    // body blocks the render pipeline actually asks the model to bake in, so a
+    // sparse species opener is not inflated over a threshold by text that does
+    // not exist on the page.
+    readableWords: integer('readable_words'),
+    readableChars: integer('readable_chars'),
+    textBlocks: integer('text_blocks'),
+    /** Operator's explicit review route ('AI_REVIEW' | 'MANUAL_REVIEW').
+     *  Overrides the measured route for workflow purposes ONLY — it never
+     *  changes readableWords, so the measurement stays auditable and the UI can
+     *  always show what the rule would have decided on its own. */
+    reviewRouteOverride: text('review_route_override'),
+    reviewRouteOverrideBy: text('review_route_override_by'),
+    reviewRouteOverrideAt: timestamp('review_route_override_at', { withTimezone: true }),
+    /** High-risk escalation (tiny labels, diagram text, pseudo-text risk,
+     *  visible collision). Escalation only ever moves a page toward STRONGER
+     *  review, so this can promote a short page to AI review but can never pull
+     *  a long one down. Free text: the operator states what they saw. */
+    reviewEscalationReason: text('review_escalation_reason'),
     ...timestamps,
   },
   (table) => ({
@@ -275,6 +322,7 @@ export const pages = pgTable(
     projectStatusIdx: index('pages_project_status_idx').on(table.projectId, table.status),
     projectEntryKeyIdx: index('pages_project_entry_key_idx').on(table.projectId, table.entryKey),
     projectPreviewApprovedIdx: index('pages_project_preview_approved_idx').on(table.projectId, table.previewApproved),
+    projectReadableWordsIdx: index('pages_project_readable_words_idx').on(table.projectId, table.readableWords),
   }),
 );
 
@@ -328,6 +376,47 @@ export const images = pgTable(
 // but is a separate product (typography baked into the generated image). Lives
 // alongside `images`; never mutates legacy state. Book assembly reads only rows
 // where active=true AND approved_for_book=true. See SPEC_PRODUCTIONIZE.md.
+/**
+ * Forensic review verdicts, bound to ONE render.
+ *
+ * Keyed on renderId rather than pageId, and that is the whole point: a verdict
+ * describes the exact image a reviewer looked at. When a page is re-rendered
+ * the new render has no rows here, so it is UNREVIEWED by construction and an
+ * old approval can never silently carry across to artwork nobody has seen.
+ * That failure mode is not hypothetical on this project — a stale CLEAN verdict
+ * against a superseded render is what made `CH02_P027` look safe when it was
+ * not.
+ *
+ * Append-only. A re-review inserts a new row; the previous verdict stays as
+ * provenance. "Current" means the most recent row for that render.
+ */
+export const renderReviews = pgTable(
+  'render_reviews',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    renderId: uuid('render_id')
+      .notNull()
+      .references(() => wholePageRenders.id, { onDelete: 'cascade' }),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    status: renderReviewStatusEnum('status').notNull(),
+    method: renderReviewMethodEnum('method').notNull(),
+    /** Structured findings for ISSUE_FOUND / UNCERTAIN, e.g.
+     *  [{ kind: 'SUBSTITUTED_LETTER', printed: 'follage', expected: 'foliage', where: '...' }] */
+    findings: jsonb('findings'),
+    notes: text('notes'),
+    reviewedBy: text('reviewed_by').notNull(),
+    /** Free-text label for the reviewing model/UI, e.g. "Claude chat (forensic prompt v1)". */
+    reviewerLabel: text('reviewer_label'),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    renderIdx: index('render_reviews_render_idx').on(table.renderId, table.reviewedAt),
+    projectIdx: index('render_reviews_project_idx').on(table.projectId),
+  }),
+);
+
 export const wholePageRenders = pgTable(
   'whole_page_renders',
   {

@@ -355,3 +355,30 @@ export async function countApprovedPages(projectId: string): Promise<number> {
     );
   return Number(row?.count ?? 0);
 }
+
+/**
+ * Set (or clear, with null) the operator's review-route override for one page.
+ *
+ * Writes ONLY the override columns. The measured readableWords is deliberately
+ * untouched: an override changes who reviews the page, never what the page
+ * actually contains, so the console can always show the measurement alongside
+ * the operator's decision and the rule stays auditable.
+ */
+export async function setReviewRouteOverride(
+  projectId: string,
+  pageKey: string,
+  route: 'AI_REVIEW' | 'MANUAL_REVIEW' | null,
+  by: string,
+): Promise<boolean> {
+  const db = getDb();
+  const updated = await db
+    .update(pages)
+    .set({
+      reviewRouteOverride: route,
+      reviewRouteOverrideBy: route === null ? null : by,
+      reviewRouteOverrideAt: route === null ? null : new Date(),
+    })
+    .where(and(eq(pages.projectId, projectId), eq(pages.pageKey, pageKey)))
+    .returning({ id: pages.id });
+  return updated.length > 0;
+}

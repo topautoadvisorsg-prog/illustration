@@ -649,17 +649,112 @@ export default function ProductionConsole({ onExitToLegacy }) {
     // UNDERFILL). NOT the legacy text-fit-preview, which re-planned the un-split
     // per-entry manifests and reported false overflow. No render, no spend.
     const tf = await api(`/api/projects/${project.id}/pagination-preview`, { method: "POST", body: "{}" });
-    const list = (tf.pages || []).map((p) => ({
-      pageKey: p.pageKey,
-      entryTitle: p.entryTitle,
-      layoutTemplate: p.layoutTemplate,
-      fitStatus: p.fit?.status,
-      fit: p.fit,
-      zones: p.allocation,
-      blockers: p.blockers,
-    }));
+    // Review routing rides along from the persisted measurement, merged by
+    // pageKey. Failure here must never break the planning preview, so it
+    // degrades to "no routing shown" rather than throwing.
+    const routed = await api(`/api/projects/${project.id}/paginated-pages`).catch(() => ({ pages: [], routing: null }));
+    const rmap = new Map((routed.pages || []).map((r) => [r.pageKey, r]));
+    const list = (tf.pages || []).map((p) => {
+      const r = rmap.get(p.pageKey) || {};
+      return {
+        pageKey: p.pageKey,
+        entryTitle: p.entryTitle,
+        layoutTemplate: p.layoutTemplate,
+        fitStatus: p.fit?.status,
+        fit: p.fit,
+        zones: p.allocation,
+        blockers: p.blockers,
+        readableWords: r.readableWords ?? null,
+        textBlocks: r.textBlocks ?? null,
+        reviewRoute: r.reviewRoute ?? null,
+        reviewRouteLabel: r.reviewRouteLabel ?? null,
+        reviewRouteReason: r.reviewRouteReason ?? null,
+        manualCheckRequired: !!r.manualCheckRequired,
+        reviewRouteOverridden: !!r.reviewRouteOverridden,
+      };
+    });
+    setRouting(routed.routing || null);
     setPages(list);
     return list;
+  }, [api, project]);
+
+  const loadBoard = useCallback(async () => {
+    if (!project) return;
+    const b = await api(`/api/projects/${project.id}/review-board`).catch(() => null);
+    setBoard(b);
+  }, [api, project]);
+
+  /** Copy the OFFICIAL forensic prompt verbatim. Fetched from the backend so
+   *  there is exactly one copy of it and the console can never drift. */
+  const copyForensicPrompt = useCallback(async () => {
+    const r = await api(`/api/review/forensic-prompt`);
+    await navigator.clipboard.writeText(r.prompt);
+    setPromptCopied(true);
+    setTimeout(() => setPromptCopied(false), 2500);
+  }, [api]);
+
+  /** Download an export. Plain link so the browser handles the file. */
+  const downloadExport = useCallback((params) => {
+    if (!project) return;
+    const pw = sessionStorage.getItem("wl_pw") || "";
+    const qs = new URLSearchParams({ ...params, ...(pw ? { k: pw } : {}) }).toString();
+    window.location.href = `${BACKEND}/api/projects/${project.id}/review-export.zip?${qs}`;
+  }, [project]);
+
+  /** Write the same export to a local folder — the drag-into-chat workflow. */
+  const exportReviewFolder = useCallback(async (selection) => {
+    if (!project) return;
+    setExportNote("Exporting…");
+    try {
+      const r = await api(`/api/projects/${project.id}/review-export`, {
+        method: "POST",
+        body: JSON.stringify({ selection, format: "folder" }),
+      });
+      setExportNote(r.ok ? `Exported ${r.counts.total} pages → ${r.path}` : r.message);
+    } catch (e) {
+      setExportNote(`Export failed: ${e.message}`);
+    }
+  }, [api, project]);
+
+  /** Record a verdict against the EXACT render that was reviewed. */
+  const recordVerdict = useCallback(async (renderId, status, notes) => {
+    if (!project || !renderId) return;
+    await api(`/api/projects/${project.id}/render-reviews`, {
+      method: "POST",
+      body: JSON.stringify({ renderId, status, method: "AI_CHAT", notes: notes || undefined, reviewedBy: "operator", reviewerLabel: "Claude chat (forensic pixel QA v1)" }),
+    });
+    await loadBoard();
+  }, [api, project, loadBoard]);
+
+  /**
+   * Operator override of a page's review route. Changes only WHO reviews the
+   * page: the server never touches readableWords, so the tile keeps showing
+   * the real measurement alongside the override marker and the rule stays
+   * auditable. Passing null clears the override.
+   */
+  const setReviewRoute = useCallback(async (pageKey, route) => {
+    if (!project) return;
+    await api(`/api/projects/${project.id}/pages/${pageKey}/review-route`, {
+      method: "PATCH",
+      body: JSON.stringify({ route, by: "operator" }),
+    });
+    const routed = await api(`/api/projects/${project.id}/paginated-pages`).catch(() => ({ pages: [], routing: null }));
+    const rmap = new Map((routed.pages || []).map((r) => [r.pageKey, r]));
+    const merge = (p) => {
+      const r = rmap.get(p.pageKey);
+      if (!r) return p;
+      return {
+        ...p,
+        reviewRoute: r.reviewRoute ?? null,
+        reviewRouteLabel: r.reviewRouteLabel ?? null,
+        reviewRouteReason: r.reviewRouteReason ?? null,
+        manualCheckRequired: !!r.manualCheckRequired,
+        reviewRouteOverridden: !!r.reviewRouteOverridden,
+      };
+    };
+    setRouting(routed.routing || null);
+    setPages((prev) => (prev || []).map(merge));
+    setZoom((z) => (z && z.pageKey === pageKey ? merge(z) : z));
   }, [api, project]);
 
   const doPaginate = (confirmOrphan = false) => run("Paginating", async () => {
@@ -1168,6 +1263,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
         {step === "paginate" && (
           <Panel title="Paginate" sub="Flow the chapter body into pages with the body flow engine (no spend). Reference sections use the two-column reference model.">
             <Guard project={project} setStep={setStep} />
+            {project && <TypesetPreview project={project} api={api} fileUrlBase={BACKEND} />}
             {project && (
               <div style={S.card}>
                 <button style={S.btn()} onClick={() => doPaginate(false).catch(() => {})}>Paginate body</button>
@@ -1178,13 +1274,145 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     <b>{pagination.summary?.totalPages} pages</b> — {pagination.summary?.openers} openers · {pagination.summary?.continuations} continuations · {pagination.summary?.compactions} compacted.
                   </div>
                 )}
+                {/* ── FORENSIC REVIEW WORKFLOW ─────────────────────────────
+                    Routing (blue) says WHO reviews a page. Verdict (its own
+                    chips) says what they found. The two are never merged. */}
+                <div style={{ marginTop: 16, padding: 14, border: `1px solid ${C.line}`, borderRadius: 10, background: C.panel }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>Forensic review</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button style={S.btn(promptCopied ? "ok" : "primary")} onClick={copyForensicPrompt}>
+                        {promptCopied ? "Prompt copied" : "Copy Forensic Prompt"}
+                      </button>
+                      <button style={S.ghost} onClick={loadBoard}>Refresh</button>
+                    </div>
+                  </div>
+
+                  {!board && <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>Click Refresh to load routing and review status.</div>}
+
+                  {board && (
+                    <>
+                      <div style={{ marginTop: 10, fontSize: 13, color: C.muted }}>
+                        Routing rule: <b>{board.threshold}+ canonical source words to AI review</b>. Routing is not approval.
+                      </div>
+                      <div style={{ marginTop: 8, display: "flex", gap: 14, flexWrap: "wrap", fontSize: 13 }}>
+                        <span><span style={S.pill(C.blue)}>AI REVIEW</span> {board.counts.aiReview} <span style={{ color: C.muted }}>({board.counts.aiReviewUnreviewed} unreviewed)</span></span>
+                        <span><span style={S.pill(C.muted)}>MANUAL</span> {board.counts.manualReview} <span style={{ color: C.muted }}>({board.counts.manualUnreviewed} unreviewed)</span></span>
+                        <span style={{ color: C.muted }}>|</span>
+                        <span><span style={S.pill(C.green)}>APPROVED</span> {board.counts.approved}</span>
+                        <span><span style={S.pill(C.red)}>ISSUE</span> {board.counts.issueFound}</span>
+                        <span><span style={S.pill(C.orange)}>UNCERTAIN</span> {board.counts.uncertain}</span>
+                        <span><span style={S.pill(C.line)}>UNREVIEWED</span> {board.counts.unreviewed}</span>
+                      </div>
+
+                      <div style={{ marginTop: 12, fontSize: 12, color: C.muted }}>Download as .zip</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button style={S.btn()} onClick={() => downloadExport({ route: "AI_REVIEW" })}>AI review pages ({board.counts.aiReview})</button>
+                        <button style={S.btn("ghost")} onClick={() => downloadExport({ route: "MANUAL_REVIEW" })}>Manual review pages ({board.counts.manualReview})</button>
+                        <button style={S.btn("ghost")} onClick={() => downloadExport({ unreviewed: "true" })}>All unreviewed ({board.counts.unreviewed})</button>
+                        <button style={S.btn("ghost")} disabled={picked.length === 0} onClick={() => downloadExport({ pageKeys: picked.join(",") })}>Selected ({picked.length})</button>
+                      </div>
+
+                      <div style={{ marginTop: 10, fontSize: 12, color: C.muted }}>Or write to a local folder (drag straight into a chat)</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button style={S.ghost} onClick={() => exportReviewFolder({ kind: "ROUTE", route: "AI_REVIEW" })}>AI review to folder</button>
+                        <button style={S.ghost} onClick={() => exportReviewFolder({ kind: "ROUTE", route: "MANUAL_REVIEW" })}>Manual to folder</button>
+                        <button style={S.ghost} disabled={picked.length === 0} onClick={() => exportReviewFolder({ kind: "PAGE_KEYS", pageKeys: picked })}>Selected to folder</button>
+                      </div>
+                      {exportNote && <div style={{ marginTop: 8, fontSize: 12, color: C.ink, wordBreak: "break-all" }}>{exportNote}</div>}
+
+                      <div style={{ marginTop: 14, maxHeight: 340, overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ background: C.paper }}>
+                              <th style={{ padding: 6, width: 28 }}></th>
+                              <th style={{ padding: 6, textAlign: "left" }}>Page</th>
+                              <th style={{ padding: 6, textAlign: "left" }}>Render</th>
+                              <th style={{ padding: 6, textAlign: "right" }}>Words</th>
+                              <th style={{ padding: 6, textAlign: "left" }}>Route</th>
+                              <th style={{ padding: 6, textAlign: "left" }}>Verdict</th>
+                              <th style={{ padding: 6, textAlign: "left" }}>Record</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {board.pages.map((p) => {
+                              const vc = p.reviewStatus === "APPROVED" ? C.green : p.reviewStatus === "ISSUE_FOUND" ? C.red : p.reviewStatus === "UNCERTAIN" ? C.orange : C.line;
+                              const ai = p.reviewRoute === "AI_REVIEW";
+                              return (
+                                <tr key={p.pageKey} style={{ borderTop: `1px solid ${C.line}` }}>
+                                  <td style={{ padding: 4, textAlign: "center" }}>
+                                    <input type="checkbox" checked={picked.includes(p.pageKey)}
+                                      onChange={(e) => setPicked((prev) => e.target.checked ? [...prev, p.pageKey] : prev.filter((k) => k !== p.pageKey))} />
+                                  </td>
+                                  <td style={{ padding: 4, fontWeight: 600 }}>{p.pageKey}</td>
+                                  <td style={{ padding: 4, color: C.muted }}>{p.renderVersion != null ? `v${p.renderVersion}` : "-"}</td>
+                                  <td style={{ padding: 4, textAlign: "right" }}>{p.readableWords == null ? "-" : p.readableWords}</td>
+                                  <td style={{ padding: 4 }} title={p.reviewRouteReason || ""}>
+                                    <span style={{ ...S.pill(ai ? C.blue : "transparent"), color: ai ? "#fff" : C.blue, border: ai ? "none" : `1px solid ${C.field}` }}>
+                                      {ai ? "AI" : "MANUAL"}
+                                    </span>
+                                    {p.escalated && <span style={{ fontSize: 10, color: C.orange, marginLeft: 4 }}>esc</span>}
+                                    {p.overridden && <span style={{ fontSize: 10, color: C.muted, marginLeft: 4 }}>ovr</span>}
+                                  </td>
+                                  <td style={{ padding: 4 }}><span style={S.pill(vc)}>{p.reviewStatus}</span></td>
+                                  <td style={{ padding: 4, whiteSpace: "nowrap" }}>
+                                    <button style={{ ...S.ghost, marginTop: 0, padding: "2px 6px", fontSize: 11 }} disabled={!p.renderId} onClick={() => recordVerdict(p.renderId, "APPROVED")}>ok</button>
+                                    <button style={{ ...S.ghost, marginTop: 0, padding: "2px 6px", fontSize: 11 }} disabled={!p.renderId} onClick={() => recordVerdict(p.renderId, "ISSUE_FOUND", window.prompt("Findings for " + p.pageKey) || "")}>issue</button>
+                                    <button style={{ ...S.ghost, marginTop: 0, padding: "2px 6px", fontSize: 11 }} disabled={!p.renderId} onClick={() => recordVerdict(p.renderId, "UNCERTAIN", window.prompt("What is uncertain on " + p.pageKey) || "")}>?</button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
                 {pages && pages.length > 0 && (
                   <>
                     <div style={{ marginTop: 8, color: C.muted, fontSize: 13 }}>
                       Planning preview — the text flowed into each layout (no illustration yet). Tinted blocks = where art will go. Check the <b>fit</b> chip and click any page to enlarge and confirm it reads well, <i>before</i> any render spend.
                     </div>
+                    {routing && (
+                      <div style={{ marginTop: 10, padding: "10px 12px", border: `1px solid ${C.field}`, borderRadius: 8, background: "rgba(157,187,214,0.10)" }}>
+                        <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>
+                          Review routing — who checks each page. <b>{routing.threshold}+ readable words → AI review.</b> This is a routing attribute, not an approval state.
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                          {[
+                            ["ALL", `All ${routing.total}`],
+                            ["AI_REVIEW", `HIGH TEXT · AI REVIEW ${routing.aiReview}`],
+                            ["MANUAL_REVIEW", `MANUAL REVIEW ${routing.manualReview}`],
+                          ].map(([key, label]) => (
+                            <button
+                              key={key}
+                              onClick={() => setRouteFilter(key)}
+                              style={{
+                                padding: "5px 11px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                                border: `1px solid ${routeFilter === key ? C.blue : C.line}`,
+                                background: routeFilter === key ? C.blue : "transparent",
+                                color: routeFilter === key ? "#fff" : C.ink,
+                              }}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                          {routing.manualCheckRequired > 0 && (
+                            <span style={{ fontSize: 11, color: C.orange }}>
+                              {routing.manualCheckRequired} also need a manual check (structured layout)
+                            </span>
+                          )}
+                          {routing.overridden > 0 && (
+                            <span style={{ fontSize: 11, color: C.muted }}>{routing.overridden} operator override(s)</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div style={S.grid}>
-                      {pages.map((p) => <PagePreview key={p.pageKey} page={p} trim={trimSize(form.trim)} onZoom={setZoom} />)}
+                      {pages
+                        .filter((p) => routeFilter === "ALL" || p.reviewRoute === routeFilter)
+                        .map((p) => <PagePreview key={p.pageKey} page={p} trim={trimSize(form.trim)} onZoom={setZoom} />)}
                     </div>
                   </>
                 )}
@@ -1505,7 +1733,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
             )}
           </Panel>
         )}
-        {zoom && <ZoomModal page={zoom} trim={trimSize(form.trim)} onClose={() => setZoom(null)} />}
+        {zoom && <ZoomModal page={zoom} trim={trimSize(form.trim)} onClose={() => setZoom(null)} onSetRoute={setReviewRoute} />}
         {isMobile && (
           <div className="wl-mobile-step-dock" aria-label="Mobile workflow navigation" style={{ position: "fixed", left: 10, right: 10, bottom: "calc(10px + env(safe-area-inset-bottom, 0px))", zIndex: 500, display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 12, border: `1px solid ${C.line}`, background: "rgba(251,247,234,0.98)", boxShadow: "0 8px 26px rgba(46,36,23,0.18)" }}>
             <button type="button" disabled={activeStepIndex <= 0} onClick={() => goRelativeStep(-1)} style={{ ...S.ghost, margin: 0, padding: "8px 10px", opacity: activeStepIndex <= 0 ? 0.45 : 1 }}>Back</button>
@@ -1573,25 +1801,68 @@ function fitMeta(fit) {
   return { bg: C.muted, text: f || "—" };
 }
 
+/**
+ * Review-routing badge. BLUE only — routing is not an approval verdict, so it
+ * must never borrow green/yellow/red. AI-review pages get the solid blue fill
+ * so the operator can scan the strip and see at a glance which pages are
+ * theirs; manual pages get a quiet outline.
+ */
+function RouteBadge({ page, compact }) {
+  if (!page.reviewRoute) return null;
+  const ai = page.reviewRoute === "AI_REVIEW";
+  const words = page.readableWords;
+  const base = {
+    display: "inline-block", fontSize: compact ? 9 : 11, fontWeight: 700, letterSpacing: 0.3,
+    padding: compact ? "1px 5px" : "2px 8px", borderRadius: 4, whiteSpace: "nowrap",
+  };
+  const style = ai
+    ? { ...base, background: C.blue, color: "#fff" }
+    : { ...base, background: "transparent", color: C.blue, border: `1px solid ${C.field}` };
+  const text = ai ? (compact ? "AI" : "HIGH TEXT · AI REVIEW") : (compact ? "MANUAL" : "MANUAL REVIEW");
+  return (
+    <span title={page.reviewRouteReason || ""}>
+      <span style={style}>{text}</span>
+      {page.manualCheckRequired && (
+        <span style={{ ...base, background: "transparent", color: C.orange, border: `1px solid ${C.orange}`, marginLeft: 4 }}>
+          {compact ? "+CHK" : "+ MANUAL CHECK"}
+        </span>
+      )}
+      {page.reviewRouteOverridden && (
+        <span style={{ fontSize: 9, color: C.muted, marginLeft: 4 }}>override</span>
+      )}
+      {words != null && !compact && (
+        <span style={{ fontSize: 10, color: C.muted, marginLeft: 6 }}>{words} readable words</span>
+      )}
+    </span>
+  );
+}
+
 function PagePreview({ page, trim, onZoom }) {
   const W = 168;
   const p = { ...page, __w: trim.widthIn, __h: trim.heightIn };
   const fm = fitMeta(page.fitStatus);
+  const ai = page.reviewRoute === "AI_REVIEW";
   return (
     <div style={{ width: W }}>
-      <div onClick={() => onZoom(page)} title="Click to enlarge" style={{ cursor: "zoom-in" }}>
+      <div
+        onClick={() => onZoom(page)}
+        title="Click to enlarge"
+        style={{ cursor: "zoom-in", outline: ai ? `2px solid ${C.blue}` : "none", outlineOffset: 2, borderRadius: 2 }}
+      >
         <PageLayout page={p} width={W} />
       </div>
       <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, wordBreak: "break-all" }}>{page.pageKey}</div>
-      <div style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
         <span style={S.pill(fm.bg)}>{page.fitStatus}</span>
-        <span style={{ fontSize: 10, color: C.muted }}>{page.entryTitle || page.layoutTemplate}</span>
+        <RouteBadge page={page} compact />
+        {page.readableWords != null && <span style={{ fontSize: 10, color: C.muted }}>{page.readableWords}w</span>}
       </div>
+      <div style={{ marginTop: 2, fontSize: 10, color: C.muted }}>{page.entryTitle || page.layoutTemplate}</div>
     </div>
   );
 }
 
-function ZoomModal({ page, trim, onClose }) {
+function ZoomModal({ page, trim, onClose, onSetRoute }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const W = isMobile ? 300 : 460;
   const fm = fitMeta(page.fitStatus);
@@ -1602,6 +1873,20 @@ function ZoomModal({ page, trim, onClose }) {
           <div><b>{page.pageKey}</b> · {page.layoutTemplate} · <span style={S.pill(fm.bg)}>{fm.text}</span></div>
           <button style={S.ghost} onClick={onClose}>Close ✕</button>
         </div>
+        {page.reviewRoute && (
+          <div style={{ marginBottom: 10, padding: "8px 10px", border: `1px solid ${C.field}`, borderRadius: 6 }}>
+            <RouteBadge page={page} />
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{page.reviewRouteReason}</div>
+            {onSetRoute && (
+              <div style={{ marginTop: 6, display: "flex", gap: 6, alignItems: "center" }}>
+                <span style={{ fontSize: 11, color: C.muted }}>Override route:</span>
+                <button style={{ ...S.ghost, marginTop: 0 }} onClick={() => onSetRoute(page.pageKey, "AI_REVIEW")}>AI review</button>
+                <button style={{ ...S.ghost, marginTop: 0 }} onClick={() => onSetRoute(page.pageKey, "MANUAL_REVIEW")}>Manual</button>
+                <button style={{ ...S.ghost, marginTop: 0 }} onClick={() => onSetRoute(page.pageKey, null)}>Clear</button>
+              </div>
+            )}
+          </div>
+        )}
         <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 18, alignItems: "flex-start" }}>
           <PageLayout page={{ ...page, __w: trim.widthIn, __h: trim.heightIn }} width={W} />
           <div style={{ fontSize: 13, minWidth: isMobile ? 0 : 200, width: isMobile ? "100%" : undefined }}>
@@ -1650,6 +1935,122 @@ function Panel({ title, sub, children }) {
 function Guard({ project, setStep }) {
   if (project) return null;
   return <div style={{ ...S.card, borderColor: C.orange }}>Open or create a project first. <button style={S.ghost} onClick={() => setStep("project")}>Go to Project</button></div>;
+}
+
+/**
+ * TYPESET PREVIEW — the real interior, in the console.
+ *
+ * For a text-first book the pages are deterministically typeset (Paged.js), not
+ * AI-generated images, so the operator must be able to judge the actual book:
+ * type size, measure, margins, chapter openers, page density, real page count.
+ * Free — no model call, no spend.
+ *
+ * The PDF is shown in an <iframe> rather than rasterised to images on purpose:
+ * the browser's own viewer gives page-by-page navigation, zoom, and true vector
+ * type at real trim, which is exactly what is being judged.
+ */
+function TypesetPreview({ project, api, fileUrlBase }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [report, setReport] = useState(null);
+  const [src, setSrc] = useState(null);
+  const [recto, setRecto] = useState(true);
+
+  // Revoke the previous object URL so repeated previews don't leak blobs.
+  useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
+
+  const build = async () => {
+    setBusy(true); setErr(""); setReport(null);
+    try {
+      const q = `recto=${recto ? "true" : "false"}`;
+      const meta = await api(`/api/projects/${project.id}/typeset-preview?format=json&${q}`);
+      setReport(meta.report);
+      const pw = sessionStorage.getItem("wl_pw") || "";
+      const res = await fetch(
+        `${fileUrlBase}/api/projects/${project.id}/typeset-preview?${q}`,
+        { headers: pw ? { Authorization: `Bearer ${pw}` } : {} },
+      );
+      if (!res.ok) throw new Error(`Preview failed (${res.status})`);
+      const blob = await res.blob();
+      setSrc((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(blob); });
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const r = report;
+  return (
+    <div style={{ ...S.card, borderColor: C.blue }}>
+      <b>Typeset interior preview</b>
+      <div style={{ fontSize: 12.5, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
+        The real printed interior: deterministic typesetting, live vector text, at true trim.
+        Page breaks come from the typesetter itself, so this page count is the one the book will have. Free.
+      </div>
+      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+        <button style={busy ? { ...S.btn(), background: C.muted } : S.btn()} disabled={busy} onClick={build}>
+          {busy ? "Typesetting…" : src ? "Rebuild preview" : "Build typeset preview"}
+        </button>
+        <label style={{ fontSize: 12.5, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
+          <input type="checkbox" checked={recto} onChange={(e) => setRecto(e.target.checked)} />
+          Chapters start on a right-hand page
+          <span style={{ color: C.muted }}>(adds a blank when one ends on a right page)</span>
+        </label>
+      </div>
+
+      {busy && <div style={{ ...S.pill(C.orange), marginTop: 10 }}>⏳ Flowing the whole book — this takes a moment on a long manuscript.</div>}
+      {err && <div style={{ ...S.card, borderColor: C.red, color: C.red }}>⚠ {err}</div>}
+
+      {r && (
+        <div style={{ ...S.grid, marginTop: 12 }}>
+          <Stat label="Total pages" value={r.totalPages} />
+          <Stat label="Trim" value={`${r.trim.widthIn} × ${r.trim.heightIn} in`} />
+          <Stat label="Body type" value={`${r.bodyPt}pt / ${r.lineHeight}`} />
+          <Stat label="Gutter" value={`${r.marginsIn.gutterIn} in`} />
+          <Stat label="Blank pages" value={r.blankPages.length} />
+          <Stat label="Overflowing" value={r.verticalOverflowPages.length} />
+        </div>
+      )}
+
+      {r && r.verticalOverflowPages.length > 0 && (
+        <div style={{ color: C.red, fontSize: 12.5, marginTop: 8 }}>
+          ⚠ Text may be clipped on page(s): {r.verticalOverflowPages.join(", ")}
+        </div>
+      )}
+
+      {src && (
+        <>
+          <iframe
+            title="Typeset interior preview"
+            src={src}
+            style={{ width: "100%", height: "78vh", marginTop: 12, border: `1px solid ${C.line}`, borderRadius: 8, background: "#fff" }}
+          />
+          <div style={{ marginTop: 8 }}>
+            <a href={src} download={`${(project.title || "book").replace(/[^\w-]+/g, "-").toLowerCase()}-typeset.pdf`} style={{ ...S.ghost, display: "inline-block", textDecoration: "none" }}>
+              ⭳ Download this proof
+            </a>
+          </div>
+        </>
+      )}
+
+      {r && (
+        <details style={{ marginTop: 12 }}>
+          <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600, color: C.blue }}>
+            Section start pages ({r.sectionStarts.length})
+          </summary>
+          <div style={{ marginTop: 8, fontSize: 12.5, columns: 2, columnGap: 24 }}>
+            {r.sectionStarts.map((s, i) => (
+              <div key={i} style={{ breakInside: "avoid", marginBottom: 3 }}>
+                <b style={{ color: C.blue }}>p{s.page}</b>{" "}
+                <span style={{ color: C.muted }}>{s.label || s.kind}</span> — {s.title}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
 }
 
 /**

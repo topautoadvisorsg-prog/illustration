@@ -51,9 +51,24 @@ import {
   writePreviewToCache,
 } from '../pipeline/stage-1.8-preview/preview-cache.js';
 import { isChromiumAvailable } from '../pipeline/stage-6-layout/render-pdf.js';
+import {
+  DEFAULT_HIGH_TEXT_WORD_THRESHOLD,
+  classifyReviewRoute,
+  summariseRouting,
+  type PageRoutingInput,
+  type ReviewRoute,
+  type ReviewRoutingPolicy,
+} from '../services/review-routing/policy.js';
+import { setReviewRouteOverride } from '../db/repositories/pagination.repo.js';
 
 const ProjectParamsSchema = z.object({ id: z.string().uuid() });
 const PageParamsSchema = z.object({ pageId: z.string().uuid() });
+const PageRouteParamsSchema = z.object({ id: z.string().uuid(), pageKey: z.string().min(1) });
+const ReviewRouteOverrideSchema = z.object({
+  /** null clears the override and returns the page to its measured route. */
+  route: z.enum(['AI_REVIEW', 'MANUAL_REVIEW']).nullable(),
+  by: z.string().min(1).optional(),
+});
 
 /**
  * 503 body: every route returns this shape when the feature flag is off so
@@ -65,6 +80,46 @@ function flagDisabledResponse() {
     error: 'Service Unavailable',
     message: 'PAGINATION_V1_ENABLED is false; this endpoint is dormant.',
     statusCode: 503,
+  };
+}
+
+/** Shape a page row into the routing policy's input. */
+function toRoutingInput(row: {
+  readableWords: number | null;
+  textBlocks: number | null;
+  layoutTemplate: string | null;
+  reviewRouteOverride: string | null;
+}): PageRoutingInput {
+  return {
+    readableWords: row.readableWords,
+    textBlocks: row.textBlocks,
+    layoutTemplate: row.layoutTemplate,
+    reviewRouteOverride: (row.reviewRouteOverride as ReviewRoute | null) ?? null,
+  };
+}
+
+/** The routing block the console renders on each page tile. */
+function routingFields(
+  row: Parameters<typeof toRoutingInput>[0],
+  policy: ReviewRoutingPolicy,
+): {
+  reviewRoute: ReviewRoute;
+  isHighText: boolean;
+  manualCheckRequired: boolean;
+  reviewRouteOverridden: boolean;
+  reviewRouteMeasured: ReviewRoute;
+  reviewRouteLabel: string;
+  reviewRouteReason: string;
+} {
+  const r = classifyReviewRoute(toRoutingInput(row), policy);
+  return {
+    reviewRoute: r.route,
+    isHighText: r.isHighText,
+    manualCheckRequired: r.manualCheckRequired,
+    reviewRouteOverridden: r.overridden,
+    reviewRouteMeasured: r.measuredRoute,
+    reviewRouteLabel: r.label,
+    reviewRouteReason: r.reason,
   };
 }
 
@@ -407,6 +462,11 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
         return reply.code(404).send({ error: 'Not Found', message: 'Project not found.', statusCode: 404 });
       }
       const rows = await listPaginatedPagesForProject(id);
+      const routingPolicy = {
+        highTextWordThreshold:
+          (project as { highTextWordThreshold?: number | null }).highTextWordThreshold ??
+          DEFAULT_HIGH_TEXT_WORD_THRESHOLD,
+      };
       // Resolve real entry titles + image subjects in one batch so the
       // operator sees actual names, not the bare pageKey.
       const entryKeys = collectEntryKeys(rows);
@@ -439,9 +499,50 @@ export async function registerPaginationRoutes(app: FastifyInstance): Promise<vo
           previewApprovedBy: row.previewApprovedBy,
           readingFieldChars: row.readingFieldChars,
           readingFieldWords: row.readingFieldWords,
+          // ── Review routing. A ROUTING attribute, never an approval verdict:
+          // the console renders it in its own colour channel so it can never be
+          // confused with GREEN/YELLOW/RED approval state. ──
+          readableWords: row.readableWords,
+          readableChars: row.readableChars,
+          textBlocks: row.textBlocks,
+          reviewRouteOverride: row.reviewRouteOverride ?? null,
+          ...routingFields(row, routingPolicy),
         };
       });
-      return { pages };
+      return {
+        pages,
+        routing: {
+          threshold: routingPolicy.highTextWordThreshold,
+          ...summariseRouting(rows.map(toRoutingInput), routingPolicy),
+        },
+      };
+    },
+  );
+
+  // PATCH /api/projects/:id/pages/:pageKey/review-route — operator override.
+  // Changes WHO reviews the page. Deliberately cannot touch readableWords, so
+  // the measurement stays auditable and the console can always show both the
+  // measured route and the operator's choice side by side.
+  app.patch(
+    '/api/projects/:id/pages/:pageKey/review-route',
+    {
+      schema: {
+        params: PageRouteParamsSchema,
+        body: ReviewRouteOverrideSchema,
+        response: { 404: ApiErrorSchema, 503: ApiErrorSchema },
+      },
+    },
+    async (request, reply) => {
+      if (!getEnv().PAGINATION_V1_ENABLED) {
+        return reply.code(503).send(flagDisabledResponse());
+      }
+      const { id, pageKey } = PageRouteParamsSchema.parse(request.params);
+      const { route, by } = ReviewRouteOverrideSchema.parse(request.body);
+      const updated = await setReviewRouteOverride(id, pageKey, route, by ?? 'operator');
+      if (!updated) {
+        return reply.code(404).send({ error: 'Not Found', message: 'Page not found.', statusCode: 404 });
+      }
+      return { pageKey, reviewRouteOverride: route, by: by ?? 'operator' };
     },
   );
 

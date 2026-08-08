@@ -43,6 +43,8 @@ export const REVIEWER_VERSION = 3;
 export interface TextReviewResult {
   pass: boolean;
   issues: string[];
+  /** Claims rejected by the schema guard. Kept for provenance, never evidence. */
+  suppressedIssues?: string[];
   transcription?: string;
   model: string;
   /** Reviewer ruleset that produced this verdict. See REVIEWER_VERSION. */
@@ -86,6 +88,52 @@ A printed book SHOULD use curly apostrophes and proper dashes even when the sour
 Respond with STRICT JSON only, no markdown fences, in this exact shape:
 {"transcription": "your full step-1 transcription", "pass": boolean, "issues": ["one specific word-level defect per entry, in the form: WRONG_WORD (as printed) -> CORRECT_WORD (from source)"]}
 "pass" is true only if issues is empty. Every issue must name a SPECIFIC word that differs — never describe a defect without quoting the exact wrong word and the exact correct word side by side.`;
+
+/**
+ * Schema sanity guard on a single reviewer claim.
+ *
+ * Beta measurement on 2026-08-08 found the model emitting claims that cannot
+ * describe a defect: `Unlike (as printed) -> Unlike (from source)` names the
+ * same word twice, `metres -> meters` "corrects" a word the source never
+ * contains, and `continent's -> continent’s` reports a straight quote against a
+ * curly one. Five of fifteen claims in that run were of this kind. They are not
+ * wrong judgements about the page; they are malformed output, and letting them
+ * into the evidence system means an operator investigates a defect that was
+ * never claimed about anything real.
+ *
+ * Rejects a claim when, after benign typographic normalisation:
+ *   - printed and source tokens are identical
+ *   - the claimed source token does not appear in the source passage
+ *   - there is no parseable difference at all
+ * Anything it cannot parse is KEPT — this suppresses noise, never judgement.
+ */
+function isSubstantiveClaim(issue: string, sourceText: string): boolean {
+  const m = issue.match(/^\s*(.+?)\s*\(as printed[^)]*\)\s*->\s*(.+?)\s*\(from source\)/i);
+  if (!m) return true; // unparseable shape: keep it, a human decides
+
+  // Only quotes, dashes and case are benign here. A letter difference is real.
+  const norm = (s: string): string =>
+    s
+      .normalize('NFKC')
+      .replace(/[‘’‚‛′´`]/g, "'")
+      .replace(/[“”„‟″]/g, '"')
+      .replace(/[‐‑‒–—―−]/g, '-')
+      .trim()
+      .toLowerCase();
+
+  const printed = norm(m[1]!);
+  const source = norm(m[2]!);
+  if (!printed || !source) return false;
+  if (printed === source) return false; // degenerate: names one word twice
+
+  // The word the reviewer says the source contains must actually be in it.
+  const sourceWords = new Set(norm(sourceText).split(/\s+/));
+  const bare = (s: string): string => s.replace(/[^\p{L}\p{N}'-]/gu, '');
+  if (bare(source) && !sourceWords.has(source) && ![...sourceWords].some((w) => bare(w) === bare(source))) {
+    return false; // claims a correction to text that is not in the passage
+  }
+  return true;
+}
 
 export async function reviewRenderedText(imagePngBuffer: Buffer, sourceText: string): Promise<TextReviewResult> {
   const env = getEnv();
@@ -140,14 +188,21 @@ export async function reviewRenderedText(imagePngBuffer: Buffer, sourceText: str
     throw new Error(`AI review returned non-JSON output: ${raw.slice(0, 300)}`);
   }
 
-  const issues = Array.isArray(parsed.issues) ? parsed.issues.filter((x): x is string => typeof x === 'string') : [];
-  const pass = typeof parsed.pass === 'boolean' ? parsed.pass : issues.length === 0;
+  const rawIssues = Array.isArray(parsed.issues) ? parsed.issues.filter((x): x is string => typeof x === 'string') : [];
+  const suppressed = rawIssues.filter((i) => !isSubstantiveClaim(i, sourceText));
+  const issues = rawIssues.filter((i) => isSubstantiveClaim(i, sourceText));
+  // `pass` is recomputed from the SURVIVING issues: a page whose only findings
+  // were degenerate has no findings at all.
+  const pass = issues.length === 0;
   const transcription = typeof parsed.transcription === 'string' ? parsed.transcription : undefined;
 
   const u = response.usage;
   return {
     pass,
     issues,
+    // Raw model output is preserved for provenance: suppressed claims are still
+    // visible for reviewer-quality analysis, they just are not defect evidence.
+    suppressedIssues: suppressed.length ? suppressed : undefined,
     transcription,
     model: env.OPENAI_REVIEW_MODEL,
     reviewerVersion: REVIEWER_VERSION,

@@ -1,0 +1,36 @@
+# Isolated LOCAL DEVELOPMENT database.
+#
+# Local dev and the Railway deployment previously shared one Supabase database,
+# so a local probe could — and on 2026-08-08 did — mutate a real project's
+# manuscript provenance. This container is the development database; production
+# stays on Supabase and is never reachable from a dev-configured backend.
+#
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.dev.yml down          # keeps data
+#   docker compose -f docker-compose.dev.yml down -v       # wipes data
+#
+# The connection string lives in .env.development.local (gitignored).
+
+services:
+  dev-db:
+    image: postgres:16-alpine
+    container_name: wildlands-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wildlands
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: wildlands_dev
+    ports:
+      # 55432, not 5432: a non-standard port cannot be confused with a system
+      # Postgres, and makes an accidental production-looking URL obvious.
+      - '55432:5432'
+    volumes:
+      - wildlands-dev-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U wildlands -d wildlands_dev']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  wildlands-dev-pgdata:

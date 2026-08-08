@@ -1,0 +1,158 @@
+/**
+ * Render a typeset book: HTML -> Paged.js -> vector PDF, plus a page report.
+ *
+ * Chromium is required (puppeteer-core bundles no browser). `resolveChromiumPath()`
+ * probes CHROMIUM_PATH / PUPPETEER_EXECUTABLE_PATH first, then common Linux
+ * paths — on Windows the env var is mandatory.
+ */
+
+import type { ProjectConfig } from '@wildlands/shared';
+import { loadPagedPolyfill, resolveChromiumPath } from '../stage-6-layout/render-pdf.js';
+import {
+  buildTypesetHtml,
+  parseTypesetSections,
+  typesetMarginsForTrim,
+  type TypesetMargins,
+  type TypesetReport,
+} from './typeset-book.js';
+
+export interface RenderTypesetInput {
+  markdown: string;
+  config: ProjectConfig;
+  margins?: TypesetMargins;
+  chaptersStartRecto?: boolean;
+}
+
+export interface RenderTypesetResult {
+  pdf: Buffer;
+  report: TypesetReport;
+  /** The HTML actually rendered, for debugging a layout complaint. */
+  html: string;
+}
+
+export class TypesetUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TypesetUnavailableError';
+  }
+}
+
+/**
+ * Browser-side measurement, passed as a STRING rather than a function.
+ *
+ * tsx/esbuild injects a `__name` helper into compiled functions; puppeteer
+ * serialises the function source into the page, where `__name` does not exist,
+ * and every `page.evaluate` throws "__name is not defined". A string body is
+ * compiled by the browser untouched. Do not convert these back to arrow
+ * functions.
+ */
+const MEASURE_JS = `(() => {
+  const d = document;
+  function pageNumOf(el) {
+    const p = el.closest('.pagedjs_page');
+    return p ? Number(p.getAttribute('data-page-number')) : null;
+  }
+  // Paged.js splits one <section> into a fragment per page, each carrying the
+  // same data-title. Only the fragment holding .opener is the true start.
+  const sectionStarts = [];
+  d.querySelectorAll('section.tsec > .opener h2').forEach(function (h) {
+    const s = h.closest('section');
+    sectionStarts.push({
+      title: s.getAttribute('data-title'),
+      label: s.getAttribute('data-label') || '',
+      kind: s.getAttribute('data-kind') || '',
+      page: pageNumOf(h),
+    });
+  });
+  // Only VERTICAL overflow means text is at risk of being cut. Paged.js page
+  // containers routinely report a large constant horizontal scrollWidth that is
+  // a container artifact, not content, so measuring dx produces false alarms.
+  const verticalOverflowPages = [];
+  d.querySelectorAll('.pagedjs_page_content').forEach(function (c) {
+    if (c.scrollHeight - c.clientHeight > 2) {
+      const p = c.closest('.pagedjs_page');
+      if (p) verticalOverflowPages.push(Number(p.getAttribute('data-page-number')));
+    }
+  });
+  const blankPages = [];
+  d.querySelectorAll('.pagedjs_page').forEach(function (p) {
+    if ((p.textContent || '').replace(/\\s/g, '').length < 4) {
+      blankPages.push(Number(p.getAttribute('data-page-number')));
+    }
+  });
+  return {
+    totalPages: d.querySelectorAll('.pagedjs_page').length,
+    sectionStarts: sectionStarts,
+    verticalOverflowPages: verticalOverflowPages,
+    blankPages: blankPages,
+  };
+})()`;
+
+/** Poll until Paged.js stops adding pages, so a long book is never truncated. */
+const STABLE_JS = `(function () {
+  const n = document.querySelectorAll('.pagedjs_page').length;
+  const s = window.__tsStable || { n: -1, streak: 0 };
+  if (n === s.n) { s.streak++; } else { s.n = n; s.streak = 0; }
+  window.__tsStable = s;
+  return s.streak >= 5;
+})()`;
+
+export async function renderTypesetBook(input: RenderTypesetInput): Promise<RenderTypesetResult> {
+  const chromium = resolveChromiumPath();
+  if (!chromium) {
+    throw new TypesetUnavailableError(
+      'Typesetting needs a Chromium browser and none was found. Set CHROMIUM_PATH (or PUPPETEER_EXECUTABLE_PATH) to a Chrome/Chromium executable.',
+    );
+  }
+
+  const margins = input.margins ?? typesetMarginsForTrim(input.config.trimSize);
+  const sections = parseTypesetSections(input.markdown);
+  if (sections.length === 0) {
+    throw new TypesetUnavailableError(
+      'No typesettable sections found. The manuscript needs chapter headings (e.g. "# Chapter 1" followed by "## Title").',
+    );
+  }
+
+  const polyfillJs = await loadPagedPolyfill();
+  const html = buildTypesetHtml({ ...input, sections, margins, polyfillJs });
+
+  const { default: puppeteer } = await import('puppeteer-core');
+  const browser = await puppeteer.launch({
+    executablePath: chromium,
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--font-render-hinting=none'],
+  });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 180_000 });
+    await page.waitForFunction(`document.querySelectorAll('.pagedjs_page').length > 0`, { timeout: 180_000 });
+    await page.waitForFunction(STABLE_JS, { timeout: 300_000, polling: 300 });
+
+    const measured = (await page.evaluate(MEASURE_JS)) as Omit<
+      TypesetReport,
+      'trim' | 'marginsIn' | 'bodyPt' | 'lineHeight'
+    >;
+
+    const pdf = await page.pdf({
+      width: `${input.config.trimSize.widthIn}in`,
+      height: `${input.config.trimSize.heightIn}in`,
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    });
+
+    return {
+      pdf: Buffer.from(pdf),
+      html,
+      report: {
+        ...measured,
+        trim: { widthIn: input.config.trimSize.widthIn, heightIn: input.config.trimSize.heightIn },
+        marginsIn: margins,
+        bodyPt: input.config.typography.bodyPt,
+        lineHeight: input.config.typography.lineHeight,
+      },
+    };
+  } finally {
+    await browser.close();
+  }
+}

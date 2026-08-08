@@ -1275,6 +1275,68 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     },
   );
 
+  // ── TYPESET PREVIEW ───────────────────────────────────────────────────────
+  // Renders the WHOLE book through Paged.js and returns the vector PDF inline,
+  // so the operator reviews the real interior in the console instead of being
+  // handed a file. Free: deterministic typesetting, no model call, no spend.
+  //
+  // Page breaking is Paged.js's, not Pagination v1's character grid — see
+  // pipeline/typeset/typeset-book.ts. The measured page count is returned in
+  // headers so the UI can show it without parsing the PDF.
+  const TypesetQuerySchema = z.object({
+    /** 'pdf' (default) streams it for an inline viewer; 'json' returns the report. */
+    format: z.enum(['pdf', 'json']).default('pdf'),
+    /** Start every section on a recto. Costs a blank verso when one ends on a recto. */
+    recto: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+  });
+
+  app.get('/api/projects/:id/typeset-preview', async (request, reply) => {
+    const { id } = ProjectParamsSchema.parse(request.params);
+    const query = TypesetQuerySchema.parse(request.query ?? {});
+    const project = await getProject(id);
+    if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+    if (!project.manuscriptPath) {
+      throw new UserFacingError('No manuscript on file. Upload one before previewing the typeset interior.', {
+        code: 'No Manuscript On File',
+        errorCode: ERROR_CODES.MANUSCRIPT_MISSING,
+        statusCode: 404,
+        action: { type: 'navigate', target: 'manuscript', label: 'Go to Manuscript' },
+      });
+    }
+
+    const { getProjectStorage } = await import('../services/storage/project-storage.js');
+    const markdown = (await getProjectStorage().readProjectFile(project.manuscriptPath)).toString('utf8');
+    const config = parseProjectConfig(project);
+
+    const { renderTypesetBook, TypesetUnavailableError } = await import(
+      '../pipeline/typeset/render-typeset.js'
+    );
+    try {
+      const result = await renderTypesetBook({ markdown, config, chaptersStartRecto: query.recto });
+      if (query.format === 'json') return { report: result.report };
+
+      reply.header('content-type', 'application/pdf');
+      reply.header('content-disposition', 'inline; filename="typeset-preview.pdf"');
+      // Surfaced as headers so the viewer can show counts without re-parsing.
+      reply.header('x-total-pages', String(result.report.totalPages));
+      reply.header('x-blank-pages', String(result.report.blankPages.length));
+      reply.header('x-overflow-pages', String(result.report.verticalOverflowPages.length));
+      return reply.send(result.pdf);
+    } catch (err) {
+      if (err instanceof TypesetUnavailableError) {
+        throw new UserFacingError(err.message, {
+          code: 'Typesetting Unavailable',
+          errorCode: ERROR_CODES.UNCLASSIFIED,
+          statusCode: 503,
+        });
+      }
+      throw err;
+    }
+  });
+
   app.post(
     '/api/projects/:id/manifests',
     {

@@ -19,6 +19,7 @@ import { registerSubjectBadgeRoutes } from './api/subject-badges.routes.js';
 import { registerSupervisorRoutes } from './api/supervisor.routes.js';
 import { registerEpubRoutes } from './api/epub.routes.js';
 import { registerDiagnosticsRoutes } from './api/diagnostics.routes.js';
+import { registerReviewWorkflowRoutes } from './api/review-workflow.routes.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const env = getEnv();
@@ -114,6 +115,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   // operator diagnostics page. Same password gate as everything else; not a
   // customer-facing surface.
   await registerDiagnosticsRoutes(app);
+  await registerReviewWorkflowRoutes(app);
 
   app.get('/', async () => ({
     service: 'wildlands-backend',

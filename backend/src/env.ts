@@ -37,6 +37,16 @@ if (IS_TEST) {
   loadDotenv({ path: path.join(REPO_ROOT, '.env.test'), override: true });
 } else {
   loadDotenv({ path: path.join(REPO_ROOT, '.env'), override: true });
+  // DEVELOPER OVERRIDE LAYER, loaded last so it wins.
+  //
+  // `.env` holds real production credentials and is shared with the deployed
+  // stack; a developer must not have to edit it (and risk committing or losing
+  // it) just to point at a local database. `.env.development.local` is
+  // gitignored and overrides only what it names — in practice DATABASE_URL,
+  // pointing at the Docker Postgres from docker-compose.dev.yml.
+  //
+  // Absent, behaviour is exactly as before.
+  loadDotenv({ path: path.join(REPO_ROOT, '.env.development.local'), override: true });
 }
 
 /** A placeholder value still using the .env.example template. */
@@ -90,6 +100,15 @@ const EnvSchema = z.object({
   SENTRY_DSN_BACKEND: z.string().default(''),
 
   STORAGE_ROOT: z.string().default(path.join(REPO_ROOT, 'backend/storage')),
+
+  // ── Database environment guard (lib/db-environment.ts) ──
+  // What this process believes it is. Only 'production' exempts a process from
+  // the production-database guard, so a developer machine cannot migrate or
+  // mutate production even if it loads the production .env.
+  APP_ENVIRONMENT: z.enum(['development', 'production', 'test']).default('development'),
+  // Host fragment identifying the production database. Empty means "treat any
+  // non-loopback host as potentially production" — fail safe, not fail open.
+  PRODUCTION_DB_HOST: z.string().default(''),
 
   // Pagination v1 feature flag. When false (default), Stage 1.75 modules can be
   // imported and unit-tested but no API endpoint exposes them and the existing

@@ -135,3 +135,9 @@ ai-review-report.json
 
 # Reconciliation proposal (regenerable, read-only output)
 reconciliation-report.json
+
+# Local OCR screening cache (regenerable, ~MBs of raw OCR text)
+.ocr-cache/
+
+# Local developer overrides (dev database, Chromium path). Never commit.
+.env.development.local
