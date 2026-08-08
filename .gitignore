@@ -132,3 +132,6 @@ backend/scripts/experiments/
 
 # AI text-review results (regenerable; can be large)
 ai-review-report.json
+
+# Reconciliation proposal (regenerable, read-only output)
+reconciliation-report.json
