@@ -1977,6 +1977,84 @@ function Guard({ project, setStep }) {
 }
 
 /**
+ * Renders PDF pages to canvas so the operator actually sees the book.
+ *
+ * The first version embedded the PDF in an <iframe> and relied on the browser's
+ * built-in PDF plugin. That plugin rendered a blank black box, so the preview
+ * showed nothing at all. Drawing the pages ourselves with pdf.js removes that
+ * dependency entirely.
+ *
+ * Pages render in batches as you scroll: a 155-page book is far too much to
+ * rasterise up front, and the operator only needs the next few pages.
+ */
+function PdfPages({ url, pageCount }) {
+  const hostRef = useRef(null);
+  const [shown, setShown] = useState(8);
+  const [total, setTotal] = useState(pageCount || 0);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    let doc = null;
+    (async () => {
+      try {
+        const pdfjs = await import("pdfjs-dist/build/pdf");
+        // Worker disabled on purpose: the CRA build does not emit the worker
+        // asset at a stable URL, and a missing worker fails silently. Rendering
+        // on the main thread is slower but always works.
+        pdfjs.GlobalWorkerOptions.workerSrc = "";
+        const task = pdfjs.getDocument({ url, disableWorker: true });
+        doc = await task.promise;
+        if (cancelled) return;
+        setTotal(doc.numPages);
+        const host = hostRef.current;
+        if (!host) return;
+        host.innerHTML = "";
+        for (let n = 1; n <= Math.min(shown, doc.numPages); n++) {
+          const page = await doc.getPage(n);
+          if (cancelled) return;
+          const viewport = page.getViewport({ scale: 1.4 });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          canvas.style.cssText = `width:100%;max-width:${Math.round(viewport.width)}px;display:block;margin:0 auto 14px;border:1px solid ${C.line};box-shadow:0 1px 4px rgba(0,0,0,.12);background:#fff;`;
+          const wrap = document.createElement("div");
+          const cap = document.createElement("div");
+          cap.textContent = `page ${n}`;
+          cap.style.cssText = `text-align:center;font-size:11px;color:${C.muted};margin-bottom:4px;`;
+          wrap.appendChild(cap);
+          wrap.appendChild(canvas);
+          host.appendChild(wrap);
+          await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+        }
+      } catch (e) {
+        if (!cancelled) setErr(e.message || String(e));
+      }
+    })();
+    return () => { cancelled = true; if (doc) doc.destroy?.(); };
+  }, [url, shown]);
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      {err && <div style={{ color: C.red, fontSize: 12.5 }}>⚠ Could not render pages: {err}</div>}
+      <div
+        ref={hostRef}
+        style={{ maxHeight: "78vh", overflowY: "auto", background: "#efe9db", padding: 14, border: `1px solid ${C.line}`, borderRadius: 8 }}
+      />
+      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 12.5, color: C.muted }}>Showing {Math.min(shown, total)} of {total} pages</span>
+        {shown < total && (
+          <button style={{ ...S.ghost, margin: 0 }} onClick={() => setShown((s) => s + 12)}>Load 12 more pages</button>
+        )}
+        {shown < total && (
+          <button style={{ ...S.ghost, margin: 0 }} onClick={() => setShown(total)}>Load all {total}</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * TYPESET PREVIEW — the real interior, in the console.
  *
  * For a text-first book the pages are deterministically typeset (Paged.js), not
@@ -2060,11 +2138,12 @@ function TypesetPreview({ project, api, fileUrlBase }) {
 
       {src && (
         <>
-          <iframe
-            title="Typeset interior preview"
-            src={src}
-            style={{ width: "100%", height: "78vh", marginTop: 12, border: `1px solid ${C.line}`, borderRadius: 8, background: "#fff" }}
-          />
+          {/* Pages are rendered to canvas with pdf.js rather than embedded in an
+              <iframe>. An iframe hands the PDF to the browser's plugin, which
+              may not render at all (it showed a blank black box), so the
+              operator could not see their own book. Drawing the pages ourselves
+              makes them appear reliably, in the console, like a book. */}
+          <PdfPages url={src} pageCount={r ? r.totalPages : 0} />
           <div style={{ marginTop: 8 }}>
             <a href={src} download={`${(project.title || "book").replace(/[^\w-]+/g, "-").toLowerCase()}-typeset.pdf`} style={{ ...S.ghost, display: "inline-block", textDecoration: "none" }}>
               ⭳ Download this proof
