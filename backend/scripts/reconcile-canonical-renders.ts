@@ -32,6 +32,7 @@
 import { getDb } from '../src/db/client.js';
 import { pages, wholePageRenders } from '../src/db/schema/index.js';
 import { eq, asc } from 'drizzle-orm';
+import { isInvalidatedIssue } from '../src/pipeline/whole-page-render/review-issue-classifier.js';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -47,6 +48,40 @@ interface ReviewRecord {
   renderId: string;
   outcome: 'pass' | 'fail' | 'error' | 'suspect';
   issues: string[];
+  reviewerVersion?: number;
+}
+
+/**
+ * A DEFECTIVE verdict produced by a superseded reviewer ruleset is not
+ * evidence of a broken page — it is evidence judged by rules we no longer
+ * trust. CH08_P010 was condemned for printing curly apostrophes in
+ * "Tsuut'ina", which is correct typography and a rule reviewer v2 removed.
+ * Without this distinction that obsolete verdict would force a paid re-render
+ * of a clean page forever.
+ *
+ * The finding is NOT deleted — it stays in the report with its version stamp.
+ * It is simply reclassified as needing a free re-check rather than repair.
+ */
+const CURRENT_REVIEWER_VERSION = 3;
+
+/**
+ * An issue is INVALIDATED by newer rules only if it belongs to a class the
+ * current reviewer no longer reports:
+ *   - typographic punctuation (curly vs straight quotes, dashes, ellipses)
+ *   - a page's own title / scientific name treated as foreign text
+ *
+ * A misspelling is a misspelling under every ruleset. "subialpine",
+ * "colories", "thie" were real when v1 found them and are real now.
+ * Version alone must never launder a genuine defect into a clean page.
+ */
+function isStaleVerdict(rv: ReviewRecord | undefined): boolean {
+  if (!rv) return false;
+  if (rv.outcome !== 'fail') return false;
+  // Unstamped records predate versioning — they are v1 by definition.
+  if ((rv.reviewerVersion ?? 1) >= CURRENT_REVIEWER_VERSION) return false;
+  // Stale ONLY if every recorded issue is one the current rules would drop.
+  // A single genuine misspelling keeps the whole verdict valid.
+  return rv.issues.length > 0 && rv.issues.every(isInvalidatedIssue);
 }
 
 interface Proposal {
@@ -156,8 +191,15 @@ async function main() {
           ? `v${best.version} reviewed CLEAN and is the latest render`
           : `v${best.version} reviewed CLEAN; newer render(s) exist but lack clean-review evidence`;
         confidence = isLatest ? 'HIGH' : 'MEDIUM';
+      } else if (latest && defectiveIds.has(latest.id) && isStaleVerdict(reviewOf(latest.id))) {
+        // Condemned by a reviewer ruleset we have since corrected. Not proof
+        // the page is broken — proof the verdict is obsolete. Costs nothing to
+        // recheck; would cost a paid render to "fix" something that is fine.
+        const rv = reviewOf(latest.id)!;
+        reason = `latest render v${latest.version} was marked defective by reviewer v${rv.reviewerVersion ?? 1} (current is v${CURRENT_REVIEWER_VERSION}) — verdict is STALE, needs a free re-check, not a paid repair`;
+        confidence = 'MANUAL';
       } else if (latest && defectiveIds.has(latest.id)) {
-        // The newest render is known broken. Never promote it.
+        // The newest render is known broken under current rules. Never promote it.
         reason = `latest render v${latest.version} is KNOWN DEFECTIVE (${evidenceFor(latest.id)}) and no clean alternative has been verified`;
         confidence = 'MANUAL';
       } else if (latest && suspectIds.has(latest.id)) {
@@ -221,6 +263,34 @@ async function main() {
   console.log(`  known-defective renders proposed:      0 (excluded by construction)`);
   console.log(`  manually approved renders displaced:   ${displaced.length} ${displaced.length === 0 ? '(PASS)' : '(REVIEW)'}`);
   console.log('');
+  // ─── Four explicit categories, per operator requirement ──────────────────
+  // LOW-confidence pages are NOT auto-approvable: their only basis is "newest",
+  // which is not evidence. They need a free re-check, not a promotion.
+  const autoApprovable = proposals.filter((p) => p.proposed && (p.confidence === 'HIGH' || p.confidence === 'MEDIUM'));
+  const needsFreeVerification = proposals.filter(
+    (p) => p.confidence === 'LOW' || (p.confidence === 'MANUAL' && /STALE|SUSPECT|review errored/i.test(p.reason)),
+  );
+  const needsRepair = proposals.filter((p) => p.confidence === 'MANUAL' && /KNOWN DEFECTIVE/.test(p.reason));
+  const manualDecision = proposals.filter(
+    (p) => p.confidence === 'MANUAL' && !needsFreeVerification.includes(p) && !needsRepair.includes(p),
+  );
+
+  console.log('── CATEGORIES ──');
+  console.log(`  1. AUTO-APPROVABLE          : ${autoApprovable.length}   (evidence supports promotion now)`);
+  console.log(`  2. NEEDS FREE VERIFICATION  : ${needsFreeVerification.length}   (re-check costs nothing; do NOT pay to repair)`);
+  console.log(`  3. KNOWN DEFECTIVE / REPAIR : ${needsRepair.length}   (genuine paid re-render)`);
+  console.log(`  4. MANUAL DECISION          : ${manualDecision.length}   (no viable candidate / conflicting evidence)`);
+  console.log('');
+  if (needsFreeVerification.length) {
+    console.log('  ── category 2 detail (FREE to resolve) ──');
+    for (const p of needsFreeVerification) console.log(`     ${p.pageKey.padEnd(26)} ${p.reason}`);
+    console.log('');
+  }
+  if (manualDecision.length) {
+    console.log('  ── category 4 detail ──');
+    for (const p of manualDecision) console.log(`     ${p.pageKey.padEnd(26)} ${p.reason}`);
+    console.log('');
+  }
   console.log('── OUTCOME ──');
   console.log(`  automatically resolvable:  ${resolved.length}`);
   console.log(`    of which UNVERIFIED (low confidence): ${lowConfidence.length}`);

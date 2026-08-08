@@ -20,11 +20,33 @@ function getClient(): OpenAI {
   return client;
 }
 
+/**
+ * Reviewer version. BUMP THIS whenever the prompt, model policy, or judging
+ * rules change in a way that could alter a verdict.
+ *
+ * Findings are evidence, and evidence has provenance. CH08_P010 was marked
+ * DEFECTIVE for printing curly apostrophes in "Tsuut'ina" — correct
+ * typography, and a rule the reviewer now explicitly ignores. Without a
+ * version stamp that obsolete verdict would permanently condemn a clean page
+ * and force a paid re-render forever. With one, reconciliation can tell
+ * "judged by rules we no longer trust" apart from "actually broken", while
+ * the original finding is preserved rather than deleted.
+ *
+ * History:
+ *   1 — original two-step transcribe-then-compare, gpt-5.5 (reasoning).
+ *   2 — title/scientific-name included in source; typographic punctuation
+ *       (curly quotes, dashes, ellipses, ligatures) no longer reported.
+ *   3 — moved off reasoning models to a plain vision model at temperature 0.
+ */
+export const REVIEWER_VERSION = 3;
+
 export interface TextReviewResult {
   pass: boolean;
   issues: string[];
   transcription?: string;
   model: string;
+  /** Reviewer ruleset that produced this verdict. See REVIEWER_VERSION. */
+  reviewerVersion: number;
   /**
    * Token usage for THIS call. Reported so batch cost can be measured rather
    * than assumed — the cost-control policy forbids calling an operation cheap
@@ -128,6 +150,7 @@ export async function reviewRenderedText(imagePngBuffer: Buffer, sourceText: str
     issues,
     transcription,
     model: env.OPENAI_REVIEW_MODEL,
+    reviewerVersion: REVIEWER_VERSION,
     usage: u
       ? { promptTokens: u.prompt_tokens ?? 0, completionTokens: u.completion_tokens ?? 0, totalTokens: u.total_tokens ?? 0 }
       : undefined,

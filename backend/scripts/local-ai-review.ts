@@ -29,7 +29,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { getProjectStorage } from '../src/services/storage/project-storage.js';
-import { reviewRenderedText } from '../src/services/openai/text-review.js';
+import { reviewRenderedText, REVIEWER_VERSION } from '../src/services/openai/text-review.js';
 import { deriveReviewSourceText } from '../src/pipeline/whole-page-render/review-source-text.js';
 import type { WholePageSpec } from '../src/pipeline/whole-page-render/types.js';
 
@@ -68,6 +68,8 @@ interface Record_ {
   outcome: Outcome;
   issues: string[];
   error?: string;
+  /** Reviewer ruleset that produced this verdict — lets a stale verdict be superseded rather than deleted. */
+  reviewerVersion?: number;
 }
 
 interface Target {
@@ -239,7 +241,7 @@ async function main() {
   for (const t of targets) {
     process.stdout.write(`  ${t.pageKey} ... `);
     const r = await reviewOne(t.renderId);
-    const rec: Record_ = { pageKey: t.pageKey, renderId: t.renderId, outcome: r.outcome, issues: r.issues, error: r.error };
+    const rec: Record_ = { pageKey: t.pageKey, renderId: t.renderId, outcome: r.outcome, issues: r.issues, error: r.error, reviewerVersion: REVIEWER_VERSION };
     records.push(rec);
     if (r.outcome === 'pass') {
       passed++;
