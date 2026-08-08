@@ -54,6 +54,13 @@ Report ONLY genuine spelling/typography defects found by that comparison:
 
 Do NOT report: font style choices, illustration content/quality, layout, color, or anything that is not a literal text-accuracy defect. Ignore markdown-bold markers (**) from the source since they are not meant to be printed — they are formatting, not content.
 
+Do NOT report typographic punctuation differences. These are CORRECT typesetting, not defects, and reporting them sends a good page for an expensive re-render:
+- curly/smart quotes and apostrophes (' ' " ") versus straight ones (' ") — treat them as identical
+- en/em dashes (– —) versus hyphens (-) — treat them as identical
+- ellipsis character (…) versus three periods (...) — treat them as identical
+- ligatures (ﬁ ﬂ) versus their separate letters — treat them as identical
+A printed book SHOULD use curly apostrophes and proper dashes even when the source text uses plain ASCII. Only report a punctuation mark when it changes the sentence's meaning or grammar — for example a period printed where the source has a question mark.
+
 Respond with STRICT JSON only, no markdown fences, in this exact shape:
 {"transcription": "your full step-1 transcription", "pass": boolean, "issues": ["one specific word-level defect per entry, in the form: WRONG_WORD (as printed) -> CORRECT_WORD (from source)"]}
 "pass" is true only if issues is empty. Every issue must name a SPECIFIC word that differs — never describe a defect without quoting the exact wrong word and the exact correct word side by side.`;
