@@ -51,7 +51,7 @@ const S = {
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 12, marginTop: 14 },
 };
 
-const EMPTY_SETUP_FORM = { title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10", backBlurb: "", backFeatures: "", backAuthorBio: "" };
+const EMPTY_SETUP_FORM = { title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10", bodyPt: 11, lineHeight: 1.4, backBlurb: "", backFeatures: "", backAuthorBio: "" };
 const EMPTY_NEW_FORM = { title: "", subtitle: "", author: "" };
 
 const STEPS = [
@@ -448,7 +448,11 @@ export default function ProductionConsole({ onExitToLegacy }) {
       const cfg = d?.config;
       if (cancelled || !cfg) return;
       const w = cfg.trimSize?.widthIn, h = cfg.trimSize?.heightIn;
-      const trim = w === 6 && h === 9 ? "6x9" : w === 8.5 && h === 11 ? "8.5x11" : "7x10";
+      const trim =
+        w === 5.5 && h === 8.5 ? "5.5x8.5"
+        : w === 6 && h === 9 ? "6x9"
+        : w === 8.5 && h === 11 ? "8.5x11"
+        : "7x10";
       const authors = cfg.publishing?.authors;
       const bd = cfg.publishing?.bookDescription ?? {};
       setForm({
@@ -459,6 +463,10 @@ export default function ProductionConsole({ onExitToLegacy }) {
         series: cfg.publishing?.series?.name ?? "",
         volume: cfg.volume ?? cfg.publishing?.series?.volumeNumber ?? 1,
         trim,
+        // Body typography is a per-book decision (a digest guide is not set like
+        // a large-format field guide), so Setup owns it rather than the renderer.
+        bodyPt: cfg.typography?.bodyPt ?? 11,
+        lineHeight: cfg.typography?.lineHeight ?? 1.4,
         // Back-cover copy: blurb (paragraph), features (one per line), author note.
         backBlurb: bd.blurb ?? (bd.hooks?.length ? bd.hooks.join("\n") : ""),
         backFeatures: (bd.features ?? []).join("\n"),
@@ -490,7 +498,12 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return () => { cancelled = true; };
   }, [project?.id, api]);
 
+  // Bleed belongs to the TRIM, not to a global constant. A text interior has
+  // nothing running to the edge, so it prints with zero bleed; an illustrated
+  // page bleeds 0.125. Hardcoding 0.125 for every trim (the old behaviour) gave
+  // the digest preset the wrong canvas.
   function trimSize(t) {
+    if (t === "5.5x8.5") return { widthIn: 5.5, heightIn: 8.5, bleedIn: 0 };
     if (t === "6x9") return { widthIn: 6, heightIn: 9, bleedIn: 0.125 };
     if (t === "8.5x11") return { widthIn: 8.5, heightIn: 11, bleedIn: 0.125 };
     return { widthIn: 7, heightIn: 10, bleedIn: 0.125 };
@@ -522,6 +535,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
       subtitle: f.subtitle,
       authorName: f.author,
       trimSize: trimSize(f.trim),
+      // Only the two body values Setup owns. The API deep-merges, so every other
+      // typography field (fonts, per-role sizes) keeps its stored value instead
+      // of being reset to a schema default.
+      typography: {
+        bodyPt: Number(f.bodyPt) || 11,
+        lineHeight: Number(f.lineHeight) || 1.4,
+      },
       publishing: {
         title: f.title,
         subtitle: f.subtitle,
@@ -1216,11 +1236,30 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 </label>
                 <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 600 }}>Trim size
                   <select style={S.input} value={form.trim} onChange={(e) => setForm({ ...form, trim: e.target.value })}>
-                    <option value="7x10">Hardcover 7 × 10</option>
-                    <option value="6x9">Paperback 6 × 9</option>
-                    <option value="8.5x11">Large 8.5 × 11</option>
+                    <option value="7x10">Hardcover 7 × 10 (bleed 0.125)</option>
+                    <option value="6x9">Paperback 6 × 9 (bleed 0.125)</option>
+                    <option value="5.5x8.5">Paperback Digest 5.5 × 8.5 (text interior, bleed 0)</option>
+                    <option value="8.5x11">Large 8.5 × 11 (bleed 0.125)</option>
                   </select>
+                  <span style={{ fontWeight: 400, color: C.muted, fontSize: 12 }}>
+                    Bleed follows the trim. A text interior prints with none; an illustrated page bleeds 0.125 in.
+                  </span>
                 </label>
+                {/* Body typography lives here, not in the renderer: it is a
+                    per-book decision, and the typesetter reads it from config. */}
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 600, flex: "1 1 140px" }}>Body size (pt)
+                    <input type="number" min="8" max="16" step="0.5" style={S.input} value={form.bodyPt}
+                      onChange={(e) => setForm({ ...form, bodyPt: e.target.value })} />
+                  </label>
+                  <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 600, flex: "1 1 140px" }}>Line height
+                    <input type="number" min="1" max="2" step="0.05" style={S.input} value={form.lineHeight}
+                      onChange={(e) => setForm({ ...form, lineHeight: e.target.value })} />
+                  </label>
+                </div>
+                <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
+                  Drives the typeset interior directly. Digest text books are typically 12pt / 1.3; large-format illustrated pages 11pt / 1.4.
+                </div>
 
                 <div style={{ marginTop: 22, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>Back Cover</div>
