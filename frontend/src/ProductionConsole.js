@@ -1999,11 +1999,14 @@ function PdfPages({ url, pageCount }) {
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist/build/pdf");
-        // Worker disabled on purpose: the CRA build does not emit the worker
-        // asset at a stable URL, and a missing worker fails silently. Rendering
-        // on the main thread is slower but always works.
-        pdfjs.GlobalWorkerOptions.workerSrc = "";
-        const task = pdfjs.getDocument({ url, disableWorker: true });
+        // pdf.js REQUIRES a worker. Leaving workerSrc empty makes it fall back
+        // to a "fake worker" that then fails with
+        // `Cannot read properties of undefined (reading 'WorkerMessageHandler')`.
+        // `pdf.worker.entry` is the webpack-bundled worker, so CRA emits it and
+        // the URL is always correct.
+        const workerMod = await import("pdfjs-dist/build/pdf.worker.entry");
+        pdfjs.GlobalWorkerOptions.workerSrc = workerMod.default ?? workerMod;
+        const task = pdfjs.getDocument(url);
         doc = await task.promise;
         if (cancelled) return;
         setTotal(doc.numPages);
