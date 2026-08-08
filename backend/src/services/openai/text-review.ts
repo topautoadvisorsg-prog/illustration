@@ -85,7 +85,16 @@ export async function reviewRenderedText(imagePngBuffer: Buffer, sourceText: str
     // gpt-5.5 only supports its default temperature (1) — no low-temperature
     // determinism knob on this model generation. Accepted tradeoff for the
     // reasoning-quality improvement.
-    max_completion_tokens: 3000,
+    // gpt-5.5 is a REASONING model: its internal reasoning tokens are billed
+    // against this same budget before a single output token is produced. At
+    // 3000 the densest pages spent the entire allowance reasoning and returned
+    // an empty completion — surfacing as "AI review returned no content" and
+    // costing a full paid call for no result. It reproduced on exactly the
+    // text-heaviest pages (the look-alikes comparison table, the packed larch
+    // page, the knots pages) and never on sparse ones, which is the signature.
+    // Measured successful completions average ~1250 tokens, so the output
+    // itself was never the problem; the reasoning overhead on top of it was.
+    max_completion_tokens: 8000,
     response_format: { type: 'json_object' },
   });
 

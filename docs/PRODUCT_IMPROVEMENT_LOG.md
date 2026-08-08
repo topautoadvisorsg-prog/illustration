@@ -41,7 +41,31 @@ Every entry: what was observed, what it cost, root cause, whether it is fixed, a
 
 ---
 
+### P-010 · Reviewer produces garbage on panel/step-structured pages
+**Observed:** `CH08_P008` (the Bowline page) was reported with **54 issues**, claiming the entire body text was missing. The page is in fact flawless — title, finished-knot plate, five numbered step panels, all five step texts, a "Where you'll use it" paragraph, and an application scene. It is one of the operator-approved pages.
+
+**Why it happens:** the reviewer does a word-by-word diff against `pageText.body`. When a page legitimately restructures its text into numbered panels and labeled steps, the reading order and content no longer align linearly with the source string, and the diff degenerates into "every word is missing."
+
+**Cost of the gap:** acting on this signal would have re-rendered an approved page and destroyed artwork the operator signed off on after three rounds. Caught only because the image was inspected before spending.
+
+**Proposed fix:** detect structured layouts (`LAYOUT_15_PROGRESSION_STUDY` and similar) and either skip word-order diffing for them or compare as an unordered bag of words. A defect count above roughly 20 on a single page should be treated as a reviewer failure, not a page failure, and escalated for human inspection rather than auto-fixed.
+
+**Status:** NOT FIXED. **Standing rule until it is: never re-render on a very high issue count without looking at the image first.**
+
+---
+
+### P-011 · Resume flags could silently become full-book sweeps — FIXED 2026-08-07
+`--only-errors` was run to retry 4 pages that had returned empty completions. The report still held 120 pages marked `error` from an unrelated outage days earlier, so the flag correctly — and silently — expanded to a near-full-book sweep: ~$5.40 against a ~$4.60 balance. Killed after one page (~$0.05).
+
+Any batch over 15 pages now prints its scope and measured cost estimate and refuses to start without `--yes`. Selection bugs are caught before they are billed. Verified: `--only-errors` now reports "113 pages, ~$5.08" and exits rather than spending.
+
+---
+
 ## FIXED
+
+### P-012 · Reasoning-model token budget starved the output — FIXED 2026-08-07
+`max_completion_tokens: 3000` on `gpt-5.5`, a reasoning model whose internal reasoning is billed against that same budget before any output token is emitted. On the densest pages the entire allowance went to reasoning and the call returned an empty completion — surfacing as "AI review returned no content" and costing a full paid call for nothing. It reproduced only on the text-heaviest pages (the look-alikes comparison table, the packed larch page, the knots pages), which is the signature. Measured successful completions average ~1,250 tokens, so the output was never the problem. Raised to 8000; the previously-erroring look-alikes page now reviews and passes.
+
 
 ### P-004 · Reviewer flagged a page's own title as an error — FIXED 2026-08-07
 `deriveReviewSourceText` compared the image against body text only, excluding the title and scientific-name byline that are genuinely printed. `CH02_P007` was flagged for correctly printing "CANADA LYNX / Lynx canadensis". A false positive here is not free — it sends a good page for a paid re-render. Commit `06a004c`.

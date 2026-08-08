@@ -144,6 +144,35 @@ async function main() {
     process.exit(0);
   }
 
+  // COST GUARD. Measured: ~3,550 tokens and ~$0.045 per page.
+  //
+  // This exists because of a real near-miss: `--only-errors` was run intending
+  // to retry 4 pages that had returned empty completions, but the report still
+  // held 120 pages marked 'error' from an unrelated outage days earlier. The
+  // flag did exactly what it promised and silently became a near-full-book
+  // sweep — ~$5.40 against a ~$4.60 balance. It was killed after one page.
+  //
+  // Any batch large enough to matter now states its size and estimated cost
+  // and refuses to start without --yes. Selection bugs are caught before they
+  // are billed, not after.
+  const COST_PER_PAGE = 0.045;
+  const CONFIRM_THRESHOLD = 15;
+  const estimated = (targets.length * COST_PER_PAGE).toFixed(2);
+  console.log(`Scope: ${targets.length} page(s). Estimated cost: ~$${estimated} (~$${COST_PER_PAGE}/page, measured).`);
+  if (targets.length > CONFIRM_THRESHOLD && !argv.includes('--yes')) {
+    console.error(
+      [
+        '',
+        `REFUSING TO START: ${targets.length} pages exceeds the ${CONFIRM_THRESHOLD}-page confirmation threshold.`,
+        `Estimated cost ~$${estimated}.`,
+        '',
+        'If this number is larger than you expected, your selection is wrong — check it before spending.',
+        'To proceed deliberately, re-run with --yes.',
+      ].join('\n'),
+    );
+    process.exit(3);
+  }
+
   console.log(`Reviewing ${targets.length} page(s) locally (no deployed backend involved)...\n`);
   const records: Record_[] = [];
   let passed = 0;
