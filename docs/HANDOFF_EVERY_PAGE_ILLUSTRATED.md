@@ -6,6 +6,9 @@
 
 ---
 
+> ## ⛔ READ FIRST — [`docs/COST_CONTROL_POLICY.md`](COST_CONTROL_POLICY.md)
+> **Binding on every agent, no exceptions.** No paid operation starts without estimate → measured sample → explicit approval. Batch renders, full-book AI/OCR review, and cover generation ALWAYS require approval. Resume failed batches, never restart them. Never call an operation "cheap" without measuring it — that assumption cost ~$10 (half wasted) on 2026-08-06. Free deterministic checks (`verify-text-fidelity.ts`) run before anything paid.
+
 ## SESSION UPDATE 2026-08-04 — READ THIS FIRST (supersedes nothing below, adds to it)
 
 > **PUBLISHING HOLD — INCOMPLETE.** A source-to-live coverage audit found that all eight
