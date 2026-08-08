@@ -36,7 +36,32 @@ import type { WholePageSpec } from '../src/pipeline/whole-page-render/types.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPORT_PATH = path.join(__dirname, '..', '..', 'ai-review-report.json');
 
-type Outcome = 'pass' | 'fail' | 'error';
+/**
+ * 'suspect' means the REVIEWER probably failed, not the page.
+ *
+ * CH08_P008 (the operator-approved Bowline page) was reported with 54 issues
+ * claiming its entire body text was missing. The page is flawless. Word-by-word
+ * diffing collapses on pages that legitimately reorganize their source text —
+ * knot instructions, numbered diagrams, tables, calendars, indexes, contents
+ * pages, labeled illustrations. Acting on that signal would have destroyed
+ * artwork approved after three rounds of review.
+ *
+ * A high issue count therefore never means "re-render this page". It means
+ * "a human looks at this image before anyone spends anything."
+ */
+type Outcome = 'pass' | 'fail' | 'error' | 'suspect';
+
+/** Above this many issues on ONE page, treat the reviewer as unreliable. */
+const SUSPECT_ISSUE_THRESHOLD = 15;
+
+/** Layouts that intentionally restructure text into panels, steps, or columns. */
+const STRUCTURED_LAYOUTS = [
+  'LAYOUT_15_PROGRESSION_STUDY',
+  'LAYOUT_12_DIAGNOSTIC_DIAGRAM',
+  'LAYOUT_9_DIAGNOSTIC_DIAGRAM',
+  'LAYOUT_REFERENCE',
+  'LAYOUT_7_SCATTERED_VIGNETTES',
+];
 interface Record_ {
   pageKey: string;
   renderId: string;
@@ -103,9 +128,21 @@ async function reviewOne(
       usageTotals.completionTokens += result.usage.completionTokens;
       usageTotals.calls++;
     }
+    const issues = result.issues ?? [];
+    // Reviewer-failure detection. A page is 'suspect', never 'fail', when the
+    // issue count is implausibly high or the layout is one that deliberately
+    // restructures its text. Suspect pages require human eyes and must never
+    // trigger an automatic re-render.
+    const layout = String((render.specJson as WholePageSpec)?.layoutGeometry?.layoutTemplate ?? '');
+    const structured = STRUCTURED_LAYOUTS.includes(layout);
+    const outcome: Outcome = result.pass
+      ? 'pass'
+      : issues.length >= SUSPECT_ISSUE_THRESHOLD || (structured && issues.length > 3)
+        ? 'suspect'
+        : 'fail';
     return {
-      outcome: result.pass ? 'pass' : 'fail',
-      issues: result.issues ?? [],
+      outcome,
+      issues,
       usage: result.usage ? { promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens } : undefined,
     };
   } catch (err) {
@@ -158,7 +195,26 @@ async function main() {
   const COST_PER_PAGE = 0.045;
   const CONFIRM_THRESHOLD = 15;
   const estimated = (targets.length * COST_PER_PAGE).toFixed(2);
-  console.log(`Scope: ${targets.length} page(s). Estimated cost: ~$${estimated} (~$${COST_PER_PAGE}/page, measured).`);
+
+  // Every paid batch states WHY these exact pages were chosen. The near-miss
+  // happened because "--only-errors" looked like "retry the 4 that just
+  // failed" while actually meaning "every page ever marked error, including
+  // 120 from an unrelated outage". Naming the selection basis makes a wrong
+  // scope obvious before it is billed.
+  const selectionReason = onlyErrors
+    ? 'pages whose LAST RECORDED OUTCOME was "error" — NOTE: this includes historical errors from earlier runs, not just the most recent failure'
+    : onlyUnchecked
+      ? 'pages with no verified result yet (never reviewed, or previously errored)'
+      : filters.length
+        ? `page keys CONTAINING any of: ${filters.join(', ')} (substring match — may pull in continuation pages such as _c1/_c2)`
+        : 'EVERY page in the project (no filter given)';
+
+  console.log('--- PAID BATCH ---');
+  console.log(`  pages/calls:     ${targets.length}`);
+  console.log(`  estimated cost:  ~$${estimated}  (~$${COST_PER_PAGE}/page, measured)`);
+  console.log(`  selected because: ${selectionReason}`);
+  if (process.env.WL_BALANCE) console.log(`  balance (from WL_BALANCE): $${process.env.WL_BALANCE}`);
+  console.log('------------------');
   if (targets.length > CONFIRM_THRESHOLD && !argv.includes('--yes')) {
     console.error(
       [
@@ -178,6 +234,7 @@ async function main() {
   let passed = 0;
   let failed = 0;
   let errored = 0;
+  let suspect = 0;
 
   for (const t of targets) {
     process.stdout.write(`  ${t.pageKey} ... `);
@@ -191,6 +248,12 @@ async function main() {
       failed++;
       console.log(`FAIL — ${r.issues.length} issue(s)`);
       for (const i of r.issues) console.log(`      · ${i}`);
+    } else if (r.outcome === 'suspect') {
+      suspect++;
+      console.log(`SUSPECT — ${r.issues.length} issue(s). REVIEWER likely failed, not the page.`);
+      console.log('      DO NOT re-render. Inspect the image before spending anything.');
+      for (const i of r.issues.slice(0, 4)) console.log(`      · ${i}`);
+      if (r.issues.length > 4) console.log(`      · …and ${r.issues.length - 4} more`);
     } else {
       errored++;
       console.log(`ERROR: ${r.error}`);
