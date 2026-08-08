@@ -70,6 +70,21 @@ export async function reviewRenderedText(imagePngBuffer: Buffer, sourceText: str
   const openai = getClient();
   const b64 = imagePngBuffer.toString('base64');
 
+  // This task is OCR plus a string diff: read the page, transcribe it, say
+  // where it differs from source. There is nothing to reason about.
+  //
+  // It previously ran on gpt-5.5, a REASONING model, which was the wrong tool
+  // and the main reason a full-book pass cost ~$12. Reasoning tokens are
+  // billed before a single output token exists and are invisible in the
+  // response, so on the densest pages the entire budget went to thinking and
+  // the call returned nothing at all — a fully billed request for zero
+  // information. Reasoning models also pin temperature at 1, which made the
+  // reviewer non-deterministic: the same page could pass one run and fail the
+  // next on a marginal punctuation call.
+  //
+  // A plain vision model does this job directly and deterministically.
+  const isReasoningModel = /^(o\d|gpt-5)/.test(env.OPENAI_REVIEW_MODEL);
+
   const response = await openai.chat.completions.create({
     model: env.OPENAI_REVIEW_MODEL,
     messages: [
@@ -78,23 +93,18 @@ export async function reviewRenderedText(imagePngBuffer: Buffer, sourceText: str
         role: 'user',
         content: [
           { type: 'text', text: `SOURCE TEXT (must match exactly):\n\n${sourceText}` },
+          // 'high' is required: the defects being hunted are single-letter
+          // ("thie" for "the"), and low detail downsamples them away.
           { type: 'image_url', image_url: { url: `data:image/png;base64,${b64}`, detail: 'high' } },
         ],
       },
     ],
-    // gpt-5.5 only supports its default temperature (1) — no low-temperature
-    // determinism knob on this model generation. Accepted tradeoff for the
-    // reasoning-quality improvement.
-    // gpt-5.5 is a REASONING model: its internal reasoning tokens are billed
-    // against this same budget before a single output token is produced. At
-    // 3000 the densest pages spent the entire allowance reasoning and returned
-    // an empty completion — surfacing as "AI review returned no content" and
-    // costing a full paid call for no result. It reproduced on exactly the
-    // text-heaviest pages (the look-alikes comparison table, the packed larch
-    // page, the knots pages) and never on sparse ones, which is the signature.
-    // Measured successful completions average ~1250 tokens, so the output
-    // itself was never the problem; the reasoning overhead on top of it was.
-    max_completion_tokens: 8000,
+    // Deterministic where the model allows it. Reasoning models reject any
+    // temperature but their default, so only set it when it is supported.
+    ...(isReasoningModel ? {} : { temperature: 0 }),
+    // Reasoning models bill hidden reasoning against this budget, so they need
+    // far more headroom than the ~1,250 tokens a real answer occupies.
+    max_completion_tokens: isReasoningModel ? 8000 : 4000,
     response_format: { type: 'json_object' },
   });
 
