@@ -32,6 +32,9 @@ export const ERROR_CODES = {
   MANUSCRIPT_FORMAT_GENERIC: 'WL-3000',
   UNSUPPORTED_MANUSCRIPT_FORMAT: 'WL-3001',
   MANUSCRIPT_MISSING: 'WL-3002',
+  /** Refused: the submitted text is the stored sanitized working copy, so
+   *  accepting it would replace the canonical source with its own derivative. */
+  WORKING_COPY_NOT_A_SOURCE: 'WL-3003',
 
   UNCLASSIFIED: 'WL-9000',
 } as const;

@@ -41,6 +41,8 @@ import { preflightBook, stitchPdfs, type PreflightReport } from '../stage-7-pdf-
 import { assemblePagePrompt } from '../whole-page-render/assemble-page-prompt.js';
 import { PAGE_TYPOGRAPHY_DNA } from '../whole-page-render/typography-dna.js';
 import type { WholePageSpec } from '../whole-page-render/types.js';
+import { getDefaultEdition } from '../../db/repositories/editions.repo.js';
+import { getProductionProfile } from '../production-profiles/registry.js';
 import { assembleIllustrationDna } from '../publishing-standard/index.js';
 import { generateImage } from '../../services/openai/openai.js';
 import sharp from 'sharp';
@@ -560,7 +562,8 @@ export async function generateCoverWrapArtwork(
   if (pageCount === 0) throw new RenderBlockedError('No planned pages found; run pagination/front matter before generating the cover.', 'no_pages');
 
   const dims = computeCoverDimensions(config, pageCount);
-  const prompt = buildCoverWrapPrompt(config, pageCount, dims);
+  const edition = await getDefaultEdition(projectId).catch(() => null);
+  const prompt = buildCoverWrapPrompt(config, pageCount, dims, edition?.styleDnaId);
   const image = await generateImage({ prompt, size: '1536x1024', quality: 'high' });
 
   const storage = getProjectStorage();
@@ -599,6 +602,9 @@ export function buildCoverWrapPrompt(
   config: ProjectConfig,
   pageCount: number,
   dims: ReturnType<typeof computeCoverDimensions>,
+  /** Style DNA for this edition's cover. Omitted → the production profile's
+   *  default, which for the field guide is the Color profile (unchanged). */
+  styleDnaId?: string,
 ): string {
   const backCover = buildBackCoverCopy(config.publishing.bookDescription);
   const title = config.publishing.title ?? config.title;
@@ -647,7 +653,9 @@ export function buildCoverWrapPrompt(
       decorativeInitial: null,
     },
     illustrationDNA: {
-      masterStyleBlock: assembleIllustrationDna(),
+      masterStyleBlock: assembleIllustrationDna(
+        styleDnaId ?? getProductionProfile(config.productionProfileId).defaultStyleDnaId,
+      ),
       // Operator cover art-direction (when supplied) drives a specific, curated
       // wrap scene; otherwise fall back to a generic establishing scene evoked by
       // the title. Either way it stays ONE continuous full-bleed wrap with calm

@@ -26,6 +26,8 @@ import {
   type ProjectConfig,
 } from '@wildlands/shared';
 import { persistManifests, type PageSeed } from '../../db/repositories/manifests.repo.js';
+import { getProductionProfile } from '../production-profiles/registry.js';
+import type { BookProductionProfile, ClassificationInput } from '../production-profiles/types.js';
 import { extractBinomial } from '../subject-badges/extract-badges.js';
 import { logger } from '../../lib/logger.js';
 import { UserFacingError } from '../../lib/user-facing-error.js';
@@ -71,8 +73,33 @@ function stripMarkdown(value: string): string {
     .trim();
 }
 
-function signalText(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline): string {
-  return `${chapter.title}\n${entry.title}\n${entry.bodyMarkdown.slice(0, 1600)}`.toLowerCase();
+/**
+ * Build the narrow classification view of a chapter+entry. The classification
+ * functions below take THIS instead of the full outline objects so they can be
+ * lifted verbatim into the field-guide production profile
+ * (`pipeline/production-profiles/wildlands-field-guide.ts`) without dragging the
+ * parser's types along. Pure re-shaping — no behaviour change.
+ */
+export function toClassificationInput(
+  chapter: ManuscriptChapterOutline,
+  entry: ManuscriptEntryOutline,
+  region: string,
+  scientificName?: string,
+): ClassificationInput {
+  return {
+    chapterNumber: chapter.chapterNumber,
+    chapterTitle: chapter.title,
+    entryTitle: entry.title,
+    bodyMarkdown: entry.bodyMarkdown,
+    wordCount: entry.wordCount,
+    isChapterOpener: entry.isChapterOpener,
+    region,
+    scientificName,
+  };
+}
+
+function signalText(i: ClassificationInput): string {
+  return `${i.chapterTitle}\n${i.entryTitle}\n${i.bodyMarkdown.slice(0, 1600)}`.toLowerCase();
 }
 
 function cleanDisplayTitle(title: string): string {
@@ -101,14 +128,14 @@ function extractScientificName(entry: ManuscriptEntryOutline): string | undefine
 // fix: classify on title, not body.)
 const DANGER_TITLE_RE =
   /(deadly|toxic|poisonous|venomous|danger|hazard|lyme disease|tick-borne|tick borne|rabies|anaphylaxis|hypothermia|river crossing|extreme weather|spruce trap)/;
-function dangerTitleText(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline): string {
-  return `${chapter.title}\n${entry.title}`.toLowerCase();
+function dangerTitleText(i: ClassificationInput): string {
+  return `${i.chapterTitle}\n${i.entryTitle}`.toLowerCase();
 }
 
-function inferCategory(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline): string | undefined {
-  const text = signalText(chapter, entry);
+export function inferCategory(i: ClassificationInput): string | undefined {
+  const text = signalText(i);
 
-  if (DANGER_TITLE_RE.test(dangerTitleText(chapter, entry))) {
+  if (DANGER_TITLE_RE.test(dangerTitleText(i))) {
     return 'DANGER';
   }
   if (/\bedible\b/.test(text)) return 'EDIBLE';
@@ -118,25 +145,23 @@ function inferCategory(chapter: ManuscriptChapterOutline, entry: ManuscriptEntry
   return undefined;
 }
 
-function isDangerEntry(chapter: ManuscriptChapterOutline, entry: ManuscriptEntryOutline, category?: string): boolean {
+function isDangerEntry(i: ClassificationInput, category?: string): boolean {
   if (category === 'DANGER') return true;
-  return DANGER_TITLE_RE.test(dangerTitleText(chapter, entry));
+  return DANGER_TITLE_RE.test(dangerTitleText(i));
 }
 
-function inferContentType(
-  chapter: ManuscriptChapterOutline,
-  entry: ManuscriptEntryOutline,
-  category?: string,
-): ContentType {
-  if (entry.isChapterOpener) return 'CHAPTER_OPENER';
-  const text = signalText(chapter, entry);
+export function inferContentType(i: ClassificationInput, category?: string): ContentType {
+  const chapter = { chapterNumber: i.chapterNumber };
+  const entry = { title: i.entryTitle };
+  if (i.isChapterOpener) return 'CHAPTER_OPENER';
+  const text = signalText(i);
   const title = entry.title.toLowerCase();
 
   if (chapter.chapterNumber === 1 || chapter.chapterNumber === 6) {
     if (/(zone|wilderness zones|habitat|forest|wetland|boreal|alpine|hardwood)/.test(title)) return 'HABITAT_OVERVIEW';
     if (/(geography|geology|climate|season|first peoples|terrain|navigation|technology)/.test(title)) return 'TERRAIN_ANALYSIS';
   }
-  if (isDangerEntry(chapter, entry, category)) return 'WARNING_PAGE';
+  if (isDangerEntry(i, category)) return 'WARNING_PAGE';
   // REFERENCE is a dedicated reference SECTION (recognized by its TITLE), not any
   // entry that merely mentions these words. Matching the body mislabeled botanical
   // entries — e.g. a first-aid PLANT like yarrow or plantain became a reference
@@ -164,7 +189,7 @@ function inferContentType(
   return 'ENCYCLOPEDIA_ENTRY';
 }
 
-function chooseManifestTemplate(contentType: ContentType, wordCount: number): LayoutTemplateId {
+export function chooseManifestTemplate(contentType: ContentType, wordCount: number): LayoutTemplateId {
   switch (contentType) {
     case 'WARNING_PAGE':
     case 'COMPARISON':
@@ -294,12 +319,10 @@ function firstContextCue(text: string): string | undefined {
  * trusted as the subject directly; only literary/thematic titles fall through to
  * body/chapter derivation — which is exactly the "THE BONES OF THE LAND" case.
  */
-function deriveVisualSubject(
-  chapter: ManuscriptChapterOutline,
-  entry: ManuscriptEntryOutline,
-  contentType: ContentType,
-  scientificName?: string,
-): string {
+function deriveVisualSubject(i: ClassificationInput, contentType: ContentType): string {
+  const chapter = { title: i.chapterTitle };
+  const entry = { title: i.entryTitle, bodyMarkdown: i.bodyMarkdown };
+  const scientificName = i.scientificName;
   const title = cleanDisplayTitle(entry.title);
 
   // A scientific name or a species/plant content type means the title IS the subject.
@@ -348,17 +371,11 @@ function deriveVisualSubject(
   return 'the surrounding wilderness landscape';
 }
 
-function imageSubjectFor(
-  chapter: ManuscriptChapterOutline,
-  entry: ManuscriptEntryOutline,
-  contentType: ContentType,
-  region: string,
-  scientificName?: string,
-): string {
-  const subject = deriveVisualSubject(chapter, entry, contentType, scientificName);
+export function imageSubjectFor(i: ClassificationInput, contentType: ContentType): string {
+  const subject = deriveVisualSubject(i, contentType);
   // Region prefix is data-driven from the project (never a hardcoded region), so
   // every volume in the series localizes its own habitat/terrain subjects.
-  const regionPrefix = region ? `${region} ` : '';
+  const regionPrefix = i.region ? `${i.region} ` : '';
 
   switch (contentType) {
     case 'WARNING_PAGE':
@@ -384,17 +401,25 @@ function buildEntryManifest(
   chapter: ManuscriptChapterOutline,
   entry: ManuscriptEntryOutline,
   region: string,
+  profile: BookProductionProfile,
 ): GeneratedEntry {
-  const scientificName = extractScientificName(entry);
-  const category = inferCategory(chapter, entry);
-  const contentType = inferContentType(chapter, entry, category);
+  // Binomial extraction is field-guide furniture; profiles that don't stamp
+  // subject badges don't have scientific names to find.
+  const scientificName = profile.badgesEnabled ? extractScientificName(entry) : undefined;
+  const input = toClassificationInput(chapter, entry, region, scientificName);
+  const category = profile.classification.inferCategory(input);
+  const contentType = profile.classification.inferContentType(input, category);
+  // A profile with no automatic subject derivation (a budgeted book, where the
+  // handful of illustrations are chosen and art-directed by a human) returns
+  // null. Store the empty string rather than a guessed wilderness noun.
+  const imageSubject = profile.classification.deriveImageSubject(input, contentType) ?? '';
   return {
     entryTitle: entry.title,
     scientificName,
     category,
     contentType,
-    imageSubject: imageSubjectFor(chapter, entry, contentType, region, scientificName),
-    layoutTemplate: chooseManifestTemplate(contentType, entry.wordCount),
+    imageSubject,
+    layoutTemplate: profile.classification.chooseTemplate(contentType, entry.wordCount),
     bodyMarkdown: entry.bodyMarkdown,
   };
 }
@@ -407,6 +432,11 @@ function regionFromConfig(config: ProjectConfig): string {
 
 export function buildDeterministicManifestResult(outline: ManuscriptOutline, config: ProjectConfig): ManifestGenerationResult {
   const region = regionFromConfig(config);
+  // Book Production Profile — the domain decisions (classification, template
+  // choice, image-subject derivation) come from here, not from this module.
+  // Defaults to the field-guide profile, whose hooks are these same functions,
+  // so existing books are unaffected.
+  const profile = getProductionProfile(config.productionProfileId);
 
   // EMPTY_CHAPTER (WL-2003) guard. This used to fall out of the schema for
   // free: a chapter with no "### Entry" headings produced an empty `entries`
@@ -435,7 +465,7 @@ export function buildDeterministicManifestResult(outline: ManuscriptOutline, con
     chapters: outline.chapters.map((chapter) => ({
       chapterNumber: chapter.chapterNumber,
       chapterTitle: chapter.title,
-      entries: chapter.entries.map((entry) => buildEntryManifest(chapter, entry, region)),
+      entries: chapter.entries.map((entry) => buildEntryManifest(chapter, entry, region, profile)),
     })),
   };
 

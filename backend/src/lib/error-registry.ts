@@ -175,6 +175,19 @@ export const ERROR_REGISTRY: Record<string, ErrorRegistryEntry> = {
     severity: 'structural',
   },
 
+  [ERROR_CODES.WORKING_COPY_NOT_A_SOURCE]: {
+    code: ERROR_CODES.WORKING_COPY_NOT_A_SOURCE,
+    title: 'Working Copy Is Not A Source',
+    friendlyMessage:
+      'That is the stored working copy, not a source file. It is the sanitized derivative of your canonical manuscript, so uploading it would replace the canonical source with a derivative and record the wrong hash. Drop the original manuscript file instead.',
+    technicalCause:
+      "POST /api/projects/:id/manuscript: the submitted markdown hashes to the project's stored manuscript_sha256 (the sanitized working copy) while manuscript_sanitized is true, so the working copy provably differs from the canonical source. The console restores the working copy into the Manuscript textarea, so clicking Upload without dropping a file submits derived bytes.",
+    recovery:
+      'Drop the original manuscript file into the Manuscript step. The character count shown must match the real file, not the restored copy.',
+    step: 'manuscript',
+    severity: 'validation',
+  },
+
   [ERROR_CODES.UNCLASSIFIED]: {
     code: ERROR_CODES.UNCLASSIFIED,
     title: 'Unclassified Validation Error',

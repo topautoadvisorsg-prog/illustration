@@ -160,8 +160,33 @@ export const projects = pgTable('projects', {
   subtitle: text('subtitle'),
   authorName: text('author_name').notNull(),
   config: jsonb('config').notNull(),
+  /**
+   * The DERIVED WORKING manuscript — sanitized/normalized at ingest. This is
+   * what breakdown, pagination, prompts, and renders read. Unchanged semantics:
+   * every downstream consumer already points here.
+   */
   manuscriptPath: text('manuscript_path'),
   manuscriptSha256: text('manuscript_sha256'),
+  /**
+   * The CANONICAL SOURCE artifact — the operator's uploaded bytes, stored
+   * verbatim and never rewritten. Its hash is the one an author freezes and
+   * quotes; production must be verifiable against it.
+   *
+   * Kept SEPARATE from the working manuscript on purpose. Sanitization (emoji
+   * stripping, mojibake repair, whitespace tidy) is legitimate production
+   * normalization, but it must produce a DERIVATIVE — it must never silently
+   * replace the artifact the author froze. `manuscriptPath` is the derivative;
+   * these two columns are its provenance.
+   *
+   * Nullable: projects uploaded before this existed have no canonical copy
+   * retained, and that must be visible rather than faked.
+   */
+  canonicalManuscriptPath: text('canonical_manuscript_path'),
+  canonicalManuscriptSha256: text('canonical_manuscript_sha256'),
+  /** True when the derived working manuscript is byte-identical to the source
+   *  (i.e. sanitization changed nothing). Lets the UI say "verbatim" without
+   *  re-reading both files. */
+  manuscriptSanitized: boolean('manuscript_sanitized'),
   status: projectStatusEnum('status').default('DRAFT').notNull(),
   ...timestamps,
 });

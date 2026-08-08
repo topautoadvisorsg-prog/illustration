@@ -51,6 +51,9 @@ const S = {
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 12, marginTop: 14 },
 };
 
+const EMPTY_SETUP_FORM = { title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10", backBlurb: "", backFeatures: "", backAuthorBio: "" };
+const EMPTY_NEW_FORM = { title: "", subtitle: "", author: "" };
+
 const STEPS = [
   { key: "project", label: "1 · Project", purpose: "Create or open a book project." },
   { key: "manuscript", label: "2 · Manuscript", purpose: "Upload the master manuscript." },
@@ -210,13 +213,48 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
   const [projects, setProjects] = useState([]);
   const [project, setProject] = useState(null); // active project object
-  const [form, setForm] = useState({ title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10", backBlurb: "", backFeatures: "", backAuthorBio: "" });
+  // Step 3 · Book Setup form — mirrors the OPEN project's saved config.
+  const [form, setForm] = useState(EMPTY_SETUP_FORM);
+  // Step 1 · Create-new form — deliberately SEPARATE state. When these shared a
+  // single `form`, opening a book auto-filled "Create new" with that book's
+  // title/author (see the config-sync effect below), so the only visible way to
+  // start a fresh book looked like a pre-filled duplicate of the current one.
+  const [newForm, setNewForm] = useState(EMPTY_NEW_FORM);
   const [manuscript, setManuscript] = useState("");
   const [manuscriptName, setManuscriptName] = useState("");
+  /**
+   * WHERE the textarea's current content came from. This is a provenance
+   * control, not a UI nicety.
+   *
+   *   "empty"    — nothing loaded.
+   *   "file"     — the operator dropped/selected a local source file THIS
+   *                session. Genuine source bytes. Eligible to become canonical.
+   *   "typed"    — the operator typed or pasted into an empty box. Also genuine
+   *                source bytes they supplied. Eligible.
+   *   "restored" — the PLATFORM loaded the stored SANITIZED WORKING COPY. These
+   *                are derivative bytes. NOT eligible to become canonical, and
+   *                sticky: editing restored text keeps it derivative, because
+   *                the emoji/mojibake the sanitizer already removed cannot be
+   *                recovered by editing what is left.
+   */
+  const [manuscriptOrigin, setManuscriptOrigin] = useState("empty");
+  /** Only a real source file (or fresh paste) may replace the canonical artifact. */
+  const canUploadCanonical = manuscriptOrigin === "file" || manuscriptOrigin === "typed";
 
   const [breakdown, setBreakdown] = useState(null);
   const [pagination, setPagination] = useState(null);
   const [pages, setPages] = useState(null); // paginated page rows (zones + text)
+  // Review ROUTING — who reviews each page. Held in its own state, and painted
+  // in its own colour channel (blue), so it can never be read as an approval
+  // verdict. GREEN/YELLOW/RED continue to mean approved / needs review / flagged.
+  const [routing, setRouting] = useState(null);
+  const [routeFilter, setRouteFilter] = useState("ALL");
+  // Forensic review workflow: routing + verdict are separate dimensions and are
+  // held separately here so the UI can never collapse them into one colour.
+  const [board, setBoard] = useState(null);
+  const [picked, setPicked] = useState([]);
+  const [promptCopied, setPromptCopied] = useState(false);
+  const [exportNote, setExportNote] = useState(null);
   const [zoom, setZoom] = useState(null); // page being enlarged in the preview
   const [matter, setMatter] = useState(null);
   const [renders, setRenders] = useState(null); // { total, byStatus, bookReady, renders:[] }
@@ -434,14 +472,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
   // the active project changes — without this, navigating back after a
   // successful upload (e.g. because Breakdown failed) shows an empty textarea
   // and looks like the uploaded text was lost.
+  //
+  // PROVENANCE: what comes back here is the SANITIZED WORKING COPY, not the
+  // operator's source bytes. Restored text is therefore marked `restored` and is
+  // NOT eligible to become a new canonical source — re-uploading it would
+  // launder a derivative into the canonical slot and make the provenance panel
+  // confidently display the wrong frozen hash. See manuscriptOrigin.
   useEffect(() => {
-    if (!project?.id) { setManuscript(""); setManuscriptName(""); return undefined; }
+    if (!project?.id) { setManuscript(""); setManuscriptName(""); setManuscriptOrigin("empty"); return undefined; }
     let cancelled = false;
     api(`/api/projects/${project.id}/manuscript`).then((d) => {
       if (cancelled || !d) return;
       setManuscript(d.manuscript || "");
       setManuscriptName((d.relativePath || "").split("/").pop() || "");
-    }).catch(() => { if (!cancelled) { setManuscript(""); setManuscriptName(""); } });
+      setManuscriptOrigin(d.manuscript ? "restored" : "empty");
+    }).catch(() => { if (!cancelled) { setManuscript(""); setManuscriptName(""); setManuscriptOrigin("empty"); } });
     return () => { cancelled = true; };
   }, [project?.id, api]);
 
@@ -451,32 +496,36 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return { widthIn: 7, heightIn: 10, bleedIn: 0.125 };
   }
 
-  function cleanConfig() {
+  // `src` defaults to the Step 3 Setup form. Step 1's Create-new passes its own
+  // (title/subtitle/author only) so a brand-new book never inherits the values
+  // of whichever project happens to be open.
+  function cleanConfig(src) {
+    const f = src || form;
     // Minimal, clean config — the whole-page pipeline takes its visual DNA from
     // the locked Publishing Standard, so NO legacy style/palette blob is sent.
     // All book identity (title/subtitle/cover description/author/series/volume)
     // is data, set per book — nothing book- or series-specific is hardcoded.
-    const vol = Math.max(1, parseInt(form.volume, 10) || 1);
-    const series = (form.series || "").trim();
-    const coverDescription = (form.coverDescription || "").trim();
+    const vol = Math.max(1, parseInt(f.volume, 10) || 1);
+    const series = (f.series || "").trim();
+    const coverDescription = (f.coverDescription || "").trim();
     // Back cover — three distinct pieces (data-driven, optional). Features is a
     // newline-per-item textarea → array. Omit the whole block when all empty.
-    const blurb = (form.backBlurb || "").trim();
-    const features = (form.backFeatures || "").split("\n").map((f) => f.trim()).filter(Boolean);
-    const authorBio = (form.backAuthorBio || "").trim();
+    const blurb = (f.backBlurb || "").trim();
+    const features = (f.backFeatures || "").split("\n").map((x) => x.trim()).filter(Boolean);
+    const authorBio = (f.backAuthorBio || "").trim();
     const bookDescription = blurb || features.length || authorBio
       ? { blurb: blurb || undefined, features: features.length ? features : undefined, authorBio: authorBio || undefined }
       : undefined;
     return {
       volume: vol,
-      title: form.title,
-      subtitle: form.subtitle,
-      authorName: form.author,
-      trimSize: trimSize(form.trim),
+      title: f.title,
+      subtitle: f.subtitle,
+      authorName: f.author,
+      trimSize: trimSize(f.trim),
       publishing: {
-        title: form.title,
-        subtitle: form.subtitle,
-        authors: form.author.split(",").map((a) => a.trim()).filter(Boolean),
+        title: f.title,
+        subtitle: f.subtitle,
+        authors: f.author.split(",").map((a) => a.trim()).filter(Boolean),
         coverDescription: coverDescription || undefined,
         series: series ? { name: series, volumeNumber: vol } : undefined,
         bookDescription,
@@ -492,18 +541,33 @@ export default function ProductionConsole({ onExitToLegacy }) {
     // common mistake instead of waiting on a network error to say the same
     // thing. See docs/ERROR_HANDLING_STANDARD.md.
     const fieldErrors = [];
-    if (!form.title.trim()) fieldErrors.push({ path: "title", label: "Title", message: "Title is required.", errorCode: "WL-1001" });
-    if (!form.author.trim()) fieldErrors.push({ path: "authorName", label: "Author / pen name", message: "Author / pen name is required.", errorCode: "WL-1002" });
+    if (!newForm.title.trim()) fieldErrors.push({ path: "title", label: "Title", message: "Title is required.", errorCode: "WL-1001" });
+    if (!newForm.author.trim()) fieldErrors.push({ path: "authorName", label: "Author / pen name", message: "Author / pen name is required.", errorCode: "WL-1002" });
     if (fieldErrors.length > 0) {
       const err = new Error(fieldErrors.length === 1 ? fieldErrors[0].message : "Please fix the highlighted fields.");
       err.fields = fieldErrors;
       err.errorCode = fieldErrors.length === 1 ? fieldErrors[0].errorCode : "WL-1000";
       throw err;
     }
-    const d = await api("/api/projects", { method: "POST", body: JSON.stringify({ config: cleanConfig() }) });
+    const d = await api("/api/projects", { method: "POST", body: JSON.stringify({ config: cleanConfig({ ...newForm, trim: "7x10", volume: 1 }) }) });
     setProject(d.project); setProjects((c) => [d.project, ...c.filter((p) => p.id !== d.project.id)]);
+    setNewForm(EMPTY_NEW_FORM);
     return { notice: `Created “${d.project.title}”.` };
   });
+
+  // Close the open book without deleting anything: clears the active project,
+  // the Setup form and the manuscript buffer, drops the saved place so a reload
+  // doesn't silently re-open it, and returns to Step 1.
+  const closeProject = () => {
+    setProject(null);
+    setForm(EMPTY_SETUP_FORM);
+    setManuscript(""); setManuscriptName("");
+    setBreakdown(null); setPagination(null); setPages(null);
+    setErrorState(EMPTY_ERROR_STATE);
+    localStorage.removeItem("wl_last_place");
+    setStep("project");
+    setNotice("Project closed. Create a new book or open another below.");
+  };
 
   const deleteProject = (p) => run("Deleting project", async () => {
     await api(`/api/projects/${p.id}`, { method: "DELETE" });
@@ -512,9 +576,31 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return { notice: `Deleted “${p.title}”.` };
   });
 
+  // Optional publishing fields this form OWNS. The API now merges rather than
+  // replaces (so a save can never delete config the form doesn't render), which
+  // means clearing a field has to be said out loud: if the operator blanks one
+  // of these, send an explicit unset for it. Anything NOT in this list is not
+  // this form's to delete.
+  const setupOwnedOptionalPaths = () => {
+    const paths = [];
+    if (!(form.coverDescription || "").trim()) paths.push("publishing.coverDescription");
+    if (!(form.series || "").trim()) paths.push("publishing.series");
+    if (
+      !(form.backBlurb || "").trim() &&
+      !(form.backFeatures || "").trim() &&
+      !(form.backAuthorBio || "").trim()
+    ) {
+      paths.push("publishing.bookDescription");
+    }
+    return paths;
+  };
+
   const saveSetup = () => run("Saving setup", async () => {
     if (!project) throw new Error("Open a project first.");
-    const d = await api(`/api/projects/${project.id}/config`, { method: "PATCH", body: JSON.stringify({ config: cleanConfig() }) });
+    const d = await api(`/api/projects/${project.id}/config`, {
+      method: "PATCH",
+      body: JSON.stringify({ config: cleanConfig(), unset: setupOwnedOptionalPaths() }),
+    });
     setProject(d.project);
     return { notice: "Book setup saved." };
   });
@@ -522,7 +608,18 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const upload = () => run("Uploading manuscript", async () => {
     if (!project) throw new Error("Open a project first.");
     if (!manuscript.trim()) throw new Error("Paste or drop your manuscript text first.");
+    // Provenance gate. The button is already disabled in this state; this is the
+    // second line of defence so the check cannot be lost to a UI regression.
+    // (The backend enforces the same invariant independently — see the upload
+    // route's WORKING_COPY_NOT_A_SOURCE guard.)
+    if (!canUploadCanonical) {
+      throw new Error(
+        "This is the stored working copy the platform restored, not a source file. Drop the original manuscript file to replace the canonical source.",
+      );
+    }
     const d = await api(`/api/projects/${project.id}/manuscript`, { method: "POST", body: JSON.stringify({ filename: manuscriptName || "manuscript.md", markdown: manuscript }) });
+    // Keep the project row fresh so the provenance panel below reflects THIS upload.
+    setProject((p) => (p ? { ...p, ...d.project } : d.project));
     return { notice: `Manuscript stored: ${d.manuscript?.totalChapters ?? "?"} chapters, ${d.manuscript?.totalEntries ?? "?"} entries.` };
   });
 
@@ -829,6 +926,17 @@ export default function ProductionConsole({ onExitToLegacy }) {
         <div style={isMobile ? { marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.line}`, fontSize: 11.5, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } : { marginTop: 22, paddingTop: 14, borderTop: `1px solid ${C.line}`, fontSize: 12, color: C.muted }}>
           {project ? <>Active: <b style={{ color: C.ink }}>{project.title}</b></> : "No project open"}
         </div>
+        {/* Without this, an open book had no visible exit — the only way back to
+            a clean Step 1 was clearing browser storage. Closing never deletes. */}
+        {project && (
+          <button
+            title="Close this book and go back to Step 1 (nothing is deleted)"
+            style={{ ...S.ghost, marginTop: 8, fontSize: 11.5, width: isMobile ? "auto" : "100%", textAlign: "left" }}
+            onClick={closeProject}
+          >
+            ✕ Close project
+          </button>
+        )}
         {onExitToLegacy && (
           <button style={{ ...S.ghost, marginTop: 14, fontSize: 11 }} onClick={onExitToLegacy}>Legacy tools ↗</button>
         )}
@@ -900,15 +1008,20 @@ export default function ProductionConsole({ onExitToLegacy }) {
             </div>
             <div style={S.card}>
               <b>Create new</b>
-              <LabeledInput label="Book title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} error={fieldError(errorState.fields, "title")} />
+              {/* Bound to `newForm`, NOT the Setup form — a new book starts blank
+                  even when another project is open. */}
+              <LabeledInput label="Book title" value={newForm.title} onChange={(v) => setNewForm({ ...newForm, title: v })} error={fieldError(errorState.fields, "title")} />
               {/* Progressive validation: flagged the instant it matches, not after Create is clicked — duplicate
                   titles are still allowed (see the disambiguating subtitle/author/date above), this is just a heads-up. */}
-              {form.title.trim() && projects.some((p) => p.title.trim().toLowerCase() === form.title.trim().toLowerCase()) && (
-                <div style={{ color: C.orange, fontSize: 12, marginTop: 4 }}>A project named "{form.title.trim()}" already exists. You can still create another — just double-check this isn't an accidental duplicate.</div>
+              {newForm.title.trim() && projects.some((p) => p.title.trim().toLowerCase() === newForm.title.trim().toLowerCase()) && (
+                <div style={{ color: C.orange, fontSize: 12, marginTop: 4 }}>A project named "{newForm.title.trim()}" already exists. You can still create another — just double-check this isn't an accidental duplicate.</div>
               )}
-              <LabeledInput label="Subtitle" value={form.subtitle} onChange={(v) => setForm({ ...form, subtitle: v })} error={fieldError(errorState.fields, "subtitle")} />
-              <LabeledInput label="Author / pen name" value={form.author} onChange={(v) => setForm({ ...form, author: v })} error={fieldError(errorState.fields, "authorName")} />
+              <LabeledInput label="Subtitle" value={newForm.subtitle} onChange={(v) => setNewForm({ ...newForm, subtitle: v })} error={fieldError(errorState.fields, "subtitle")} />
+              <LabeledInput label="Author / pen name" value={newForm.author} onChange={(v) => setNewForm({ ...newForm, author: v })} error={fieldError(errorState.fields, "authorName")} />
               <button style={S.btn()} onClick={() => createProject().then(() => setStep("manuscript")).catch(() => {})}>Create project →</button>
+              <div style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
+                Creating a new book closes the one that's open. Nothing is deleted — reopen it any time from the list above.
+              </div>
             </div>
           </Panel>
         )}
@@ -935,9 +1048,41 @@ export default function ProductionConsole({ onExitToLegacy }) {
                   <button style={S.ghost} onClick={() => downloadTextFile("manuscript-template.md", MANUSCRIPT_TEMPLATE)}>⭳ Download template (.md)</button>
                 </div>
                 <div style={S.card}>
-                  <DropZone onText={(t, n) => { setManuscript(t); setManuscriptName(n); }} />
-                  <textarea style={{ ...S.input, minHeight: 200, fontFamily: "monospace", fontSize: 12 }} value={manuscript} placeholder="# Chapter 1 …" onChange={(e) => setManuscript(e.target.value)} />
-                  <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{manuscript.length.toLocaleString()} chars{manuscriptName ? ` · ${manuscriptName}` : ""}</div>
+                  <DropZone onText={(t, n) => { setManuscript(t); setManuscriptName(n); setManuscriptOrigin("file"); }} />
+                  <textarea
+                    style={{ ...S.input, minHeight: 200, fontFamily: "monospace", fontSize: 12 }}
+                    value={manuscript}
+                    placeholder="# Chapter 1 …"
+                    onChange={(e) => {
+                      setManuscript(e.target.value);
+                      // Typing into an EMPTY box is the operator supplying genuine
+                      // source bytes. Editing RESTORED text is not: the sanitizer
+                      // already removed characters that editing cannot bring back,
+                      // so it stays derivative. Editing a dropped FILE also stays
+                      // "file" — those bytes originated from a real source.
+                      setManuscriptOrigin((o) => (o === "empty" ? "typed" : o));
+                    }}
+                  />
+                  <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>
+                    {manuscript.length.toLocaleString()} chars{manuscriptName ? ` · ${manuscriptName}` : ""}
+                    {manuscriptOrigin === "file" && <span style={{ ...S.pill(C.green), marginLeft: 8 }}>SOURCE FILE</span>}
+                    {manuscriptOrigin === "typed" && <span style={{ ...S.pill(C.green), marginLeft: 8 }}>TYPED / PASTED</span>}
+                    {manuscriptOrigin === "restored" && <span style={{ ...S.pill(C.muted), marginLeft: 8 }}>RESTORED WORKING COPY</span>}
+                  </div>
+                  {manuscriptOrigin === "restored" && (
+                    <div style={{ ...S.card, borderColor: C.orange, marginTop: 10 }}>
+                      <b>This is the stored working copy, not a source file.</b>
+                      <div style={{ fontSize: 12.5, color: C.ink, marginTop: 6, lineHeight: 1.5 }}>
+                        The platform loaded the <b>sanitized working manuscript</b> so you can read and
+                        check it. These are derived bytes — the canonical source may contain characters
+                        (emoji, original punctuation) that were stripped to produce this copy.
+                        <br /><br />
+                        Uploading it would record a derivative as your canonical artifact and show the
+                        wrong frozen hash, so it is blocked. <b>Drop the original manuscript file above</b>
+                        {" "}to replace the canonical source.
+                      </div>
+                    </div>
+                  )}
                   {/* Progressive validation (docs/ERROR_HANDLING_STANDARD.md): a coarse,
                       client-side echo of assertUsableManuscriptOutline's rule, shown as
                       they type — not a hard block, since a partial paste mid-edit
@@ -945,8 +1090,16 @@ export default function ProductionConsole({ onExitToLegacy }) {
                   {manuscriptStructureHint(manuscript) && (
                     <div style={{ color: C.orange, fontSize: 12, marginTop: 4 }}>⚠ {manuscriptStructureHint(manuscript)}</div>
                   )}
-                  <button style={S.btn()} onClick={() => upload().then(() => setStep("setup")).catch(() => {})}>Upload manuscript →</button>
+                  <button
+                    style={{ ...S.btn(), ...(canUploadCanonical ? {} : { background: C.muted, cursor: "not-allowed" }) }}
+                    disabled={!canUploadCanonical}
+                    title={canUploadCanonical ? "Store this as the canonical source manuscript" : "Drop a source file first — the restored working copy cannot become the canonical source."}
+                    onClick={() => upload().then(() => setStep("setup")).catch(() => {})}
+                  >
+                    Upload manuscript →
+                  </button>
                 </div>
+                <ManuscriptProvenance project={project} />
               </>
             )}
           </Panel>
@@ -1497,6 +1650,61 @@ function Panel({ title, sub, children }) {
 function Guard({ project, setStep }) {
   if (project) return null;
   return <div style={{ ...S.card, borderColor: C.orange }}>Open or create a project first. <button style={S.ghost} onClick={() => setStep("project")}>Go to Project</button></div>;
+}
+
+/**
+ * Manuscript provenance. Shows the CANONICAL SOURCE hash — the operator's exact
+ * uploaded bytes — so a frozen manuscript can be checked against the author's
+ * own record BEFORE any production spend.
+ *
+ * The working manuscript is a sanitized derivative and has its own, different
+ * hash. Showing only that (the old behaviour) made a frozen hash look wrong.
+ * Both are shown, clearly labelled, whenever they differ.
+ */
+function ManuscriptProvenance({ project }) {
+  const canonical = project?.canonicalManuscriptSha256;
+  const working = project?.manuscriptSha256;
+  if (!canonical && !working) return null;
+
+  const mono = { fontFamily: "monospace", fontSize: 11, wordBreak: "break-all", color: C.ink };
+  const row = (label, value, note) => (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
+      <div style={mono}>{value || "—"}</div>
+      {note && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>{note}</div>}
+    </div>
+  );
+
+  return (
+    <div style={S.card}>
+      <b>Manuscript provenance</b>
+      {canonical ? (
+        <>
+          {row("Canonical source · SHA-256", canonical, "The exact bytes you uploaded. Retained unchanged — check this against your frozen hash.")}
+          {project.manuscriptSanitized
+            ? row(
+                "Working copy · SHA-256",
+                working,
+                "Production reads this sanitized derivative (emoji/ICON markers stripped, mojibake repaired, trailing spaces trimmed). A different hash here is expected and does not mean the source changed.",
+              )
+            : (
+              <div style={{ marginTop: 8, fontSize: 12.5, color: C.green }}>
+                ✓ Sanitization changed nothing — production reads the canonical bytes verbatim.
+              </div>
+            )}
+        </>
+      ) : (
+        <>
+          {row("Working copy · SHA-256", working)}
+          <div style={{ color: C.orange, fontSize: 12, marginTop: 8 }}>
+            ⚠ No canonical source retained for this upload. It predates canonical-source
+            retention, so the hash above is the sanitized working copy, not your uploaded
+            bytes. Re-upload the manuscript to record a verifiable canonical hash.
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 function Stat({ label, value }) {
   return (

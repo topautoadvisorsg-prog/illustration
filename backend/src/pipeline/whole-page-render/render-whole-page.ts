@@ -26,6 +26,8 @@ import {
   markRendering,
   type WholePageRenderRow,
 } from '../../db/repositories/whole-page-render.repo.js';
+import { getDefaultEdition } from '../../db/repositories/editions.repo.js';
+import { getProductionProfile } from '../production-profiles/registry.js';
 import { WILDLANDS_STANDARD, resolveGeometry } from '../publishing-standard/index.js';
 import { directLayout, type LayoutAllocation } from '../stage-6-layout/layout-director.js';
 import { computePageGeometry } from '../stage-6-layout/page-geometry.js';
@@ -149,6 +151,17 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
   else if (pageRow.pageKey === entryKey && (meta as { textPlacement?: string })?.textPlacement)
     allocation.textPlacement = (meta as { textPlacement?: string }).textPlacement!;
 
+  // EDITION → STYLE DNA. Until now `buildPageSpec` accepted `styleDnaId` but
+  // nothing ever passed it, so every render silently used the Color default and
+  // the whole edition layer was inert. Resolve the project's default edition and
+  // pass its Style DNA through. Falls back to the production profile's default
+  // when the project has no edition row (every project predating the backfill),
+  // which for the field guide is the same Color profile as before — so existing
+  // books render byte-identically.
+  const profile = getProductionProfile(config.productionProfileId);
+  const edition = await getDefaultEdition(pageRow.projectId).catch(() => null);
+  const styleDnaId = edition?.styleDnaId ?? profile.defaultStyleDnaId;
+
   const spec = buildPageSpec({
     pageRow,
     config,
@@ -158,6 +171,7 @@ export async function prepareRender(pageId: string): Promise<PreparedRender> {
     imageSubject,
     badgeContext,
     pageRolePolicy,
+    styleDnaId,
   });
   const assembledPrompt = assemblePagePrompt(spec);
   const size = pickSize(geometry.trimWidthIn, geometry.trimHeightIn);

@@ -228,6 +228,11 @@ export const TrimSizeSchema = z.object({
 export const PublishingFormatSchema = z.enum([
   'KINDLE_DIGITAL',
   'PAPERBACK_6X9',
+  // Digest 5.5x8.5 — the standard middle-grade / young-teen trim. Regular trim
+  // (full KDP royalty). Selected as the working trim for text-first B&W
+  // nonfiction; see CHAPTER_BOOK_STANDARD.md. NOT a global default: the
+  // Wildlands field guides stay on HARDCOVER_7X10.
+  'PAPERBACK_DIGEST_5_5X8_5',
   'HARDCOVER_7X10',
   'LARGE_FORMAT_HARDCOVER_8_5X11',
   'CUSTOM',
@@ -279,6 +284,22 @@ export const PUBLISHING_STANDARD_PRESETS = {
       ebookEdition: 'KINDLE_EPUB',
       renderEngine: 'PUPPETEER_PAGEDJS',
       pdfTarget: 'KDP premium color hardcover 8.5 x 11',
+    },
+  },
+  PAPERBACK_DIGEST_5_5X8_5: {
+    format: 'PAPERBACK_DIGEST_5_5X8_5',
+    label: 'Paperback Digest 5.5 x 8.5',
+    typographyPackage: 'Text-First Digest',
+    // Bleed 0: illustrations sit INSIDE the margins with white around them, so
+    // nothing runs to the trim. If any illustration ever bleeds, the whole file
+    // needs 0.125 bleed (CHAPTER_BOOK_STANDARD.md §1).
+    trimSize: { widthIn: 5.5, heightIn: 8.5, bleedIn: 0 },
+    typography: { bodyPt: 12, lineHeight: 1.3 },
+    outputProfile: {
+      printEdition: 'PREMIUM',
+      ebookEdition: 'KINDLE_EPUB',
+      renderEngine: 'PUPPETEER_PAGEDJS',
+      pdfTarget: 'KDP black & white paperback 5.5 x 8.5 (digest)',
     },
   },
   KINDLE_DIGITAL: {
@@ -648,6 +669,22 @@ export function backCoverLines(bd?: BookDescription | null): string[] {
 export const ProjectConfigSchema = z.object({
   brand: BrandSchema.default('THE_WILDLANDS'),
   audience: AudienceSchema.default('ADULT'),
+  /**
+   * BOOK PRODUCTION PROFILE — the single switch that says "what kind of book is
+   * this?". Resolved through the production-profile registry
+   * (`pipeline/production-profiles/registry.ts`), exactly like `styleDnaId` is
+   * resolved through the Style DNA registry.
+   *
+   * Lives in the config JSONB deliberately. `brand` and `audience` are Postgres
+   * ENUM columns (`brandEnum`, `audienceEnum`), so widening either one needs an
+   * `ALTER TYPE` migration; the profile id needs none, and it is the real
+   * switch. Widening brand/audience stays available later if we ever want to
+   * query by them.
+   *
+   * Defaults to the field-guide profile so every existing project parses and
+   * behaves byte-identically.
+   */
+  productionProfileId: z.string().min(1).default('wildlands-field-guide'),
   editions: z.array(EditionSchema).default(['PREMIUM', 'KINDLE_EPUB']),
   volume: z.number().int().positive(),
   title: z.string().min(1),
@@ -693,6 +730,14 @@ export const ProjectSchema = z.object({
   authorName: z.string().nullable(),
   status: ProjectStatusSchema,
   manuscriptPath: z.string().nullable(),
+  /** Hash of the DERIVED WORKING manuscript — what production reads. */
+  manuscriptSha256: z.string().nullable().optional(),
+  /** Hash of the CANONICAL SOURCE artifact — the operator's uploaded bytes.
+   *  This is the value an author freezes and quotes. Null on projects ingested
+   *  before canonical retention existed. */
+  canonicalManuscriptSha256: z.string().nullable().optional(),
+  /** True when sanitization changed something, so working != source. */
+  manuscriptSanitized: z.boolean().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { createHash } from 'node:crypto';
 import { isNativeError } from 'node:util/types';
 import {
   ApiErrorSchema,
@@ -34,6 +35,7 @@ import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-mani
 import { UserFacingError } from '../lib/user-facing-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { timeOperation } from '../lib/timing.js';
+import { applyConfigPatch } from '../lib/merge-config.js';
 import { planPage, validateLayoutLibrary } from '../pipeline/stage-2-planner/plan-pages.js';
 import { previewProjectTextFit } from '../pipeline/stage-6-layout/text-fit-preview.js';
 import { previewProjectPagination } from '../pipeline/stage-6-layout/pagination-preview.js';
@@ -216,6 +218,13 @@ function toContract(row: ProjectRow) {
     authorName: row.authorName,
     status: row.status,
     manuscriptPath: row.manuscriptPath,
+    // Manuscript provenance. Surfaced so the operator can verify that production
+    // is based on the frozen source BEFORE any spend — the whole point of
+    // retaining the canonical artifact. Null on projects ingested before
+    // canonical retention existed; the UI must say so rather than imply verified.
+    manuscriptSha256: row.manuscriptSha256,
+    canonicalManuscriptSha256: row.canonicalManuscriptSha256,
+    manuscriptSanitized: row.manuscriptSanitized,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -224,7 +233,21 @@ function toContract(row: ProjectRow) {
 const ProjectListResponseSchema = z.object({ projects: z.array(ProjectSchema) });
 const CreatedProjectResponseSchema = z.object({ project: ProjectSchema });
 const ProjectConfigResponseSchema = z.object({ config: ProjectConfigSchema });
-const UpdateProjectConfigBodySchema = z.object({ config: ProjectConfigSchema });
+/**
+ * PATCH body. `config` is deliberately a LOOSE object, not `ProjectConfigSchema`:
+ * parsing a partial payload through the full schema would materialise every
+ * `.default()` (layoutPolicy, colorPalette, imageGeneration, …) and those
+ * defaults would then merge OVER the project's real stored values. The merged
+ * RESULT is validated with `ProjectConfigSchema` in the handler instead, which
+ * is the only place a complete config actually exists.
+ *
+ * `unset` deletes by dot-path (`publishing.series`). Deleting production
+ * metadata must be requested by name — never achieved by omitting a field.
+ */
+const UpdateProjectConfigBodySchema = z.object({
+  config: z.record(z.unknown()),
+  unset: z.array(z.string().min(1)).max(64).optional(),
+});
 
 function layoutCompatibilityLabels(layoutTemplate: string | null, contentType?: string): string[] {
   const labels = new Set<string>();
@@ -256,6 +279,7 @@ const UploadManuscriptBodySchema = z
   });
 const UploadManuscriptResponseSchema = z.object({
   project: ProjectSchema,
+  /** The DERIVED WORKING manuscript — sanitized; what production reads. */
   manuscript: z.object({
     relativePath: z.string(),
     sha256: z.string(),
@@ -264,6 +288,18 @@ const UploadManuscriptResponseSchema = z.object({
     totalEntries: z.number(),
     totalWords: z.number(),
     warnings: z.array(z.string()),
+  }),
+  /**
+   * The CANONICAL SOURCE artifact — exact uploaded bytes, retained unchanged.
+   * `sha256` here is the hash an author freezes; the operator must be able to
+   * check it against their own record before any production spend.
+   */
+  canonicalSource: z.object({
+    relativePath: z.string(),
+    sha256: z.string(),
+    sizeBytes: z.number(),
+    /** True when the working copy differs, i.e. sanitization changed something. */
+    sanitized: z.boolean(),
   }),
 });
 
@@ -1075,13 +1111,29 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       const existing = await getProject(id);
       if (!existing) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
       const existingConfig = parseProjectConfig(existing);
-      const row = await updateProjectConfig(id, {
-        ...body.config,
+
+      // MERGE, never replace. A partial payload (which is what the Book Setup
+      // form sends — it renders a strict subset of the config) must not delete
+      // the keys it does not carry. See lib/merge-config.ts for the defect this
+      // fixes. Clearing a value is explicit, via `unset` dot-paths.
+      const merged = applyConfigPatch(
+        existingConfig as unknown as Record<string, unknown>,
+        body.config as unknown as Record<string, unknown>,
+        body.unset ?? [],
+      );
+
+      // Re-validate the MERGED result: merging can only ever produce a config
+      // the schema has not seen, so parse before persisting rather than trusting
+      // that two valid halves compose into a valid whole.
+      const nextConfig = ProjectConfigSchema.parse({
+        ...merged,
         layoutApprovals: existingConfig.layoutApprovals ?? {},
         // Preserve the plan snapshot so changing the standard/trim correctly
         // shows the plan as STALE (Priority #1) instead of silently matching.
         planMeta: existingConfig.planMeta,
       });
+
+      const row = await updateProjectConfig(id, nextConfig);
       if (!row) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
       return { project: toContract(row) };
     },
@@ -1103,10 +1155,47 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       const existing = await getProject(id);
       if (!existing) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
 
+      // ── CANONICAL PROVENANCE GUARD (server-side, cannot be bypassed) ──
+      // The console restores the SANITIZED WORKING COPY into the Manuscript
+      // textarea so the operator can read it. Re-uploading that text would
+      // record a derivative as the canonical artifact and make the provenance
+      // panel display the wrong frozen hash.
+      //
+      // The invariant: refuse when the submitted bytes are exactly the stored
+      // working copy AND that working copy is known to differ from the canonical
+      // source. Both conditions matter — if sanitization was a no-op the working
+      // copy IS the canonical bytes, so submitting them is indistinguishable
+      // from submitting the real file and cannot launder anything.
+      // NOTE the shape of the exemption. We refuse whenever the submitted bytes
+      // are the stored working copy, and only step aside when we can PROVE the
+      // working copy is itself the canonical source (identical hashes). Keying
+      // off the `manuscriptSanitized` flag instead was wrong: it is NULL on
+      // every project ingested before canonical retention existed, so the guard
+      // silently did nothing for exactly the rows most at risk.
+      if (existing.manuscriptSha256 && body.markdown) {
+        const submittedSha = createHash('sha256').update(body.markdown, 'utf8').digest('hex');
+        const workingIsProvablyCanonical =
+          existing.canonicalManuscriptSha256 !== null &&
+          existing.canonicalManuscriptSha256 === existing.manuscriptSha256;
+        if (submittedSha === existing.manuscriptSha256 && !workingIsProvablyCanonical) {
+          throw new UserFacingError(
+            'That is the stored working copy, not a source file. It is the sanitized derivative of your canonical manuscript, so uploading it would replace the canonical source with a derivative and record the wrong hash. Drop the original manuscript file instead.',
+            {
+              code: 'Working Copy Is Not A Source',
+              errorCode: ERROR_CODES.WORKING_COPY_NOT_A_SOURCE,
+              statusCode: 409,
+              action: { type: 'navigate', target: 'manuscript', label: 'Back to Manuscript' },
+            },
+          );
+        }
+      }
+
       let manuscript;
+      let canonicalSource;
+      let sanitized;
       let outline;
       try {
-        ({ manuscript, outline } = await ingestManuscript({
+        ({ manuscript, canonicalSource, sanitized, outline } = await ingestManuscript({
           projectId: id,
           filename: body.filename,
           markdown: body.markdown,
@@ -1118,7 +1207,13 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         }
         throw err;
       }
-      const updated = await setManuscript(id, manuscript.relativePath, manuscript.sha256);
+      const updated = await setManuscript(id, {
+        manuscriptPath: manuscript.relativePath,
+        manuscriptSha256: manuscript.sha256,
+        canonicalManuscriptPath: canonicalSource.relativePath,
+        canonicalManuscriptSha256: canonicalSource.sha256,
+        manuscriptSanitized: sanitized,
+      });
 
       return {
         project: toContract(updated ?? existing),
@@ -1130,6 +1225,12 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           totalEntries: outline.totalEntries,
           totalWords: outline.totalWords,
           warnings: outline.warnings,
+        },
+        canonicalSource: {
+          relativePath: canonicalSource.relativePath,
+          sha256: canonicalSource.sha256,
+          sizeBytes: canonicalSource.sizeBytes,
+          sanitized,
         },
       };
     },

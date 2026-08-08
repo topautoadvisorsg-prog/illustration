@@ -84,17 +84,34 @@ export async function deleteProject(id: string): Promise<boolean> {
   });
 }
 
+export interface ManuscriptProvenance {
+  /** Derived working manuscript (sanitized) — what every downstream stage reads. */
+  manuscriptPath: string;
+  manuscriptSha256: string;
+  /** Canonical source artifact — the operator's exact uploaded bytes. */
+  canonicalManuscriptPath: string;
+  canonicalManuscriptSha256: string;
+  /** False when sanitization was a no-op (working == source byte-for-byte). */
+  manuscriptSanitized: boolean;
+}
+
+/**
+ * Record BOTH manuscript artifacts and the relationship between them.
+ *
+ * The canonical source hash is the one an author freezes and quotes; the
+ * working hash is the one production actually reads. Storing only the latter
+ * (the old behaviour) made a frozen manuscript unverifiable against the
+ * platform — the row's hash was the sanitized derivative's.
+ */
 export async function setManuscript(
   id: string,
-  manuscriptPath: string,
-  manuscriptSha256: string,
+  provenance: ManuscriptProvenance,
 ): Promise<ProjectRow | null> {
   const db = getDb();
   const [row] = await db
     .update(projects)
     .set({
-      manuscriptPath,
-      manuscriptSha256,
+      ...provenance,
       status: 'MANUSCRIPT_UPLOADED',
       updatedAt: new Date(),
     })

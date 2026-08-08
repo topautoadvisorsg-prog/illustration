@@ -49,7 +49,9 @@ describe('format calibration', () => {
     expect(report.chapterNumber).toBe(1);
     expect(report.currentFormat).toBe('HARDCOVER_7X10');
     expect(report.recommendedFormat).toBeTruthy();
-    expect(report.options).toHaveLength(4);
+    // One option per non-CUSTOM publishing preset. Now 5: the 5.5x8.5 digest
+    // trim was registered for text-first B&W nonfiction.
+    expect(report.options).toHaveLength(5);
     const first = report.options[0];
     const second = report.options[1];
     expect(first).toBeDefined();
