@@ -26,5 +26,15 @@ export function deriveReviewSourceText(spec: WholePageSpec): string {
   if (spec.pageType === 'TITLE_PAGE') {
     return spec.typographyDNA.titleHierarchy.join('\n\n');
   }
-  return spec.pageText?.body ?? '';
+  // Every other page type bakes its TITLE and scientific-name byline onto the
+  // page alongside the body. Returning body alone made the reviewer report the
+  // page's own heading as text that shouldn't be there: CH02_P007 was flagged
+  // for printing "CANADA LYNX / Lynx canadensis", which is correct content.
+  // A false positive here is not free — it sends a good page back for a paid
+  // re-render. Include what is actually printed.
+  const title = spec.pageText?.title;
+  const parts = [title?.name, title?.scientificName, spec.pageText?.body].filter(
+    (x): x is string => Boolean(x && x.trim()),
+  );
+  return parts.join('\n\n');
 }
