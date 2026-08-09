@@ -73,6 +73,16 @@ export interface TypesetTypeScale {
 export interface TypesetParagraphPolicy {
   /** First-line indent for continuing paragraphs, in em. */
   indentEm: number;
+  /**
+   * Vertical space between paragraphs, in em.
+   *
+   * 0 is classic trade-book setting: separation is carried entirely by the
+   * first-line indent. It is correct, and it is also the single biggest driver
+   * of how dense the page feels — worth a deliberate look for a book whose
+   * reader is 9-14 and working through it a bit at a time, rather than a value
+   * inherited by default.
+   */
+  spacingEm: number;
   /** The first paragraph after a heading sets flush left, no indent. */
   firstParagraphFlush: boolean;
   justify: boolean;

@@ -55,6 +55,8 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
 
   paragraphs: {
     indentEm: 1.2,
+    // 0 = indent-only separation, classic trade-book setting. Under review.
+    spacingEm: 0,
     firstParagraphFlush: true,
     justify: true,
     hyphenate: true,

@@ -500,7 +500,7 @@ body {
 
 /* Body paragraphs are the ONLY justified role, and their last line stays ragged. */
 p { margin: 0; text-indent: ${para.indentEm}em; text-align: ${para.justify ? 'justify' : 'left'}; text-align-last: left; }
-p.first { text-indent: 0; }
+${para.spacingEm > 0 ? `p + p { margin-top: ${para.spacingEm}em; }\n` : ''}p.first { text-indent: 0; }
 h3 { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 500; font-size: ${t.sectionHeadingPt}pt;
   letter-spacing: .04em; margin: 1.15em 0 .35em; break-after: avoid; break-inside: avoid;
   text-align: left; text-align-last: left; }
