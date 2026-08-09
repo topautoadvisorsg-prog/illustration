@@ -384,9 +384,17 @@ const expectedText = sections
 const expNorm = norm(expectedText);
 const pdfNorm = norm(pageTexts.join(' '));
 
+// This count is LARGER than section 3's by design, and the gap has been
+// mistaken for a discrepancy. Section 3 compares manuscript prose against what
+// parsing produced, with the `# Chapter N` structural markers stripped out.
+// This compares what must APPEAR on the page, which additionally includes the
+// rendered chapter labels. Stating the arithmetic inline means the two numbers
+// never have to be reconciled from memory again.
+const labelChars = sections.reduce((n, s) => n + norm(chapterLabel(s) ?? '').length, 0);
 check(expNorm === pdfNorm, 'every word of the manuscript is on the page, in order',
   expNorm === pdfNorm
-    ? `${expNorm.length.toLocaleString()} chars matched`
+    ? `${expNorm.length.toLocaleString()} chars matched ` +
+      `(= ${(expNorm.length - labelChars).toLocaleString()} manuscript + ${labelChars} chapter labels, cf. section 3)`
     : `expected ${expNorm.length.toLocaleString()} vs PDF ${pdfNorm.length.toLocaleString()}`);
 
 if (expNorm !== pdfNorm) {

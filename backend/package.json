@@ -32,7 +32,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "test": "vitest run",
-    "qa:fingerprint": "tsx scripts/typeset-fingerprint.ts"
+    "qa:fingerprint": "tsx scripts/typeset-fingerprint.ts",
+    "qa:illustrations": "tsx scripts/illustration-candidates.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
