@@ -55,8 +55,13 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
 
   paragraphs: {
     indentEm: 1.2,
-    // 0 = indent-only separation, classic trade-book setting. Under review.
-    spacingEm: 0,
+    // APPROVED 2026-08-09 after comparing 0 / 0.25 / 0.35 on a dense body page.
+    // At 0 the page read as one continuous block — correct for a novel, too
+    // packed for a 9-14 reader dipping in and out of a practical guide. 0.35
+    // was airy enough to start looking like a worksheet. 0.25 separates
+    // paragraphs into visible units while the page still reads as a book.
+    // The 1.2em indent is KEPT: the two work together rather than either/or.
+    spacingEm: 0.25,
     firstParagraphFlush: true,
     justify: true,
     hyphenate: true,
