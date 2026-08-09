@@ -239,31 +239,49 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
 @page opener { @top-left { content: none; } @top-right { content: none; } }
 
 html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+/* JUSTIFICATION IS SET PER TYPOGRAPHIC ROLE, NEVER INHERITED.
+   Body justification leaking into headings stretched "No One Told Me That"
+   wall-to-wall and pushed the chapter label's words to opposite margins. It
+   also stretched paragraph LAST lines ("make good choices." spread across the
+   full measure), which is wrong in any book: a justified paragraph justifies
+   its full lines and leaves the last one ragged.
+   Every role below therefore declares BOTH `text-align` and `text-align-last`,
+   so nothing depends on inheritance or on the renderer's default for last
+   lines. Do not remove the `text-align-last` declarations. */
 body {
   font-family: '${t.bodyFont}', Georgia, serif;
   font-size: ${t.bodyPt}pt; line-height: ${t.lineHeight};
-  text-align: justify; hyphens: auto; -webkit-hyphens: auto;
+  hyphens: auto; -webkit-hyphens: auto;
   orphans: 2; widows: 2;
+  text-align: left; text-align-last: left;
 }
 .booktitle-src { string-set: booktitle "${escapeHtml(title)}"; }
 
 .tsec { ${recto ? 'break-before: recto;' : 'break-before: page;'} page: opener; string-set: sectitle attr(data-title); }
-.tsec > .opener { padding-top: ${sinkIn}in; margin-bottom: 2em; text-align: center; break-after: avoid; }
-.kicker { font-family: '${t.headingFont}', sans-serif; font-size: ${t.labelPt + 1.5}pt; letter-spacing: .22em;
-  text-transform: uppercase; margin: 0 0 .5em; text-align: center; }
-.tsec > .opener h2 { font-family: '${t.headingFont}', sans-serif; font-weight: 500;
-  font-size: ${Math.round(t.bodyPt * 1.6)}pt; line-height: 1.15; margin: 0; text-align: center; }
+/* Chapter opener: one centred heading block — "Chapter One" over the title,
+   per CHAPTER_BOOK_STANDARD.md §3. Centring is declared on the block AND on
+   both children, last line included, so a stretched title cannot come back. */
+.tsec > .opener { padding-top: ${sinkIn}in; margin-bottom: 2em; break-after: avoid;
+  text-align: center; text-align-last: center; }
+.kicker { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-size: ${t.labelPt + 1.5}pt;
+  letter-spacing: .22em; text-transform: uppercase; margin: 0 0 .5em;
+  text-align: center; text-align-last: center; white-space: nowrap; }
+.tsec > .opener h2 { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 500;
+  font-size: ${Math.round(t.bodyPt * 1.6)}pt; line-height: 1.15; margin: 0;
+  text-align: center; text-align-last: center; }
 
-p { margin: 0; text-indent: 1.2em; }
+/* Body paragraphs are the ONLY justified role, and their last line stays ragged. */
+p { margin: 0; text-indent: 1.2em; text-align: justify; text-align-last: left; }
 p.first { text-indent: 0; }
-h3 { font-family: '${t.headingFont}', sans-serif; font-weight: 500; font-size: ${t.sectionHeadingPt}pt;
-  letter-spacing: .04em; margin: 1.15em 0 .35em; text-align: left; break-after: avoid; break-inside: avoid; }
+h3 { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 500; font-size: ${t.sectionHeadingPt}pt;
+  letter-spacing: .04em; margin: 1.15em 0 .35em; break-after: avoid; break-inside: avoid;
+  text-align: left; text-align-last: left; }
 h4 { font-family: '${t.bodyFont}', serif; font-style: italic; font-weight: 600; font-size: ${t.subsectionHeadingPt}pt;
-  margin: 1em 0 .3em; text-align: left; break-after: avoid; }
+  margin: 1em 0 .3em; break-after: avoid; text-align: left; text-align-last: left; }
 ul { margin: .5em 0 .6em; padding-left: 1.4em; }
-li { margin: 0 0 .18em; text-align: left; }
-.scene-break { text-indent: 0; text-align: center; margin: .9em 0; letter-spacing: .5em;
-  break-after: avoid; break-inside: avoid; }
+li { margin: 0 0 .18em; text-align: left; text-align-last: left; }
+.scene-break { text-indent: 0; margin: .9em 0; letter-spacing: .5em;
+  break-after: avoid; break-inside: avoid; text-align: center; text-align-last: center; }
 </style></head>
 <body>
 <div class="booktitle-src"></div>
