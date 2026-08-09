@@ -25,7 +25,8 @@
     "worker:epub-export": "tsx src/workers/epub-export.worker.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "qa:fingerprint": "tsx scripts/typeset-fingerprint.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
