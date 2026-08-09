@@ -147,13 +147,17 @@ function bodyToHtml(lines: string[], micro?: TerminalMicroSectionPolicy): string
   const html: string[] = [];
   let para: string[] = [];
   let list: string[] = [];
+  /** Which kind of list is open. Switching kind closes the previous one. */
+  let listKind: 'ul' | 'ol' | null = null;
   let quote: string[] = [];
   let flushNext = true;
 
   const closeList = (): void => {
     if (!list.length) return;
-    html.push(`<ul>${list.map((li) => `<li>${inlineMarkdown(li)}</li>`).join('')}</ul>`);
+    const tag = listKind === 'ol' ? 'ol' : 'ul';
+    html.push(`<${tag}>${list.map((li) => `<li>${inlineMarkdown(li)}</li>`).join('')}</${tag}>`);
     list = [];
+    listKind = null;
     flushNext = false;
   };
   /**
@@ -166,24 +170,28 @@ function bodyToHtml(lines: string[], micro?: TerminalMicroSectionPolicy): string
    */
   const closeQuote = (): void => {
     if (!quote.length) return;
-    const paras = quote
+    const lines = [...quote];
+    // A callout whose FIRST SOURCE LINE is entirely bold is a labelled callout:
+    // that line is its label and belongs on its own line, with the quote
+    // starting beneath. This must be checked on the raw line, not on the joined
+    // paragraph — Markdown lazy continuation merges consecutive quote lines
+    // into one paragraph, so by then the label is buried mid-sentence and the
+    // rendered page runs "LABEL quote body..." together on one line.
+    let label = '';
+    const first = lines[0]?.trim() ?? '';
+    const m = /^\*\*(.+)\*\*$/.exec(first);
+    if (m) {
+      label = `<p class="callout-label">${inlineMarkdown(m[1]!)}</p>`;
+      lines.shift();
+    }
+    const body = lines
       .join('\n')
       .split(/\n\s*\n/)
       .map((p) => p.replace(/\s*\n\s*/g, ' ').trim())
-      .filter(Boolean);
-    const body = paras
-      .map((p, i) => {
-        // A callout whose FIRST paragraph is entirely bold is a labelled
-        // callout: that paragraph is its label and belongs on its own line,
-        // with the quote starting beneath. Detected from the markup, so any
-        // callout written that way gets the treatment — no phrase is special.
-        const label = i === 0 ? /^\*\*(.+)\*\*$/.exec(p) : null;
-        return label
-          ? `<p class="callout-label">${inlineMarkdown(label[1]!)}</p>`
-          : `<p>${inlineMarkdown(p)}</p>`;
-      })
+      .filter(Boolean)
+      .map((p) => `<p>${inlineMarkdown(p)}</p>`)
       .join('');
-    html.push(`<blockquote class="callout">${body}</blockquote>`);
+    html.push(`<blockquote class="callout">${label}${body}</blockquote>`);
     quote = [];
     flushNext = true;
   };
@@ -199,6 +207,11 @@ function bodyToHtml(lines: string[], micro?: TerminalMicroSectionPolicy): string
     // A blank line inside a quote is a paragraph break, not the end of it.
     if (!t) {
       if (quote.length) { quote.push(''); continue; }
+      // A blank line between list items does NOT end the list — Markdown calls
+      // that a "loose" list, and this manuscript writes numbered steps both
+      // ways. Closing here split one list of steps into several stray
+      // paragraphs. The list is closed by the first line that is not an item.
+      if (list.length) { closePara(); continue; }
       closeList(); closePara(); continue;
     }
     const bq = t.match(/^>\s?(.*)$/);
@@ -219,8 +232,19 @@ function bodyToHtml(lines: string[], micro?: TerminalMicroSectionPolicy): string
     if (h4) { closeList(); closePara(); html.push(`<h4>${inlineMarkdown(h4[1]!)}</h4>`); flushNext = true; continue; }
     const h3 = t.match(/^###\s+(.*)$/);
     if (h3) { closeList(); closePara(); html.push(`<h3>${inlineMarkdown(h3[1]!)}</h3>`); flushNext = true; continue; }
-    const li = t.match(/^[-*]\s+(.*)$/);
-    if (li) { closePara(); list.push(li[1]!); continue; }
+    const bullet = t.match(/^[-*]\s+(.*)$/);
+    // Ordered steps: "1. text" / "2) text". Without this branch the numerals
+    // printed as literal text mid-paragraph and the steps ran together — 63
+    // numbered lists in this manuscript rendered that way.
+    const numbered = bullet ? null : t.match(/^\d+[.)]\s+(.*)$/);
+    if (bullet || numbered) {
+      const kind: 'ul' | 'ol' = bullet ? 'ul' : 'ol';
+      if (listKind && listKind !== kind) closeList();
+      listKind = kind;
+      closePara();
+      list.push((bullet ?? numbered)![1]!);
+      continue;
+    }
     closeList();
     para.push(t);
   }
@@ -506,8 +530,13 @@ h3 { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 500; fo
   text-align: left; text-align-last: left; }
 h4 { font-family: '${t.bodyFont}', serif; font-style: italic; font-weight: 600; font-size: ${t.subsectionHeadingPt}pt;
   margin: 1em 0 .3em; break-after: avoid; text-align: left; text-align-last: left; }
-ul { margin: .5em 0 .6em; padding-left: ${blocks.listIndentEm}em; }
-li { margin: 0 0 ${blocks.listItemSpacingEm}em; text-align: left; text-align-last: left; }
+ul, ol { margin: .5em 0 .6em; padding-left: ${blocks.listIndentEm}em; }
+li { margin: 0 0 ${blocks.listItemSpacingEm}em; text-align: left; text-align-last: left;
+  text-indent: 0; padding-left: .15em; }
+/* Numbered steps keep their own counter; the manuscript's numerals are markup,
+   never printed text. */
+ol { list-style: decimal; }
+ul { list-style: disc; }
 .scene-break { text-indent: 0; margin: .9em 0; letter-spacing: ${blocks.sceneBreakLetterSpacingEm}em;
   break-after: avoid; break-inside: avoid; text-align: center; text-align-last: center; }
 /* Callout — a Markdown blockquote. Kept on one page: a two-line aside broken

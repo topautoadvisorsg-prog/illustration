@@ -385,6 +385,22 @@ describe('callout labels', () => {
     expect(html).toContain('<p>Whatever this is, it is worse for me.</p>');
   });
 
+  /**
+   * The shape this manuscript actually uses: label, quote and body on
+   * CONSECUTIVE quote lines with no blank between. Markdown lazy continuation
+   * merges those into one paragraph, so checking the joined paragraph for
+   * "entirely bold" never matched and the label printed inline mid-sentence.
+   */
+  it('lifts the label when it is the first LINE of a lazily-continued quote', () => {
+    const html = render(
+      "> **THE LIE YOUR BRAIN IS TELLING YOU**\n> *I've gotten worse.*\n> This one gets guys to quit sports.",
+    );
+    expect(html).toContain('<p class="callout-label">THE LIE YOUR BRAIN IS TELLING YOU</p>');
+    // The label must not remain inside the body paragraph.
+    expect(html).not.toMatch(/<p>[^<]*THE LIE YOUR BRAIN/);
+    expect(html).toContain('This one gets guys to quit sports.');
+  });
+
   it('is structural, not phrase-specific', () => {
     expect(render('> **ANY OTHER LABEL**\n>\n> Body.')).toContain('<p class="callout-label">ANY OTHER LABEL</p>');
   });
@@ -398,6 +414,59 @@ describe('callout labels', () => {
   it('does not treat a mid-callout bold paragraph as a label', () => {
     const html = bodyOf(render('> Opening line.\n>\n> **Bold but not first.**'));
     expect(html).not.toContain('callout-label');
+  });
+});
+
+/**
+ * bodyToHtml had no ordered-list branch, so 63 numbered lists across the
+ * manuscript rendered as paragraphs with the numerals printed as literal text.
+ */
+describe('lists', () => {
+  const render = (md: string) =>
+    bodyOf(
+      buildTypesetHtml({
+        sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${md}\n`),
+        config: configFor(),
+        layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+      }),
+    );
+
+  it('renders numbered steps as an ordered list, numerals as markup', () => {
+    const html = render('What helps:\n\n1. **Heat.** A warm bath.\n2. **Stretching.** Calves.\n3. **Massage.** Rub it.');
+    expect(html).toContain('<ol>');
+    expect((html.match(/<li>/g) ?? []).length).toBe(3);
+    // The numerals must not survive as text.
+    expect(html).not.toMatch(/<li>1\./);
+    expect(html).not.toMatch(/<p[^>]*>\s*1\./);
+  });
+
+  it('keeps a blank-line-separated (loose) numbered list as ONE list', () => {
+    const html = render('Intro:\n\n1. **Slow down.** Rushed speech.\n\n2. **Lower volume.** Not a whisper.\n\n3. **Do not force it.** See above.');
+    expect((html.match(/<ol>/g) ?? []).length).toBe(1);
+    expect((html.match(/<li>/g) ?? []).length).toBe(3);
+  });
+
+  it('still renders bullets as an unordered list', () => {
+    const html = render('- First\n- Second');
+    expect(html).toContain('<ul>');
+    expect((html.match(/<li>/g) ?? []).length).toBe(2);
+  });
+
+  it('closes one list when the other kind starts', () => {
+    const html = render('- Bullet\n1. Numbered');
+    expect(html).toContain('<ul>');
+    expect(html).toContain('<ol>');
+  });
+
+  it('ends the list at the first non-item line', () => {
+    const html = render('1. Step one.\n2. Step two.\n\nA following paragraph.');
+    expect((html.match(/<ol>/g) ?? []).length).toBe(1);
+    expect(html).toContain('A following paragraph.');
+    expect(html).not.toMatch(/<li>A following paragraph/);
+  });
+
+  it('accepts the "1)" form', () => {
+    expect(render('1) One\n2) Two')).toContain('<ol>');
   });
 });
 
