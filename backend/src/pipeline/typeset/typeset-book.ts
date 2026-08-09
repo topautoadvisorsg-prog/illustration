@@ -18,6 +18,9 @@
 
 import type { ProjectConfig, TrimSize } from '@wildlands/shared';
 import { bundledFontCss } from './font-assets.js';
+import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from './layout-standards/educational-nonfiction-v1.js';
+import { resolveTypesetDesign } from './layout-standards/resolve-design.js';
+import type { ChapterLabelFormat, TypesetLayoutStandard } from './layout-standards/types.js';
 
 // ── Geometry ────────────────────────────────────────────────────────────────
 
@@ -135,6 +138,7 @@ function bodyToHtml(lines: string[]): string {
   const html: string[] = [];
   let para: string[] = [];
   let list: string[] = [];
+  let quote: string[] = [];
   let flushNext = true;
 
   const closeList = (): void => {
@@ -142,6 +146,27 @@ function bodyToHtml(lines: string[]): string {
     html.push(`<ul>${list.map((li) => `<li>${inlineMarkdown(li)}</li>`).join('')}</ul>`);
     list = [];
     flushNext = false;
+  };
+  /**
+   * Markdown blockquotes become a styled callout.
+   *
+   * Without this branch a "> " line fell through to a normal paragraph and the
+   * marker printed as a literal ">" mid-sentence — visible on p7 of NO ONE TOLD
+   * ME THAT, and in every chapter, because these asides recur throughout.
+   * Blank-line-separated runs inside one quote stay separate paragraphs.
+   */
+  const closeQuote = (): void => {
+    if (!quote.length) return;
+    const paras = quote
+      .join('\n')
+      .split(/\n\s*\n/)
+      .map((p) => p.replace(/\s*\n\s*/g, ' ').trim())
+      .filter(Boolean)
+      .map((p) => `<p>${inlineMarkdown(p)}</p>`)
+      .join('');
+    html.push(`<blockquote class="callout">${paras}</blockquote>`);
+    quote = [];
+    flushNext = true;
   };
   const closePara = (): void => {
     if (!para.length) return;
@@ -152,7 +177,14 @@ function bodyToHtml(lines: string[]): string {
 
   for (const line of lines) {
     const t = line.trim();
-    if (!t) { closeList(); closePara(); continue; }
+    // A blank line inside a quote is a paragraph break, not the end of it.
+    if (!t) {
+      if (quote.length) { quote.push(''); continue; }
+      closeList(); closePara(); continue;
+    }
+    const bq = t.match(/^>\s?(.*)$/);
+    if (bq) { closeList(); closePara(); quote.push(bq[1] ?? ''); continue; }
+    closeQuote();
     if (/^-{3,}$/.test(t) || /^\*\s*\*\s*\*$/.test(t)) {
       closeList(); closePara();
       html.push('<p class="scene-break">* * *</p>');
@@ -168,7 +200,7 @@ function bodyToHtml(lines: string[]): string {
     closeList();
     para.push(t);
   }
-  closeList(); closePara();
+  closeQuote(); closeList(); closePara();
   return html.join('\n');
 }
 
@@ -180,6 +212,12 @@ export interface TypesetHtmlInput {
   margins?: TypesetMargins;
   /** Paged.js polyfill source. Omit for a browser-free HTML string (tests). */
   polyfillJs?: string;
+  /**
+   * The pinned layout standard. Omitted only by older callers and tests, which
+   * fall back to the educational-nonfiction v1 design — the design those
+   * callers were written against, so their output is unchanged.
+   */
+  layoutStandard?: TypesetLayoutStandard;
   /**
    * Start every section on a right-hand page (premium convention). Costs a blank
    * verso whenever a section ends on a recto — roughly 10% of the page count on
@@ -239,27 +277,58 @@ export function spellChapterNumber(n: number): string {
   return ones ? `${tens}-${ones}` : tens;
 }
 
-/** The chapter opener's kicker, e.g. "Chapter Twelve". Empty for matter sections. */
-export function chapterLabel(section: Pick<TypesetSection, 'kind' | 'number'>): string {
+/**
+ * The chapter opener's kicker, e.g. "Chapter Twelve". Empty for matter sections.
+ *
+ * The label is generated in its natural case; rendering it uppercase is a STYLE
+ * decision the standard makes via text-transform. Never pre-uppercase here — a
+ * standard that wants title case could not undo it.
+ */
+export function chapterLabel(
+  section: Pick<TypesetSection, 'kind' | 'number'>,
+  format: ChapterLabelFormat = 'chapter-word',
+): string {
   if (section.kind !== 'chapter' || section.number === null) return '';
+  if (format === 'none') return '';
+  if (format === 'chapter-numeral') return `Chapter ${section.number}`;
   return `Chapter ${spellChapterNumber(section.number)}`;
 }
 
 export function buildTypesetHtml(input: TypesetHtmlInput): string {
   const { sections, config } = input;
-  const trim = config.trimSize;
-  const m = input.margins ?? typesetMarginsForTrim(trim);
-  const t = config.typography;
+
+  // The page design comes from the pinned layout standard; the project supplies
+  // only the operator-chosen fields. An explicit `margins` argument still wins,
+  // so callers that know the final page count can widen the gutter.
+  const standard = input.layoutStandard ?? EDUCATIONAL_NONFICTION_TYPESET_V1;
+  const design = resolveTypesetDesign({
+    standard,
+    config,
+    chaptersStartRecto: input.chaptersStartRecto,
+  });
+
+  const trim = design.trim;
+  const m = input.margins ?? design.margins;
+  const t = design.type;
+  const para = standard.paragraphs;
+  const op = standard.opener;
+  const furn = standard.furniture;
+  const blocks = standard.blocks;
+  const openerAlign = op.centered ? 'center' : 'left';
+  const smallCaps = furn.runningHeadSmallCaps ? 'small-caps' : 'normal';
+  const folioContent = furn.folio === 'none' ? 'none' : 'counter(page)';
+  const runningHead = (role: 'book-title' | 'section-title' | 'none'): string =>
+    role === 'book-title' ? 'string(booktitle)' : role === 'section-title' ? 'string(sectitle)' : 'none';
   const title = config.publishing?.title ?? config.title;
-  const recto = input.chaptersStartRecto !== false;
+  const recto = design.chaptersStartRecto;
 
   // The classic drop: the chapter heading begins about a third down the text
   // block, leaving white space above it.
-  const sinkIn = ((trim.heightIn - m.topIn - m.bottomIn) / 3).toFixed(3);
+  const sinkIn = ((trim.heightIn - m.topIn - m.bottomIn) / op.sinkDivisor).toFixed(3);
 
   const body = sections
     .map((s, i) => {
-      const label = chapterLabel(s);
+      const label = chapterLabel(s, op.labelFormat);
       return `<section class="tsec ${s.kind}" id="tsec-${i}" data-title="${escapeHtml(s.title)}" data-label="${escapeHtml(label)}" data-kind="${s.kind}">
   <header class="opener">
     ${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}
@@ -293,16 +362,16 @@ ${fonts.css}
 @page { size: ${trim.widthIn}in ${trim.heightIn}in; margin: ${m.topIn}in ${m.outsideIn}in ${m.bottomIn}in ${m.gutterIn}in; }
 @page :left {
   margin-left: ${m.outsideIn}in; margin-right: ${m.gutterIn}in;
-  @top-left { content: string(booktitle); font-family: '${t.bodyFont}', serif; font-variant: small-caps; font-size: ${t.labelPt}pt; letter-spacing: .06em; }
-  @bottom-center { content: counter(page); font-family: '${t.bodyFont}', serif; font-size: ${t.captionPt + 1}pt; }
+  @top-left { content: ${runningHead(furn.versoRunningHead)}; font-family: '${t.bodyFont}', serif; font-variant: ${smallCaps}; font-size: ${t.labelPt}pt; letter-spacing: ${furn.runningHeadLetterSpacingEm}em; }
+  @bottom-center { content: ${folioContent}; font-family: '${t.bodyFont}', serif; font-size: ${t.captionPt + t.folioPtDelta}pt; }
 }
 @page :right {
   margin-left: ${m.gutterIn}in; margin-right: ${m.outsideIn}in;
-  @top-right { content: string(sectitle); font-family: '${t.bodyFont}', serif; font-variant: small-caps; font-size: ${t.labelPt}pt; letter-spacing: .06em; }
-  @bottom-center { content: counter(page); font-family: '${t.bodyFont}', serif; font-size: ${t.captionPt + 1}pt; }
+  @top-right { content: ${runningHead(furn.rectoRunningHead)}; font-family: '${t.bodyFont}', serif; font-variant: ${smallCaps}; font-size: ${t.labelPt}pt; letter-spacing: ${furn.runningHeadLetterSpacingEm}em; }
+  @bottom-center { content: ${folioContent}; font-family: '${t.bodyFont}', serif; font-size: ${t.captionPt + t.folioPtDelta}pt; }
 }
 /* A chapter-opening page carries no running head — only the drop folio. */
-@page opener { @top-left { content: none; } @top-right { content: none; } }
+@page opener {${furn.suppressRunningHeadOnOpener ? ' @top-left { content: none; } @top-right { content: none; }' : ''}${furn.suppressFolioOnOpener ? ' @bottom-center { content: none; }' : ''} }
 
 html, body { margin: 0; padding: 0; background: #fff; color: #000; }
 /* JUSTIFICATION IS SET PER TYPOGRAPHIC ROLE, NEVER INHERITED.
@@ -329,27 +398,34 @@ body {
 /* Chapter opener: one centred heading block — "Chapter One" over the title,
    per CHAPTER_BOOK_STANDARD.md §3. Centring is declared on the block AND on
    both children, last line included, so a stretched title cannot come back. */
-.tsec > .opener { padding-top: ${sinkIn}in; margin-bottom: 2em; break-after: avoid;
-  text-align: center; text-align-last: center; }
-.kicker { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-size: ${t.labelPt + 1.5}pt;
-  letter-spacing: .22em; text-transform: uppercase; margin: 0 0 .5em;
-  text-align: center; text-align-last: center; white-space: nowrap; }
+.tsec > .opener { padding-top: ${sinkIn}in; margin-bottom: ${op.blockMarginBottomEm}em; break-after: avoid;
+  text-align: ${openerAlign}; text-align-last: ${openerAlign}; }
+.kicker { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-size: ${t.labelPt + t.kickerPtDelta}pt;
+  letter-spacing: ${op.labelLetterSpacingEm}em; text-transform: ${op.labelTransform}; margin: 0 0 .5em;
+  text-align: ${openerAlign}; text-align-last: ${openerAlign}; white-space: nowrap; }
 .tsec > .opener h2 { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 500;
-  font-size: ${Math.round(t.bodyPt * 1.6)}pt; line-height: 1.15; margin: 0;
-  text-align: center; text-align-last: center; }
+  font-size: ${Math.round(t.bodyPt * t.chapterTitleScale)}pt; line-height: 1.15; margin: 0;
+  text-align: ${openerAlign}; text-align-last: ${openerAlign}; }
 
 /* Body paragraphs are the ONLY justified role, and their last line stays ragged. */
-p { margin: 0; text-indent: 1.2em; text-align: justify; text-align-last: left; }
+p { margin: 0; text-indent: ${para.indentEm}em; text-align: ${para.justify ? 'justify' : 'left'}; text-align-last: left; }
 p.first { text-indent: 0; }
 h3 { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 500; font-size: ${t.sectionHeadingPt}pt;
   letter-spacing: .04em; margin: 1.15em 0 .35em; break-after: avoid; break-inside: avoid;
   text-align: left; text-align-last: left; }
 h4 { font-family: '${t.bodyFont}', serif; font-style: italic; font-weight: 600; font-size: ${t.subsectionHeadingPt}pt;
   margin: 1em 0 .3em; break-after: avoid; text-align: left; text-align-last: left; }
-ul { margin: .5em 0 .6em; padding-left: 1.4em; }
-li { margin: 0 0 .18em; text-align: left; text-align-last: left; }
-.scene-break { text-indent: 0; margin: .9em 0; letter-spacing: .5em;
+ul { margin: .5em 0 .6em; padding-left: ${blocks.listIndentEm}em; }
+li { margin: 0 0 ${blocks.listItemSpacingEm}em; text-align: left; text-align-last: left; }
+.scene-break { text-indent: 0; margin: .9em 0; letter-spacing: ${blocks.sceneBreakLetterSpacingEm}em;
   break-after: avoid; break-inside: avoid; text-align: center; text-align-last: center; }
+/* Callout — a Markdown blockquote. Kept on one page: a two-line aside broken
+   across a spread reads as two unrelated fragments. */
+.callout { margin: ${blocks.callout.marginYEm}em 0; padding-left: ${blocks.callout.paddingLeftEm}em;
+  border-left: ${blocks.callout.borderLeftPt}pt solid currentColor; break-inside: avoid;
+  font-size: ${(t.bodyPt * blocks.callout.scale).toFixed(2)}pt;${blocks.callout.italic ? ' font-style: italic;' : ''} }
+.callout p { text-indent: 0; text-align: left; text-align-last: left; }
+.callout p + p { margin-top: .35em; }
 </style></head>
 <body>
 <div class="booktitle-src"></div>

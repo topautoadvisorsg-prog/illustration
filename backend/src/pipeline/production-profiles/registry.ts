@@ -10,11 +10,13 @@
  * `productionProfileId` resolves to exactly the behaviour it already had.
  */
 
+import { BW_EDUCATIONAL_NONFICTION_PROFILE } from './bw-educational-nonfiction.js';
 import { WILDLANDS_FIELD_GUIDE_PROFILE } from './wildlands-field-guide.js';
 import type { BookProductionProfile } from './types.js';
 
 export const PRODUCTION_PROFILES: Record<string, BookProductionProfile> = {
   [WILDLANDS_FIELD_GUIDE_PROFILE.id]: WILDLANDS_FIELD_GUIDE_PROFILE,
+  [BW_EDUCATIONAL_NONFICTION_PROFILE.id]: BW_EDUCATIONAL_NONFICTION_PROFILE,
 };
 
 /** The profile every pre-existing project resolves to. */

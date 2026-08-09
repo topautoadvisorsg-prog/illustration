@@ -16,12 +16,15 @@ import {
   type TypesetMargins,
   type TypesetReport,
 } from './typeset-book.js';
+import type { TypesetLayoutStandard } from './layout-standards/types.js';
 
 export interface RenderTypesetInput {
   markdown: string;
   config: ProjectConfig;
   margins?: TypesetMargins;
   chaptersStartRecto?: boolean;
+  /** The project's pinned layout standard. Omitted only by tests. */
+  layoutStandard?: TypesetLayoutStandard;
 }
 
 export interface RenderTypesetResult {
@@ -136,7 +139,13 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
   }
 
   const polyfillJs = await loadPagedPolyfill();
-  const html = buildTypesetHtml({ ...input, sections, margins, polyfillJs });
+  const html = buildTypesetHtml({
+    ...input,
+    sections,
+    margins,
+    polyfillJs,
+    layoutStandard: input.layoutStandard,
+  });
 
   const { default: puppeteer } = await import('puppeteer-core');
   const browser = await puppeteer.launch({

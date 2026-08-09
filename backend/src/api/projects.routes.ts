@@ -1314,9 +1314,57 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     const { renderTypesetBook, TypesetUnavailableError } = await import(
       '../pipeline/typeset/render-typeset.js'
     );
+    const { getProductionProfile } = await import('../pipeline/production-profiles/registry.js');
+    const { resolveTypesetLayoutStandard, UnknownTypesetLayoutStandardError } = await import(
+      '../pipeline/typeset/layout-standards/registry.js'
+    );
+    const { EDUCATIONAL_NONFICTION_TYPESET_V1 } = await import(
+      '../pipeline/typeset/layout-standards/educational-nonfiction-v1.js'
+    );
+
+    // The page design comes from the book's layout standard, resolved through
+    // its production profile. Precedence: the PROJECT'S PIN wins over the
+    // profile default — that is what makes a pin a pin. A book approved on @1
+    // keeps rendering against @1 even after the profile starts naming @2.
+    const profile = getProductionProfile(config.productionProfileId);
+    const standardId =
+      config.typesetLayoutStandardId ??
+      profile.typesetLayoutStandardId ??
+      // A profile with no typeset standard (the field guide) still reaches this
+      // route today; v1 is the design it has been rendering all along.
+      EDUCATIONAL_NONFICTION_TYPESET_V1.id;
+
+    let layoutStandard;
     try {
-      const result = await renderTypesetBook({ markdown, config, chaptersStartRecto: query.recto });
-      if (query.format === 'json') return { report: result.report };
+      layoutStandard = resolveTypesetLayoutStandard(standardId);
+    } catch (err) {
+      if (err instanceof UnknownTypesetLayoutStandardError) {
+        throw new UserFacingError(err.message, {
+          code: 'Unknown Layout Standard',
+          errorCode: ERROR_CODES.UNCLASSIFIED,
+          statusCode: 409,
+        });
+      }
+      throw err;
+    }
+
+    // Pin on the first successful typeset, so a later @2 cannot move a book
+    // that has already been rendered and reviewed.
+    if (!config.typesetLayoutStandardId) {
+      await updateProjectConfig(id, { ...config, typesetLayoutStandardId: standardId });
+      request.log.info({ projectId: id, standardId, profileId: profile.id }, 'pinned typeset layout standard');
+    }
+
+    try {
+      const result = await renderTypesetBook({
+        markdown,
+        config,
+        chaptersStartRecto: query.recto,
+        layoutStandard,
+      });
+      if (query.format === 'json') {
+        return { report: result.report, layoutStandardId: standardId, productionProfileId: profile.id };
+      }
 
       reply.header('content-type', 'application/pdf');
       reply.header('content-disposition', 'inline; filename="typeset-preview.pdf"');

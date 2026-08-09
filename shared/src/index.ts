@@ -685,6 +685,20 @@ export const ProjectConfigSchema = z.object({
    * behaves byte-identically.
    */
   productionProfileId: z.string().min(1).default('wildlands-field-guide'),
+  /**
+   * PINNED TYPESET LAYOUT STANDARD — the versioned id this book's interior is
+   * rendered against, e.g. `educational-nonfiction-typeset@1`.
+   *
+   * Written once, from the production profile, the first time the book is
+   * typeset. After that it is the project's, not the profile's: registering an
+   * improved `@2` must never silently re-render a book that was approved on
+   * `@1`, because the operator would have no way to tell the design had moved.
+   * Upgrading is an explicit action that rewrites this field.
+   *
+   * Optional so every existing project parses unchanged; absent means "not yet
+   * typeset", and the first render pins it.
+   */
+  typesetLayoutStandardId: z.string().min(1).optional(),
   editions: z.array(EditionSchema).default(['PREMIUM', 'KINDLE_EPUB']),
   volume: z.number().int().positive(),
   title: z.string().min(1),

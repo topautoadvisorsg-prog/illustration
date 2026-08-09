@@ -148,6 +148,17 @@ export interface BookProductionProfile {
   defaultStyleDnaId: string;
   /** Which publishing standard governs typography/palette/ornament. */
   publishingStandardId: string;
+  /**
+   * Which typeset layout standard governs the printed page — geometry, type
+   * scale, opener treatment, furniture, block styles. Versioned id, e.g.
+   * `educational-nonfiction-typeset@1`; resolved through
+   * `typeset/layout-standards/registry.ts`.
+   *
+   * Only meaningful when `bodyRenderTrack` is `typeset`. An AI whole-page book
+   * gets its look from the publishing standard and Style DNA instead, so this
+   * is optional rather than required.
+   */
+  typesetLayoutStandardId?: string;
   bodyRenderTrack: BodyRenderTrack;
   illustrationPolicy: IllustrationPolicy;
   classification: ClassificationHooks;
