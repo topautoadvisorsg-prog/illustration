@@ -188,6 +188,33 @@ export interface TypesetHtmlInput {
   chaptersStartRecto?: boolean;
 }
 
+/**
+ * Paged.js completion signal — MUST be injected before the polyfill script.
+ *
+ * The renderer used to decide pagination had finished by watching the page
+ * count stop changing for 1.5s. That is a plateau, not an ending: Paged.js goes
+ * quiet between chunks, and a render that had reached page 31 of a 155-page book
+ * could be accepted as complete and then reported as "0 overflow". Same input,
+ * different answers on consecutive runs.
+ *
+ * The polyfill takes `window.PagedConfig.after`, which it awaits exactly once
+ * after `previewer.preview()` resolves. That is the library telling us it is
+ * done, so completion is now a fact rather than an inference.
+ */
+export const PAGED_DONE_HOOK = `<script>
+window.PagedConfig = {
+  auto: true,
+  after: function (flow) {
+    window.__wlTypesetDone = {
+      total: (flow && flow.total) || document.querySelectorAll('.pagedjs_page').length
+    };
+  }
+};
+</script>`;
+
+/** Browser-side predicate: has Paged.js reported completion? */
+export const TYPESET_DONE_JS = `!!window.__wlTypesetDone`;
+
 const ONES = [
   '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
   'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen',
@@ -327,7 +354,7 @@ li { margin: 0 0 .18em; text-align: left; text-align-last: left; }
 <body>
 <div class="booktitle-src"></div>
 ${body}
-${input.polyfillJs ? `<script>${input.polyfillJs}</script>` : ''}
+${input.polyfillJs ? `${PAGED_DONE_HOOK}\n<script>${input.polyfillJs}</script>` : ''}
 </body></html>`;
 }
 

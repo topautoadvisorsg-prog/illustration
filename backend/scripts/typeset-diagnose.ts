@@ -18,7 +18,7 @@ loadDotenv({ path: path.join(ROOT, '.env.development.local'), override: true });
 const { sanitizeManuscript } = await import('../src/pipeline/stage-1-ingestion/sanitize-manuscript.js');
 const { buildTypesetHtml, parseTypesetSections, typesetMarginsForTrim } = await import('../src/pipeline/typeset/typeset-book.js');
 const { loadPagedPolyfill, resolveChromiumPath } = await import('../src/pipeline/stage-6-layout/render-pdf.js');
-const { STABLE_JS } = await import('../src/pipeline/typeset/render-typeset.js');
+const { TYPESET_DONE_JS } = await import('../src/pipeline/typeset/typeset-book.js');
 const { ProjectConfigSchema } = await import('@wildlands/shared');
 
 const md = sanitizeManuscript(
@@ -119,8 +119,7 @@ const before = await page.evaluate(PROBE);
 const htmlPaged = buildTypesetHtml({ sections, config, margins, polyfillJs: await loadPagedPolyfill() });
 await page.setContent(htmlPaged, { waitUntil: 'domcontentloaded', timeout: 180_000 });
 await settleFonts();
-await page.waitForFunction(`document.querySelectorAll('.pagedjs_page').length > 0`, { timeout: 180_000 });
-await page.waitForFunction(STABLE_JS, { timeout: 300_000, polling: 300 });
+await page.waitForFunction(TYPESET_DONE_JS, { timeout: 300_000, polling: 250 });
 const after = await page.evaluate(PROBE);
 
 const outDir = path.join(ROOT, 'outputs', 'typeset-prototype');

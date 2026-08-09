@@ -12,6 +12,7 @@ import {
   buildTypesetHtml,
   parseTypesetSections,
   typesetMarginsForTrim,
+  TYPESET_DONE_JS,
   type TypesetMargins,
   type TypesetReport,
 } from './typeset-book.js';
@@ -88,20 +89,35 @@ const MEASURE_JS = `(() => {
   };
 })()`;
 
+export class TypesetIncompleteError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TypesetIncompleteError';
+  }
+}
+
 /**
- * Poll until Paged.js stops adding pages, so a long book is never truncated.
+ * Second gate: every section in the manuscript must appear in the paginated DOM.
  *
- * Exported so diagnostics wait on the SAME readiness condition the real
- * renderer does. A second, hand-copied poll in a diagnostic script is a
- * baseline that can drift away from production without anyone noticing.
+ * The completion hook is the primary signal, but a page count alone cannot tell
+ * you whether the END of the book made it — a truncated render reports a
+ * plausible number of pages and zero overflow, because the pages it did lay out
+ * are all fine. Comparing rendered section openers against the sections we fed
+ * in makes "the book stopped early" structurally impossible to accept, whatever
+ * the cause.
  */
-export const STABLE_JS = `(function () {
-  const n = document.querySelectorAll('.pagedjs_page').length;
-  const s = window.__tsStable || { n: -1, streak: 0 };
-  if (n === s.n) { s.streak++; } else { s.n = n; s.streak = 0; }
-  window.__tsStable = s;
-  return s.streak >= 5;
-})()`;
+export function assertTypesetComplete(
+  renderedSectionTitles: readonly string[],
+  expectedSectionTitles: readonly string[],
+): void {
+  if (renderedSectionTitles.length === expectedSectionTitles.length) return;
+  const missing = expectedSectionTitles.filter((t) => !renderedSectionTitles.includes(t));
+  throw new TypesetIncompleteError(
+    `Typesetting stopped early: ${renderedSectionTitles.length} of ${expectedSectionTitles.length} sections reached the page. ` +
+      `Missing: ${missing.slice(0, 3).map((t) => JSON.stringify(t)).join(', ')}${missing.length > 3 ? ` (+${missing.length - 3} more)` : ''}. ` +
+      `The PDF would have been a partial book reporting no overflow.`,
+  );
+}
 
 export async function renderTypesetBook(input: RenderTypesetInput): Promise<RenderTypesetResult> {
   const chromium = resolveChromiumPath();
@@ -130,14 +146,20 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
   });
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 180_000 });
-    await page.waitForFunction(`document.querySelectorAll('.pagedjs_page').length > 0`, { timeout: 180_000 });
-    await page.waitForFunction(STABLE_JS, { timeout: 300_000, polling: 300 });
+    // Fonts are vendored into the document, so nothing is fetched at render
+    // time and there is no network to go idle. Completion comes from Paged.js.
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 180_000 });
+    await page.waitForFunction(TYPESET_DONE_JS, { timeout: 300_000, polling: 250 });
 
     const measured = (await page.evaluate(MEASURE_JS)) as Omit<
       TypesetReport,
       'trim' | 'marginsIn' | 'bodyPt' | 'lineHeight'
     >;
+
+    assertTypesetComplete(
+      measured.sectionStarts.map((s) => s.title),
+      sections.map((s) => s.title),
+    );
 
     const pdf = await page.pdf({
       width: `${input.config.trimSize.widthIn}in`,
