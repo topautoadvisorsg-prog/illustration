@@ -242,6 +242,64 @@ describe('page furniture', () => {
   });
 });
 
+/**
+ * SECTION-START POLICY — role-aware, not one blanket rule.
+ *
+ * A single `break-before: recto` on `.tsec` forced SOURCES, A NOTE FOR PARENTS
+ * and ABOUT THE AUTHOR onto rectos too, costing three blank pages in the last
+ * nine of a 159-page book. Chapters keep the convention; back matter does not.
+ */
+describe('section-start policy', () => {
+  const css = () =>
+    buildTypesetHtml({
+      sections: parseTypesetSections('# Chapter 1\n\n## Only Chapter\n\nBody.\n'),
+      config: configFor(),
+      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+    });
+
+  it('breaks by section role rather than applying one rule to every section', () => {
+    const html = css();
+    expect(html).toContain('.tsec.chapter { break-before: recto; }');
+    expect(html).toContain('.tsec.back { break-before: page; }');
+    expect(html).toContain('.tsec.front { break-before: recto; }');
+    // The blanket rule is what caused the problem; it must not come back.
+    expect(/\.tsec \{[^}]*break-before/.test(html)).toBe(false);
+  });
+
+  it('keys the policy to role, never to section titles', () => {
+    const html = css();
+    for (const name of ['SOURCES', 'ABOUT THE AUTHOR', 'A NOTE FOR PARENTS']) {
+      expect(html.slice(0, html.indexOf('<body>'))).not.toContain(name);
+    }
+  });
+
+  it('lets the operator toggle move chapters only, leaving back matter alone', () => {
+    const html = buildTypesetHtml({
+      sections: parseTypesetSections('# Chapter 1\n\n## T\n\nBody.\n'),
+      config: configFor(),
+      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+      chaptersStartRecto: false,
+    });
+    expect(html).toContain('.tsec.chapter { break-before: page; }');
+    // Back matter was already 'page' and stays there; the toggle is about the
+    // chapter convention, so it must not silently reach into other roles.
+    expect(html).toContain('.tsec.back { break-before: page; }');
+    expect(html).toContain('.tsec.front { break-before: recto; }');
+  });
+
+  it('honours a standard that wants back matter on rectos too', () => {
+    const html = buildTypesetHtml({
+      sections: parseTypesetSections('# Chapter 1\n\n## T\n\nBody.\n'),
+      config: configFor(),
+      layoutStandard: {
+        ...EDUCATIONAL_NONFICTION_TYPESET_V1,
+        sectionStart: { front: 'recto', chapter: 'recto', back: 'recto' },
+      },
+    });
+    expect(html).toContain('.tsec.back { break-before: recto; }');
+  });
+});
+
 describe('markdown callouts', () => {
   const render = (md: string) =>
     buildTypesetHtml({

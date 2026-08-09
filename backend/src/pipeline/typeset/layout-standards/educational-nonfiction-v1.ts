@@ -92,8 +92,15 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
     centered: true,
   },
 
-  // Premium convention: a chapter always opens on a right-hand page. Costs a
-  // blank verso whenever the previous chapter ends on a recto (14 in this book).
+  // Premium convention for CHAPTERS only. Back matter starts on the next
+  // available page: SOURCES, A NOTE FOR PARENTS and ABOUT THE AUTHOR are each
+  // a page or two, and forcing them onto rectos cost three blank pages in the
+  // last nine of the book for no reader benefit.
+  sectionStart: {
+    front: 'recto',
+    chapter: 'recto',
+    back: 'page',
+  },
   chaptersStartRecto: true,
 
   furniture: {

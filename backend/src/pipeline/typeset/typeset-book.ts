@@ -449,7 +449,16 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
    */
   const runningHead = (role: 'book-title' | 'section-title' | 'none'): string =>
     role === 'book-title' ? `"${cssString(title)}"` : role === 'section-title' ? 'string(sectitle)' : 'none';
-  const recto = design.chaptersStartRecto;
+  /**
+   * Where a section of each ROLE begins. The operator toggle governs CHAPTERS
+   * only; front and back matter keep the standard's policy, because the toggle
+   * is about the premium chapter convention and not about whether a two-page
+   * back-matter note has earned a blank verso in front of it.
+   */
+  const startFor = (kind: TypesetSection['kind']): 'recto' | 'page' => {
+    if (kind === 'chapter') return design.chaptersStartRecto ? 'recto' : 'page';
+    return standard.sectionStart[kind];
+  };
 
   // The classic drop: the chapter heading begins about a third down the text
   // block, leaving white space above it.
@@ -559,7 +568,12 @@ body {
    unqualified name either: it applies to every page the section spans, which
    silently removed the running heads from the entire book.
    (No backticks in this comment: it lives inside a template literal.) */
-.tsec { ${recto ? 'break-before: recto;' : 'break-before: page;'} page: opener; string-set: sectitle attr(data-title); }
+.tsec { page: opener; string-set: sectitle attr(data-title); }
+/* Section starts are ROLE-AWARE. A chapter opening on a recto is a convention
+   worth a blank verso; a two-paragraph back-matter note is not. */
+.tsec.front { break-before: ${startFor('front')}; }
+.tsec.chapter { break-before: ${startFor('chapter')}; }
+.tsec.back { break-before: ${startFor('back')}; }
 /* Chapter opener: one centred heading block — "Chapter One" over the title,
    per CHAPTER_BOOK_STANDARD.md §3. Centring is declared on the block AND on
    both children, last line included, so a stretched title cannot come back. */

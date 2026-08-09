@@ -251,7 +251,25 @@ export interface TypesetLayoutStandard {
   type: TypesetTypeScale;
   paragraphs: TypesetParagraphPolicy;
   opener: TypesetChapterOpener;
-  /** Start every chapter on a recto, inserting a blank verso when needed. */
+  /**
+   * Where each KIND of section begins. Role-aware on purpose: a chapter opening
+   * on a recto is a premium convention worth a blank verso; a two-paragraph
+   * back-matter note is not. Forcing every section to a recto cost this book
+   * three blank pages in its last nine.
+   *
+   * Keyed by section role, not by title, so it holds for any book of the class
+   * instead of naming SOURCES / ABOUT THE AUTHOR and friends.
+   */
+  sectionStart: {
+    front: 'recto' | 'page';
+    chapter: 'recto' | 'page';
+    back: 'recto' | 'page';
+  };
+  /**
+   * Operator toggle for CHAPTERS only, overriding `sectionStart.chapter` for a
+   * single render. Front and back matter keep the standard's policy — the
+   * toggle is about the premium chapter convention, not about back matter.
+   */
   chaptersStartRecto: boolean;
   furniture: TypesetPageFurniture;
   blocks: TypesetBlockStyles;
