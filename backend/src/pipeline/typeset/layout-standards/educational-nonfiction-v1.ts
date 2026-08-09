@@ -136,7 +136,13 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
 
   alertPanel: {
     enabled: true,
-    headings: ['SEE A DOCTOR IF'],
+    // The manuscript signals a safety callout with an ALL-CAPS H3. Both of
+    // these recur; the other all-caps H3s in the book are one-off category
+    // headings in the Quick-Answer Index and must stay headings.
+    // TALK TO SOMEONE IF carries the mental-health guidance, including the
+    // self-harm indicators — the content in this book that most needs to be
+    // findable by someone scanning for it.
+    headings: ['SEE A DOCTOR IF', 'TALK TO SOMEONE IF'],
     labelPt: 10.5,
     labelLetterSpacingEm: 0.12,
     // A real rule on all four sides: the book calls these boxes, so they are

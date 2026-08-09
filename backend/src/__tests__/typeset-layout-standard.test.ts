@@ -585,6 +585,29 @@ describe('alert panel', () => {
     expect(render('B.\n\n### Something else\n\n- x')).not.toContain('alert-panel');
   });
 
+  it('boxes TALK TO SOMEONE IF, including its intro paragraph', () => {
+    const html = render(
+      'B.\n\n### TALK TO SOMEONE IF\n\nSome things deserve a real person rather than a book:\n\n- The anger has led to hurting yourself.\n\nTell a parent or another adult you trust.',
+    );
+    const panel = /<aside class="alert-panel">([\s\S]*?)<\/aside>/.exec(html)?.[1] ?? '';
+    expect(html).toContain('<p class="alert-label">TALK TO SOMEONE IF</p>');
+    expect(panel).toContain('Some things deserve a real person');
+    expect(panel).toContain('hurting yourself');
+    expect(panel).toContain('Tell a parent or another adult you trust.');
+  });
+
+  /**
+   * The manuscript's Quick-Answer Index uses all-caps H3s as category headings.
+   * They share the casing convention but are not callouts and must not be boxed.
+   */
+  it('leaves the index category headings as plain headings', () => {
+    for (const h of ['YOUR VOICE', 'SLEEP AND EATING', 'DOWN THERE', 'BEING YOU']) {
+      const html = render(`B.\n\n### ${h}\n\nSome entry text.`);
+      expect(html).not.toContain('alert-panel');
+      expect(html).toContain(`<h3>${h}</h3>`);
+    }
+  });
+
   it('boxes every occurrence, not just the first', () => {
     const html = render('B.\n\n### SEE A DOCTOR IF\n\n- a\n\n### Mid\n\nx\n\n### SEE A DOCTOR IF\n\n- b');
     expect((html.match(/<aside class="alert-panel">/g) ?? []).length).toBe(2);

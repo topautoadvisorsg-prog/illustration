@@ -140,3 +140,30 @@ furniture instead of re-implementing them in SVG.
 Front matter is not missing from the current proof by accident: Breakdown has
 never run (issue 4), so no front-matter rows exist. Its absence is expected and
 is not a defect of the interior.
+
+---
+
+## 6. Numbered sequences are authored two ways (manuscript variation)
+
+**Status:** recorded, no action · **Severity:** minor · **NOT a renderer defect**
+
+The manuscript writes numbered steps in two different forms:
+
+```
+1. **Heat.** A warm bath before bed.        63x — real Markdown ordered list
+**1. Wash twice a day. Gently.**            21x — bold lead-in paragraph
+This is the one that works fastest.
+```
+
+Both render correctly and exactly as marked up. They simply *look* different: the
+Markdown form gets hanging numerals in the margin; the bold form reads as
+indented paragraphs with the number inline. Visible on p85, where the first item
+sits flush (first paragraph after a heading) and the rest indent.
+
+Deliberately left alone. Fixing it would mean either editing the frozen
+manuscript, or teaching the renderer to infer list structure from bold
+formatting — inventing structure from styling, and repaginating the book to do
+it. The variation is as likely to be an authorial choice as an oversight.
+
+Recorded here as a manuscript-authored formatting variation so it is not
+rediscovered as a bug during a later QA pass.
