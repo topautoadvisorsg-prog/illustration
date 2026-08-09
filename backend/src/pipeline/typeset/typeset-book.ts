@@ -22,6 +22,7 @@ import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from './layout-standards/educationa
 import { resolveTypesetDesign } from './layout-standards/resolve-design.js';
 import type {
   ChapterLabelFormat,
+  ChapterTakeawayPolicy,
   TerminalMicroSectionPolicy,
   TypesetLayoutStandard,
 } from './layout-standards/types.js';
@@ -143,7 +144,11 @@ export function parseTypesetSections(markdown: string): TypesetSection[] {
  */
 const SCENE_BREAK = '<p class="scene-break">* * *</p>';
 
-function bodyToHtml(lines: string[], micro?: TerminalMicroSectionPolicy): string {
+function bodyToHtml(
+  lines: string[],
+  micro?: TerminalMicroSectionPolicy,
+  takeaway?: ChapterTakeawayPolicy,
+): string {
   const html: string[] = [];
   let para: string[] = [];
   let list: string[] = [];
@@ -254,6 +259,29 @@ function bodyToHtml(lines: string[], micro?: TerminalMicroSectionPolicy): string
   // page anyway, they orphan onto a near-empty page carrying only asterisks
   // (this is what left page 4 blank but for two rows of them).
   while (html.length && html[html.length - 1] === SCENE_BREAK) html.pop();
+
+  // A recognised closing beat becomes the takeaway component: compact, kept
+  // whole, and kept WITH the chapter content before it. Checked before the
+  // generic micro-section rule because it is the more specific treatment.
+  if (takeaway?.enabled && takeaway.headings.length) {
+    const lastH3 = html.map((h) => h.startsWith('<h3')).lastIndexOf(true);
+    if (lastH3 >= 0 && lastH3 < html.length - 1) {
+      const headingText = (html[lastH3] ?? '').replace(/<[^>]+>/g, '').trim();
+      const isTakeaway = takeaway.headings.some(
+        (h) => h.toLowerCase() === headingText.toLowerCase(),
+      );
+      if (isTakeaway) {
+        const label =
+          takeaway.labelTransform === 'uppercase' ? headingText.toUpperCase() : headingText;
+        const rest = html.splice(lastH3 + 1).join('\n');
+        html.splice(lastH3, 1);
+        html.push(
+          `<div class="takeaway"><p class="takeaway-label">${escapeHtml(label)}</p>${rest}</div>`,
+        );
+        return html.join('\n');
+      }
+    }
+  }
 
   // Wrap a terminal micro-section so it stays whole and gets one chance to fit
   // on the page it starts from. See TerminalMicroSectionPolicy.
@@ -386,6 +414,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
   const furn = standard.furniture;
   const blocks = standard.blocks;
   const micro = standard.terminalMicroSection;
+  const tk = standard.chapterTakeaway;
   const openerAlign = op.centered ? 'center' : 'left';
   const smallCaps = furn.runningHeadSmallCaps ? 'small-caps' : 'normal';
   const folioContent = furn.folio === 'none' ? 'none' : 'counter(page)';
@@ -413,7 +442,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
     ${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}
     <h2>${escapeHtml(s.title)}</h2>
   </header>
-  ${bodyToHtml(s.bodyLines, standard.terminalMicroSection)}
+  ${bodyToHtml(s.bodyLines, standard.terminalMicroSection, standard.chapterTakeaway)}
 </section>`;
     })
     .join('\n');
@@ -553,6 +582,16 @@ ul { list-style: disc; }
    tightened space above as one controlled attempt to fit where it starts. */
 .tail-unit { break-inside: avoid; }
 .tail-unit h3 { margin-top: ${micro.tightenedMarginTopEm}em; }
+/* Chapter takeaway: the recurring closing beat. break-before: avoid keeps it
+   with the chapter content it belongs to instead of opening a near-empty page;
+   break-inside: avoid means the label can never be stranded from its sentence. */
+.takeaway { margin: ${tk.marginTopEm}em 0 0; break-inside: avoid; break-before: avoid; }
+.takeaway-label { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 600;
+  font-size: ${tk.labelPt}pt; letter-spacing: ${tk.labelLetterSpacingEm}em;
+  text-transform: ${tk.labelTransform}; margin: 0 0 ${tk.labelGapEm}em;
+  text-align: left; text-align-last: left; break-after: avoid; }
+.takeaway p { text-indent: 0; }
+.takeaway p + p { margin-top: .25em; }
 </style></head>
 <body>
 ${body}

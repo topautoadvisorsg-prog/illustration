@@ -128,10 +128,10 @@ describe('standard drives the rendered CSS (behaviour preserved)', () => {
   it('emits the approved geometry and type scale', () => {
     const css = html();
     expect(css).toContain('@page { size: 5.5in 8.5in; margin: 0.625in 0.5in 0.625in 0.625in; }');
-    // 27% of the 7.25in text block — the approved opener sink.
-    expect(css).toContain('padding-top: 1.958in');
+    // 24% of the 7.25in text block — the approved opener sink.
+    expect(css).toContain('padding-top: 1.740in');
     expect(css).toContain('font-size: 19pt'); // chapter title = 12 * 1.6
-    expect(css).toContain('font-size: 10pt'); // kicker = 8.5 + 1.5
+    expect(css).toContain('font-size: 11pt'); // kicker = 8.5 + 2.5
     expect(css).toContain('orphans: 2; widows: 2');
     expect(css).toContain('hyphens: auto');
     expect(css).toContain('text-indent: 1.2em');
@@ -326,9 +326,10 @@ describe('terminal micro-section', () => {
     });
 
   it('wraps a heading plus a single short line', () => {
-    const html = render('Opening paragraph.\n\n### The one thing to remember\n\nThis is not a race.');
+    // Deliberately NOT the takeaway heading — that has its own component and
+    // takes precedence. This covers the generic fallback.
+    const html = render('Opening paragraph.\n\n### A closing note\n\nThis is not a race.');
     expect(html).toContain('<div class="tail-unit">');
-    expect(html).toContain('break-inside: avoid');
     // The heading must travel WITH its text, never strand at the foot.
     const unit = /<div class="tail-unit">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? '';
     expect(unit).toContain('<h3>');
@@ -467,6 +468,74 @@ describe('lists', () => {
 
   it('accepts the "1)" form', () => {
     expect(render('1) One\n2) Two')).toContain('<ol>');
+  });
+});
+
+/**
+ * 21 of 23 chapters end with the same closing heading plus one sentence. As a
+ * normal H3 that landed on its own page filling ~7% whenever the previous page
+ * was full. As a component it stays compact and travels with its chapter.
+ */
+describe('chapter takeaway component', () => {
+  const render = (body: string) =>
+    bodyOf(
+      buildTypesetHtml({
+        sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${body}\n`),
+        config: configFor(),
+        layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+      }),
+    );
+
+  it('renders the recognised closing heading as a takeaway, not an H3', () => {
+    const html = render('Body text.\n\n### The one thing to remember\n\nThis is not a race.');
+    expect(html).toContain('<div class="takeaway">');
+    expect(html).toContain('<p class="takeaway-label">THE ONE THING TO REMEMBER</p>');
+    expect(html).toContain('This is not a race.');
+    // It must stop being a heading.
+    expect(html).not.toMatch(/<h3>The one thing to remember<\/h3>/i);
+  });
+
+  it('preserves the manuscript sentence exactly', () => {
+    const html = render('B.\n\n### The one thing to remember\n\nYour body is growing in the wrong order on purpose, and it evens out.');
+    expect(html).toContain('Your body is growing in the wrong order on purpose, and it evens out.');
+  });
+
+  it('keeps the block with the preceding content and unbroken', () => {
+    const css = buildTypesetHtml({
+      sections: parseTypesetSections('# Chapter 1\n\n## T\n\nB.\n\n### The one thing to remember\n\nShort.\n'),
+      config: configFor(),
+      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+    });
+    expect(css).toMatch(/\.takeaway \{[^}]*break-inside: avoid/);
+    expect(css).toMatch(/\.takeaway \{[^}]*break-before: avoid/);
+    // The label can never be stranded from its sentence.
+    expect(css).toMatch(/\.takeaway-label \{[\s\S]*?break-after: avoid/);
+  });
+
+  it('matches case-insensitively but leaves other headings alone', () => {
+    expect(render('B.\n\n### THE ONE THING TO REMEMBER\n\nX.')).toContain('<div class="takeaway">');
+    const other = render('B.\n\n### Something else entirely\n\nX.');
+    expect(other).not.toContain('takeaway');
+    expect(other).toContain('<h3>Something else entirely</h3>');
+  });
+
+  it('only applies to the FINAL heading of a chapter', () => {
+    const html = render('### The one thing to remember\n\nMid-chapter.\n\n### Later section\n\nEnd body.');
+    expect(html).not.toContain('<div class="takeaway">');
+  });
+
+  it('honours a standard that disables it', () => {
+    const html = bodyOf(
+      buildTypesetHtml({
+        sections: parseTypesetSections('# Chapter 1\n\n## T\n\nB.\n\n### The one thing to remember\n\nShort.\n'),
+        config: configFor(),
+        layoutStandard: {
+          ...EDUCATIONAL_NONFICTION_TYPESET_V1,
+          chapterTakeaway: { ...EDUCATIONAL_NONFICTION_TYPESET_V1.chapterTakeaway, enabled: false },
+        },
+      }),
+    );
+    expect(html).not.toContain('<div class="takeaway">');
   });
 });
 

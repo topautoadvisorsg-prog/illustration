@@ -49,7 +49,10 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
     labelPt: 8.5,
     captionPt: 9,
     chapterTitleScale: 1.6,
-    kickerPtDelta: 1.5,
+    // Kicker 10pt -> 11pt (labelPt 8.5 + 2.5). At 10pt it read undersized
+    // against the 19pt chapter title. Face, tracking, caps and centring
+    // deliberately unchanged.
+    kickerPtDelta: 2.5,
     folioPtDelta: 1,
   },
 
@@ -76,7 +79,10 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
     // practical guide. 25% was efficient but tight enough that the opening
     // moment stopped feeling deliberate. 27% keeps the drop and starts the body
     // ~44% down instead of ~49%.
-    sinkFraction: 0.27,
+    // 33% -> 27% -> 24%. Each step moved the first line of reading text higher
+    // and freed usable depth below the opener; at 27% it still sat lower than
+    // this book wants.
+    sinkFraction: 0.24,
     // "Chapter One", not "Chapter 1" — CHAPTER_BOOK_STANDARD.md §3. The label is
     // generated in words and uppercased by style, never pre-uppercased in code.
     labelFormat: 'chapter-word',
@@ -106,7 +112,10 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
     sceneBreakMark: '* * *',
     sceneBreakLetterSpacingEm: 0.5,
     listIndentEm: 1.4,
-    listItemSpacingEm: 0.18,
+    // 0.18em -> 0.30em. At 0.18 multi-line list items separated LESS clearly
+    // than the 0.25em between paragraphs, so a wrapped item read as continuous
+    // prose. Items must separate at least as clearly as paragraphs do.
+    listItemSpacingEm: 0.3,
     callout: {
       borderLeftPt: 1.5,
       paddingLeftEm: 0.9,
@@ -123,5 +132,19 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
     enabled: true,
     maxWords: 45,
     tightenedMarginTopEm: 0.5,
+  },
+
+  chapterTakeaway: {
+    enabled: true,
+    headings: ['The one thing to remember'],
+    // A label, not a heading: smaller than the 13pt H3 it replaces so the block
+    // reads as a closing note rather than opening a new section.
+    labelPt: 10,
+    labelLetterSpacingEm: 0.12,
+    labelTransform: 'uppercase',
+    // Tighter than an H3's 1.15em, so the takeaway sits with the chapter it
+    // closes rather than announcing itself.
+    marginTopEm: 0.9,
+    labelGapEm: 0.25,
   },
 };

@@ -164,6 +164,32 @@ export interface TerminalMicroSectionPolicy {
   tightenedMarginTopEm: number;
 }
 
+/**
+ * CHAPTER TAKEAWAY — a recurring closing beat, not a normal subsection.
+ *
+ * 21 of this book's 23 chapters end with the same heading followed by a single
+ * sentence. Set as an ordinary H3 that is a heading plus one line, which lands
+ * on its own page whenever the previous page is full and fills about 7% of it.
+ * Treating it as a component lets it stay compact and travel with the chapter
+ * content it belongs to.
+ *
+ * Matching is by heading text, declared here — the component is reusable, and a
+ * different book class names its closing beat something else.
+ */
+export interface ChapterTakeawayPolicy {
+  enabled: boolean;
+  /** Heading texts that become a takeaway. Compared case-insensitively. */
+  headings: readonly string[];
+  /** Label point size. */
+  labelPt: number;
+  labelLetterSpacingEm: number;
+  labelTransform: 'uppercase' | 'none';
+  /** Space above the whole block, in em. Tighter than an H3's 1.15em. */
+  marginTopEm: number;
+  /** Space between the label and the takeaway sentence, in em. */
+  labelGapEm: number;
+}
+
 export interface TypesetBlockStyles {
   /** Printed glyphs for a scene break, e.g. "* * *". */
   sceneBreakMark: string;
@@ -202,4 +228,5 @@ export interface TypesetLayoutStandard {
   furniture: TypesetPageFurniture;
   blocks: TypesetBlockStyles;
   terminalMicroSection: TerminalMicroSectionPolicy;
+  chapterTakeaway: ChapterTakeawayPolicy;
 }
