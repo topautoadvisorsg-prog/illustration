@@ -17,6 +17,7 @@
  */
 
 import type { ProjectConfig, TrimSize } from '@wildlands/shared';
+import { bundledFontCss } from './font-assets.js';
 
 // ── Geometry ────────────────────────────────────────────────────────────────
 
@@ -242,16 +243,24 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
     })
     .join('\n');
 
-  const fontQuery = [t.headingFont, t.bodyFont]
+  // Fonts come from vendored assets so the printed interior is reproducible
+  // offline. Only families with no bundled asset fall back to the CDN, and that
+  // fallback is a dev convenience — see font-assets.ts.
+  const fonts = bundledFontCss([t.headingFont, t.bodyFont]);
+  const fontQuery = fonts.missing
     .map((f) => `family=${f.replace(/\s+/g, '+')}:ital,wght@0,400;0,500;0,600;1,400`)
     .join('&');
+  const cdnLink = fontQuery
+    ? `<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?${fontQuery}&display=swap" rel="stylesheet">`
+    : '<!-- all faces vendored; no external font request -->';
 
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?${fontQuery}&display=swap" rel="stylesheet">
+${cdnLink}
 <style>
+${fonts.css}
 /* Trim with ZERO bleed: a text interior has nothing running to the edge.
    Margins are MIRRORED — gutter inside, smaller margin at the fore-edge. */
 @page { size: ${trim.widthIn}in ${trim.heightIn}in; margin: ${m.topIn}in ${m.outsideIn}in ${m.bottomIn}in ${m.gutterIn}in; }

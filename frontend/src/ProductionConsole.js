@@ -51,7 +51,13 @@ const S = {
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 12, marginTop: 14 },
 };
 
-const EMPTY_SETUP_FORM = { title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10", bodyPt: 11, lineHeight: 1.4, backBlurb: "", backFeatures: "", backAuthorBio: "" };
+const EMPTY_SETUP_FORM = { title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10", bodyPt: 11, lineHeight: 1.4, headingFont: "Cormorant Garamond", bodyFont: "EB Garamond", backBlurb: "", backFeatures: "", backAuthorBio: "" };
+
+// The faces the renderer can actually produce. Free text here would silently
+// fall back to a generic at print time, so Setup offers only families the
+// pipeline ships. Display faces first, then the text faces.
+const HEADING_FONTS = ["Oswald", "Archivo", "Montserrat", "Cormorant Garamond", "EB Garamond"];
+const BODY_FONTS = ["EB Garamond", "Cormorant Garamond", "Lora", "Archivo"];
 const EMPTY_NEW_FORM = { title: "", subtitle: "", author: "" };
 
 const STEPS = [
@@ -467,6 +473,8 @@ export default function ProductionConsole({ onExitToLegacy }) {
         // a large-format field guide), so Setup owns it rather than the renderer.
         bodyPt: cfg.typography?.bodyPt ?? 11,
         lineHeight: cfg.typography?.lineHeight ?? 1.4,
+        headingFont: cfg.typography?.headingFont ?? "Cormorant Garamond",
+        bodyFont: cfg.typography?.bodyFont ?? "EB Garamond",
         // Back-cover copy: blurb (paragraph), features (one per line), author note.
         backBlurb: bd.blurb ?? (bd.hooks?.length ? bd.hooks.join("\n") : ""),
         backFeatures: (bd.features ?? []).join("\n"),
@@ -535,12 +543,14 @@ export default function ProductionConsole({ onExitToLegacy }) {
       subtitle: f.subtitle,
       authorName: f.author,
       trimSize: trimSize(f.trim),
-      // Only the two body values Setup owns. The API deep-merges, so every other
-      // typography field (fonts, per-role sizes) keeps its stored value instead
-      // of being reset to a schema default.
+      // The four values Setup owns: body size, leading, and the two font roles.
+      // The API deep-merges, so per-role type sizes keep their stored values
+      // instead of being reset to a schema default.
       typography: {
         bodyPt: Number(f.bodyPt) || 11,
         lineHeight: Number(f.lineHeight) || 1.4,
+        headingFont: f.headingFont || "Cormorant Garamond",
+        bodyFont: f.bodyFont || "EB Garamond",
       },
       publishing: {
         title: f.title,
@@ -1259,6 +1269,26 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 </div>
                 <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
                   Drives the typeset interior directly. Digest text books are typically 12pt / 1.3; large-format illustrated pages 11pt / 1.4.
+                </div>
+                {/* Font roles: headingFont is the display face (chapter labels,
+                    titles, section headings); bodyFont is the text face. Both
+                    already existed in ProjectConfig but had no way in. */}
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 600, flex: "1 1 180px" }}>Display face (headings)
+                    <select style={S.input} value={form.headingFont}
+                      onChange={(e) => setForm({ ...form, headingFont: e.target.value })}>
+                      {HEADING_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 600, flex: "1 1 180px" }}>Text face (body)
+                    <select style={S.input} value={form.bodyFont}
+                      onChange={(e) => setForm({ ...form, bodyFont: e.target.value })}>
+                      {BODY_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
+                  The display face sets chapter labels, chapter titles and section headings. Rebuild the typeset preview in Step 5 to see a change.
                 </div>
 
                 <div style={{ marginTop: 22, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>

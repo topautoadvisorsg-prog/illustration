@@ -141,3 +141,6 @@ reconciliation-report.json
 
 # Local developer overrides (dev database, Chromium path). Never commit.
 .env.development.local
+
+# Diagnostic output from typeset-diagnose.ts and other local probes.
+/outputs/

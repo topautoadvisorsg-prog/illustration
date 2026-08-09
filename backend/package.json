@@ -11,6 +11,7 @@
     "start": "drizzle-kit migrate && node dist/index.js",
     "smoke": "tsx scripts/smoke-test.ts",
     "audit:manuscript": "tsx scripts/audit-manuscript.ts",
+    "vendor:fonts": "tsx scripts/vendor-fonts.ts",
     "storage:prune": "tsx scripts/db-guard.ts prune && tsx scripts/storage-prune.ts",
     "drizzle:generate": "drizzle-kit generate",
     "db:guard": "tsx scripts/db-guard.ts",
