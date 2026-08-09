@@ -539,6 +539,83 @@ describe('chapter takeaway component', () => {
   });
 });
 
+/**
+ * The book's front matter promises "boxes marked SEE A DOCTOR IF". Rendered as
+ * ordinary H3s they were not boxes — on the nine blocks carrying medical
+ * guidance, which are the ones most needing to be scannable.
+ */
+describe('alert panel', () => {
+  const render = (md: string) =>
+    bodyOf(
+      buildTypesetHtml({
+        sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${md}\n`),
+        config: configFor(),
+        layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+      }),
+    );
+
+  it('boxes a recognised alert heading with its list and closing paragraph', () => {
+    const html = render(
+      'Body.\n\n### SEE A DOCTOR IF\n\n- One leg only.\n- Swelling or redness.\n\nOrdinary growing pains are both legs.\n\n### Next section\n\nAfter.',
+    );
+    expect(html).toContain('<aside class="alert-panel">');
+    expect(html).toContain('<p class="alert-label">SEE A DOCTOR IF</p>');
+    const panel = /<aside class="alert-panel">([\s\S]*?)<\/aside>/.exec(html)?.[1] ?? '';
+    expect(panel).toContain('One leg only.');
+    expect(panel).toContain('Ordinary growing pains are both legs.');
+    // The panel must END at the next heading.
+    expect(panel).not.toContain('Next section');
+    expect(panel).not.toContain('After.');
+    expect(html).toContain('<h3>Next section</h3>');
+  });
+
+  it('runs to the end of the section when no heading follows', () => {
+    const html = render('Body.\n\n### SEE A DOCTOR IF\n\n- Item.\n\nClosing reassurance.');
+    const panel = /<aside class="alert-panel">([\s\S]*?)<\/aside>/.exec(html)?.[1] ?? '';
+    expect(panel).toContain('Item.');
+    expect(panel).toContain('Closing reassurance.');
+  });
+
+  it('stops being a plain heading', () => {
+    expect(render('B.\n\n### SEE A DOCTOR IF\n\n- x')).not.toContain('<h3>SEE A DOCTOR IF</h3>');
+  });
+
+  it('matches case-insensitively and leaves other headings alone', () => {
+    expect(render('B.\n\n### See a doctor if\n\n- x')).toContain('<aside class="alert-panel">');
+    expect(render('B.\n\n### Something else\n\n- x')).not.toContain('alert-panel');
+  });
+
+  it('boxes every occurrence, not just the first', () => {
+    const html = render('B.\n\n### SEE A DOCTOR IF\n\n- a\n\n### Mid\n\nx\n\n### SEE A DOCTOR IF\n\n- b');
+    expect((html.match(/<aside class="alert-panel">/g) ?? []).length).toBe(2);
+  });
+
+  it('honours a standard that disables it', () => {
+    const html = bodyOf(
+      buildTypesetHtml({
+        sections: parseTypesetSections('# Chapter 1\n\n## T\n\nB.\n\n### SEE A DOCTOR IF\n\n- x\n'),
+        config: configFor(),
+        layoutStandard: {
+          ...EDUCATIONAL_NONFICTION_TYPESET_V1,
+          alertPanel: { ...EDUCATIONAL_NONFICTION_TYPESET_V1.alertPanel, enabled: false },
+        },
+      }),
+    );
+    expect(html).not.toContain('alert-panel');
+    expect(html).toContain('<h3>SEE A DOCTOR IF</h3>');
+  });
+
+  it('draws a real border and keeps the box unbroken', () => {
+    const css = buildTypesetHtml({
+      sections: parseTypesetSections('# Chapter 1\n\n## T\n\nB.\n\n### SEE A DOCTOR IF\n\n- x\n'),
+      config: configFor(),
+      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+    });
+    expect(css).toMatch(/\.alert-panel \{[^}]*border: 0\.75pt solid/);
+    expect(css).toMatch(/\.alert-panel \{[^}]*break-inside: avoid/);
+  });
+});
+
 describe('chapter label formats', () => {
   it('spells by default and never pre-uppercases', () => {
     expect(chapterLabel({ kind: 'chapter', number: 21 })).toBe('Chapter Twenty-One');

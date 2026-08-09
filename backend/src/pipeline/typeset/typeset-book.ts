@@ -21,6 +21,7 @@ import { bundledFontCss } from './font-assets.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from './layout-standards/educational-nonfiction-v1.js';
 import { resolveTypesetDesign } from './layout-standards/resolve-design.js';
 import type {
+  AlertPanelPolicy,
   ChapterLabelFormat,
   ChapterTakeawayPolicy,
   TerminalMicroSectionPolicy,
@@ -148,6 +149,7 @@ function bodyToHtml(
   lines: string[],
   micro?: TerminalMicroSectionPolicy,
   takeaway?: ChapterTakeawayPolicy,
+  alert?: AlertPanelPolicy,
 ): string {
   const html: string[] = [];
   let para: string[] = [];
@@ -259,6 +261,24 @@ function bodyToHtml(
   // page anyway, they orphan onto a near-empty page carrying only asterisks
   // (this is what left page 4 blank but for two rows of them).
   while (html.length && html[html.length - 1] === SCENE_BREAK) html.pop();
+
+  // Recognised alert headings become boxed panels. Done before the takeaway and
+  // micro-section passes so those see the final element list. A panel runs to
+  // the next heading or the end of the section, which is where these blocks
+  // end: bullets followed by a closing paragraph that belongs with them.
+  if (alert?.enabled && alert.headings.length) {
+    const isAlert = (h: string): boolean =>
+      h.startsWith('<h3') &&
+      alert.headings.some((a) => a.toLowerCase() === h.replace(/<[^>]+>/g, '').trim().toLowerCase());
+    for (let i = html.length - 1; i >= 0; i -= 1) {
+      if (!isAlert(html[i]!)) continue;
+      let end = i + 1;
+      while (end < html.length && !html[end]!.startsWith('<h3') && !html[end]!.startsWith('<h4')) end += 1;
+      const label = html[i]!.replace(/<[^>]+>/g, '').trim();
+      const inner = html.slice(i + 1, end).join('\n');
+      html.splice(i, end - i, `<aside class="alert-panel"><p class="alert-label">${escapeHtml(label)}</p>${inner}</aside>`);
+    }
+  }
 
   // A recognised closing beat becomes the takeaway component: compact, kept
   // whole, and kept WITH the chapter content before it. Checked before the
@@ -415,6 +435,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
   const blocks = standard.blocks;
   const micro = standard.terminalMicroSection;
   const tk = standard.chapterTakeaway;
+  const ap = standard.alertPanel;
   const openerAlign = op.centered ? 'center' : 'left';
   const smallCaps = furn.runningHeadSmallCaps ? 'small-caps' : 'normal';
   const folioContent = furn.folio === 'none' ? 'none' : 'counter(page)';
@@ -442,7 +463,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
     ${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}
     <h2>${escapeHtml(s.title)}</h2>
   </header>
-  ${bodyToHtml(s.bodyLines, standard.terminalMicroSection, standard.chapterTakeaway)}
+  ${bodyToHtml(s.bodyLines, standard.terminalMicroSection, standard.chapterTakeaway, standard.alertPanel)}
 </section>`;
     })
     .join('\n');
@@ -582,6 +603,19 @@ ul { list-style: disc; }
    tightened space above as one controlled attempt to fit where it starts. */
 .tail-unit { break-inside: avoid; }
 .tail-unit h3 { margin-top: ${micro.tightenedMarginTopEm}em; }
+/* Alert panel: the book's front matter calls these BOXES, so they are boxes.
+   Kept whole — a safety box split across a spread reads as two fragments and
+   the second half loses its heading. */
+.alert-panel { border: ${ap.borderPt}pt solid currentColor; padding: ${ap.paddingEm}em;
+  margin: ${ap.marginYEm}em 0;${ap.keepTogether ? ' break-inside: avoid;' : ''} }
+.alert-label { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 600;
+  font-size: ${ap.labelPt}pt; letter-spacing: ${ap.labelLetterSpacingEm}em;
+  text-transform: uppercase; margin: 0 0 .45em; text-align: left; text-align-last: left;
+  break-after: avoid; }
+.alert-panel p { text-indent: 0; }
+.alert-panel > p + p { margin-top: .3em; }
+.alert-panel ul, .alert-panel ol { margin: .3em 0; }
+.alert-panel > ul + p, .alert-panel > ol + p { margin-top: .5em; }
 /* Chapter takeaway: the recurring closing beat. break-before: avoid keeps it
    with the chapter content it belongs to instead of opening a near-empty page;
    break-inside: avoid means the label can never be stranded from its sentence. */

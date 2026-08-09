@@ -134,6 +134,19 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
     tightenedMarginTopEm: 0.5,
   },
 
+  alertPanel: {
+    enabled: true,
+    headings: ['SEE A DOCTOR IF'],
+    labelPt: 10.5,
+    labelLetterSpacingEm: 0.12,
+    // A real rule on all four sides: the book calls these boxes, so they are
+    // boxes. Thin enough not to shout on an uncoated B&W page.
+    borderPt: 0.75,
+    paddingEm: 0.8,
+    marginYEm: 1,
+    keepTogether: true,
+  },
+
   chapterTakeaway: {
     enabled: true,
     headings: ['The one thing to remember'],

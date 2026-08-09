@@ -190,6 +190,34 @@ export interface ChapterTakeawayPolicy {
   labelGapEm: number;
 }
 
+/**
+ * ALERT PANEL — a boxed, self-contained aside introduced by a known heading.
+ *
+ * This book's front matter tells the reader "you'll see BOXES marked SEE A
+ * DOCTOR IF". Rendered as an ordinary H3 they were not boxes at all, just
+ * another heading in the flow — a promise the page did not keep, on the nine
+ * blocks in the book that carry medical guidance and most need to be scannable.
+ *
+ * The panel runs from the matched heading to the next heading or the end of the
+ * section, which is where these blocks consistently end: bullets, then a
+ * closing reassurance paragraph that belongs with them.
+ */
+export interface AlertPanelPolicy {
+  enabled: boolean;
+  /** Heading texts that open a panel. Compared case-insensitively. */
+  headings: readonly string[];
+  labelPt: number;
+  labelLetterSpacingEm: number;
+  borderPt: number;
+  paddingEm: number;
+  marginYEm: number;
+  /**
+   * Keep the whole panel on one page. A safety box split across a spread reads
+   * as two unrelated fragments, and the second half loses its heading.
+   */
+  keepTogether: boolean;
+}
+
 export interface TypesetBlockStyles {
   /** Printed glyphs for a scene break, e.g. "* * *". */
   sceneBreakMark: string;
@@ -229,4 +257,5 @@ export interface TypesetLayoutStandard {
   blocks: TypesetBlockStyles;
   terminalMicroSection: TerminalMicroSectionPolicy;
   chapterTakeaway: ChapterTakeawayPolicy;
+  alertPanel: AlertPanelPolicy;
 }
