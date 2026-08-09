@@ -2043,6 +2043,54 @@ function Guard({ project, setStep }) {
 }
 
 /**
+ * Enlarge one typeset page. Mirrors ZoomModal (the illustration reviewer's
+ * lightbox) so both review surfaces behave identically: click the backdrop to
+ * dismiss, header carries the identity, body scrolls if the page is tall.
+ *
+ * Re-renders from the PDF at a high scale rather than upscaling the thumbnail
+ * bitmap — the whole point of opening a page is to read the type.
+ */
+function TypesetPageModal({ docRef, page, onClose }) {
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const canvasRef = useRef(null);
+  const W = isMobile ? 320 : 620;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const doc = docRef.current;
+      const canvas = canvasRef.current;
+      if (!doc || !canvas) return;
+      const pg = await doc.getPage(page.n);
+      if (cancelled) return;
+      const base = pg.getViewport({ scale: 1 });
+      const viewport = pg.getViewport({ scale: (W / base.width) * 2 }); // 2x for crisp type
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.width = `${W}px`;
+      await pg.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    })();
+    return () => { cancelled = true; };
+  }, [docRef, page.n, W]);
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(20,16,8,0.55)", display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "center", zIndex: 9000, padding: isMobile ? 10 : 24, overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.panel, borderRadius: 12, padding: isMobile ? 12 : 20, maxHeight: isMobile ? "none" : "92vh", overflow: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <div>
+            <b>page {page.n}</b>
+            {page.section ? <span style={{ color: C.muted }}> · {page.section}</span> : null}
+            {page.flag ? <span style={{ ...S.pill(page.flag === "overflow" ? C.red : C.muted), marginLeft: 8 }}>{page.flag}</span> : null}
+          </div>
+          <button style={S.ghost} onClick={onClose}>Close ✕</button>
+        </div>
+        <canvas ref={canvasRef} style={{ display: "block", border: `1px solid ${C.line}`, background: "#fff" }} />
+      </div>
+    </div>
+  );
+}
+
+/**
  * Renders PDF pages to canvas so the operator actually sees the book.
  *
  * The first version embedded the PDF in an <iframe> and relied on the browser's
@@ -2050,18 +2098,46 @@ function Guard({ project, setStep }) {
  * showed nothing at all. Drawing the pages ourselves with pdf.js removes that
  * dependency entirely.
  *
- * Pages render in batches as you scroll: a 155-page book is far too much to
- * rasterise up front, and the operator only needs the next few pages.
+ * ─── WHY A GRID ───────────────────────────────────────────────────────────
+ * The pages used to stack one-per-row inside a fixed-height box with its own
+ * scrollbar, which made reviewing a 155-page book a slog: one page visible at a
+ * time, nested scrolling, no way to compare spreads or spot an odd page without
+ * hunting. This reuses the illustration reviewer's pattern instead — a thumbnail
+ * grid, click to enlarge — so both review surfaces work the same way. The inner
+ * scroller is gone; the whole book flows down the page.
+ *
+ * Pages still render in batches: a 155-page book is far too much to rasterise up
+ * front.
  */
-function PdfPages({ url, pageCount }) {
+function PdfPages({ url, pageCount, report }) {
   const hostRef = useRef(null);
-  const [shown, setShown] = useState(8);
+  const docRef = useRef(null);
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const [shown, setShown] = useState(24);
   const [total, setTotal] = useState(pageCount || 0);
   const [err, setErr] = useState("");
+  const [cols, setCols] = useState(4);
+  const [zoomPage, setZoomPage] = useState(null);
+
+  /**
+   * Page number -> the section that STARTS there, plus anything the report
+   * already flagged. Keeps section context visible while scanning, and makes a
+   * suspicious page identifiable without opening it.
+   */
+  const pageMeta = useMemo(() => {
+    const m = new Map();
+    for (const s of report?.sectionStarts ?? []) {
+      if (s.page) m.set(s.page, { ...(m.get(s.page) || {}), section: s.label || s.title });
+    }
+    for (const p of report?.blankPages ?? []) m.set(p, { ...(m.get(p) || {}), flag: "blank" });
+    for (const p of report?.verticalOverflowPages ?? []) m.set(p, { ...(m.get(p) || {}), flag: "overflow" });
+    return m;
+  }, [report]);
+
+  const effCols = isMobile ? Math.min(cols, 2) : cols;
 
   useEffect(() => {
     let cancelled = false;
-    let doc = null;
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist/build/pdf");
@@ -2073,52 +2149,106 @@ function PdfPages({ url, pageCount }) {
         const workerMod = await import("pdfjs-dist/build/pdf.worker.entry");
         pdfjs.GlobalWorkerOptions.workerSrc = workerMod.default ?? workerMod;
         const task = pdfjs.getDocument(url);
-        doc = await task.promise;
-        if (cancelled) return;
+        const doc = await task.promise;
+        if (cancelled) { doc.destroy?.(); return; }
+        docRef.current = doc;
         setTotal(doc.numPages);
         const host = hostRef.current;
         if (!host) return;
         host.innerHTML = "";
+
+        // Thumbnails are cheap at 4-up and readable at 2-up; render each at the
+        // size it is actually displayed rather than one size for both.
+        const targetW = effCols >= 4 ? 190 : 380;
+
         for (let n = 1; n <= Math.min(shown, doc.numPages); n++) {
           const page = await doc.getPage(n);
           if (cancelled) return;
-          const viewport = page.getViewport({ scale: 1.4 });
+          const base = page.getViewport({ scale: 1 });
+          const viewport = page.getViewport({ scale: (targetW / base.width) * 1.5 });
           const canvas = document.createElement("canvas");
           canvas.width = viewport.width;
           canvas.height = viewport.height;
-          canvas.style.cssText = `width:100%;max-width:${Math.round(viewport.width)}px;display:block;margin:0 auto 14px;border:1px solid ${C.line};box-shadow:0 1px 4px rgba(0,0,0,.12);background:#fff;`;
-          const wrap = document.createElement("div");
+          canvas.style.cssText = `width:100%;display:block;border:1px solid ${C.line};box-shadow:0 1px 4px rgba(0,0,0,.12);background:#fff;cursor:zoom-in;`;
+
+          const meta = pageMeta.get(n) || {};
+          const cell = document.createElement("div");
           const cap = document.createElement("div");
           cap.textContent = `page ${n}`;
-          cap.style.cssText = `text-align:center;font-size:11px;color:${C.muted};margin-bottom:4px;`;
-          wrap.appendChild(cap);
-          wrap.appendChild(canvas);
-          host.appendChild(wrap);
+          cap.style.cssText = `font-size:11px;font-weight:700;color:${C.ink};margin-bottom:4px;`;
+          if (meta.flag) {
+            const pill = document.createElement("span");
+            pill.textContent = meta.flag;
+            pill.style.cssText = `margin-left:6px;font-weight:400;font-size:10px;color:${meta.flag === "overflow" ? C.red : C.muted};`;
+            cap.appendChild(pill);
+          }
+          const ctx = document.createElement("div");
+          ctx.textContent = meta.section || "";
+          ctx.style.cssText = `font-size:10px;color:${C.muted};margin-top:4px;min-height:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`;
+
+          cell.appendChild(cap);
+          cell.appendChild(canvas);
+          cell.appendChild(ctx);
+          // A section opener is the natural landmark when scanning; ringing it
+          // makes chapter boundaries findable at a glance.
+          if (meta.section) canvas.style.outline = `2px solid ${C.blue}`;
+          canvas.addEventListener("click", () => setZoomPage({ n, section: meta.section, flag: meta.flag }));
+          host.appendChild(cell);
           await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
         }
       } catch (e) {
         if (!cancelled) setErr(e.message || String(e));
       }
     })();
-    return () => { cancelled = true; if (doc) doc.destroy?.(); };
-  }, [url, shown]);
+    return () => {
+      cancelled = true;
+      const d = docRef.current;
+      docRef.current = null;
+      if (d) d.destroy?.();
+    };
+  }, [url, shown, effCols, pageMeta]);
+
+  const densityBtn = (n, label) => (
+    <button
+      key={n}
+      onClick={() => setCols(n)}
+      style={{ ...S.ghost, margin: 0, padding: "4px 10px", fontSize: 12, background: cols === n ? C.blue : "transparent", color: cols === n ? "#fff" : C.ink, borderColor: cols === n ? C.blue : C.line }}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <div style={{ marginTop: 12 }}>
       {err && <div style={{ color: C.red, fontSize: 12.5 }}>⚠ Could not render pages: {err}</div>}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+        <span style={{ fontSize: 12, color: C.muted }}>View</span>
+        {densityBtn(4, "Overview · 4 across")}
+        {densityBtn(2, "Review · 2 across")}
+        <span style={{ fontSize: 11.5, color: C.muted, marginLeft: 4 }}>
+          Click any page to enlarge. Chapter openers are outlined.
+        </span>
+      </div>
+
+      {/* No inner scrollbar: the book flows down the page so the whole thing can
+          be scanned in one continuous pass. */}
       <div
         ref={hostRef}
-        style={{ maxHeight: "78vh", overflowY: "auto", background: "#efe9db", padding: 14, border: `1px solid ${C.line}`, borderRadius: 8 }}
+        style={{ display: "grid", gridTemplateColumns: `repeat(${effCols}, 1fr)`, gap: effCols >= 4 ? 14 : 20, background: "#efe9db", padding: 14, border: `1px solid ${C.line}`, borderRadius: 8, alignItems: "start" }}
       />
-      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+
+      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: 12.5, color: C.muted }}>Showing {Math.min(shown, total)} of {total} pages</span>
         {shown < total && (
-          <button style={{ ...S.ghost, margin: 0 }} onClick={() => setShown((s) => s + 12)}>Load 12 more pages</button>
+          <button style={{ ...S.ghost, margin: 0 }} onClick={() => setShown((s) => s + 24)}>Load 24 more pages</button>
         )}
         {shown < total && (
           <button style={{ ...S.ghost, margin: 0 }} onClick={() => setShown(total)}>Load all {total}</button>
         )}
       </div>
+
+      {zoomPage && <TypesetPageModal docRef={docRef} page={zoomPage} onClose={() => setZoomPage(null)} />}
     </div>
   );
 }
@@ -2212,7 +2342,7 @@ function TypesetPreview({ project, api, fileUrlBase }) {
               may not render at all (it showed a blank black box), so the
               operator could not see their own book. Drawing the pages ourselves
               makes them appear reliably, in the console, like a book. */}
-          <PdfPages url={src} pageCount={r ? r.totalPages : 0} />
+          <PdfPages url={src} pageCount={r ? r.totalPages : 0} report={r} />
           <div style={{ marginTop: 8 }}>
             <a href={src} download={`${(project.title || "book").replace(/[^\w-]+/g, "-").toLowerCase()}-typeset.pdf`} style={{ ...S.ghost, display: "inline-block", textDecoration: "none" }}>
               ⭳ Download this proof
