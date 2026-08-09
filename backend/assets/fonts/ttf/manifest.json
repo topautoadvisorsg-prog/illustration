@@ -1,198 +1,129 @@
 [
   {
-    "file": "archivo-400-italic.ttf",
+    "file": "archivo-italic.ttf",
     "family": "Archivo",
     "style": "italic",
-    "weight": "400",
-    "bytes": 99516
+    "weights": [
+      "400",
+      "600"
+    ],
+    "bytes": 99476,
+    "originalFamily": "Archivo SemiBold"
   },
   {
-    "file": "archivo-600-italic.ttf",
-    "family": "Archivo",
-    "style": "italic",
-    "weight": "600",
-    "bytes": 99516
-  },
-  {
-    "file": "archivo-400-normal.ttf",
+    "file": "archivo-normal.ttf",
     "family": "Archivo",
     "style": "normal",
-    "weight": "400",
-    "bytes": 89632
+    "weights": [
+      "400",
+      "500",
+      "600"
+    ],
+    "bytes": 89580,
+    "originalFamily": "Archivo SemiBold"
   },
   {
-    "file": "archivo-500-normal.ttf",
-    "family": "Archivo",
-    "style": "normal",
-    "weight": "500",
-    "bytes": 89632
-  },
-  {
-    "file": "archivo-600-normal.ttf",
-    "family": "Archivo",
-    "style": "normal",
-    "weight": "600",
-    "bytes": 89632
-  },
-  {
-    "file": "cormorant-garamond-400-italic.ttf",
+    "file": "cormorant-garamond-italic.ttf",
     "family": "Cormorant Garamond",
     "style": "italic",
-    "weight": "400",
-    "bytes": 125716
+    "weights": [
+      "400",
+      "600"
+    ],
+    "bytes": 125764,
+    "originalFamily": "Cormorant Garamond Light"
   },
   {
-    "file": "cormorant-garamond-600-italic.ttf",
-    "family": "Cormorant Garamond",
-    "style": "italic",
-    "weight": "600",
-    "bytes": 125716
-  },
-  {
-    "file": "cormorant-garamond-400-normal.ttf",
+    "file": "cormorant-garamond-normal.ttf",
     "family": "Cormorant Garamond",
     "style": "normal",
-    "weight": "400",
-    "bytes": 120604
+    "weights": [
+      "400",
+      "500",
+      "600"
+    ],
+    "bytes": 120704,
+    "originalFamily": "Cormorant Garamond Light"
   },
   {
-    "file": "cormorant-garamond-500-normal.ttf",
-    "family": "Cormorant Garamond",
-    "style": "normal",
-    "weight": "500",
-    "bytes": 120604
-  },
-  {
-    "file": "cormorant-garamond-600-normal.ttf",
-    "family": "Cormorant Garamond",
-    "style": "normal",
-    "weight": "600",
-    "bytes": 120604
-  },
-  {
-    "file": "eb-garamond-400-italic.ttf",
+    "file": "eb-garamond-italic.ttf",
     "family": "EB Garamond",
     "style": "italic",
-    "weight": "400",
-    "bytes": 94376
+    "weights": [
+      "400",
+      "600"
+    ],
+    "bytes": 94424,
+    "originalFamily": "EB Garamond"
   },
   {
-    "file": "eb-garamond-600-italic.ttf",
-    "family": "EB Garamond",
-    "style": "italic",
-    "weight": "600",
-    "bytes": 94376
-  },
-  {
-    "file": "eb-garamond-400-normal.ttf",
+    "file": "eb-garamond-normal.ttf",
     "family": "EB Garamond",
     "style": "normal",
-    "weight": "400",
-    "bytes": 92756
+    "weights": [
+      "400",
+      "500",
+      "600"
+    ],
+    "bytes": 92788,
+    "originalFamily": "EB Garamond"
   },
   {
-    "file": "eb-garamond-500-normal.ttf",
-    "family": "EB Garamond",
-    "style": "normal",
-    "weight": "500",
-    "bytes": 92756
-  },
-  {
-    "file": "eb-garamond-600-normal.ttf",
-    "family": "EB Garamond",
-    "style": "normal",
-    "weight": "600",
-    "bytes": 92756
-  },
-  {
-    "file": "lora-400-italic.ttf",
+    "file": "lora-italic.ttf",
     "family": "Lora",
     "style": "italic",
-    "weight": "400",
-    "bytes": 79208
+    "weights": [
+      "400",
+      "600"
+    ],
+    "bytes": 79220,
+    "originalFamily": "Lora"
   },
   {
-    "file": "lora-600-italic.ttf",
-    "family": "Lora",
-    "style": "italic",
-    "weight": "600",
-    "bytes": 79208
-  },
-  {
-    "file": "lora-400-normal.ttf",
+    "file": "lora-normal.ttf",
     "family": "Lora",
     "style": "normal",
-    "weight": "400",
-    "bytes": 76408
+    "weights": [
+      "400",
+      "500",
+      "600"
+    ],
+    "bytes": 76408,
+    "originalFamily": "Lora"
   },
   {
-    "file": "lora-500-normal.ttf",
-    "family": "Lora",
-    "style": "normal",
-    "weight": "500",
-    "bytes": 76408
-  },
-  {
-    "file": "lora-600-normal.ttf",
-    "family": "Lora",
-    "style": "normal",
-    "weight": "600",
-    "bytes": 76408
-  },
-  {
-    "file": "montserrat-400-italic.ttf",
+    "file": "montserrat-italic.ttf",
     "family": "Montserrat",
     "style": "italic",
-    "weight": "400",
-    "bytes": 100140
+    "weights": [
+      "400",
+      "600"
+    ],
+    "bytes": 100168,
+    "originalFamily": "Montserrat Thin"
   },
   {
-    "file": "montserrat-600-italic.ttf",
-    "family": "Montserrat",
-    "style": "italic",
-    "weight": "600",
-    "bytes": 100140
-  },
-  {
-    "file": "montserrat-400-normal.ttf",
+    "file": "montserrat-normal.ttf",
     "family": "Montserrat",
     "style": "normal",
-    "weight": "400",
-    "bytes": 97924
+    "weights": [
+      "400",
+      "500",
+      "600"
+    ],
+    "bytes": 97984,
+    "originalFamily": "Montserrat Thin"
   },
   {
-    "file": "montserrat-500-normal.ttf",
-    "family": "Montserrat",
-    "style": "normal",
-    "weight": "500",
-    "bytes": 97924
-  },
-  {
-    "file": "montserrat-600-normal.ttf",
-    "family": "Montserrat",
-    "style": "normal",
-    "weight": "600",
-    "bytes": 97924
-  },
-  {
-    "file": "oswald-400-normal.ttf",
+    "file": "oswald-normal.ttf",
     "family": "Oswald",
     "style": "normal",
-    "weight": "400",
-    "bytes": 44272
-  },
-  {
-    "file": "oswald-500-normal.ttf",
-    "family": "Oswald",
-    "style": "normal",
-    "weight": "500",
-    "bytes": 44272
-  },
-  {
-    "file": "oswald-600-normal.ttf",
-    "family": "Oswald",
-    "style": "normal",
-    "weight": "600",
-    "bytes": 44272
+    "weights": [
+      "400",
+      "500",
+      "600"
+    ],
+    "bytes": 44272,
+    "originalFamily": "Oswald"
   }
 ]

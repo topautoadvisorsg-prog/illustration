@@ -51,20 +51,21 @@ export interface BundledFonts {
 }
 
 /**
- * SYSTEM-INSTALLED FAMILIES — the reason the interior can embed real fonts.
+ * SYSTEM-INSTALLED FAMILIES — deference, not a font-embedding strategy.
  *
- * Chromium converts ANY `@font-face` into Type3 glyph-drawing procedures, which
- * print RIPs commonly reject, and emits proper embedded Type0 CID subsets only
- * for fonts in the host's font path. Proven both ways in
- * `scripts/font-embed-probe.ts`. So on a host where a family is installed we
- * must NOT emit an `@font-face` for it — doing so wins over the system font and
- * puts us straight back to Type3.
+ * This once carried the claim that Chromium emits Type0 CID subsets only for
+ * fonts in the host's font path and turns every `@font-face` into Type3.
+ * Measured in the render image itself, that is FALSE. The trigger is VARIABLE
+ * fonts: a variable face comes out Type3 whether it arrives as a webfont or
+ * from the font path, and a static face comes out Type0 either way.
+ * `scripts/font-system-probe.mjs` measures both paths side by side. So Type3 is
+ * fixed in the vendored assets, by shipping static instances — not here, and
+ * not by installing anything in the image.
  *
- * The render image installs the same faces the vendored stylesheets carry
- * (`scripts/derive-ttf.ts` decompresses them, so the glyph data is identical
- * and pagination cannot move). Windows dev boxes have none of them installed
- * and keep using the vendored CSS, which is correct there: local renders are
- * for layout review, not for print.
+ * What survives is a narrower rule that is still worth keeping: if the host
+ * resolves a family itself, emitting an `@font-face` would silently override
+ * it. The render image installs none of the book faces, so this is a no-op
+ * there; it matters only on a machine where someone has installed them.
  */
 let systemFamiliesCache: Set<string> | null = null;
 

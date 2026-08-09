@@ -14,6 +14,23 @@
  * what we already ship is lossless: identical glyph outlines, identical
  * metrics, identical pagination — by construction, not by hope.
  *
+ * ─── WHY ONE FILE PER FAMILY+STYLE, NOT PER WEIGHT ────────────────────────
+ * These are VARIABLE fonts. Each stylesheet repeats ONE binary under
+ * `font-weight: 400`, `500` and `600` and lets the browser pin the `wght` axis
+ * from the `@font-face` descriptor — verified by hashing the base64 payloads,
+ * which are identical across the three weights of a given family+style. Writing
+ * one file per declared weight would install three indistinguishable faces and
+ * leave it to fontconfig to guess between them. So we key by payload and emit
+ * one file per distinct binary, recording every weight it serves.
+ *
+ * ─── WHY THE NAME TABLE GETS REPAIRED ─────────────────────────────────────
+ * Archivo's sliced binary claims family "Archivo SemiBold" with no typographic
+ * family record, so `fc-list` in the render image never reports a family called
+ * "Archivo" and `font-family: Archivo` would fall back to DejaVu Sans without a
+ * word of warning. EB Garamond is named correctly, which is the only reason the
+ * two behave differently. `rewriteFontNames` repairs the identity and touches
+ * NOTHING else — asserted below by hashing every other table before and after.
+ *
  * ─── WHY ONLY THE latin SUBSET ────────────────────────────────────────────
  * Each family ships two subsets per weight/style (latin, latin-ext). Installing
  * both would give fontconfig two faces with identical family/style metadata and
@@ -24,9 +41,12 @@
  *
  *   yarn workspace @wildlands/backend fonts:ttf
  */
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { readFontNames, rewriteFontNames, tableDigests } from '../src/pipeline/typeset/sfnt-name.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../');
 const FONT_DIR = path.join(ROOT, 'backend/assets/fonts');
@@ -93,20 +113,80 @@ const { decompress } = await import('wawoff2');
 await rm(TTF_DIR, { recursive: true, force: true });
 await mkdir(TTF_DIR, { recursive: true });
 
-const manifest: { file: string; family: string; style: string; weight: string; bytes: number }[] = [];
+interface ManifestEntry {
+  file: string;
+  /** The family name fontconfig will report, and the one CSS must ask for. */
+  family: string;
+  style: string;
+  /** Every `font-weight` the stylesheet serves from this one binary. */
+  weights: string[];
+  bytes: number;
+  /** What the sliced binary called itself before the identity repair. */
+  originalFamily: string;
+}
+
+const manifest: ManifestEntry[] = [];
 for (const entry of (await readdir(FONT_DIR)).filter((f) => f.endsWith('.css'))) {
   const slug = entry.replace(/\.css$/, '');
   const css = await readFile(path.join(FONT_DIR, entry), 'utf8');
   const family = /\/\*\s*([^—]+)—/.exec(css)?.[1]?.trim() ?? slug;
+
+  // One entry per DISTINCT binary. The stylesheet repeats the same variable
+  // font across weights, so the payload hash — not the declared weight — is
+  // what tells us how many faces there really are.
+  const byPayload = new Map<string, { face: Face; weights: Set<string> }>();
   for (const face of latinFaces(family, css)) {
-    const ttf = Buffer.from(await decompress(face.bytes));
-    const file = `${slug}-${face.weight}-${face.style}.ttf`;
+    const key = createHash('sha256').update(face.bytes).digest('hex');
+    const existing = byPayload.get(key);
+    if (existing) {
+      if (existing.face.style !== face.style) {
+        throw new Error(`${slug}: one binary is served as both ${existing.face.style} and ${face.style}`);
+      }
+      existing.weights.add(face.weight);
+    } else {
+      byPayload.set(key, { face, weights: new Set([face.weight]) });
+    }
+  }
+
+  for (const { face, weights } of byPayload.values()) {
+    const raw = Buffer.from(await decompress(face.bytes));
+    const before = readFontNames(raw);
+    const subfamily = face.style === 'italic' ? 'Italic' : 'Regular';
+    const ttf = rewriteFontNames(raw, { family, subfamily });
+
+    // The repair is only safe because it is provably confined to `name`. Every
+    // other table has to come through byte-identical or the outlines and
+    // metrics this whole script exists to preserve are no longer guaranteed.
+    const [a, b] = [tableDigests(raw), tableDigests(ttf)];
+    const moved = Object.keys(a).filter((tag) => tag !== 'name' && tag !== 'head' && a[tag] !== b[tag]);
+    if (moved.length) {
+      throw new Error(`${slug} ${face.style}: identity repair altered ${moved.join(', ')} — refusing to write`);
+    }
+    const after = readFontNames(ttf);
+    if (after.family !== family || after.subfamily !== subfamily) {
+      throw new Error(`${slug} ${face.style}: name rewrite did not take (got ${after.family} / ${after.subfamily})`);
+    }
+
+    const sorted = [...weights].sort();
+    const file = `${slug}-${face.style}.ttf`;
     await writeFile(path.join(TTF_DIR, file), ttf);
-    manifest.push({ file, family, style: face.style, weight: face.weight, bytes: ttf.length });
-    console.log(`  ${file.padEnd(34)} ${family} ${face.weight} ${face.style}  ${(ttf.length / 1024).toFixed(0)}kB`);
+    manifest.push({
+      file,
+      family,
+      style: face.style,
+      weights: sorted,
+      bytes: ttf.length,
+      originalFamily: before.family,
+    });
+    const renamed = before.family === family ? '' : `  (was "${before.family}")`;
+    console.log(
+      `  ${file.padEnd(30)} ${family} ${subfamily}  wght ${sorted.join('/')}  ${(ttf.length / 1024).toFixed(0)}kB${renamed}`,
+    );
   }
 }
 
 await writeFile(path.join(TTF_DIR, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(`\n${manifest.length} faces -> backend/assets/fonts/ttf/`);
+const families = [...new Set(manifest.map((m) => m.family))].sort();
+console.log(`\n${manifest.length} faces / ${families.length} families -> backend/assets/fonts/ttf/`);
+console.log(`families: ${families.join(', ')}`);
 process.exit(0);
