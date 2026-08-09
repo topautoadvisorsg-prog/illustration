@@ -83,6 +83,18 @@ export interface GenerateFromBlueprintInput {
   /** PNG of the layout blueprint (composition map) handed to the model as a reference. */
   blueprintPng: Buffer;
   size?: ImageSize;
+  /**
+   * Optional PNG mask, same dimensions as the reference image. TRANSPARENT pixels
+   * are the region the model may paint; opaque pixels are the ones it is asked
+   * to hold.
+   *
+   * This constrains the REQUEST. It is not a guarantee about the response, and
+   * callers must not treat it as one: a page of set type must never be replaced
+   * by a model's reconstruction of what that type looked like, and the only way
+   * to be sure of that is to keep the original pixels and composite the masked
+   * region back in yourself.
+   */
+  maskPng?: Buffer;
 }
 
 /**
@@ -95,11 +107,15 @@ export async function generateImageFromBlueprint(input: GenerateFromBlueprintInp
   const openai = getClient();
   const size: ImageSize = input.size ?? '1024x1536';
   const imageFile = await toFile(input.blueprintPng, 'blueprint.png', { type: 'image/png' });
+  const maskFile = input.maskPng
+    ? await toFile(input.maskPng, 'mask.png', { type: 'image/png' })
+    : undefined;
 
   // gpt-image params differ from the DALL-E edit type union; cast like generateImage.
   const params = {
     model: env.OPENAI_IMAGE_MODEL,
     image: imageFile,
+    ...(maskFile ? { mask: maskFile } : {}),
     prompt: input.prompt,
     size,
     n: 1,
