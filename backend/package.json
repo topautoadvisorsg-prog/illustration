@@ -14,6 +14,7 @@
     "vendor:fonts": "tsx scripts/vendor-fonts.ts",
     "qa:typeset": "tsx scripts/typeset-qa-layer1.ts",
     "qa:shoot": "tsx scripts/shoot-page.ts",
+    "qa:fontprobe": "tsx scripts/font-embed-probe.ts",
     "storage:prune": "tsx scripts/db-guard.ts prune && tsx scripts/storage-prune.ts",
     "drizzle:generate": "drizzle-kit generate",
     "db:guard": "tsx scripts/db-guard.ts",
@@ -74,6 +75,7 @@
     "epubchecker": "^5.2.1",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.6"
+    "vitest": "^2.1.6",
+    "wawoff2": "^2.0.1"
   }
 }
