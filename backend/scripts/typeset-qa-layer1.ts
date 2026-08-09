@@ -348,6 +348,32 @@ section('5b. Page furniture (measured from the PDF)');
     headOnOpener.length ? `head present on ${headOnOpener.slice(0, 6).join(', ')}` : `${openerPages.size} openers`);
   check(furnishedBlanks.length === 0, 'parity blanks carry no running head or folio',
     furnishedBlanks.length ? `furniture on ${furnishedBlanks.slice(0, 6).join(', ')}` : `${blanks.size} blanks`);
+
+  /**
+   * Sparse pages are a WARNING, not a failure. A chapter ending part-way down a
+   * page is normal; a page holding a heading and one line is not a rule
+   * violation but does read as unfinished, and it is invisible to every other
+   * check here. Reported so the number is tracked rather than rediscovered one
+   * page at a time during visual review.
+   */
+  const sparse: string[] = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    if (blanks.has(p)) continue;
+    const pg = await doc.getPage(p);
+    const tc = await pg.getTextContent();
+    let lo = topBand, hi = bottomBand, any = false;
+    for (const it of tc.items as { str: string; transform: number[] }[]) {
+      if (!it.str.trim()) continue;
+      const y = it.transform[5] ?? 0;
+      if (y < bottomBand || y > topBand) continue;
+      any = true; lo = Math.min(lo, y); hi = Math.max(hi, y);
+    }
+    if (!any) continue;
+    const fill = ((hi - lo) / (topBand - bottomBand)) * 100;
+    if (fill < 30) sparse.push(`p${p} ${Math.round(fill)}%`);
+  }
+  if (sparse.length) warn(`${sparse.length} non-blank pages fill under 30% of the text block`, sparse.slice(0, 12).join(', '));
+  else console.log('  PASS  no unexpectedly sparse pages');
 }
 
 // ── 6. text fidelity: sections -> PDF ───────────────────────────────────────
