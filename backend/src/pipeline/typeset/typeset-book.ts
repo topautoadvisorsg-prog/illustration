@@ -245,9 +245,11 @@ html, body { margin: 0; padding: 0; background: #fff; color: #000; }
    also stretched paragraph LAST lines ("make good choices." spread across the
    full measure), which is wrong in any book: a justified paragraph justifies
    its full lines and leaves the last one ragged.
-   Every role below therefore declares BOTH `text-align` and `text-align-last`,
-   so nothing depends on inheritance or on the renderer's default for last
-   lines. Do not remove the `text-align-last` declarations. */
+   Every role below therefore declares BOTH text-align AND text-align-last, so
+   nothing depends on inheritance or on the renderer's default for last lines.
+   Do not remove the text-align-last declarations.
+   NOTE: no backticks in this comment — it lives inside a template literal, and
+   a stray backtick silently terminates the string and breaks the build. */
 body {
   font-family: '${t.bodyFont}', Georgia, serif;
   font-size: ${t.bodyPt}pt; line-height: ${t.lineHeight};
