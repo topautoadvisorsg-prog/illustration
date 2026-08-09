@@ -20,7 +20,11 @@ import type { ProjectConfig, TrimSize } from '@wildlands/shared';
 import { bundledFontCss } from './font-assets.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from './layout-standards/educational-nonfiction-v1.js';
 import { resolveTypesetDesign } from './layout-standards/resolve-design.js';
-import type { ChapterLabelFormat, TypesetLayoutStandard } from './layout-standards/types.js';
+import type {
+  ChapterLabelFormat,
+  TerminalMicroSectionPolicy,
+  TypesetLayoutStandard,
+} from './layout-standards/types.js';
 
 // ── Geometry ────────────────────────────────────────────────────────────────
 
@@ -139,7 +143,7 @@ export function parseTypesetSections(markdown: string): TypesetSection[] {
  */
 const SCENE_BREAK = '<p class="scene-break">* * *</p>';
 
-function bodyToHtml(lines: string[]): string {
+function bodyToHtml(lines: string[], micro?: TerminalMicroSectionPolicy): string {
   const html: string[] = [];
   let para: string[] = [];
   let list: string[] = [];
@@ -166,10 +170,20 @@ function bodyToHtml(lines: string[]): string {
       .join('\n')
       .split(/\n\s*\n/)
       .map((p) => p.replace(/\s*\n\s*/g, ' ').trim())
-      .filter(Boolean)
-      .map((p) => `<p>${inlineMarkdown(p)}</p>`)
+      .filter(Boolean);
+    const body = paras
+      .map((p, i) => {
+        // A callout whose FIRST paragraph is entirely bold is a labelled
+        // callout: that paragraph is its label and belongs on its own line,
+        // with the quote starting beneath. Detected from the markup, so any
+        // callout written that way gets the treatment — no phrase is special.
+        const label = i === 0 ? /^\*\*(.+)\*\*$/.exec(p) : null;
+        return label
+          ? `<p class="callout-label">${inlineMarkdown(label[1]!)}</p>`
+          : `<p>${inlineMarkdown(p)}</p>`;
+      })
       .join('');
-    html.push(`<blockquote class="callout">${paras}</blockquote>`);
+    html.push(`<blockquote class="callout">${body}</blockquote>`);
     quote = [];
     flushNext = true;
   };
@@ -216,6 +230,24 @@ function bodyToHtml(lines: string[]): string {
   // page anyway, they orphan onto a near-empty page carrying only asterisks
   // (this is what left page 4 blank but for two rows of them).
   while (html.length && html[html.length - 1] === SCENE_BREAK) html.pop();
+
+  // Wrap a terminal micro-section so it stays whole and gets one chance to fit
+  // on the page it starts from. See TerminalMicroSectionPolicy.
+  if (micro?.enabled) {
+    const lastH3 = html.map((h) => h.startsWith('<h3')).lastIndexOf(true);
+    if (lastH3 >= 0 && lastH3 < html.length - 1) {
+      const tail = html.slice(lastH3 + 1);
+      const words = tail
+        .join(' ')
+        .replace(/<[^>]+>/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean).length;
+      if (words > 0 && words <= micro.maxWords) {
+        const unit = html.splice(lastH3).join('\n');
+        html.push(`<div class="tail-unit">${unit}</div>`);
+      }
+    }
+  }
   return html.join('\n');
 }
 
@@ -329,6 +361,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
   const op = standard.opener;
   const furn = standard.furniture;
   const blocks = standard.blocks;
+  const micro = standard.terminalMicroSection;
   const openerAlign = op.centered ? 'center' : 'left';
   const smallCaps = furn.runningHeadSmallCaps ? 'small-caps' : 'normal';
   const folioContent = furn.folio === 'none' ? 'none' : 'counter(page)';
@@ -356,7 +389,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
     ${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}
     <h2>${escapeHtml(s.title)}</h2>
   </header>
-  ${bodyToHtml(s.bodyLines)}
+  ${bodyToHtml(s.bodyLines, standard.terminalMicroSection)}
 </section>`;
     })
     .join('\n');
@@ -484,6 +517,13 @@ li { margin: 0 0 ${blocks.listItemSpacingEm}em; text-align: left; text-align-las
   font-size: ${(t.bodyPt * blocks.callout.scale).toFixed(2)}pt;${blocks.callout.italic ? ' font-style: italic;' : ''} }
 .callout p { text-indent: 0; text-align: left; text-align-last: left; }
 .callout p + p { margin-top: .35em; }
+/* A callout's label sits on its own line with the quote beneath it. */
+.callout-label { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 600;
+  letter-spacing: .04em; margin: 0 0 .3em; break-after: avoid; }
+/* Terminal micro-section: kept whole (never strand the heading), with a
+   tightened space above as one controlled attempt to fit where it starts. */
+.tail-unit { break-inside: avoid; }
+.tail-unit h3 { margin-top: ${micro.tightenedMarginTopEm}em; }
 </style></head>
 <body>
 ${body}

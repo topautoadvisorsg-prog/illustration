@@ -128,6 +128,25 @@ export interface TypesetPageFurniture {
   suppressFurnitureOnBlank: boolean;
 }
 
+/**
+ * A chapter whose LAST subsection is a heading plus a sentence or two will,
+ * left alone, carry that whole unit to a fresh page and leave it stranded on an
+ * otherwise empty leaf. Page 15 was a heading and one line above 85% white.
+ *
+ * The unit is kept indivisible (never strand the heading at the foot of the
+ * previous page) and given one controlled chance to fit where it is, by
+ * tightening the space above the heading. If it still does not fit, a new page
+ * is the better of the two bad outcomes.
+ */
+export interface TerminalMicroSectionPolicy {
+  /** Off entirely when false. */
+  enabled: boolean;
+  /** Treat as a micro-section only when the body after the final heading is at most this many words. */
+  maxWords: number;
+  /** Tightened space above the heading, in em. The rescue attempt. */
+  tightenedMarginTopEm: number;
+}
+
 export interface TypesetBlockStyles {
   /** Printed glyphs for a scene break, e.g. "* * *". */
   sceneBreakMark: string;
@@ -165,4 +184,5 @@ export interface TypesetLayoutStandard {
   chaptersStartRecto: boolean;
   furniture: TypesetPageFurniture;
   blocks: TypesetBlockStyles;
+  terminalMicroSection: TerminalMicroSectionPolicy;
 }

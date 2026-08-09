@@ -102,4 +102,13 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
       scale: 0.95,
     },
   },
+
+  // Conservative on purpose: 45 words is roughly three lines at this measure,
+  // so an ordinary closing subsection is untouched and normal keep-with-next
+  // behaviour elsewhere is unchanged.
+  terminalMicroSection: {
+    enabled: true,
+    maxWords: 45,
+    tightenedMarginTopEm: 0.5,
+  },
 };

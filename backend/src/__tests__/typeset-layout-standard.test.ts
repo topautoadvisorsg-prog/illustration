@@ -12,6 +12,9 @@ import {
 import { gutterForPageCount, resolveTypesetDesign } from '../pipeline/typeset/layout-standards/resolve-design.js';
 import { getProductionProfile } from '../pipeline/production-profiles/registry.js';
 
+/** Only the rendered markup — the stylesheet always names every class. */
+const bodyOf = (html: string): string => html.slice(html.indexOf('<body>'));
+
 const configFor = (overrides: Record<string, unknown> = {}) =>
   ProjectConfigSchema.parse({
     volume: 1,
@@ -304,6 +307,96 @@ describe('scene breaks', () => {
     const html = render('Before.\n\n---\n---\n\nAfter.');
     expect(html).toContain('Before.');
     expect(html).toContain('After.');
+  });
+});
+
+/**
+ * Page 15 was a heading plus one line above 85% white space. The unit is kept
+ * indivisible so the heading is never stranded, and given one tightened-margin
+ * chance to fit where it starts. Deliberately conservative: ordinary closing
+ * subsections must be left alone.
+ */
+describe('terminal micro-section', () => {
+  const render = (body: string) =>
+    buildTypesetHtml({
+      sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${body}\n`),
+      config: configFor(),
+      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+    });
+
+  it('wraps a heading plus a single short line', () => {
+    const html = render('Opening paragraph.\n\n### The one thing to remember\n\nThis is not a race.');
+    expect(html).toContain('<div class="tail-unit">');
+    expect(html).toContain('break-inside: avoid');
+    // The heading must travel WITH its text, never strand at the foot.
+    const unit = /<div class="tail-unit">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? '';
+    expect(unit).toContain('<h3>');
+    expect(unit).toContain('This is not a race.');
+  });
+
+  it('leaves an ordinary closing subsection alone', () => {
+    const long = 'word '.repeat(120);
+    const html = bodyOf(render(`Opening paragraph.\n\n### A normal section\n\n${long}`));
+    expect(html).not.toContain('tail-unit');
+  });
+
+  it('does not fire when the chapter ends without a heading', () => {
+    expect(bodyOf(render('Just a paragraph.\n\nAnd another one.'))).not.toContain('tail-unit');
+  });
+
+  it('does not fire on a heading with no body after it', () => {
+    // Nothing to keep together; the heading is the section's last element.
+    expect(bodyOf(render('Opening.\n\n### Dangling heading'))).not.toContain('tail-unit');
+  });
+
+  it('only ever wraps the FINAL heading', () => {
+    const html = bodyOf(render('Intro.\n\n### First\n\nSome body here.\n\n### Last\n\nShort tail.'));
+    expect((html.match(/tail-unit/g) ?? []).length).toBe(1);
+    const unit = /<div class="tail-unit">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? '';
+    expect(unit).toContain('Last');
+    expect(unit).not.toContain('First');
+  });
+
+  it('honours a standard that disables the rule', () => {
+    const html = buildTypesetHtml({
+      sections: parseTypesetSections('# Chapter 1\n\n## T\n\nP.\n\n### Tail\n\nShort.\n'),
+      config: configFor(),
+      layoutStandard: {
+        ...EDUCATIONAL_NONFICTION_TYPESET_V1,
+        terminalMicroSection: { ...EDUCATIONAL_NONFICTION_TYPESET_V1.terminalMicroSection, enabled: false },
+      },
+    });
+    expect(bodyOf(html)).not.toContain('tail-unit');
+  });
+});
+
+describe('callout labels', () => {
+  const render = (md: string) =>
+    buildTypesetHtml({
+      sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${md}\n`),
+      config: configFor(),
+      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+    });
+
+  it('lifts an all-bold first paragraph onto its own label line', () => {
+    const html = render('> **THE LIE YOUR BRAIN IS TELLING YOU**\n>\n> Whatever this is, it is worse for me.');
+    expect(html).toContain('<p class="callout-label">THE LIE YOUR BRAIN IS TELLING YOU</p>');
+    expect(html).toContain('<p>Whatever this is, it is worse for me.</p>');
+  });
+
+  it('is structural, not phrase-specific', () => {
+    expect(render('> **ANY OTHER LABEL**\n>\n> Body.')).toContain('<p class="callout-label">ANY OTHER LABEL</p>');
+  });
+
+  it('leaves an unlabelled callout as plain paragraphs', () => {
+    const html = bodyOf(render('> Just a quoted aside with no label.'));
+    expect(html).toContain('<blockquote class="callout">');
+    expect(html).not.toContain('callout-label');
+  });
+
+  it('does not treat a mid-callout bold paragraph as a label', () => {
+    const html = bodyOf(render('> Opening line.\n>\n> **Bold but not first.**'));
+    expect(html).not.toContain('callout-label');
   });
 });
 
