@@ -95,7 +95,10 @@ try {
       continue;
     }
     await el.scrollIntoView();
-    const out = path.join(SHOTS, `page-${n}.png`);
+    // Optional label so two font sets (or two treatments) can be shot into the
+    // same directory and compared, instead of one silently overwriting the other.
+    const suffix = process.env.WL_SHOT_LABEL ? `-${process.env.WL_SHOT_LABEL}` : '';
+    const out = path.join(SHOTS, `page-${n}${suffix}.png`);
     await writeFile(out, (await el.screenshot()) as Buffer);
     console.log(`page ${n} -> ${out}`);
   }

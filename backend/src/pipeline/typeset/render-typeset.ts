@@ -27,6 +27,41 @@ export interface RenderTypesetInput {
   chaptersStartRecto?: boolean;
   /** The project's pinned layout standard. Omitted only by tests. */
   layoutStandard?: TypesetLayoutStandard;
+  /**
+   * Also collect per-block line geometry. Off by default: it costs an extra DOM
+   * pass and nothing in the production path needs it. Used to prove that a
+   * change touching text metrics did not move a single line break.
+   */
+  deepProbe?: boolean;
+}
+
+/**
+ * One addressable block, measured after pagination.
+ *
+ * `lines` holds the block's line BOXES, not its characters. `getClientRects()`
+ * over a range spanning the block returns one rect per line fragment, so both
+ * the count and the widths change the moment a word moves to another line —
+ * which makes it a cheap whole-book detector for "did this wrap differently".
+ * `textSha` catches the coarser failure a geometry check would miss: text lost,
+ * duplicated, or reordered.
+ */
+export interface TypesetBlockProbe {
+  blockId: string;
+  /**
+   * Which fragment of the block this is, 0-based. Paged.js splits a block that
+   * crosses a page break into one element per page, all carrying the SAME
+   * data-block-id. Without this index a comparison keyed on the id alone lines
+   * up one run's first fragment against the other's second and reports a
+   * whole-book repagination that never happened.
+   */
+  frag: number;
+  page: number | null;
+  /** Tag plus classes, so a heading, a list item and an alert panel differ. */
+  kind: string;
+  /** Per line: [top, left, width] relative to the page box, 2dp. */
+  lines: [number, number, number][];
+  textSha: string;
+  chars: number;
 }
 
 export interface RenderTypesetResult {
@@ -38,6 +73,8 @@ export interface RenderTypesetResult {
   blocks: TypesetBlockRef[];
   /** Which local overrides applied, and which matched no block. */
   overrides: OverrideCssResult;
+  /** Present only when `deepProbe` was requested. Reading order. */
+  probe?: TypesetBlockProbe[];
 }
 
 export class TypesetUnavailableError extends Error {
@@ -110,6 +147,59 @@ const MEASURE_JS = `(() => {
     blankPages: blankPages,
     pageBlocks: pageBlocks,
   };
+})()`;
+
+/**
+ * Line-level probe. A string for the same reason as MEASURE_JS above — do not
+ * convert it to a function.
+ *
+ * Line boxes are recorded RELATIVE to their page box. Absolute coordinates
+ * would differ between two runs for reasons that have nothing to do with
+ * wrapping (a block landing on a later page sits lower on the strip), and a
+ * detector that fires on everything tells you nothing.
+ */
+const DEEP_PROBE_JS = `(() => {
+  const d = document;
+  // Synchronous FNV-1a. crypto.subtle is async and this runs inside a single
+  // evaluate; the hash only has to detect change, not resist an adversary.
+  function hash(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+  const r2 = function (n) { return Math.round(n * 100) / 100; };
+  const out = [];
+  const fragSeen = {};
+  d.querySelectorAll('[data-block-id]').forEach(function (el) {
+    const pageEl = el.closest('.pagedjs_page');
+    const page = pageEl ? Number(pageEl.getAttribute('data-page-number')) : null;
+    const origin = pageEl ? pageEl.getBoundingClientRect() : { top: 0, left: 0 };
+    const range = d.createRange();
+    range.selectNodeContents(el);
+    const lines = [];
+    const rects = range.getClientRects();
+    for (let i = 0; i < rects.length; i++) {
+      const b = rects[i];
+      if (b.width < 0.5 && b.height < 0.5) continue; // collapsed artifacts
+      lines.push([r2(b.top - origin.top), r2(b.left - origin.left), r2(b.width)]);
+    }
+    const text = (el.textContent || '').replace(/\\s+/g, ' ').trim();
+    const id = el.getAttribute('data-block-id');
+    fragSeen[id] = fragSeen[id] === undefined ? 0 : fragSeen[id] + 1;
+    out.push({
+      blockId: id,
+      frag: fragSeen[id],
+      page: page,
+      kind: el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).trim().split(/\\s+/).join('.') : ''),
+      lines: lines,
+      textSha: hash(text),
+      chars: text.length,
+    });
+  });
+  return out;
 })()`;
 
 export class TypesetIncompleteError extends Error {
@@ -194,6 +284,10 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
       sections.map((s) => s.title),
     );
 
+    // Measured before page.pdf(), so the probe describes the same layout the
+    // PDF is generated from rather than a state the printing pass may perturb.
+    const probe = input.deepProbe ? ((await page.evaluate(DEEP_PROBE_JS)) as TypesetBlockProbe[]) : undefined;
+
     const pdf = await page.pdf({
       width: `${input.config.trimSize.widthIn}in`,
       height: `${input.config.trimSize.heightIn}in`,
@@ -206,6 +300,7 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
       pdf: Buffer.from(pdf),
       html,
       blocks,
+      probe,
       overrides: overrideReport[0] ?? { css: '', orphaned: [], applied: [] },
       report: {
         ...measured,

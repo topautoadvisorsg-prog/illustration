@@ -147,3 +147,9 @@ reconciliation-report.json
 
 # Throwaway page shots from qa:shoot — evidence for one layout decision.
 qa-shots/
+
+# Deep render fingerprints are regenerable working artifacts. The approved
+# baseline is NOT: it is the reference a candidate interior is judged against.
+qa/*
+!qa/approved-baseline-variable-fonts.json
+.font-instancing/
