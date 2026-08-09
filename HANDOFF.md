@@ -1,85 +1,113 @@
-# Wildlands Interior — Agent Handoff
+# HANDOFF — NO ONE TOLD ME THAT (typeset print book)
 
-> **This entire doc is about the New England book (project `66c1c69c-...`) and is stale as of 2026-08-02.**
-> **For the currently active book, THE WILDLANDS: CANADIAN ROCKIES (project `8c1e161a-...`), see [`docs/HANDOFF_EVERY_PAGE_ILLUSTRATED.md`](docs/HANDOFF_EVERY_PAGE_ILLUSTRATED.md) instead — its "SESSION UPDATE 2026-08-02" section at the top is the most current state of the project.**
+Written 2026-08-08. Read this before touching anything.
 
-## 🚫 RENDER SAFETY RULES (operator, NON-NEGOTIABLE — applies to EVERY agent/chat)
-Each page render costs money (~$0.09–$0.10) and a full-book re-render is ~$30. A prior session ran **390 render calls on a 275-page book** by re-rendering pages on its own. That must never recur. The rules:
-1. **Render each page EXACTLY ONCE per go.** No second pass, no auto-retry. A FAILED page is *reported*, not silently re-run.
-2. **The OPERATOR sees the actual rendered image and decides.** After any render, immediately show the real image (`_full.ts <keys>`) and STOP. An agent NEVER decides on its own that an image is "no good" and re-renders it.
-3. **Re-render ONLY the specific pages the operator flags, after they've seen the image, on an explicit "go".**
-4. **NEVER bulk-render the book.** `_batch.ts` hard-refuses > 5 keys unless the operator sets `RENDER_BULK=1`. Do not bypass it.
-5. **Show blueprint + prompt and get approval BEFORE the first render too** (no-spend review via `_inspect.ts` / `_prompt.ts` / `_layoutpreview.ts`).
+## The goal
 
-## ⚠️ SESSION UPDATE 2026-06-19 — READ FIRST (cold restart after machine format)
+Publish **NO ONE TOLD ME THAT** — a black-and-white educational nonfiction
+puberty guide for boys 9–14. It is a **professionally typeset print book**, not
+an AI-illustrated one. Body pages are deterministic typeset text (Paged.js →
+vector PDF). Roughly 10–12 B&W illustrations may be added later as deliberate
+moments. **No AI page rendering for body pages. No paid image generation.**
 
-**Why the machine was formatted:** the operator's OpenAI billing was nearly maxed (~$99.75/$120 in June). Investigated it: the "Usage" dashboard showed **$0 under "Images" but ~$98 under "Responses & Chat Completions" + 3.85M tokens** — which looked alarming, but is **not theft and not Codex**. `gpt-image-2` (our image model, called via `openai.images.generate`/`.edit`) is **token-billed**, so its usage files under the *tokens / chat-completions* bucket, NOT the legacy per-image "Images" counter. The math matches: ~1,040 image renders × ~3,700 input tokens (our ~11K-char prompt + the attached blueprint image) = 3.85M tokens. **So ~$98 = the 275-page book render + this month's renders. Cost ≈ $0.09–$0.10 per page render.** The operator still chose to **rotate all keys and format the machine** out of caution (keys had been pasted in chat). **All old keys are burned — recreate `.env` with the new rotated ones (see "how to run").**
+## Operating rules the operator has set (follow these)
 
-**What this session built (all committed to branch `session/qa-rebalance-2026-06-19`, NOT merged to main):**
-1. **Blueprint safe-rail made bold + dark** (`blueprint.ts` `COLORS.support` → `#B5500A`, thicker dashed stroke) — the orange trim-safe line was invisible on parchment; now clearly visible. Blueprint legend (real, from `blueprint.ts`): **STRONG BLUE = primary illustration subject · LIGHT BLUE = background illustration field (never blank) · RED = reading/text zone (+title) · YELLOW = badge/page-number reserved · ORANGE DASHED = the safe boundary (only text+subject must stay inside; illustration may bleed past).**
-2. **Fixed `_inspect.ts` blueprint viewer** — it was rendering a 2×2-px image (treated `size` as an object; it's a `"WxH"` string). Now full-size.
-3. **The 10–12% template (`LAYOUT_2_TEXT_HEAVY` = TEXT_DOMINANT) regeometried** — illustration now sits at the TOP (may graze the trim), title + body brought DOWN fully inside the safe rail (was riding the top edge → would get cut). Prompt + blueprint both updated to agree.
-4. **NEW balanced 25% template `LAYOUT_E_BAND_BALANCED`** — a contained natural-history illustration band across the top + one clean centered reading field below. The middle ground between 12% and 50%. Added across the stack (shared enum, `LAYOUT_PROFILES`, `ArtSlot 'BALANCED_BAND'`, `layout-director` placement+zonePlan, `image-shape`, `layered-layout`, `plan-pages`, `text-fit`). Backend tsc clean, shared rebuilt.
+1. **Work in the real platform UI, in the browser.** Do not do the work in
+   terminal scripts and hand back files. The operator must see it on screen at
+   `frontend-production-f65d.up.railway.app`. Scripts are for diagnosis only.
+2. **The operator uploads a manuscript ONCE.** Never ask for a re-upload because
+   environments differ. Fix version skew yourself.
+3. **Do not modify the frozen manuscript prose.**
+4. **Fix root causes generically**, not one-off patches for this book.
+5. **Ask before paid rendering.** Nothing paid has been run.
+6. Report honestly; state what is verified vs assumed.
 
-**The rebalance directive (operator, supersedes "shrink the illustration"):** the goal is **REBALANCE proportions, not minimize.** Keep real natural-history illustrations (wildlife/plant/habitat studies) — never replace with icons/ornaments, never delete art. Per page: if a 50% band crowds the text → reduce toward 25% or 10–12%; if reduction leaves dead parchment → increase. Success = text comfortably inside the rail + meaningful illustration + no dead parchment + balanced. Two named templates: **15% (small subject top, TEXT_DOMINANT)** and **25% (`LAYOUT_E_BAND_BALANCED`)**.
+## Current state — WORKING
 
-**Per-page state of the 3 pages worked this session:**
-- **CH01_P003** — rendered on the 12% TEXT_DOMINANT fix, **GOOD / banked** (active render). Leave it.
-- **CH01_P002** — was rendering ~50% (its subject literally says "wilderness LANDSCAPE", so it sprawled). Now set to `LAYOUT_E_BAND_BALANCED` (25%); blueprint approved. **NOT yet re-rendered** (blocked on OpenAI billing). Active render is still the old 50% one.
-- **FM_005_INTRODUCTION** — was too small (dead parchment); its subject was rewritten in `page-role-policy.ts` (INTRO_OPENER) from "a small sprig" to a "meaningful New England woodland habitat study", set to `LAYOUT_E_BAND_BALANCED` (25%); blueprint approved. **NOT yet re-rendered** (billing). Active is still the old fern-band one.
-- **Next action after restart:** recreate `.env` (rotated keys) + ensure OpenAI has headroom → `cd backend && CONC=2 node "../node_modules/tsx/dist/cli.mjs" scripts/_batch.ts balanced25 CH01_P002 FM_005_INTRODUCTION` → review with `_full.ts` → operator approves.
+- **Typeset engine** `backend/src/pipeline/typeset/` — config-driven (trim,
+  margins, typography from ProjectConfig; structure from manuscript headings).
+  `GET /api/projects/:id/typeset-preview` (`?format=json` for the report).
+- **Console**: Step 5 · Paginate → *Typeset interior preview*. Renders pages to
+  canvas with pdf.js (an `<iframe>` PDF embed showed a blank black box).
+- **Current proof**: 155 pages, 5.5×8.5, 12pt/1.3, 0.625in gutter, bleed 0,
+  **0 overflow**, 14 blank pages, chapters on rectos from p5.
+- **Chapter opener alignment: FIXED and verified in production** (see below).
+- **Dev/prod DB isolation**: Docker Postgres on 55432,
+  `docker-compose.dev.yml`, `.env.development.local` (gitignored, loaded last),
+  guard in `backend/src/lib/db-environment.ts`.
+- Manuscript provenance: canonical source retained separately from the
+  sanitized working copy. Canonical `2145cb95…0157a8`, working `165a6dbb…c4818f`.
 
-**Front/back-matter scope the operator wants done (issue = ornaments getting cut, + rebalance):** modify `FM_004_CONTENTS`, `FM_005_INTRODUCTION`, `FM_006`–`FM_011_INTRODUCTION_CONT`; back matter `BM_001_GLOSSARY`, `BM_002_GLOSSARY`, `BM_003_INDEX`, `BM_004_INDEX`, `BM_005_INDEX`. **LEAVE** `FM_001_HALF_TITLE`, `FM_002_TITLE_PAGE`, `FM_003_COPYRIGHT_PAGE`, `BM_005_ABOUT_SERIES`.
+## IMMEDIATE NEXT STEPS (operator's exact order)
 
-**Review helper scripts added this session:** `_prompt.ts <key>` (dumps the FULL assembled prompt to a Downloads `.txt` + surfaces the illustration subject), `_textcheck.ts <keys>` (chars/words/paragraphs → 15% vs 25% suggestion), `_fmkeys.ts` (front/back-matter page keys + layouts), `_setlayout.ts <LAYOUT_ID> <keys>` (force a page's `layoutTemplate`).
+1. **Finish verifying the alignment fix.** Two of six cases confirmed
+   (`CHAPTER 1` label, `No One Told Me That` title — both now centered with
+   natural spacing). Still to check on pages ~6–8:
+   `What it isn't`, `The three things`,
+   `Here's something nobody warns you about.`, `make good choices.`
+   Expect: section headings LEFT, paragraph last lines RAGGED-RIGHT.
+2. **Run the diagnostic harness once** — `backend/scripts/typeset-diagnose.ts`.
+   It captures tag/class/parent/display/text-align/text-align-last/white-space/
+   word-spacing/width before AND after Paged.js, plus whether `.tsec > .opener`
+   child selectors survive pagination. **Its "after" pass currently times out**:
+   swap `waitUntil: 'networkidle0'` for the polling wait the real renderer uses
+   (see `render-typeset.ts` STABLE_JS).
+3. **Close the deploy-verification hole.** Add the running commit to
+   `/health` (`RAILWAY_GIT_COMMIT_SHA` is in the container) and add
+   `tsc --noEmit` to pre-deploy. A green `/health` must never be read as
+   "latest deploy landed" — see the incident below.
+4. **Spec deviation to decide**: the label renders `CHAPTER 1`;
+   `CHAPTER_BOOK_STANDARD.md` §3 says **"Chapter One"**. Operator's call.
+5. **Font choice.** Render the SAME opener at 5.5×8.5 in **Oswald**, **Archivo**,
+   **Montserrat**, show all three, let the operator choose. Oswald is their
+   current lean. **Do not depend on Google Fonts at render time for final print**
+   — bake the chosen family into `Dockerfile.backend` (it already apt-installs
+   fonts-liberation / fonts-dejavu-core / fonts-freefont-ttf; none of the three
+   candidates are installed, they are fetched from the CDN today).
+6. **Only then**: the 155-page design QA. Do not start it before typography is
+   confirmed — auditing against a broken style system is wasted work.
 
----
+## Two incidents that cost hours — do not repeat
 
-## What this project is
-AI-rendered book for Amazon KDP: **"THE WILDLANDS: NEW ENGLAND"** by Wade Brannock, **hardcover, 7×10 trim, 275 interior pages**. Each page is rendered as ONE whole-page image (typography + illustration baked together by gpt-image from a layout blueprint + a text prompt). The **full-wrap cover is DONE and approved — do NOT touch it.** All current work is **interior pages only**.
+**A green `/health` does not mean your code deployed.** A failed Docker build
+leaves the PREVIOUS container running and answering normally. Confirm the
+*build* and *instance*, per service:
+`railway status --json` → `serviceInstances[].latestDeployment.{meta.commitHash,status,instances[].status}`.
 
-## Where the code is / how to run it
-- Repo: `C:\Users\jovan\Downloads\wildlands agents platform` (`backend/` + `frontend/`).
-- **`PROJECT_ID` (one-line setup per book):** every operator script reads the active project from `PROJECT_ID` in `.env` via `scripts/_project.ts` (NOT hardcoded anymore). It **fails loudly if unset** and prints `[project] active PROJECT_ID = …` on every run. For THIS book set `PROJECT_ID=66c1c69c-2c81-409e-a4b5-bff3f3bb04ba`; for a new book, just change that one line. Never reintroduce a hardcoded id in a script.
-- **DO NOT use `railway run` — the Railway CLI is blocked by Windows Smart App Control (`railway.exe` fails silently with exit 1).** Backend scripts read the Railway env from a **repo-root `.env`** (gitignored; `backend/src/env.ts` auto-loads `<repo-root>/.env`). Run scripts with plain node (which Smart App Control allows):
-  ```
-  cd backend && node "../node_modules/tsx/dist/cli.mjs" scripts/<SCRIPT>.ts <args>
-  ```
-- **POST-FORMAT / NEW MACHINE — there is NO `.env` (it was DELETED; its keys were compromised).** Recreate `<repo-root>/.env` from the Railway dashboard → `@wildlands/backend` service → Variables → **Raw Editor**, copying the **freshly ROTATED keys** (the old OpenAI / Anthropic / Supabase service-role / Replicate keys are burned — do not reuse). Minimum needed: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, plus the flags (`WHOLE_PAGE_EXPERIMENT_ENABLED=true`, `PAGINATION_V1_ENABLED=true`, `LAYOUT_SIMPLIFIED_V1=true`). DB host is the Supabase pooler (`...pooler.supabase.com:6543`); `client.ts` uses `prepare:false` (pgbouncer-safe).
-- **After editing `shared/src/index.ts`, rebuild the shared package** (backend imports its built `dist`): `cd shared && node ../node_modules/typescript/bin/tsc -p tsconfig.json`.
-- Typecheck: `node "../node_modules/typescript/bin/tsc" --noEmit` from `backend/`.
-- Frontend build: `node ../node_modules/@craco/craco/dist/bin/craco.js build` from `frontend/`. Deploy = `git push origin main` (Railway auto-deploys). **Standing rule: do NOT deploy until the operator says so — ship the whole package together.**
+**Backticks inside a template literal break the build silently.**
+`typeset-book.ts` builds CSS in a template literal. A CSS comment containing
+`` `text-align` `` terminated the string, the build failed, Railway kept the old
+container, and two "fixes" appeared to do nothing. Run `tsc --noEmit` before
+pushing.
 
-## Render pipeline (key files)
-- `backend/src/pipeline/stage-6-layout/layout-director.ts` — `directLayout()` builds the zone allocation (where image vs text go) per layout; `zonePlanFor()`/`placementFor()` are the per-layout zone geometry + prompt text.
-- `backend/src/pipeline/stage-6-layout/layout-profiles.ts` — `LAYOUT_PROFILES` (artAreaFraction, artSlot, textAreaFactor) + the `ArtSlot` union.
-- `backend/src/pipeline/stage-3-generation/blueprint.ts` — paints the blueprint PNG (the AI's composition map). Orange dashed = trim-safe rail.
-- `backend/src/pipeline/whole-page-render/assemble-page-prompt.ts` — the text prompt (hardConstraints).
-- `backend/src/pipeline/whole-page-render/page-role-policy.ts` — forces layouts/subjects by page role (continuations→pure text, intro→opener, glossary→reference, etc.). **This overrides the stored `pages.layoutTemplate` for special roles** (why a layout override sometimes "doesn't take").
-- `backend/src/pipeline/whole-page-render/render-whole-page.ts` — `prepareRender(pageId)` returns `{spec, assembledPrompt, allocation, size}`; `createAndRunRender(pageId)` renders + persists (costs money).
+**Railway overrides the Dockerfile CMD** with
+`yarn workspace @wildlands/backend start` = `drizzle-kit migrate && node dist/index.js`.
+The DB guard in `drizzle.config.ts` therefore runs on every boot; it crashed the
+backend until `APP_ENVIRONMENT=production` was set on the Railway service. Any
+boot-time guard must be checked against Railway's start command, not the CMD.
 
-## Layouts in play (focal illustration size)
-- `LAYOUT_B_IMAGE_*` = ~50%. `LAYOUT_C_CORNER_*` = ~25% (L-shaped text — avoid). `LAYOUT_2_TEXT_HEAVY` = **repurposed to TEXT_DOMINANT**: a small ~10% vignette + ONE large centered reading field. `LAYOUT_D_PURE_TEXT` = 0% focal (but the calm background field still paints a strong scene — e.g. the moose intro page). Continuations are force-routed to pure text by role.
+**tsx + puppeteer**: esbuild injects a `__name` helper into compiled functions;
+puppeteer serialises them into the page where it does not exist, so every
+`page.evaluate` throws `__name is not defined`. Pass evaluate bodies as STRINGS.
 
-## THE CURRENT TASK (operator QA)
-Some pages have the **illustration too LARGE**, pushing text toward/over the trim-safe boundary. **THE FIX = SHRINK THE ILLUSTRATION.** Rules, verbatim from the operator:
-- **Shrink the illustration, keep it.** Do NOT remove the art. A full-text page still keeps a strong background illustration (the moose page is the gold standard).
-- **Do NOT make the text bigger.** Text stays 11pt. It fits because the illustration got smaller and freed the space — not because text was enlarged.
-- Ladder: 50–60% → ~25%; 25% → ~10–12%; small supporting illustration when that's enough.
-- **HARD WORKFLOW RULE: show the blueprint + prompt + a readable layout diagram and WAIT for explicit operator approval BEFORE rendering. Never render without a "go."** (The previous agent kept rendering before approval — do not.)
+## Environment
 
-## Tools already built (backend/scripts/, all read-only unless noted)
-- `_layoutpreview.ts <out> <keys>` — **readable** page layout diagram (illustration % + text zones + trim/safe lines). Use this to show the operator BEFORE rendering.
-- `_inspect.ts <key>` — prints a page's prompt placement + blueprint zones, saves the blueprint PNG.
-- `_layoutfix.ts [--apply] [--force] <CHxx|keys>` — capacity-driven layout chooser/swapper (writes `pages.layoutTemplate` via planPage+updatePagePlanning; no re-pagination). `--force` reduces even if it "fits".
-- `_batch.ts <out> <keys>` — **RENDERS** (spends) + activates + contact sheet. Only after approval.
-- `_full.ts` / `_grid.ts` — view actual renders. `_railcheck.ts` — bottom-third crop w/ rail line. `_verify.ts` — render freshness per page. `_audit_all.ts` — whole-book render status. `_prog.ts`/`_watch.ts` — status-aware progress/watchdog. `_keys.ts <CHxx>` — chapter page keys. `_err.ts <keys>` — render versions/status. `_bpmany.ts` — blueprint montage + ornament check.
+- Railway project `illustrious-reverence`; services `frontend`,
+  `@wildlands/backend`. **Railway CLI works** (logged in) — an older note
+  claiming it was blocked was wrong.
+- Local and production shared ONE Supabase DB until isolation landed; local dev
+  now uses Docker Postgres. Production data is real — do not mutate it to test.
+- Console password: ask the operator; agents cannot type it into the login form.
+  The Browser pane session is often already authenticated — check first.
+- Project id (production): `3b7ed37a-8a07-4bfd-a0c3-14ae5dc4a6ff`.
 
-## Constraints / context
-- Content = **CH01–CH08 (258 pp); there is no CH09.** Front/back matter = 17 pp. All 275 are rendered.
-- **No re-pagination / no page-count / folio / spine / cover changes** — those cascade to the approved cover. Over-capacity pages (e.g. CH08_P003 3,132 chars, the glossary pages) genuinely exceed one page at 11pt and are deferred re-pagination candidates for the NEXT book.
-- Front/back-matter ornament policy: KEEP half-title/title/copyright; STRIP edge ornaments from contents/intro/glossary/index (already done in `page-role-policy.ts` + `layout-director.ts` placement strings).
-- Every render is versioned; prior versions are inactive in `wholePageRenders` and can be reactivated (revert).
+## Not started / known gaps
 
-## Operator's QA findings still open (illustration too large → shrink)
-Content openers flagged: FM005; CH01 P002/P003/P007/P008/P009/P010; CH02 P002–P024 (many); CH03 P002/P010/P011/P017/P021/P022/P023/P025; CH04 P002/P007; CH05 P005/P010/P012; CH07 P006_c3/c5; CH08 P002_c2/P003/P004/P009. Do NOT modify CH08_P010 (approved). Work them ONE AT A TIME with operator approval per page.
+- Breakdown has not been run on this project, so Step 6 front matter (title
+  page, copyright, TOC) does not exist. The book currently opens on Chapter 1.
+- Page 1 is blank and has not been explained (13 other blanks are recto-parity).
+- Production profile system: only `wildlands-field-guide` is registered. The
+  `bw-educational-nonfiction` profile is designed but NOT built. A novel would
+  fail Breakdown outright (needs `###` entries per chapter).
+- Known ESM cycle: Stage 1.5 ↔ production-profiles registry, worked around with
+  deferred arrow wrappers. Relocate the field-guide classification to remove it.
