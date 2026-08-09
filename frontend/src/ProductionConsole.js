@@ -2050,7 +2050,211 @@ function Guard({ project, setStep }) {
  * Re-renders from the PDF at a high scale rather than upscaling the thumbnail
  * bitmap — the whole point of opening a page is to read the type.
  */
-function TypesetPageModal({ docRef, page, onClose }) {
+/**
+ * LOCAL LAYOUT OVERRIDES — the operator's escape hatch for ONE block.
+ *
+ * The rule this UI exists to keep honest:
+ *
+ *     systemic defect -> fix the layout standard (a developer, a version bump)
+ *     isolated defect -> local override (right here, no developer)
+ *     manuscript      -> frozen, always
+ *
+ * Two things are deliberately impossible from this panel. There is no free-text
+ * style field — every control below maps to one bounded property the backend
+ * schema already validates, so an override can never grow into a second,
+ * unversioned layout system. And there is no way to edit the words: an override
+ * changes how a block is SET, never what it says.
+ *
+ * Nothing here is keyed to a page number. The page is only how you FIND the
+ * block; what gets stored is the block's own content-derived id, so an override
+ * survives repagination. This book's page count moved four times during QA.
+ */
+const KEEP_CHOICES = [
+  ["", "Standard"],
+  ["yes", "Yes"],
+  ["no", "No"],
+];
+const BREAK_CHOICES = [
+  ["", "Standard"],
+  ["auto", "Auto"],
+  ["page", "Force new page"],
+  ["avoid", "Avoid"],
+];
+const VARIANT_CHOICES = [
+  ["", "Standard"],
+  ["compact", "Compact"],
+  ["roomy", "Roomy"],
+];
+
+/** Human label for a block kind — the operator should not have to read CSS. */
+const KIND_LABEL = {
+  opener: "Chapter opener",
+  p: "Paragraph",
+  h3: "Section heading",
+  h4: "Sub-heading",
+  ul: "Bulleted list",
+  ol: "Numbered list",
+  callout: "Callout",
+  "alert-panel": "Alert panel",
+  takeaway: "Chapter takeaway",
+  "tail-unit": "Closing unit",
+  "scene-break": "Scene break",
+};
+
+/** One-line plain-English summary of what an override actually changes. */
+function describeOverride(o) {
+  const parts = [];
+  if (o.variant) parts.push(`${o.variant} variant`);
+  if (o.spaceBeforeEm !== undefined) parts.push(`space before ${o.spaceBeforeEm}em`);
+  if (o.spaceAfterEm !== undefined) parts.push(`space after ${o.spaceAfterEm}em`);
+  if (o.keepWithNext !== undefined) parts.push(o.keepWithNext ? "keep with next" : "may break after");
+  if (o.keepTogether !== undefined) parts.push(o.keepTogether ? "keep together" : "may split");
+  if (o.breakBefore) parts.push(`break before: ${o.breakBefore}`);
+  if (o.breakAfter) parts.push(`break after: ${o.breakAfter}`);
+  return parts.length ? parts.join(" · ") : "no change";
+}
+
+function BlockOverrideEditor({ block, current, onSave, onReset }) {
+  const [form, setForm] = useState(() => ({
+    spaceBeforeEm: current?.spaceBeforeEm ?? "",
+    spaceAfterEm: current?.spaceAfterEm ?? "",
+    keepWithNext: current?.keepWithNext === undefined ? "" : current.keepWithNext ? "yes" : "no",
+    keepTogether: current?.keepTogether === undefined ? "" : current.keepTogether ? "yes" : "no",
+    breakBefore: current?.breakBefore ?? "",
+    breakAfter: current?.breakAfter ?? "",
+    variant: current?.variant ?? "",
+    note: current?.note ?? "",
+  }));
+  const [saving, setSaving] = useState(false);
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  // "" means "leave it to the standard", so it is omitted rather than sent as a
+  // value. That is what makes Reset and per-property Standard mean the same
+  // thing: the standard decides unless this book says otherwise.
+  const build = () => {
+    const o = {};
+    if (form.spaceBeforeEm !== "") o.spaceBeforeEm = Number(form.spaceBeforeEm);
+    if (form.spaceAfterEm !== "") o.spaceAfterEm = Number(form.spaceAfterEm);
+    if (form.keepWithNext !== "") o.keepWithNext = form.keepWithNext === "yes";
+    if (form.keepTogether !== "") o.keepTogether = form.keepTogether === "yes";
+    if (form.breakBefore !== "") o.breakBefore = form.breakBefore;
+    if (form.breakAfter !== "") o.breakAfter = form.breakAfter;
+    if (form.variant !== "") o.variant = form.variant;
+    if (form.note.trim() !== "") o.note = form.note.trim();
+    return o;
+  };
+
+  const field = (label, node) => (
+    <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11.5, color: C.muted }}>
+      {label}
+      {node}
+    </label>
+  );
+  const sel = (k, choices) => (
+    <select value={form[k]} onChange={set(k)} style={{ ...S.input, padding: "5px 7px", fontSize: 12 }}>
+      {choices.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+    </select>
+  );
+  const num = (k) => (
+    <input
+      type="number" step="0.1" min="-2" max="6" value={form[k]} onChange={set(k)} placeholder="standard"
+      style={{ ...S.input, padding: "5px 7px", fontSize: 12 }}
+    />
+  );
+
+  return (
+    <div style={{ marginTop: 8, padding: 10, background: "#f7f2e6", border: `1px solid ${C.line}`, borderRadius: 6 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
+        {field("Space before (em)", num("spaceBeforeEm"))}
+        {field("Space after (em)", num("spaceAfterEm"))}
+        {field("Keep with next", sel("keepWithNext", KEEP_CHOICES))}
+        {field("Keep together", sel("keepTogether", KEEP_CHOICES))}
+        {field("Break before", sel("breakBefore", BREAK_CHOICES))}
+        {field("Break after", sel("breakAfter", BREAK_CHOICES))}
+        {field("Variant", sel("variant", VARIANT_CHOICES))}
+      </div>
+      <div style={{ marginTop: 8 }}>
+        {field(
+          "Why (for whoever regenerates this book next)",
+          <input
+            type="text" maxLength={300} value={form.note} onChange={set("note")}
+            placeholder="e.g. thin chapter ending, pulled up to sit with the chapter"
+            style={{ ...S.input, padding: "5px 7px", fontSize: 12 }}
+          />,
+        )}
+      </div>
+      <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <button
+          style={{ ...S.btn(), margin: 0, padding: "6px 12px", fontSize: 12.5 }}
+          disabled={saving}
+          onClick={async () => { setSaving(true); try { await onSave(block.blockId, build()); } finally { setSaving(false); } }}
+        >
+          {saving ? "Saving…" : "Save override"}
+        </button>
+        {current && (
+          <button
+            style={{ ...S.ghost, margin: 0, padding: "6px 12px", fontSize: 12.5 }}
+            disabled={saving}
+            onClick={async () => { setSaving(true); try { await onReset(block.blockId); } finally { setSaving(false); } }}
+          >
+            ↺ Reset to standard
+          </button>
+        )}
+        <span style={{ fontSize: 11, color: C.muted }}>
+          Rebuild the preview to see the change.
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** The blocks that landed on one page, each openable into the editor. */
+function PageBlockList({ blocks, overrides, onSave, onReset }) {
+  const [open, setOpen] = useState(null);
+  if (!blocks.length) {
+    return <div style={{ fontSize: 12, color: C.muted, marginTop: 10 }}>No addressable blocks on this page.</div>;
+  }
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.ink, marginBottom: 6 }}>
+        Blocks on this page
+        <span style={{ fontWeight: 400, color: C.muted }}> — customise one without touching the standard or the text</span>
+      </div>
+      {blocks.map((b) => {
+        const current = overrides[b.blockId];
+        return (
+          <div key={b.blockId} style={{ borderTop: `1px solid ${C.line}`, padding: "8px 0" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.blue }}>{KIND_LABEL[b.kind] || b.kind}</span>
+              {current && <span style={{ ...S.pill(C.orange), fontSize: 10 }}>customised</span>}
+              <code style={{ fontSize: 10, color: C.muted }}>{b.blockId}</code>
+              <button
+                style={{ ...S.ghost, margin: 0, padding: "2px 8px", fontSize: 11.5, marginLeft: "auto" }}
+                onClick={() => setOpen(open === b.blockId ? null : b.blockId)}
+              >
+                {open === b.blockId ? "Close" : current ? "Edit" : "Customise"}
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: C.ink, marginTop: 3, opacity: 0.85 }}>
+              {b.preview || <i style={{ color: C.muted }}>(no text)</i>}
+            </div>
+            {current && (
+              <div style={{ fontSize: 11.5, color: C.orange, marginTop: 3 }}>
+                {describeOverride(current)}
+                {current.note ? <span style={{ color: C.muted }}> — {current.note}</span> : null}
+              </div>
+            )}
+            {open === b.blockId && (
+              <BlockOverrideEditor block={b} current={current} onSave={onSave} onReset={onReset} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TypesetPageModal({ docRef, page, onClose, blocks = [], overrides = {}, onSave, onReset }) {
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const canvasRef = useRef(null);
   const W = isMobile ? 320 : 620;
@@ -2085,6 +2289,9 @@ function TypesetPageModal({ docRef, page, onClose }) {
           <button style={S.ghost} onClick={onClose}>Close ✕</button>
         </div>
         <canvas ref={canvasRef} style={{ display: "block", border: `1px solid ${C.line}`, background: "#fff" }} />
+        {onSave && (
+          <PageBlockList blocks={blocks} overrides={overrides} onSave={onSave} onReset={onReset} />
+        )}
       </div>
     </div>
   );
@@ -2109,7 +2316,7 @@ function TypesetPageModal({ docRef, page, onClose }) {
  * Pages still render in batches: a 155-page book is far too much to rasterise up
  * front.
  */
-function PdfPages({ url, pageCount, report }) {
+function PdfPages({ url, pageCount, report, blocks = [], overrides = {}, onSave, onReset }) {
   const hostRef = useRef(null);
   const docRef = useRef(null);
   const isMobile = useMediaQuery(MOBILE_QUERY);
@@ -2131,8 +2338,27 @@ function PdfPages({ url, pageCount, report }) {
     }
     for (const p of report?.blankPages ?? []) m.set(p, { ...(m.get(p) || {}), flag: "blank" });
     for (const p of report?.verticalOverflowPages ?? []) m.set(p, { ...(m.get(p) || {}), flag: "overflow" });
+    // A customised block must be VISIBLE from the grid. An override nobody can
+    // see is a landmine for whoever regenerates the book next — they change the
+    // standard, the page still misbehaves, and nothing explains why.
+    for (const [n, ids] of Object.entries(report?.pageBlocks ?? {})) {
+      const count = ids.filter((id) => overrides[id]).length;
+      if (count) m.set(Number(n), { ...(m.get(Number(n)) || {}), overrides: count });
+    }
     return m;
-  }, [report]);
+  }, [report, overrides]);
+
+  /** blockId -> its ref, so a page's ids become nameable blocks. */
+  const blockById = useMemo(() => {
+    const m = new Map();
+    for (const b of blocks) m.set(b.blockId, b);
+    return m;
+  }, [blocks]);
+
+  const blocksOnPage = useCallback(
+    (n) => (report?.pageBlocks?.[n] ?? []).map((id) => blockById.get(id)).filter(Boolean),
+    [report, blockById],
+  );
 
   const effCols = isMobile ? Math.min(cols, 2) : cols;
 
@@ -2182,6 +2408,12 @@ function PdfPages({ url, pageCount, report }) {
             pill.style.cssText = `margin-left:6px;font-weight:400;font-size:10px;color:${meta.flag === "overflow" ? C.red : C.muted};`;
             cap.appendChild(pill);
           }
+          if (meta.overrides) {
+            const pill = document.createElement("span");
+            pill.textContent = meta.overrides > 1 ? `✎ ${meta.overrides} customised` : "✎ customised";
+            pill.style.cssText = `margin-left:6px;font-weight:700;font-size:10px;color:${C.orange};`;
+            cap.appendChild(pill);
+          }
           const ctx = document.createElement("div");
           ctx.textContent = meta.section || "";
           ctx.style.cssText = `font-size:10px;color:${C.muted};margin-top:4px;min-height:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`;
@@ -2193,6 +2425,7 @@ function PdfPages({ url, pageCount, report }) {
           // makes chapter boundaries findable at a glance.
           if (meta.section) canvas.style.outline = `2px solid ${C.blue}`;
           canvas.addEventListener("click", () => setZoomPage({ n, section: meta.section, flag: meta.flag }));
+          if (meta.overrides) canvas.style.outline = `2px solid ${C.orange}`;
           host.appendChild(cell);
           await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
         }
@@ -2227,7 +2460,7 @@ function PdfPages({ url, pageCount, report }) {
         {densityBtn(4, "Overview · 4 across")}
         {densityBtn(2, "Review · 2 across")}
         <span style={{ fontSize: 11.5, color: C.muted, marginLeft: 4 }}>
-          Click any page to enlarge. Chapter openers are outlined.
+          Click any page to enlarge and customise a block on it. Chapter openers are outlined blue; customised pages orange.
         </span>
       </div>
 
@@ -2248,7 +2481,17 @@ function PdfPages({ url, pageCount, report }) {
         )}
       </div>
 
-      {zoomPage && <TypesetPageModal docRef={docRef} page={zoomPage} onClose={() => setZoomPage(null)} />}
+      {zoomPage && (
+        <TypesetPageModal
+          docRef={docRef}
+          page={zoomPage}
+          onClose={() => setZoomPage(null)}
+          blocks={blocksOnPage(zoomPage.n)}
+          overrides={overrides}
+          onSave={onSave}
+          onReset={onReset}
+        />
+      )}
     </div>
   );
 }
@@ -2271,9 +2514,30 @@ function TypesetPreview({ project, api, fileUrlBase }) {
   const [report, setReport] = useState(null);
   const [src, setSrc] = useState(null);
   const [recto, setRecto] = useState(true);
+  /** The addressable blocks of the last render, and this book's exceptions. */
+  const [blocks, setBlocks] = useState([]);
+  const [overrides, setOverrides] = useState({});
+  const [orphaned, setOrphaned] = useState([]);
+  const [standardId, setStandardId] = useState("");
 
   // Revoke the previous object URL so repeated previews don't leak blobs.
   useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
+
+  // An override is stored against the block's content-derived id and lives in
+  // the PROJECT config, so it travels with this book and can never leak into the
+  // reusable layout standard.
+  const saveOverride = useCallback(async (blockId, override) => {
+    await api(`/api/projects/${project.id}/layout-overrides/${blockId}`, {
+      method: "PUT",
+      body: JSON.stringify(override),
+    });
+    setOverrides((o) => ({ ...o, [blockId]: override }));
+  }, [api, project.id]);
+
+  const resetOverride = useCallback(async (blockId) => {
+    await api(`/api/projects/${project.id}/layout-overrides/${blockId}`, { method: "DELETE" });
+    setOverrides((o) => { const next = { ...o }; delete next[blockId]; return next; });
+  }, [api, project.id]);
 
   const build = async () => {
     setBusy(true); setErr(""); setReport(null);
@@ -2281,6 +2545,10 @@ function TypesetPreview({ project, api, fileUrlBase }) {
       const q = `recto=${recto ? "true" : "false"}`;
       const meta = await api(`/api/projects/${project.id}/typeset-preview?format=json&${q}`);
       setReport(meta.report);
+      setBlocks(meta.blocks || []);
+      setOverrides(meta.layoutOverrides || {});
+      setOrphaned(meta.orphanedOverrides || []);
+      setStandardId(meta.layoutStandardId || "");
       const pw = sessionStorage.getItem("wl_pw") || "";
       const res = await fetch(
         `${fileUrlBase}/api/projects/${project.id}/typeset-preview?${q}`,
@@ -2342,13 +2610,63 @@ function TypesetPreview({ project, api, fileUrlBase }) {
               may not render at all (it showed a blank black box), so the
               operator could not see their own book. Drawing the pages ourselves
               makes them appear reliably, in the console, like a book. */}
-          <PdfPages url={src} pageCount={r ? r.totalPages : 0} report={r} />
+          <PdfPages
+            url={src}
+            pageCount={r ? r.totalPages : 0}
+            report={r}
+            blocks={blocks}
+            overrides={overrides}
+            onSave={saveOverride}
+            onReset={resetOverride}
+          />
           <div style={{ marginTop: 8 }}>
             <a href={src} download={`${(project.title || "book").replace(/[^\w-]+/g, "-").toLowerCase()}-typeset.pdf`} style={{ ...S.ghost, display: "inline-block", textDecoration: "none" }}>
               ⭳ Download this proof
             </a>
           </div>
         </>
+      )}
+
+      {/* Every exception in one place. A book must never be able to accumulate
+          invisible local hacks: the next person to regenerate it needs to see
+          what was customised and why, or they will change the standard trying to
+          fix a page that is already deliberately different. */}
+      {r && (Object.keys(overrides).length > 0 || orphaned.length > 0) && (
+        <div style={{ ...S.card, marginTop: 12, borderColor: C.orange }}>
+          <b style={{ fontSize: 13 }}>Local layout overrides ({Object.keys(overrides).length})</b>
+          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>
+            Per-block exceptions to <code>{standardId || "the layout standard"}</code>, stored with this book.
+            Keyed to block content, not page number, so they survive repagination.
+            A problem that recurs is systemic and belongs in the standard instead.
+          </div>
+          {Object.entries(overrides).map(([id, o]) => {
+            const b = blocks.find((x) => x.blockId === id);
+            return (
+              <div key={id} style={{ borderTop: `1px solid ${C.line}`, padding: "7px 0", fontSize: 12 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 700, color: C.blue }}>{b ? KIND_LABEL[b.kind] || b.kind : "Unknown block"}</span>
+                  <code style={{ fontSize: 10, color: C.muted }}>{id}</code>
+                  {b && <span style={{ fontSize: 11, color: C.muted }}>{b.sectionTitle}</span>}
+                  <button
+                    style={{ ...S.ghost, margin: 0, padding: "2px 8px", fontSize: 11.5, marginLeft: "auto" }}
+                    onClick={() => resetOverride(id)}
+                  >
+                    ↺ Reset to standard
+                  </button>
+                </div>
+                <div style={{ color: C.orange, fontSize: 11.5, marginTop: 2 }}>{describeOverride(o)}</div>
+                {o.note && <div style={{ color: C.muted, fontSize: 11.5 }}>{o.note}</div>}
+                {b && <div style={{ opacity: 0.8, marginTop: 2 }}>{b.preview}</div>}
+              </div>
+            );
+          })}
+          {orphaned.length > 0 && (
+            <div style={{ marginTop: 8, color: C.red, fontSize: 12 }}>
+              ⚠ {orphaned.length} override(s) point at content that is no longer in the book: {orphaned.join(", ")}.
+              They are doing nothing. Reset them, or check whether the manuscript changed.
+            </div>
+          )}
+        </div>
       )}
 
       {r && (

@@ -5,6 +5,7 @@ import {
   ApiErrorSchema,
   CreateProjectRequestSchema,
   LayoutApprovalSchema,
+  LayoutOverrideSchema,
   PageManifestSchema,
   PageQualityResolutionSchema,
   ProofArtifactSchema,
@@ -1363,7 +1364,19 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         layoutStandard,
       });
       if (query.format === 'json') {
-        return { report: result.report, layoutStandardId: standardId, productionProfileId: profile.id };
+        return {
+          report: result.report,
+          layoutStandardId: standardId,
+          productionProfileId: profile.id,
+          // The addressable blocks of this render, so the review UI can offer an
+          // override on a real block rather than on a page number.
+          blocks: result.blocks,
+          layoutOverrides: config.layoutOverrides ?? {},
+          // An override whose block no longer exists is NAMED, never silently
+          // ignored: the symptom otherwise is a page that quietly stops obeying
+          // an exception someone deliberately made.
+          orphanedOverrides: result.overrides.orphaned,
+        };
       }
 
       reply.header('content-type', 'application/pdf');
@@ -1383,6 +1396,48 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       }
       throw err;
     }
+  });
+
+  // ── LOCAL LAYOUT OVERRIDES ────────────────────────────────────────────────
+  // A per-block exception to the pinned layout standard, for an ISOLATED defect.
+  // A defect that recurs is systemic and belongs in the standard instead.
+  //
+  // Keyed by stable block id, never by page number: this book's pagination moved
+  // four times during QA, and a page-keyed override would have silently
+  // re-pointed at unrelated content each time.
+  //
+  // The body is validated against the CLOSED property set in
+  // `LayoutOverrideSchema` — spacing, page-breaking, an approved variant, a
+  // note. There is no arbitrary-CSS field and no text field: the manuscript is
+  // frozen, and an override changes how a block is SET, never what it says.
+  const OverrideParamsSchema = z.object({
+    id: z.string().uuid(),
+    blockId: z.string().regex(/^[0-9a-f]{8}$/, 'A block id is 8 hex characters.'),
+  });
+
+  app.put('/api/projects/:id/layout-overrides/:blockId', async (request, reply) => {
+    const { id, blockId } = OverrideParamsSchema.parse(request.params);
+    const override = LayoutOverrideSchema.parse(request.body ?? {});
+    const project = await getProject(id);
+    if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+    const config = parseProjectConfig(project);
+    const layoutOverrides = { ...(config.layoutOverrides ?? {}), [blockId]: override };
+    await updateProjectConfig(id, { ...config, layoutOverrides });
+    request.log.info({ projectId: id, blockId, override }, 'local layout override set');
+    return { blockId, override, count: Object.keys(layoutOverrides).length };
+  });
+
+  app.delete('/api/projects/:id/layout-overrides/:blockId', async (request, reply) => {
+    const { id, blockId } = OverrideParamsSchema.parse(request.params);
+    const project = await getProject(id);
+    if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+    const config = parseProjectConfig(project);
+    const layoutOverrides = { ...(config.layoutOverrides ?? {}) };
+    const existed = blockId in layoutOverrides;
+    delete layoutOverrides[blockId];
+    await updateProjectConfig(id, { ...config, layoutOverrides });
+    request.log.info({ projectId: id, blockId, existed }, 'local layout override reset to standard');
+    return { blockId, reset: existed, count: Object.keys(layoutOverrides).length };
   });
 
   app.post(

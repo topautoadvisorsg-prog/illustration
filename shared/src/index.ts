@@ -6,6 +6,47 @@ export const BrandSchema = z.literal('THE_WILDLANDS');
 export const AudienceSchema = z.literal('ADULT');
 export const EditionSchema = z.enum(['PREMIUM', 'KINDLE_EPUB']);
 
+/**
+ * LOCAL LAYOUT OVERRIDE — the closed, safe set of things an operator may change
+ * about ONE block of ONE book.
+ *
+ * Deliberately not a stylesheet. Every property here is a spacing or
+ * page-breaking decision a typesetter makes by hand on a problem page, with a
+ * bounded value. There is no `css` field and there never will be: an arbitrary
+ * style hook would become a second, unversioned layout system competing with
+ * the layout standard, which is the exact problem the standard was built to
+ * solve. Anything needed on more than a couple of blocks is evidence of a
+ * SYSTEMIC gap and belongs in the standard instead.
+ *
+ * There is likewise no text field. The manuscript is frozen; an override
+ * changes how a block is SET, never what it says.
+ */
+export const LayoutOverrideSchema = z
+  .object({
+    /** Extra space above the block, in em. Bounded: this is a nudge, not a layout. */
+    spaceBeforeEm: z.number().min(-2).max(6).optional(),
+    /** Extra space below the block, in em. */
+    spaceAfterEm: z.number().min(-2).max(6).optional(),
+    /** Never end a page immediately after this block (`break-after: avoid`). */
+    keepWithNext: z.boolean().optional(),
+    /** Never split this block across a page (`break-inside: avoid`). */
+    keepTogether: z.boolean().optional(),
+    /** Force or forbid a page break before this block. */
+    breakBefore: z.enum(['auto', 'page', 'avoid']).optional(),
+    /** Force or forbid a page break after this block. */
+    breakAfter: z.enum(['auto', 'page', 'avoid']).optional(),
+    /**
+     * An APPROVED variant of the block's component, not free styling. Only
+     * variants the layout standard defines are honoured; anything else is
+     * reported as unknown rather than silently applied.
+     */
+    variant: z.enum(['compact', 'roomy']).optional(),
+    /** Why this exception exists — for whoever regenerates the book next. */
+    note: z.string().max(300).optional(),
+  })
+  .strict();
+export type LayoutOverride = z.infer<typeof LayoutOverrideSchema>;
+
 export const ProjectStatusSchema = z.enum([
   'DRAFT',
   'MANUSCRIPT_UPLOADED',
@@ -699,6 +740,21 @@ export const ProjectConfigSchema = z.object({
    * typeset", and the first render pins it.
    */
   typesetLayoutStandardId: z.string().min(1).optional(),
+  /**
+   * LOCAL LAYOUT OVERRIDES — per-block exceptions to the pinned standard.
+   *
+   * Keyed by stable block id (see `pipeline/typeset/block-identity.ts`), NEVER
+   * by page number: pagination moved four times during this book's QA and any
+   * page-keyed override would have silently re-pointed at unrelated content.
+   *
+   * Per-project on purpose, so an exception travels with the book it was made
+   * for and cannot leak into the reusable standard. The rule this enforces:
+   *
+   *     systemic defect -> fix the layout standard
+   *     isolated defect -> local override
+   *     manuscript      -> frozen, always
+   */
+  layoutOverrides: z.record(z.string(), LayoutOverrideSchema).default({}),
   editions: z.array(EditionSchema).default(['PREMIUM', 'KINDLE_EPUB']),
   volume: z.number().int().positive(),
   title: z.string().min(1),

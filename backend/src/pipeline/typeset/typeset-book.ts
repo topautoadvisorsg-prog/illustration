@@ -16,8 +16,10 @@
  * ProjectConfig; structure comes from the manuscript's own headings.
  */
 
-import type { ProjectConfig, TrimSize } from '@wildlands/shared';
+import type { LayoutOverride, ProjectConfig, TrimSize } from '@wildlands/shared';
+import { slugifySection, stampBlockIds, type TypesetBlockRef } from './block-identity.js';
 import { bundledFontCss } from './font-assets.js';
+import { overrideCss, type OverrideCssResult } from './layout-overrides.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from './layout-standards/educational-nonfiction-v1.js';
 import { resolveTypesetDesign } from './layout-standards/resolve-design.js';
 import type {
@@ -145,12 +147,19 @@ export function parseTypesetSections(markdown: string): TypesetSection[] {
  */
 const SCENE_BREAK = '<p class="scene-break">* * *</p>';
 
-function bodyToHtml(
-  lines: string[],
-  micro?: TerminalMicroSectionPolicy,
-  takeaway?: ChapterTakeawayPolicy,
-  alert?: AlertPanelPolicy,
-): string {
+interface BodyHtmlOptions {
+  micro?: TerminalMicroSectionPolicy;
+  takeaway?: ChapterTakeawayPolicy;
+  alert?: AlertPanelPolicy;
+  /** Section identity, so every block can be stamped with a stable id. */
+  sectionSlug?: string;
+  sectionTitle?: string;
+  /** Receives one ref per emitted block. See `block-identity.ts`. */
+  collect?: TypesetBlockRef[];
+}
+
+function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
+  const { micro, takeaway, alert } = opts;
   const html: string[] = [];
   let para: string[] = [];
   let list: string[] = [];
@@ -280,6 +289,10 @@ function bodyToHtml(
     }
   }
 
+  /** Every block carries a stable id; overrides target these, never pages. */
+  const finish = (): string =>
+    stampBlockIds(html, opts.sectionSlug ?? '', opts.sectionTitle ?? '', opts.collect).join('\n');
+
   // A recognised closing beat becomes the takeaway component: compact, kept
   // whole, and kept WITH the chapter content before it. Checked before the
   // generic micro-section rule because it is the more specific treatment.
@@ -298,7 +311,7 @@ function bodyToHtml(
         html.push(
           `<div class="takeaway"><p class="takeaway-label">${escapeHtml(label)}</p>${rest}</div>`,
         );
-        return html.join('\n');
+        return finish();
       }
     }
   }
@@ -320,7 +333,7 @@ function bodyToHtml(
       }
     }
   }
-  return html.join('\n');
+  return finish();
 }
 
 // ── Document ────────────────────────────────────────────────────────────────
@@ -343,6 +356,16 @@ export interface TypesetHtmlInput {
    * a book of short chapters, so it is a deliberate operator choice.
    */
   chaptersStartRecto?: boolean;
+  /**
+   * Per-block exceptions to the standard, keyed by stable block id. Emitted as
+   * the LAST rules in the stylesheet, so they win by source order rather than by
+   * `!important` and the standard's own CSS stays readable.
+   */
+  layoutOverrides?: Record<string, LayoutOverride>;
+  /** Receives a ref for every block emitted. Lets callers name blocks. */
+  collectBlocks?: TypesetBlockRef[];
+  /** Receives which overrides applied and which matched nothing. */
+  overrideReport?: OverrideCssResult[];
 }
 
 /**
@@ -464,18 +487,42 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
   // block, leaving white space above it.
   const sinkIn = ((trim.heightIn - m.topIn - m.bottomIn) * op.sinkFraction).toFixed(3);
 
+  // Every block gets a stable id as it is emitted, and the refs are collected so
+  // callers (the review UI, Layer 1) can name a block without re-deriving it.
+  const collect: TypesetBlockRef[] = [];
   const body = sections
     .map((s, i) => {
       const label = chapterLabel(s, op.labelFormat);
-      return `<section class="tsec ${s.kind}" id="tsec-${i}" data-title="${escapeHtml(s.title)}" data-label="${escapeHtml(label)}" data-kind="${s.kind}">
-  <header class="opener">
-    ${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}
-    <h2>${escapeHtml(s.title)}</h2>
-  </header>
-  ${bodyToHtml(s.bodyLines, standard.terminalMicroSection, standard.chapterTakeaway, standard.alertPanel)}
+      const slug = slugifySection(s.title);
+      const opener = stampBlockIds(
+        [
+          `<header class="opener">${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}<h2>${escapeHtml(s.title)}</h2></header>`,
+        ],
+        slug,
+        s.title,
+        collect,
+      )[0]!;
+      return `<section class="tsec ${s.kind}" id="tsec-${i}" data-title="${escapeHtml(s.title)}" data-label="${escapeHtml(label)}" data-kind="${s.kind}" data-section-slug="${slug}">
+  ${opener}
+  ${bodyToHtml(s.bodyLines, {
+    micro: standard.terminalMicroSection,
+    takeaway: standard.chapterTakeaway,
+    alert: standard.alertPanel,
+    sectionSlug: slug,
+    sectionTitle: s.title,
+    collect,
+  })}
 </section>`;
     })
     .join('\n');
+  input.collectBlocks?.push(...collect);
+  // Overrides are compiled against the blocks this render actually produced, so
+  // one that matches nothing is reported rather than silently doing nothing.
+  const overrides = overrideCss(
+    input.layoutOverrides ?? config.layoutOverrides,
+    new Set(collect.map((b) => b.blockId)),
+  );
+  input.overrideReport?.push(overrides);
 
   // Fonts come from vendored assets so the printed interior is reproducible
   // offline. Only families with no bundled asset fall back to the CDN, and that
@@ -640,7 +687,7 @@ ul { list-style: disc; }
   text-align: left; text-align-last: left; break-after: avoid; }
 .takeaway p { text-indent: 0; }
 .takeaway p + p { margin-top: .25em; }
-</style></head>
+${overrides.css}</style></head>
 <body>
 ${body}
 ${input.polyfillJs ? `${PAGED_DONE_HOOK}\n<script>${input.polyfillJs}</script>` : ''}
@@ -663,6 +710,13 @@ export interface TypesetReport {
   verticalOverflowPages: number[];
   /** Pages that are effectively empty — recto-start parity blanks. */
   blankPages: number[];
+  /**
+   * Page number -> the stable block ids that landed on it. Measured, never
+   * predicted. This is what lets the review UI say "these are the blocks on
+   * page 88" and lets an override be authored against one of them without ever
+   * keying the override to the page number itself.
+   */
+  pageBlocks: Record<number, string[]>;
   trim: { widthIn: number; heightIn: number };
   marginsIn: TypesetMargins;
   bodyPt: number;

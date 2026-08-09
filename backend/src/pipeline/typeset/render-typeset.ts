@@ -17,6 +17,8 @@ import {
   type TypesetReport,
 } from './typeset-book.js';
 import type { TypesetLayoutStandard } from './layout-standards/types.js';
+import type { TypesetBlockRef } from './block-identity.js';
+import type { OverrideCssResult } from './layout-overrides.js';
 
 export interface RenderTypesetInput {
   markdown: string;
@@ -32,6 +34,10 @@ export interface RenderTypesetResult {
   report: TypesetReport;
   /** The HTML actually rendered, for debugging a layout complaint. */
   html: string;
+  /** Every addressable block in the book, in reading order. */
+  blocks: TypesetBlockRef[];
+  /** Which local overrides applied, and which matched no block. */
+  overrides: OverrideCssResult;
 }
 
 export class TypesetUnavailableError extends Error {
@@ -84,11 +90,25 @@ const MEASURE_JS = `(() => {
       blankPages.push(Number(p.getAttribute('data-page-number')));
     }
   });
+  // Which stable blocks landed on which page. This is the ONLY honest way to
+  // answer "what is on page 88?" — the block ids come from the manuscript, but
+  // where they end up is a pagination result, so it must be measured after
+  // Paged.js has finished rather than predicted. A block split across a spread
+  // appears under both pages.
+  const pageBlocks = {};
+  d.querySelectorAll('[data-block-id]').forEach(function (el) {
+    const n = pageNumOf(el);
+    if (!n) return;
+    const id = el.getAttribute('data-block-id');
+    if (!pageBlocks[n]) pageBlocks[n] = [];
+    if (pageBlocks[n].indexOf(id) === -1) pageBlocks[n].push(id);
+  });
   return {
     totalPages: d.querySelectorAll('.pagedjs_page').length,
     sectionStarts: sectionStarts,
     verticalOverflowPages: verticalOverflowPages,
     blankPages: blankPages,
+    pageBlocks: pageBlocks,
   };
 })()`;
 
@@ -139,12 +159,16 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
   }
 
   const polyfillJs = await loadPagedPolyfill();
+  const blocks: TypesetBlockRef[] = [];
+  const overrideReport: OverrideCssResult[] = [];
   const html = buildTypesetHtml({
     ...input,
     sections,
     margins,
     polyfillJs,
     layoutStandard: input.layoutStandard,
+    collectBlocks: blocks,
+    overrideReport,
   });
 
   const { default: puppeteer } = await import('puppeteer-core');
@@ -181,6 +205,8 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
     return {
       pdf: Buffer.from(pdf),
       html,
+      blocks,
+      overrides: overrideReport[0] ?? { css: '', orphaned: [], applied: [] },
       report: {
         ...measured,
         trim: { widthIn: input.config.trimSize.widthIn, heightIn: input.config.trimSize.heightIn },

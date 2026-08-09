@@ -12,8 +12,17 @@ import {
 import { gutterForPageCount, resolveTypesetDesign } from '../pipeline/typeset/layout-standards/resolve-design.js';
 import { getProductionProfile } from '../pipeline/production-profiles/registry.js';
 
+/**
+ * Every block carries a stable `data-block-id` so local overrides can target it
+ * (see `block-identity.ts`). These tests are about STRUCTURE — is a blockquote a
+ * callout, does an alert heading become a panel — so the ids are noise here and
+ * are stripped. That ids are present, unique and stable is covered on its own in
+ * `layout-overrides.test.ts`.
+ */
+const stripIds = (html: string): string => html.replace(/ data-block-id="[0-9a-f]{8}"/g, '');
+
 /** Only the rendered markup — the stylesheet always names every class. */
-const bodyOf = (html: string): string => html.slice(html.indexOf('<body>'));
+const bodyOf = (html: string): string => stripIds(html.slice(html.indexOf('<body>')));
 
 const configFor = (overrides: Record<string, unknown> = {}) =>
   ProjectConfigSchema.parse({
@@ -302,11 +311,13 @@ describe('section-start policy', () => {
 
 describe('markdown callouts', () => {
   const render = (md: string) =>
-    buildTypesetHtml({
-      sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${md}\n`),
-      config: configFor(),
-      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
-    });
+    stripIds(
+      buildTypesetHtml({
+        sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${md}\n`),
+        config: configFor(),
+        layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+      }),
+    );
 
   it('renders a blockquote as a callout, not a paragraph with a literal >', () => {
     const html = render('> **THE LIE YOUR BRAIN IS TELLING YOU**\n>\n> Whatever this is, it is worse for me.');
@@ -377,11 +388,13 @@ describe('scene breaks', () => {
  */
 describe('terminal micro-section', () => {
   const render = (body: string) =>
-    buildTypesetHtml({
-      sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${body}\n`),
-      config: configFor(),
-      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
-    });
+    stripIds(
+      buildTypesetHtml({
+        sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${body}\n`),
+        config: configFor(),
+        layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+      }),
+    );
 
   it('wraps a heading plus a single short line', () => {
     // Deliberately NOT the takeaway heading — that has its own component and
@@ -432,11 +445,13 @@ describe('terminal micro-section', () => {
 
 describe('callout labels', () => {
   const render = (md: string) =>
-    buildTypesetHtml({
-      sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${md}\n`),
-      config: configFor(),
-      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
-    });
+    stripIds(
+      buildTypesetHtml({
+        sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${md}\n`),
+        config: configFor(),
+        layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+      }),
+    );
 
   it('lifts an all-bold first paragraph onto its own label line', () => {
     const html = render('> **THE LIE YOUR BRAIN IS TELLING YOU**\n>\n> Whatever this is, it is worse for me.');
