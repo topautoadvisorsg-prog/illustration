@@ -92,3 +92,51 @@ no working alternative to compare against.
 
 See `backend/src/pipeline/typeset/render-typeset.ts` (`assertTypesetComplete`)
 and `backend/src/__tests__/typeset-completion.test.ts`.
+
+---
+
+## 4. Breakdown has no generic (non-field-guide) manuscript support
+
+**Status:** open · **Severity:** blocks the next book, not this one ·
+**Sequencing:** a separate platform improvement, deliberately NOT part of the
+layout-standard work
+
+Stage 1.5 Breakdown assumes field-guide structure — it requires `###` entries
+within each chapter and raises when a chapter has none
+(`generate-manifests.ts`: *"Each chapter needs at least one '### Entry Title'
+heading before Breakdown can continue"*). That assumption does not hold for:
+
+- **Educational nonfiction** — chapters are continuous prose with `###` section
+  headings used as *section breaks*, not as entry records. NO ONE TOLD ME THAT
+  has never run Breakdown, which is why Step 6 front matter does not exist for
+  it. The typeset track happens not to need Breakdown, so the book proceeds; a
+  book that needs front matter or illustration planning would stall here.
+- **Novels (e.g. Ragball)** — continuous prose with no sub-chapter headings at
+  all. These need chapter parsing that treats a chapter as one unit.
+
+This is the real gap in the target operator workflow (upload → confirm book type
+→ **Breakdown** → typeset → …). The `bw-educational-nonfiction` profile's
+`classification` hooks are where a book class will eventually teach Breakdown
+what its pages are; they are inert today.
+
+---
+
+## 5. Front matter renders raster pages into a vector book
+
+**Status:** open · **Severity:** blocker for the front-matter stage
+
+`backend/src/pipeline/front-matter/compose-page.ts` typesets title page,
+copyright and TOC as **SVG → sharp → PNG**. The typeset interior is Paged.js →
+**vector** text. Running the current front-matter stage against this book would
+insert rasterised pages into a book whose whole value is live, searchable,
+resolution-independent type — visibly softer on press, and unsearchable.
+
+**Do not run the front-matter stage on a typeset book until this is resolved.**
+When title page / copyright / TOC work begins, those pages need to join the
+vector typeset system — most naturally as additional `TypesetSection`s driven by
+the same layout standard, so they inherit the book's margins, type scale and
+furniture instead of re-implementing them in SVG.
+
+Front matter is not missing from the current proof by accident: Breakdown has
+never run (issue 4), so no front-matter rows exist. Its absence is expected and
+is not a defect of the interior.

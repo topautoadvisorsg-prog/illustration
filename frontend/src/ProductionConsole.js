@@ -51,13 +51,22 @@ const S = {
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 12, marginTop: 14 },
 };
 
-const EMPTY_SETUP_FORM = { title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10", bodyPt: 11, lineHeight: 1.4, headingFont: "Cormorant Garamond", bodyFont: "EB Garamond", backBlurb: "", backFeatures: "", backAuthorBio: "" };
+const EMPTY_SETUP_FORM = { title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10", bodyPt: 11, lineHeight: 1.4, headingFont: "Cormorant Garamond", bodyFont: "EB Garamond", productionProfileId: "wildlands-field-guide", typesetLayoutStandardId: "", backBlurb: "", backFeatures: "", backAuthorBio: "" };
 
 // The faces the renderer can actually produce. Free text here would silently
 // fall back to a generic at print time, so Setup offers only families the
 // pipeline ships. Display faces first, then the text faces.
 const HEADING_FONTS = ["Oswald", "Archivo", "Montserrat", "Cormorant Garamond", "EB Garamond"];
 const BODY_FONTS = ["EB Garamond", "Cormorant Garamond", "Lora", "Archivo"];
+
+// What kind of book this is. Drives the production track (AI whole-page vs
+// deterministic typeset), the illustration policy, and which layout standard
+// the interior is rendered against. Mirrors the backend production-profile
+// registry; ids must match it exactly.
+const BOOK_TYPES = [
+  { id: "wildlands-field-guide", label: "Illustrated Field Guide (AI whole-page)" },
+  { id: "bw-educational-nonfiction", label: "Educational Nonfiction — B&W Digest (typeset)" },
+];
 const EMPTY_NEW_FORM = { title: "", subtitle: "", author: "" };
 
 const STEPS = [
@@ -475,6 +484,10 @@ export default function ProductionConsole({ onExitToLegacy }) {
         lineHeight: cfg.typography?.lineHeight ?? 1.4,
         headingFont: cfg.typography?.headingFont ?? "Cormorant Garamond",
         bodyFont: cfg.typography?.bodyFont ?? "EB Garamond",
+        productionProfileId: cfg.productionProfileId ?? "wildlands-field-guide",
+        // Read-only: written by the backend on the first typeset and then owned
+        // by the project, so improving the standard cannot move an approved book.
+        typesetLayoutStandardId: cfg.typesetLayoutStandardId ?? "",
         // Back-cover copy: blurb (paragraph), features (one per line), author note.
         backBlurb: bd.blurb ?? (bd.hooks?.length ? bd.hooks.join("\n") : ""),
         backFeatures: (bd.features ?? []).join("\n"),
@@ -539,6 +552,9 @@ export default function ProductionConsole({ onExitToLegacy }) {
       : undefined;
     return {
       volume: vol,
+      // What kind of book this is. Not sent as part of `typography` — it selects
+      // the production profile, which in turn names the layout standard.
+      productionProfileId: f.productionProfileId || "wildlands-field-guide",
       title: f.title,
       subtitle: f.subtitle,
       authorName: f.author,
@@ -1290,6 +1306,26 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
                   The display face sets chapter labels, chapter titles and section headings. Rebuild the typeset preview in Step 5 to see a change.
                 </div>
+                {/* Book type selects the production profile, which decides the
+                    production track and names the layout standard the interior
+                    is rendered against. */}
+                <label style={{ display: "block", marginTop: 16, fontSize: 13, fontWeight: 600 }}>Book type
+                  <select style={S.input} value={form.productionProfileId}
+                    onChange={(e) => setForm({ ...form, productionProfileId: e.target.value })}>
+                    {BOOK_TYPES.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
+                  </select>
+                </label>
+                <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
+                  Decides whether body pages are AI-rendered or deterministically typeset, how illustrations are budgeted, and which layout standard the interior follows.
+                </div>
+                {form.typesetLayoutStandardId ? (
+                  <div style={{ marginTop: 10, padding: "8px 10px", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 6, fontSize: 12.5 }}>
+                    <strong>Layout standard:</strong> <code>{form.typesetLayoutStandardId}</code>
+                    <div style={{ color: C.muted, marginTop: 3 }}>
+                      Pinned to this book. A newer version of the standard will not change these pages unless you upgrade deliberately.
+                    </div>
+                  </div>
+                ) : null}
 
                 <div style={{ marginTop: 22, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>Back Cover</div>
