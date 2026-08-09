@@ -1,6 +1,18 @@
-# Local layout overrides — design
+# Local layout overrides
 
-**Status:** designed, not built. Recorded so the book can keep moving.
+**Status:** BUILT and operator-facing (commit `0367756`). Phases 1 and 2 shipped
+together: an override only a developer can set is not a fix for the operator, it
+is a config mutation with extra steps.
+
+| Piece | Where |
+|---|---|
+| Block identity | `backend/src/pipeline/typeset/block-identity.ts` |
+| Override → CSS | `backend/src/pipeline/typeset/layout-overrides.ts` |
+| Storage | `LayoutOverrideSchema`, `ProjectConfig.layoutOverrides` (shared) |
+| API | `PUT` / `DELETE /api/projects/:id/layout-overrides/:blockId` |
+| Block-to-page map | `TypesetReport.pageBlocks`, measured after Paged.js finishes |
+| Operator UI | Typeset preview: grid marker, per-page block list, project-level panel |
+| Tests | `backend/src/__tests__/layout-overrides.test.ts` (18) |
 
 ## The problem
 
@@ -84,31 +96,43 @@ and reported rather than silently dropped.
 
 ## Operator UI
 
-The review grid already knows which blocks are on which page, so:
-
-- a page carrying an overridden block gets a marker in the grid, like the
-  existing `blank` / `overflow` flags;
-- the enlarge modal lists that page's overridden blocks with their values and a
-  **Reset to standard** button per block;
-- a project-level list shows every override with its note, so a book cannot
-  accumulate invisible local hacks.
-
 Visibility is the point. An override nobody can see is a landmine for whoever
-regenerates the book next.
+regenerates the book next: they change the standard trying to fix a page that is
+already deliberately different, and nothing explains why.
 
-## Smallest implementation path
+- a page carrying a customised block is marked and outlined in the grid,
+  alongside the existing `blank` / `overflow` flags;
+- the enlarged page lists every block on it with an editor and **Reset to
+  standard**;
+- a project-level panel lists all exceptions with their reasons, and names any
+  override pointing at content no longer in the book.
 
-**Phase 1 — identity + renderer (small).** `blockId` generation,
-`layoutOverrides` on `ProjectConfig`, CSS emission, override-targets-missing-block
-reporting in Layer 1. No UI; overrides settable via the config PATCH endpoint
-that Book Setup already uses. This alone unblocks isolated fixes.
+## What shipped
 
-**Phase 2 — visibility (small).** Grid marker + modal list + reset button +
-project-level list.
+**Identity + renderer.** `blockId` generation, `layoutOverrides` on
+`ProjectConfig`, CSS emitted last in the stylesheet so overrides win by source
+order without `!important`, and orphaned-override reporting.
 
-**Phase 3 — authoring (only if wanted).** Click a block in the preview to open
-an override editor. Not required for the book; Phase 1 plus a config PATCH is
-enough for an operator working with an agent.
+**Visibility and authoring.** The review grid marks and outlines any page
+carrying a customised block. Enlarging a page lists the blocks that landed on it
+— kind, opening text, block id — each with an editor for the closed property set
+and **Reset to standard**. A project-level panel lists every exception with its
+reason, so a book cannot accumulate invisible local hacks.
+
+The per-page block list is driven by `TypesetReport.pageBlocks`, which is
+**measured** in the browser after Paged.js reports completion. Where a block
+lands is a pagination result and must never be predicted — the same reason an
+override is not keyed to a page in the first place.
+
+### Two guarantees worth keeping
+
+1. **Nothing is keyed to a page number.** The page is only how the operator
+   *finds* a block; what gets stored is the block's content-derived id. A test
+   asserts no emitted rule can select a page.
+2. **No arbitrary CSS, no text editing.** Every control maps to one bounded
+   property the schema validates. The schema rejects an unknown key, an unknown
+   variant, and an out-of-range value, and a note cannot close the CSS comment it
+   lands in and escape into live declarations.
 
 ## Deliberately out of scope
 
