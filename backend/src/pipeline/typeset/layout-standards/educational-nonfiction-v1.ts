@@ -63,7 +63,13 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
   },
 
   opener: {
-    sinkDivisor: 3,
+    // APPROVED 2026-08-09 after a three-way comparison at 33% / 27% / 25% on the
+    // real Chapter One opener. At 33% the first line of reading text landed at
+    // roughly the middle of the page — a literary drop that read as empty for a
+    // practical guide. 25% was efficient but tight enough that the opening
+    // moment stopped feeling deliberate. 27% keeps the drop and starts the body
+    // ~44% down instead of ~49%.
+    sinkFraction: 0.27,
     // "Chapter One", not "Chapter 1" — CHAPTER_BOOK_STANDARD.md §3. The label is
     // generated in words and uppercased by style, never pre-uppercased in code.
     labelFormat: 'chapter-word',

@@ -379,7 +379,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
 
   // The classic drop: the chapter heading begins about a third down the text
   // block, leaving white space above it.
-  const sinkIn = ((trim.heightIn - m.topIn - m.bottomIn) / op.sinkDivisor).toFixed(3);
+  const sinkIn = ((trim.heightIn - m.topIn - m.bottomIn) * op.sinkFraction).toFixed(3);
 
   const body = sections
     .map((s, i) => {

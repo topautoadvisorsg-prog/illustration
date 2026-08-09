@@ -94,10 +94,17 @@ export type ChapterLabelFormat =
 
 export interface TypesetChapterOpener {
   /**
-   * The classic drop, as a divisor of the text-block height: 3 puts the heading
-   * about one third down the page.
+   * The drop, as a fraction of the text-block height: 0.27 starts the heading
+   * about a quarter of the way down.
+   *
+   * Expressed as a fraction rather than a divisor because that is how the
+   * decision is actually made and reviewed ("27%"), and because the divisor
+   * form for anything but a simple fraction is unreadable (0.27 is a divisor of
+   * 3.7037). Judge this by looking at where the BODY text starts, not the
+   * heading: the title block plus its margin push the first line of reading
+   * text roughly 12 points further down than the sink itself.
    */
-  sinkDivisor: number;
+  sinkFraction: number;
   labelFormat: ChapterLabelFormat;
   /** Rendered case of the kicker. The label text itself is never pre-uppercased. */
   labelTransform: 'uppercase' | 'none';

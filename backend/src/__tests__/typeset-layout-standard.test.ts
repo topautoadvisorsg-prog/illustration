@@ -128,7 +128,8 @@ describe('standard drives the rendered CSS (behaviour preserved)', () => {
   it('emits the approved geometry and type scale', () => {
     const css = html();
     expect(css).toContain('@page { size: 5.5in 8.5in; margin: 0.625in 0.5in 0.625in 0.625in; }');
-    expect(css).toContain('padding-top: 2.417in'); // the one-third sink
+    // 27% of the 7.25in text block — the approved opener sink.
+    expect(css).toContain('padding-top: 1.958in');
     expect(css).toContain('font-size: 19pt'); // chapter title = 12 * 1.6
     expect(css).toContain('font-size: 10pt'); // kicker = 8.5 + 1.5
     expect(css).toContain('orphans: 2; widows: 2');
