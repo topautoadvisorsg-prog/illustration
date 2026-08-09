@@ -29,13 +29,49 @@ import type { LayoutOverride } from '@wildlands/shared';
 
 /**
  * Approved component variants. Not free styling: each is a named, reviewed
- * density the standard's components already support.
+ * treatment, and an override may only name one of these.
+ *
+ * A variant may style the block's own descendants, which is what separates a
+ * real component treatment from a margin nudge. It may NOT affect anything
+ * outside the block — in particular it must never pull neighbouring content
+ * around. Making a thin page denser by dragging the previous paragraph onto it
+ * moves unrelated text to manufacture fill, which is a worse defect than the
+ * one it hides.
+ *
+ * Keyed by selector suffix: '' is the block itself, anything else is appended
+ * to the block's attribute selector.
  */
-const VARIANTS: Record<string, string> = {
+const VARIANTS: Record<string, Record<string, string>> = {
   /** Tighten a block that is close to fitting where it belongs. */
-  compact: 'margin-top: 0.4em; margin-bottom: 0.4em;',
+  compact: { '': 'margin-top: 0.4em; margin-bottom: 0.4em;' },
   /** Open a block up when it is crowding what follows. */
-  roomy: 'margin-top: 1.4em; margin-bottom: 1.4em;',
+  roomy: { '': 'margin-top: 1.4em; margin-bottom: 1.4em;' },
+  /**
+   * CLOSING BEAT — for the closing unit of a chapter or section that ends up
+   * nearly alone on a page.
+   *
+   * The defect is not the white space, it is that the block reads as leftover:
+   * a heading and a sentence jammed against the top margin of an otherwise
+   * empty leaf, set exactly like a mid-chapter subsection. Chapters legitimately
+   * end short, so the fix is to make the page look DECIDED rather than to fill
+   * it.
+   *
+   * The treatment drops the unit clear of the top margin, centres it, and
+   * narrows the measure so the sentence reads as a closing statement instead of
+   * a truncated paragraph. Nothing outside the block moves, and not one word
+   * changes.
+   */
+  'closing-beat': {
+    '': 'margin-top: 4.5em; margin-bottom: 0; text-align: center;',
+    // The label sits centred above its sentence rather than flush left.
+    ' > h3, > .takeaway-label, > .tail-unit > h3':
+      'text-align: center; text-align-last: center; margin-bottom: 0.7em;',
+    // Justification and the first-line indent are both wrong for a centred
+    // one-sentence statement; the narrowed measure keeps it from running the
+    // full width of the text block.
+    ' p':
+      'text-align: center; text-align-last: center; text-indent: 0; max-width: 24em; margin-left: auto; margin-right: auto;',
+  },
 };
 
 export interface OverrideCssResult {
@@ -46,13 +82,21 @@ export interface OverrideCssResult {
   applied: string[];
 }
 
+/** A variant's rules for the block's DESCENDANTS, keyed by selector suffix. */
+export function variantDescendantRules(o: LayoutOverride): [string, string][] {
+  const v = o.variant ? VARIANTS[o.variant] : undefined;
+  if (!v) return [];
+  return Object.entries(v).filter(([suffix]) => suffix !== '');
+}
+
 /** One override -> its CSS declarations, in a fixed order so output is stable. */
 export function declarationsFor(o: LayoutOverride): string[] {
   const d: string[] = [];
   // A variant is a base the explicit properties may then refine, so it goes
   // first: an operator who picks "compact" and then nudges the space above
   // gets both, with the nudge winning.
-  if (o.variant && VARIANTS[o.variant]) d.push(VARIANTS[o.variant]!);
+  const own = o.variant ? VARIANTS[o.variant]?.[''] : undefined;
+  if (own) d.push(own);
   if (o.spaceBeforeEm !== undefined) d.push(`margin-top: ${o.spaceBeforeEm}em;`);
   if (o.spaceAfterEm !== undefined) d.push(`margin-bottom: ${o.spaceAfterEm}em;`);
   if (o.keepWithNext !== undefined) d.push(`break-after: ${o.keepWithNext ? 'avoid' : 'auto'};`);
@@ -88,10 +132,15 @@ export function overrideCss(
       continue;
     }
     const decls = declarationsFor(o);
-    if (decls.length === 0) continue; // a note-only override changes nothing
+    const descendants = variantDescendantRules(o);
+    if (decls.length === 0 && descendants.length === 0) continue; // note-only changes nothing
     applied.push(blockId);
+    const sel = `[data-block-id="${blockId}"]`;
     const note = o.note ? ` /* ${o.note.replace(/[*/]/g, '')} */` : '';
-    rules.push(`[data-block-id="${blockId}"] { ${decls.join(' ')} }${note}`);
+    if (decls.length) rules.push(`${sel} { ${decls.join(' ')} }${note}`);
+    // A variant may reach INTO the block. It can never reach outside it: every
+    // selector here is prefixed with the block's own attribute selector.
+    for (const [suffix, body] of descendants) rules.push(`${sel}${suffix} { ${body} }`);
   }
   if (rules.length === 0) return { css: '', orphaned, applied };
   return {

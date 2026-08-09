@@ -152,10 +152,38 @@ describe('override compilation', () => {
     expect(declarationsFor({ breakBefore: 'page' })).toEqual(['break-before: page;']);
   });
 
+  /**
+   * The closing-beat variant exists because the first attempt at a thin page
+   * used `break-before: avoid`, which made the page denser by dragging the
+   * PREVIOUS paragraph onto it. Moving unrelated text to manufacture fill is a
+   * worse defect than the one it hides. A variant restyles its own block and
+   * nothing else.
+   */
+  it('confines a variant to its own block and its descendants', () => {
+    const { css } = overrideCss({ a1b2c3d4: { variant: 'closing-beat' } }, known);
+    const selectors = css.split('\n').filter((l) => l.includes('{')).map((l) => l.slice(0, l.indexOf('{')).trim());
+    expect(selectors.length).toBeGreaterThan(1); // it reaches into the block
+    for (const s of selectors) expect(s.startsWith('[data-block-id="a1b2c3d4"]')).toBe(true);
+    // Nothing that could reach a sibling, a parent, or the page.
+    expect(css).not.toMatch(/[+~]|:has\(|body|\.pagedjs/);
+    // And it must not touch page breaking at all — that is what moved text.
+    expect(css).not.toMatch(/break-(before|after|inside)/);
+  });
+
+  it('gives the closing beat a real treatment, not just a margin', () => {
+    const { css } = overrideCss({ a1b2c3d4: { variant: 'closing-beat' } }, known);
+    expect(css).toContain('text-align: center');
+    expect(css).toMatch(/margin-top: 4\.5em/); // clear of the top margin
+    expect(css).toMatch(/max-width: 24em/); // a closing statement, not a paragraph
+    expect(css).toContain('text-indent: 0');
+  });
+
   it('lets an explicit nudge refine a variant rather than fight it', () => {
     const d = declarationsFor({ variant: 'compact', spaceBeforeEm: 0.2 });
     expect(d[0]).toContain('margin-top: 0.4em');
     expect(d[d.length - 1]).toBe('margin-top: 0.2em;'); // the nudge wins, by order
+    // An unknown variant contributes nothing rather than emitting a bare selector.
+    expect(declarationsFor({ variant: 'nope' } as never)).toEqual([]);
   });
 
   it('emits rules targeting the block id, never a page', () => {

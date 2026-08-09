@@ -2084,6 +2084,10 @@ const VARIANT_CHOICES = [
   ["", "Standard"],
   ["compact", "Compact"],
   ["roomy", "Roomy"],
+  // For a chapter/section closing unit left nearly alone on a page: drops it
+  // clear of the top margin and centres it on a narrowed measure, so the page
+  // reads as decided rather than leftover. Moves nothing outside the block.
+  ["closing-beat", "Closing beat (standalone)"],
 ];
 
 /** Human label for a block kind — the operator should not have to read CSS. */

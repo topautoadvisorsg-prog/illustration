@@ -40,7 +40,7 @@ export const LayoutOverrideSchema = z
      * variants the layout standard defines are honoured; anything else is
      * reported as unknown rather than silently applied.
      */
-    variant: z.enum(['compact', 'roomy']).optional(),
+    variant: z.enum(['compact', 'roomy', 'closing-beat']).optional(),
     /** Why this exception exists — for whoever regenerates the book next. */
     note: z.string().max(300).optional(),
   })
