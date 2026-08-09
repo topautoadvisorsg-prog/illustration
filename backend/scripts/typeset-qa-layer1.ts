@@ -307,8 +307,8 @@ section('5b. Page furniture (measured from the PDF)');
   const headOnOpener: number[] = [];
   let bodyPagesChecked = 0;
 
+  const furnishedBlanks: number[] = [];
   for (let p = 1; p <= doc.numPages; p++) {
-    if (blanks.has(p)) continue;
     const pg = await doc.getPage(p);
     const tc = await pg.getTextContent();
     const foot: { str: string; cx: number }[] = [];
@@ -319,6 +319,11 @@ section('5b. Page furniture (measured from the PDF)');
       const y = it.transform[5] ?? 0;
       if (y < bottomBand) foot.push({ str: it.str.trim(), cx: x + (it.width ?? 0) / 2 });
       else if (y > topBand) headWidth += it.width ?? 0;
+    }
+    // A parity blank must be truly blank — no running head, no folio.
+    if (blanks.has(p)) {
+      if (foot.length || headWidth > 0) furnishedBlanks.push(p);
+      continue;
     }
     const isRecto = p % 2 === 1;
     // Folio must sit on the centre of the CONTENT box, which is mirrored.
@@ -341,6 +346,8 @@ section('5b. Page furniture (measured from the PDF)');
     missingHead.length ? `${missingHead.length} missing: ${missingHead.slice(0, 8).join(', ')}` : `${bodyPagesChecked} body pages`);
   check(headOnOpener.length === 0, 'chapter-opening pages suppress the running head',
     headOnOpener.length ? `head present on ${headOnOpener.slice(0, 6).join(', ')}` : `${openerPages.size} openers`);
+  check(furnishedBlanks.length === 0, 'parity blanks carry no running head or folio',
+    furnishedBlanks.length ? `furniture on ${furnishedBlanks.slice(0, 6).join(', ')}` : `${blanks.size} blanks`);
 }
 
 // ── 6. text fidelity: sections -> PDF ───────────────────────────────────────

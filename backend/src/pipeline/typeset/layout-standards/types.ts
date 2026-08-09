@@ -120,6 +120,12 @@ export interface TypesetPageFurniture {
   suppressRunningHeadOnOpener: boolean;
   /** Suppress the folio too on opening pages. */
   suppressFolioOnOpener: boolean;
+  /**
+   * Strip all furniture from parity blanks. A blank verso inserted so the next
+   * chapter opens recto is not a page of the book — printing a running head and
+   * a folio on it advertises the mechanism and reads as a mistake.
+   */
+  suppressFurnitureOnBlank: boolean;
 }
 
 export interface TypesetBlockStyles {

@@ -401,6 +401,11 @@ ${fonts.css}
    :first scopes this to the FIRST page of each named-page run, so the rest of
    the chapter keeps its running heads. */
 @page opener:first {${furn.suppressRunningHeadOnOpener ? ' @top-left { content: none; } @top-right { content: none; }' : ''}${furn.suppressFolioOnOpener ? ' @bottom-center { content: none; }' : ''} }
+${furn.suppressFurnitureOnBlank
+  ? `/* A parity blank is not a page of the book. Printing a running head and a
+   folio on it advertises the mechanism and reads as a mistake. */
+@page :blank { @top-left { content: none; } @top-right { content: none; } @bottom-center { content: none; } }`
+  : ''}
 
 /* MARGIN-BOX ALIGNMENT — do not replace this with text-align.
    Paged.js injects margin-box content as a ::after on .pagedjs_margin-content,
@@ -437,7 +442,6 @@ body {
   orphans: 2; widows: 2;
   text-align: left; text-align-last: left;
 }
-.booktitle-src { string-set: booktitle "${escapeHtml(title)}"; }
 
 /* The whole section carries the named page, and the FIRST page of that run is
    selected with :first for the opener treatment.
@@ -482,7 +486,6 @@ li { margin: 0 0 ${blocks.listItemSpacingEm}em; text-align: left; text-align-las
 .callout p + p { margin-top: .35em; }
 </style></head>
 <body>
-<div class="booktitle-src"></div>
 ${body}
 ${input.polyfillJs ? `${PAGED_DONE_HOOK}\n<script>${input.polyfillJs}</script>` : ''}
 </body></html>`;

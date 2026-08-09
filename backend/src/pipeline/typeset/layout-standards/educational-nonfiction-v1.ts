@@ -86,6 +86,7 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
     suppressRunningHeadOnOpener: true,
     // The drop folio is the one number allowed on an opening page.
     suppressFolioOnOpener: false,
+    suppressFurnitureOnBlank: true,
   },
 
   blocks: {

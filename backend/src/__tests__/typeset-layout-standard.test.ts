@@ -193,9 +193,12 @@ describe('page furniture', () => {
     expect(html).toContain('@page opener:first {');
     expect(html).toContain('@top-left { content: none; }');
     expect(html).toContain('@top-right { content: none; }');
-    // The drop folio is the one number allowed on an opening page, so nothing
-    // may blank @bottom-center under this standard.
-    expect(html).not.toContain('@bottom-center { content: none; }');
+    // The drop folio is the one number allowed on an opening page, so the
+    // OPENER rule must not blank @bottom-center. (The :blank rule legitimately
+    // does — a parity blank carries nothing at all.)
+    const openerRule = html.split('\n').find((l) => l.startsWith('@page opener:first')) ?? '';
+    expect(openerRule).toContain('@top-left { content: none; }');
+    expect(openerRule).not.toContain('@bottom-center');
   });
 
   it('aligns margin boxes with flex, not text-align', () => {
@@ -212,6 +215,14 @@ describe('page furniture', () => {
     const html = css();
     expect(html).toContain('content: counter(page)');
     expect(html).toContain('font-size: 10pt'); // captionPt 9 + folioPtDelta 1
+  });
+
+  it('strips all furniture from parity blanks', () => {
+    const html = css();
+    // A blank verso inserted so the next chapter opens recto is not a page of
+    // the book; a running head and folio on it read as a mistake.
+    expect(html).toContain('@page :blank {');
+    expect(html).toMatch(/@page :blank \{ @top-left \{ content: none; \} @top-right \{ content: none; \} @bottom-center \{ content: none; \} \}/);
   });
 
   it('honours a standard that suppresses the folio on openers', () => {
