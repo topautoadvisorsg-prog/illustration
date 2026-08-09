@@ -57,6 +57,9 @@ export interface TypesetSection {
   bodyLines: string[];
 }
 
+/** Escape a value for use inside a CSS string literal (content: "..."). */
+const cssString = (s: string): string => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -317,9 +320,16 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
   const openerAlign = op.centered ? 'center' : 'left';
   const smallCaps = furn.runningHeadSmallCaps ? 'small-caps' : 'normal';
   const folioContent = furn.folio === 'none' ? 'none' : 'counter(page)';
-  const runningHead = (role: 'book-title' | 'section-title' | 'none'): string =>
-    role === 'book-title' ? 'string(booktitle)' : role === 'section-title' ? 'string(sectitle)' : 'none';
   const title = config.publishing?.title ?? config.title;
+  /**
+   * The book title is a constant, so it is emitted as a literal string rather
+   * than a named string fetched from a hidden element. The named-string route
+   * (string-set on an empty div, read back via string(booktitle)) resolved to
+   * nothing in the paged pass, which is why versos carried no running head at
+   * all. The section title still needs a named string — it changes per chapter.
+   */
+  const runningHead = (role: 'book-title' | 'section-title' | 'none'): string =>
+    role === 'book-title' ? `"${cssString(title)}"` : role === 'section-title' ? 'string(sectitle)' : 'none';
   const recto = design.chaptersStartRecto;
 
   // The classic drop: the chapter heading begins about a third down the text
@@ -360,18 +370,41 @@ ${fonts.css}
 /* Trim with ZERO bleed: a text interior has nothing running to the edge.
    Margins are MIRRORED — gutter inside, smaller margin at the fore-edge. */
 @page { size: ${trim.widthIn}in ${trim.heightIn}in; margin: ${m.topIn}in ${m.outsideIn}in ${m.bottomIn}in ${m.gutterIn}in; }
+/* Margin boxes declare their own alignment. A margin box is laid out as a block
+   inside its slot, so it inherits nothing useful and defaults to flush-left —
+   which put the "centred" drop folio hard against the inside margin on every
+   page. Alignment is stated explicitly here so folio and running-head placement
+   is deterministic rather than a property of whatever the renderer defaults to. */
 @page :left {
   margin-left: ${m.outsideIn}in; margin-right: ${m.gutterIn}in;
-  @top-left { content: ${runningHead(furn.versoRunningHead)}; font-family: '${t.bodyFont}', serif; font-variant: ${smallCaps}; font-size: ${t.labelPt}pt; letter-spacing: ${furn.runningHeadLetterSpacingEm}em; }
-  @bottom-center { content: ${folioContent}; font-family: '${t.bodyFont}', serif; font-size: ${t.captionPt + t.folioPtDelta}pt; }
+  @top-left { content: ${runningHead(furn.versoRunningHead)}; font-family: '${t.bodyFont}', serif; font-variant: ${smallCaps}; font-size: ${t.labelPt}pt; letter-spacing: ${furn.runningHeadLetterSpacingEm}em; text-align: left; }
+  @bottom-center { content: ${folioContent}; font-family: '${t.bodyFont}', serif; font-size: ${t.captionPt + t.folioPtDelta}pt; text-align: center; width: 100%; }
 }
 @page :right {
   margin-left: ${m.gutterIn}in; margin-right: ${m.outsideIn}in;
-  @top-right { content: ${runningHead(furn.rectoRunningHead)}; font-family: '${t.bodyFont}', serif; font-variant: ${smallCaps}; font-size: ${t.labelPt}pt; letter-spacing: ${furn.runningHeadLetterSpacingEm}em; }
-  @bottom-center { content: ${folioContent}; font-family: '${t.bodyFont}', serif; font-size: ${t.captionPt + t.folioPtDelta}pt; }
+  @top-right { content: ${runningHead(furn.rectoRunningHead)}; font-family: '${t.bodyFont}', serif; font-variant: ${smallCaps}; font-size: ${t.labelPt}pt; letter-spacing: ${furn.runningHeadLetterSpacingEm}em; text-align: right; }
+  @bottom-center { content: ${folioContent}; font-family: '${t.bodyFont}', serif; font-size: ${t.captionPt + t.folioPtDelta}pt; text-align: center; width: 100%; }
 }
-/* A chapter-opening page carries no running head — only the drop folio. */
-@page opener {${furn.suppressRunningHeadOnOpener ? ' @top-left { content: none; } @top-right { content: none; }' : ''}${furn.suppressFolioOnOpener ? ' @bottom-center { content: none; }' : ''} }
+/* A chapter-opening page carries no running head — only the drop folio.
+   :first scopes this to the FIRST page of each named-page run, so the rest of
+   the chapter keeps its running heads. */
+@page opener:first {${furn.suppressRunningHeadOnOpener ? ' @top-left { content: none; } @top-right { content: none; }' : ''}${furn.suppressFolioOnOpener ? ' @bottom-center { content: none; }' : ''} }
+
+/* MARGIN-BOX ALIGNMENT — do not replace this with text-align.
+   Paged.js injects margin-box content as a ::after on .pagedjs_margin-content,
+   and that pseudo-element computes to display:block. text-align therefore does
+   not move it: the folio printed hard against the inside margin on all 155
+   pages, and the recto running head sat left instead of right, while every DOM
+   probe cheerfully reported "center". Making the content div a flex container
+   turns the ::after into a flex item that shrink-wraps, so justify-content
+   places it deterministically. */
+.pagedjs_margin-content { display: flex; align-items: center; }
+.pagedjs_margin-top-left .pagedjs_margin-content,
+.pagedjs_margin-bottom-left .pagedjs_margin-content { justify-content: flex-start; }
+.pagedjs_margin-top-center .pagedjs_margin-content,
+.pagedjs_margin-bottom-center .pagedjs_margin-content { justify-content: center; }
+.pagedjs_margin-top-right .pagedjs_margin-content,
+.pagedjs_margin-bottom-right .pagedjs_margin-content { justify-content: flex-end; }
 
 html, body { margin: 0; padding: 0; background: #fff; color: #000; }
 /* JUSTIFICATION IS SET PER TYPOGRAPHIC ROLE, NEVER INHERITED.
@@ -394,6 +427,15 @@ body {
 }
 .booktitle-src { string-set: booktitle "${escapeHtml(title)}"; }
 
+/* The whole section carries the named page, and the FIRST page of that run is
+   selected with :first for the opener treatment.
+   Do not move the named page onto the opener header to "scope" it: the flow
+   then returns to the default page context after the header, which forces a
+   break and leaves every chapter opener holding nothing but its heading (the
+   book grew 155 -> 170 pages that way). Do not put the suppression on the
+   unqualified name either: it applies to every page the section spans, which
+   silently removed the running heads from the entire book.
+   (No backticks in this comment: it lives inside a template literal.) */
 .tsec { ${recto ? 'break-before: recto;' : 'break-before: page;'} page: opener; string-set: sectitle attr(data-title); }
 /* Chapter opener: one centred heading block — "Chapter One" over the title,
    per CHAPTER_BOOK_STANDARD.md §3. Centring is declared on the block AND on

@@ -33,6 +33,9 @@ const { renderTypesetBook } = await import('../src/pipeline/typeset/render-types
 const { parseTypesetSections, chapterLabel, typesetMarginsForTrim } = await import(
   '../src/pipeline/typeset/typeset-book.js'
 );
+const { EDUCATIONAL_NONFICTION_TYPESET_V1 } = await import(
+  '../src/pipeline/typeset/layout-standards/educational-nonfiction-v1.js'
+);
 const { ProjectConfigSchema } = await import('@wildlands/shared');
 
 // ── reporting ───────────────────────────────────────────────────────────────
@@ -153,7 +156,9 @@ const margins = typesetMarginsForTrim(config.trimSize);
 
 const runs: { pdf: Buffer; report: Awaited<ReturnType<typeof renderTypesetBook>>['report'] }[] = [];
 for (let i = 0; i < 2; i++) {
-  const r = await renderTypesetBook({ markdown, config, chaptersStartRecto: true });
+  const r = await renderTypesetBook({
+    markdown, config, chaptersStartRecto: true, layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+  });
   runs.push({ pdf: r.pdf, report: r.report });
   console.log(`        run ${i + 1}: pages=${r.report.totalPages} blanks=${r.report.blankPages.length} overflow=${r.report.verticalOverflowPages.length} sections=${r.report.sectionStarts.length}`);
 }
@@ -285,6 +290,58 @@ check(/garamond/i.test(names), 'EB Garamond embedded as the text face');
 
 // pdf.js's view, kept as context rather than as a gate.
 console.log(`        pdf.js reports families: ${[...usedFamilies].sort().join(', ') || '(none)'}`);
+
+// ── 5b. page furniture, measured ────────────────────────────────────────────
+section('5b. Page furniture (measured from the PDF)');
+{
+  const openerPages = new Set(r1.report.sectionStarts.map((s) => s.page).filter((p): p is number => p != null));
+  const blanks = new Set(r1.report.blankPages);
+  const std = EDUCATIONAL_NONFICTION_TYPESET_V1;
+  const bottomBand = std.margins.bottomIn * 72;
+  const topBand = EXPECT_H - std.margins.topIn * 72;
+  const rectoCentre = (std.margins.gutterIn * 72 + (EXPECT_W - std.margins.outsideIn * 72)) / 2;
+  const versoCentre = (std.margins.outsideIn * 72 + (EXPECT_W - std.margins.gutterIn * 72)) / 2;
+
+  const offCentre: string[] = [];
+  const missingHead: number[] = [];
+  const headOnOpener: number[] = [];
+  let bodyPagesChecked = 0;
+
+  for (let p = 1; p <= doc.numPages; p++) {
+    if (blanks.has(p)) continue;
+    const pg = await doc.getPage(p);
+    const tc = await pg.getTextContent();
+    const foot: { str: string; cx: number }[] = [];
+    let headWidth = 0;
+    for (const it of tc.items as { str: string; transform: number[]; width: number }[]) {
+      if (!it.str.trim()) continue;
+      const x = it.transform[4] ?? 0;
+      const y = it.transform[5] ?? 0;
+      if (y < bottomBand) foot.push({ str: it.str.trim(), cx: x + (it.width ?? 0) / 2 });
+      else if (y > topBand) headWidth += it.width ?? 0;
+    }
+    const isRecto = p % 2 === 1;
+    // Folio must sit on the centre of the CONTENT box, which is mirrored.
+    if (foot.length) {
+      const cx = foot.reduce((a, f) => a + f.cx, 0) / foot.length;
+      const want = isRecto ? rectoCentre : versoCentre;
+      if (Math.abs(cx - want) > 3) offCentre.push(`p${p} at ${cx.toFixed(1)} (want ${want})`);
+    }
+    if (openerPages.has(p)) {
+      if (headWidth > 0) headOnOpener.push(p);
+    } else {
+      bodyPagesChecked++;
+      if (headWidth === 0) missingHead.push(p);
+    }
+  }
+
+  check(offCentre.length === 0, 'every folio is centred on the content box',
+    offCentre.length ? `${offCentre.length} off-centre: ${offCentre.slice(0, 4).join(', ')}` : `${doc.numPages - blanks.size} pages`);
+  check(missingHead.length === 0, 'every ordinary body page carries a running head',
+    missingHead.length ? `${missingHead.length} missing: ${missingHead.slice(0, 8).join(', ')}` : `${bodyPagesChecked} body pages`);
+  check(headOnOpener.length === 0, 'chapter-opening pages suppress the running head',
+    headOnOpener.length ? `head present on ${headOnOpener.slice(0, 6).join(', ')}` : `${openerPages.size} openers`);
+}
 
 // ── 6. text fidelity: sections -> PDF ───────────────────────────────────────
 section('6. Text fidelity (parsed sections -> PDF page content)');

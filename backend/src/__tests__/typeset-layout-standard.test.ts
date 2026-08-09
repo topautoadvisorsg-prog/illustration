@@ -136,11 +136,94 @@ describe('standard drives the rendered CSS (behaviour preserved)', () => {
 
   it('keeps running heads and the drop folio on opening pages', () => {
     const css = html();
-    expect(css).toContain('content: string(booktitle)'); // verso
-    expect(css).toContain('content: string(sectitle)'); // recto
+    expect(css).toContain('"NO ONE TOLD ME THAT"'); // verso, literal book title
+    expect(css).toContain('content: string(sectitle)'); // recto, per-chapter
     expect(css).toContain('content: counter(page)');
     // Openers drop the running head but keep the folio.
-    expect(css).toMatch(/@page opener \{ @top-left \{ content: none; \} @top-right \{ content: none; \}\s*\}/);
+    expect(css).toContain("@page opener:first {");
+    expect(css).toContain('@top-left { content: none; }');
+    expect(css).toContain('@top-right { content: none; }');
+  });
+});
+
+/**
+ * Page furniture. Both defects these cover shipped invisibly: the pages looked
+ * correct, and only measuring the PDF revealed that the whole book had no
+ * running heads and every folio sat hard against the inside margin.
+ */
+describe('page furniture', () => {
+  const css = () =>
+    buildTypesetHtml({
+      sections: parseTypesetSections('# Chapter 1\n\n## Only Chapter\n\nBody.\n'),
+      config: configFor(),
+      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+    });
+
+  it('scopes the opener treatment with :first, not by moving the named page', () => {
+    const html = css();
+    // The section carries the named page and :first selects the first page of
+    // that run. Two wrong ways this has already been done:
+    //  - suppression on the unqualified @page opener applied to every page the
+    //    section spans, removing running heads from the whole book;
+    //  - moving `page: opener` onto the header forced a break when the flow
+    //    returned to the default context, so each opener held only its heading
+    //    and the book grew from 155 to 170 pages.
+    expect(/\.tsec \{[^}]*page: opener/.test(html)).toBe(true);
+    expect(/\.tsec > \.opener \{[^}]*page:\s*opener/.test(html)).toBe(false);
+    expect(html).toContain('@page opener:first {');
+    expect(html).not.toMatch(/@page opener \{/);
+  });
+
+  it('gives verso the book title and recto the section title', () => {
+    const html = css();
+    const left = /@page :left \{[\s\S]*?\n\}/.exec(html)?.[0] ?? '';
+    const right = /@page :right \{[\s\S]*?\n\}/.exec(html)?.[0] ?? '';
+    // Verso carries the book title as a literal string. The named-string route
+    // resolved to nothing in the paged pass, so versos had no running head.
+    expect(left).toContain('@top-left');
+    expect(left).toContain('"NO ONE TOLD ME THAT"');
+    expect(left).not.toContain('string(booktitle)');
+    // Recto carries the section title, which must stay a named string.
+    expect(right).toContain('@top-right');
+    expect(right).toContain('string(sectitle)');
+  });
+
+  it('suppresses the running head on opener pages but keeps the drop folio', () => {
+    const html = css();
+    expect(html).toContain('@page opener:first {');
+    expect(html).toContain('@top-left { content: none; }');
+    expect(html).toContain('@top-right { content: none; }');
+    // The drop folio is the one number allowed on an opening page, so nothing
+    // may blank @bottom-center under this standard.
+    expect(html).not.toContain('@bottom-center { content: none; }');
+  });
+
+  it('aligns margin boxes with flex, not text-align', () => {
+    const html = css();
+    // The folio is a ::after that computes to display:block, so text-align
+    // cannot move it. justify-content on a flex content div can.
+    expect(html).toContain('.pagedjs_margin-content { display: flex;');
+    expect(html).toMatch(/\.pagedjs_margin-bottom-center \.pagedjs_margin-content \{ justify-content: center; \}/);
+    expect(html).toMatch(/\.pagedjs_margin-top-right \.pagedjs_margin-content,[\s\S]*?justify-content: flex-end/);
+    expect(html).toMatch(/\.pagedjs_margin-top-left \.pagedjs_margin-content,[\s\S]*?justify-content: flex-start/);
+  });
+
+  it('emits the folio centred, at the standard size', () => {
+    const html = css();
+    expect(html).toContain('content: counter(page)');
+    expect(html).toContain('font-size: 10pt'); // captionPt 9 + folioPtDelta 1
+  });
+
+  it('honours a standard that suppresses the folio on openers', () => {
+    const html = buildTypesetHtml({
+      sections: parseTypesetSections('# Chapter 1\n\n## T\n\nBody.\n'),
+      config: configFor(),
+      layoutStandard: {
+        ...EDUCATIONAL_NONFICTION_TYPESET_V1,
+        furniture: { ...EDUCATIONAL_NONFICTION_TYPESET_V1.furniture, suppressFolioOnOpener: true },
+      },
+    });
+    expect(html).toContain('@bottom-center { content: none; }');
   });
 });
 
