@@ -161,8 +161,17 @@ describe('override compilation', () => {
    */
   it('confines a variant to its own block and its descendants', () => {
     const { css } = overrideCss({ a1b2c3d4: { variant: 'closing-beat' } }, known);
-    const selectors = css.split('\n').filter((l) => l.includes('{')).map((l) => l.slice(0, l.indexOf('{')).trim());
-    expect(selectors.length).toBeGreaterThan(1); // it reaches into the block
+    const selectors = css
+      .split('\n')
+      .filter((l) => l.includes('{'))
+      .flatMap((l) => l.slice(0, l.indexOf('{')).split(','))
+      .map((s) => s.trim())
+      .filter(Boolean);
+    expect(selectors.length).toBeGreaterThan(2); // it reaches into the block
+    // EVERY arm of every selector list, not just the first. Prefixing only the
+    // first arm leaves the rest as bare fragments, which invalidates the whole
+    // list and makes CSS drop the rule — that silently lost the heading half of
+    // this treatment while the paragraph half applied.
     for (const s of selectors) expect(s.startsWith('[data-block-id="a1b2c3d4"]')).toBe(true);
     // Nothing that could reach a sibling, a parent, or the page.
     expect(css).not.toMatch(/[+~]|:has\(|body|\.pagedjs/);
@@ -173,9 +182,12 @@ describe('override compilation', () => {
   it('gives the closing beat a real treatment, not just a margin', () => {
     const { css } = overrideCss({ a1b2c3d4: { variant: 'closing-beat' } }, known);
     expect(css).toContain('text-align: center');
-    expect(css).toMatch(/margin-top: 4\.5em/); // clear of the top margin
-    expect(css).toMatch(/max-width: 24em/); // a closing statement, not a paragraph
+    expect(css).toMatch(/margin-top: 7em/); // clear of the top margin
+    expect(css).toMatch(/max-width: 22em/); // a closing statement, not a paragraph
     expect(css).toContain('text-indent: 0');
+    // Both halves of the treatment must survive: the heading centres too.
+    expect(css).toMatch(/\[data-block-id="a1b2c3d4"\] h3/);
+    expect(css).toMatch(/\[data-block-id="a1b2c3d4"\] \.takeaway-label/);
   });
 
   it('lets an explicit nudge refine a variant rather than fight it', () => {

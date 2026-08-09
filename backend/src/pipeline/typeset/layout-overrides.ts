@@ -62,15 +62,16 @@ const VARIANTS: Record<string, Record<string, string>> = {
    * changes.
    */
   'closing-beat': {
-    '': 'margin-top: 4.5em; margin-bottom: 0; text-align: center;',
+    // Deep enough that the block clearly is not simply flowing from the top of
+    // the page. Around a fifth down the text block.
+    '': 'margin-top: 7em; margin-bottom: 0; text-align: center;',
     // The label sits centred above its sentence rather than flush left.
-    ' > h3, > .takeaway-label, > .tail-unit > h3':
-      'text-align: center; text-align-last: center; margin-bottom: 0.7em;',
+    'h3, .takeaway-label':
+      'text-align: center; text-align-last: center; margin-bottom: 0.8em;',
     // Justification and the first-line indent are both wrong for a centred
     // one-sentence statement; the narrowed measure keeps it from running the
     // full width of the text block.
-    ' p':
-      'text-align: center; text-align-last: center; text-indent: 0; max-width: 24em; margin-left: auto; margin-right: auto;',
+    p: 'text-align: center; text-align-last: center; text-indent: 0; max-width: 22em; margin-left: auto; margin-right: auto;',
   },
 };
 
@@ -138,9 +139,19 @@ export function overrideCss(
     const sel = `[data-block-id="${blockId}"]`;
     const note = o.note ? ` /* ${o.note.replace(/[*/]/g, '')} */` : '';
     if (decls.length) rules.push(`${sel} { ${decls.join(' ')} }${note}`);
-    // A variant may reach INTO the block. It can never reach outside it: every
-    // selector here is prefixed with the block's own attribute selector.
-    for (const [suffix, body] of descendants) rules.push(`${sel}${suffix} { ${body} }`);
+    // A variant may reach INTO the block. It can never reach outside it: EVERY
+    // selector is prefixed with the block's own attribute selector — including
+    // each arm of a comma-separated list. Prefixing only the first arm leaves
+    // the rest as bare fragments, which makes the whole selector list invalid,
+    // and CSS drops the entire rule. That silently lost the heading half of the
+    // closing-beat treatment while the paragraph half applied.
+    for (const [suffix, body] of descendants) {
+      const selectors = suffix
+        .split(',')
+        .map((part) => `${sel} ${part.trim()}`)
+        .join(', ');
+      rules.push(`${selectors} { ${body} }`);
+    }
   }
   if (rules.length === 0) return { css: '', orphaned, applied };
   return {

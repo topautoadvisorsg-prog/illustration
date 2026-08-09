@@ -144,3 +144,6 @@ reconciliation-report.json
 
 # Diagnostic output from typeset-diagnose.ts and other local probes.
 /outputs/
+
+# Throwaway page shots from qa:shoot — evidence for one layout decision.
+qa-shots/
