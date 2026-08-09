@@ -137,6 +137,8 @@ export function parseTypesetSections(markdown: string): TypesetSection[] {
  * after any subhead or scene break, is flush left; the rest are indented. The
  * indent marks continuation, so it is wrong wherever nothing precedes.
  */
+const SCENE_BREAK = '<p class="scene-break">* * *</p>';
+
 function bodyToHtml(lines: string[]): string {
   const html: string[] = [];
   let para: string[] = [];
@@ -190,7 +192,12 @@ function bodyToHtml(lines: string[]): string {
     closeQuote();
     if (/^-{3,}$/.test(t) || /^\*\s*\*\s*\*$/.test(t)) {
       closeList(); closePara();
-      html.push('<p class="scene-break">* * *</p>');
+      // A scene break separates two passages. Two in a row separate nothing
+      // from nothing, so collapse them. This manuscript uses a DOUBLE rule as a
+      // structural marker before every chapter heading and a single rule as a
+      // real scene break, and rendering both literally printed pairs of stray
+      // asterisk rows at the end of sections.
+      if (html[html.length - 1] !== SCENE_BREAK) html.push(SCENE_BREAK);
       flushNext = true;
       continue;
     }
@@ -204,6 +211,11 @@ function bodyToHtml(lines: string[]): string {
     para.push(t);
   }
   closeQuote(); closeList(); closePara();
+  // Drop scene breaks left at the very end of a section. Nothing follows them,
+  // so they separate nothing — and because the next section starts on a fresh
+  // page anyway, they orphan onto a near-empty page carrying only asterisks
+  // (this is what left page 4 blank but for two rows of them).
+  while (html.length && html[html.length - 1] === SCENE_BREAK) html.pop();
   return html.join('\n');
 }
 

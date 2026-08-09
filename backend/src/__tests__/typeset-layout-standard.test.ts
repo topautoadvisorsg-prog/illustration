@@ -261,6 +261,41 @@ describe('markdown callouts', () => {
   });
 });
 
+/**
+ * This manuscript uses a single rule as a real scene break and a DOUBLE rule as
+ * a structural marker before every chapter heading. Rendering both literally
+ * left pairs of stray asterisk rows at the end of sections — page 4 was blank
+ * but for two of them.
+ */
+describe('scene breaks', () => {
+  const render = (md: string) =>
+    buildTypesetHtml({
+      sections: parseTypesetSections(`# Chapter 1\n\n## T\n\n${md}\n`),
+      config: configFor(),
+      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V1,
+    });
+  const count = (html: string) => (html.match(/class="scene-break"/g) ?? []).length;
+
+  it('renders a genuine mid-text scene break', () => {
+    expect(count(render('First passage.\n\n---\n\nSecond passage.'))).toBe(1);
+  });
+
+  it('collapses consecutive rules into one break', () => {
+    expect(count(render('Before.\n\n---\n---\n\nAfter.'))).toBe(1);
+  });
+
+  it('drops scene breaks left trailing at the end of a section', () => {
+    expect(count(render('Only paragraph.\n\n---\n---'))).toBe(0);
+    expect(count(render('Only paragraph.\n\n---'))).toBe(0);
+  });
+
+  it('keeps the text on either side intact', () => {
+    const html = render('Before.\n\n---\n---\n\nAfter.');
+    expect(html).toContain('Before.');
+    expect(html).toContain('After.');
+  });
+});
+
 describe('chapter label formats', () => {
   it('spells by default and never pre-uppercases', () => {
     expect(chapterLabel({ kind: 'chapter', number: 21 })).toBe('Chapter Twenty-One');
