@@ -5,14 +5,25 @@
 # visible failure. That cost hours once (a backtick inside a CSS template
 # literal in typeset-book.ts silently terminated the string). Catch it here.
 #
+# tsc is invoked through node with an explicit path: `yarn` is not on PATH in
+# the shell git runs hooks in, so a yarn-based hook fails every push for the
+# wrong reason.
+#
 # Bypass deliberately with --no-verify if you know the build is red.
 set -e
 
+ROOT=$(git rev-parse --show-toplevel)
+TSC="$ROOT/node_modules/typescript/bin/tsc"
+
+if [ ! -f "$TSC" ]; then
+  echo "pre-push: typescript not installed — skipping typecheck."
+  exit 0
+fi
+
 echo "pre-push: typechecking shared + backend..."
 
-# The backend's types depend on shared's build output, so build shared first.
-yarn workspace @wildlands/shared build >/dev/null
-yarn workspace @wildlands/shared typecheck
-yarn workspace @wildlands/backend typecheck
+# backend's types resolve against shared's emitted d.ts, so build shared first.
+node "$TSC" -p "$ROOT/shared/tsconfig.json"
+node "$TSC" --noEmit -p "$ROOT/backend/tsconfig.json"
 
 echo "pre-push: typecheck clean."
