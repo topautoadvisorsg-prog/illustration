@@ -15,6 +15,36 @@
  * It NEVER removes real words, scientific names, measurements, headings, or
  * safety-warning copy — only decorative artifacts and broken encoding.
  *
+ * KNOWN LIMIT - "decorative" is an assumption, not a fact.
+ *
+ * Rule 2 treats every Extended_Pictographic character as decoration. That is
+ * right for a stray sparkle in a heading and WRONG for a pictograph an author
+ * is using as MEANING: a flag marking a warning, a triangle before a safety
+ * line, a tick/cross pair carrying a contrast. Those are content. The
+ * sanitizer cannot tell the difference, so it strips them, and because it runs
+ * ONCE at ingestion the loss lands in the STORED WORKING COPY. Every later
+ * stage - pagination, prompts, the rendered PDF - then sees a manuscript that
+ * never had the marker.
+ *
+ * Nothing downstream reports it. Text-fidelity QA compares the PARSED sections
+ * against the PDF, so both sides are already missing the character and the
+ * check passes clean. The canonical hash still covers the original upload
+ * (canonicalManuscriptSha256), which is what makes recovery possible - but
+ * only for someone who already suspects a marker is gone. None of this is an
+ * alarm; it is silent by construction.
+ *
+ * This has bitten once already: a flag marker was restored only because we
+ * happened to know to look for it. Treat that as the expected failure mode
+ * rather than a one-off. Before accepting a new book, diff the canonical
+ * upload against the working copy for pictographs and confirm every removal
+ * was genuinely decorative.
+ *
+ * Fixing it properly means an allow-list of meaningful pictographs mapped to
+ * typographic equivalents the interior can actually set - the layout already
+ * draws tick, cross and flag as vector glyphs, see the `.gl` rules in
+ * typeset-book.ts - plus a report of what was stripped. That is a deliberate
+ * change to ingestion, not a tweak, and it is NOT done.
+ *
  * The whole file is ASCII: every non-ASCII character is a \u escape, so the
  * source encoding can never corrupt the patterns. Mojibake source: a UTF-8
  * punctuation mark is 3 bytes (E2 80 xx); decoded as Windows-1252 those bytes
