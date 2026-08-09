@@ -88,8 +88,14 @@ const MEASURE_JS = `(() => {
   };
 })()`;
 
-/** Poll until Paged.js stops adding pages, so a long book is never truncated. */
-const STABLE_JS = `(function () {
+/**
+ * Poll until Paged.js stops adding pages, so a long book is never truncated.
+ *
+ * Exported so diagnostics wait on the SAME readiness condition the real
+ * renderer does. A second, hand-copied poll in a diagnostic script is a
+ * baseline that can drift away from production without anyone noticing.
+ */
+export const STABLE_JS = `(function () {
   const n = document.querySelectorAll('.pagedjs_page').length;
   const s = window.__tsStable || { n: -1, streak: 0 };
   if (n === s.n) { s.streak++; } else { s.n = n; s.streak = 0; }

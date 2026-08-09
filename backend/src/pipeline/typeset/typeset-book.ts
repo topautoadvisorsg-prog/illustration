@@ -187,6 +187,36 @@ export interface TypesetHtmlInput {
   chaptersStartRecto?: boolean;
 }
 
+const ONES = [
+  '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+  'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen',
+  'Eighteen', 'Nineteen',
+];
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+/**
+ * Spell a chapter number in words: 1 -> "One", 21 -> "Twenty-One".
+ *
+ * CHAPTER_BOOK_STANDARD.md §3 specifies the heading block as "Chapter One", not
+ * "Chapter 1". Anything outside 1–99 keeps the numeral rather than inventing a
+ * spelling, so an odd manuscript degrades to the old behaviour instead of
+ * producing nonsense.
+ */
+export function spellChapterNumber(n: number): string {
+  if (!Number.isInteger(n) || n < 1 || n > 99) return String(n);
+  if (n < 20) return ONES[n] ?? String(n);
+  const tens = TENS[Math.floor(n / 10)] ?? '';
+  const ones = ONES[n % 10] ?? '';
+  if (!tens) return String(n);
+  return ones ? `${tens}-${ones}` : tens;
+}
+
+/** The chapter opener's kicker, e.g. "Chapter Twelve". Empty for matter sections. */
+export function chapterLabel(section: Pick<TypesetSection, 'kind' | 'number'>): string {
+  if (section.kind !== 'chapter' || section.number === null) return '';
+  return `Chapter ${spellChapterNumber(section.number)}`;
+}
+
 export function buildTypesetHtml(input: TypesetHtmlInput): string {
   const { sections, config } = input;
   const trim = config.trimSize;
@@ -201,7 +231,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
 
   const body = sections
     .map((s, i) => {
-      const label = s.kind === 'chapter' && s.number !== null ? `Chapter ${s.number}` : '';
+      const label = chapterLabel(s);
       return `<section class="tsec ${s.kind}" id="tsec-${i}" data-title="${escapeHtml(s.title)}" data-label="${escapeHtml(label)}" data-kind="${s.kind}">
   <header class="opener">
     ${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}

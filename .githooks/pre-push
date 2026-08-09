@@ -1,0 +1,18 @@
+#!/bin/sh
+# Compile gate: a push to main deploys to Railway, and a failed Docker build
+# leaves the PREVIOUS container running and answering /health normally — so a
+# type or syntax error reaches production as "nothing happened" rather than as a
+# visible failure. That cost hours once (a backtick inside a CSS template
+# literal in typeset-book.ts silently terminated the string). Catch it here.
+#
+# Bypass deliberately with --no-verify if you know the build is red.
+set -e
+
+echo "pre-push: typechecking shared + backend..."
+
+# The backend's types depend on shared's build output, so build shared first.
+yarn workspace @wildlands/shared build >/dev/null
+yarn workspace @wildlands/shared typecheck
+yarn workspace @wildlands/backend typecheck
+
+echo "pre-push: typecheck clean."

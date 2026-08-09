@@ -8,6 +8,10 @@ const HealthResponseSchema = z.object({
   ok: z.boolean(),
   service: z.literal('wildlands-backend'),
   version: z.string(),
+  // The git SHA this container was built from. A green /health from the PREVIOUS
+  // container looks identical to a green /health from a new one, so "is my code
+  // live?" is unanswerable without this. Railway injects RAILWAY_GIT_COMMIT_SHA.
+  commit: z.string(),
   placeholderKeys: z.array(z.string()),
   // Persistence status — one call confirms the image library won't vanish:
   // durable storage + a live DB connection.
@@ -43,6 +47,7 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
         ok: true,
         service: 'wildlands-backend' as const,
         version: '0.1.0',
+        commit: process.env.RAILWAY_GIT_COMMIT_SHA ?? 'unknown',
         placeholderKeys: getPlaceholderKeys(),
         storage,
         storageDurable: storage !== 'local-ephemeral',
