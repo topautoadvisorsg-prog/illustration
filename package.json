@@ -16,7 +16,7 @@
     "build:backend": "yarn workspace @wildlands/backend build",
     "typecheck": "yarn workspaces run typecheck",
     "predeploy": "yarn workspace @wildlands/shared build && yarn workspace @wildlands/shared typecheck && yarn workspace @wildlands/backend typecheck",
-    "prepare": "git config core.hooksPath .githooks",
+    "prepare": "git config core.hooksPath .githooks || exit 0",
     "lint": "yarn workspaces run lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
   },
