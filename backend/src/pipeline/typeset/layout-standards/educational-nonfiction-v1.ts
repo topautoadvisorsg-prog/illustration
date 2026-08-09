@@ -173,4 +173,20 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V1: TypesetLayoutStandard = {
     marginTopEm: 0.9,
     labelGapEm: 0.25,
   },
+
+  // Matched by SECTION TITLE, so the behaviour is structural rather than a
+  // global Markdown change: only this section treats a line as an entry.
+  quickAnswerIndex: {
+    enabled: true,
+    sectionTitles: ['The Quick-Answer Index'],
+    // Enough to separate entries at a glance, far less than a paragraph break.
+    // This is a lookup table; 120 entries at paragraph spacing would add pages
+    // of air to the back of the book and defeat the point of an index.
+    entrySpacingEm: 0.3,
+    justify: false,
+    keepEntryTogether: true,
+    // The one category a reader must not scroll past. Its 🚩 was removed by
+    // emoji stripping at ingestion; this puts the mark back as vector.
+    urgentHeadings: ["FIRST — the ones that don't wait"],
+  },
 };

@@ -72,11 +72,46 @@ const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** Inline emphasis, applied AFTER escaping so nothing can inject markup. */
+/**
+ * GLYPHS THE TEXT FACES DO NOT CARRY — drawn, not typed.
+ *
+ * The manuscript uses two characters outside the vendored latin subsets: an
+ * arrow (U+2192, ~120 cross-references in the Quick-Answer Index) and a flag
+ * (U+1F6A9, one heading marker). Left as text they fall through to whatever
+ * font the render host happens to offer — an unknown face on an unknown
+ * machine, and for the flag, usually nothing at all, so the marker silently
+ * vanished from the page.
+ *
+ * Neither is acceptable as a final print state. Both are replaced with inline
+ * SVG paths: vector, deterministic, identical on every host, embedded as
+ * drawing operations rather than as text needing a font. `currentColor` and em
+ * sizing keep them tied to the type around them.
+ *
+ * The MANUSCRIPT still says what it said. This is a render-layer substitution.
+ */
+const XREF_ARROW =
+  '<svg class="gl gl-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+  '<path d="M2 12h18M14 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+/**
+ * Solid pennant on a staff. The pennant fills most of the box on purpose: at
+ * heading size a small mark reads as a tick or a stray bracket rather than a
+ * flag, which defeats the point of marking the one category a reader must not
+ * scroll past.
+ */
+const ALERT_FLAG =
+  '<svg class="gl gl-flag" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+  '<path d="M4 23V1.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>' +
+  '<path d="M6 2.2h16l-4.2 6.4 4.2 6.4H6z" fill="currentColor"/></svg>';
+
 function inlineMarkdown(s: string): string {
   return escapeHtml(s)
     .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/(^|[^*])\*([^*]+?)\*/g, '$1<em>$2</em>');
+    .replace(/(^|[^*])\*([^*]+?)\*/g, '$1<em>$2</em>')
+    .replace(/→/g, XREF_ARROW)
+    .replace(/🚩/g, ALERT_FLAG);
 }
 
 /**
@@ -151,6 +186,14 @@ interface BodyHtmlOptions {
   micro?: TerminalMicroSectionPolicy;
   takeaway?: ChapterTakeawayPolicy;
   alert?: AlertPanelPolicy;
+  /**
+   * Render each authored LINE as its own index entry instead of joining
+   * consecutive lines into a paragraph. Scoped to the Quick-Answer Index by the
+   * caller, never global.
+   */
+  quickAnswerEntries?: boolean;
+  /** Category headings that get the drawn alert mark. */
+  urgentHeadings?: readonly string[];
   /** Section identity, so every block can be stamped with a stable id. */
   sectionSlug?: string;
   sectionTitle?: string;
@@ -213,6 +256,15 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
   };
   const closePara = (): void => {
     if (!para.length) return;
+    // In an index the LINE is the unit: each authored line becomes its own
+    // entry rather than being joined into a paragraph. Joining them is what
+    // turned the emergency block into one unscannable justified slab.
+    if (opts.quickAnswerEntries) {
+      for (const line of para) html.push(`<p class="qa-entry">${inlineMarkdown(line)}</p>`);
+      para = [];
+      flushNext = false;
+      return;
+    }
     html.push(`<p${flushNext ? ' class="first"' : ''}>${inlineMarkdown(para.join(' '))}</p>`);
     para = [];
     flushNext = false;
@@ -247,7 +299,13 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
     const h4 = t.match(/^####\s+(.*)$/);
     if (h4) { closeList(); closePara(); html.push(`<h4>${inlineMarkdown(h4[1]!)}</h4>`); flushNext = true; continue; }
     const h3 = t.match(/^###\s+(.*)$/);
-    if (h3) { closeList(); closePara(); html.push(`<h3>${inlineMarkdown(h3[1]!)}</h3>`); flushNext = true; continue; }
+    if (h3) {
+      closeList(); closePara();
+      const isUrgent = (opts.urgentHeadings ?? []).some((h) => h.toLowerCase() === h3[1]!.trim().toLowerCase());
+      html.push(`<h3${isUrgent ? ' class="urgent"' : ''}>${isUrgent ? ALERT_FLAG : ''}${inlineMarkdown(h3[1]!)}</h3>`);
+      flushNext = true;
+      continue;
+    }
     const bullet = t.match(/^[-*]\s+(.*)$/);
     // Ordered steps: "1. text" / "2) text". Without this branch the numerals
     // printed as literal text mid-paragraph and the steps ran together — 63
@@ -459,6 +517,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
   const micro = standard.terminalMicroSection;
   const tk = standard.chapterTakeaway;
   const ap = standard.alertPanel;
+  const qa = standard.quickAnswerIndex;
   const openerAlign = op.centered ? 'center' : 'left';
   const smallCaps = furn.runningHeadSmallCaps ? 'small-caps' : 'normal';
   const folioContent = furn.folio === 'none' ? 'none' : 'counter(page)';
@@ -508,6 +567,9 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
     micro: standard.terminalMicroSection,
     takeaway: standard.chapterTakeaway,
     alert: standard.alertPanel,
+    quickAnswerEntries:
+      qa.enabled && qa.sectionTitles.some((t) => t.toLowerCase() === s.title.toLowerCase()),
+    urgentHeadings: qa.enabled ? qa.urgentHeadings : [],
     sectionSlug: slug,
     sectionTitle: s.title,
     collect,
@@ -687,6 +749,22 @@ ul { list-style: disc; }
   text-align: left; text-align-last: left; break-after: avoid; }
 .takeaway p { text-indent: 0; }
 .takeaway p + p { margin-top: .25em; }
+/* Quick-Answer Index: a lookup table set as type. One authored line = one
+   entry, no first-line indent (an index is scanned down its left edge), ragged
+   right (justifying two-line entries opens rivers), and each entry kept whole
+   so a question is never split from its answer across a page. */
+.qa-entry { text-indent: 0; margin: 0 0 ${qa.entrySpacingEm}em;
+  text-align: ${qa.justify ? 'justify' : 'left'};
+  ${qa.justify ? '' : 'hyphens: none; -webkit-hyphens: none;'}
+  ${qa.keepEntryTogether ? 'break-inside: avoid;' : ''} }
+/* Glyphs the text faces do not carry, drawn as vector rather than typed. Sized
+   and coloured from the surrounding type so they sit on the same line as text
+   instead of reading as pasted-in icons. */
+.gl { display: inline-block; height: .72em; width: .72em; vertical-align: -.04em; color: currentColor; }
+/* The manuscript already writes a space either side of the arrow, so the glyph
+   adds none of its own — with margins it read as a gap, not a pointer. */
+.gl-arrow { width: .95em; margin: 0; }
+.gl-flag { width: .82em; height: .92em; vertical-align: -.12em; margin-right: .3em; }
 ${overrides.css}</style></head>
 <body>
 ${body}

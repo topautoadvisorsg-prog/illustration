@@ -218,6 +218,51 @@ export interface AlertPanelPolicy {
   keepTogether: boolean;
 }
 
+/**
+ * QUICK-ANSWER INDEX — a scanning component, not prose.
+ *
+ * This book ends with an index of ~120 question/answer entries, each authored
+ * on its own line. Markdown treats a single newline as a soft break, so the
+ * renderer joined them: five separate emergency entries — testicular pain,
+ * self-harm, an adult asking a child to keep secrets, sextortion, not feeling
+ * safe at home — set as one continuous justified paragraph. The most
+ * safety-critical block in the book was the least scannable thing on the page.
+ *
+ * This is NOT book-wide soft-break preservation, which would repaginate
+ * everything and change prose the author wrote as prose. It is scoped
+ * STRUCTURALLY, to sections named here, where the LINE is the unit of meaning.
+ *
+ * Nor is it inferring structure from styling — the distinction that left
+ * bold-lead-in numbered steps alone. There, structure would have been invented
+ * from formatting. Here the author wrote real line breaks and the renderer was
+ * discarding them.
+ */
+export interface QuickAnswerIndexPolicy {
+  enabled: boolean;
+  /** Section titles rendered as an index. Compared case-insensitively. */
+  sectionTitles: readonly string[];
+  /** Space between entries, in em. Compact: this is a lookup table. */
+  entrySpacingEm: number;
+  /**
+   * Ragged right. Justifying one- and two-line entries opens rivers of word
+   * space, and an index is scanned down its left edge rather than read across.
+   */
+  justify: boolean;
+  /** Keep a question with its answer (`break-inside: avoid`). */
+  keepEntryTogether: boolean;
+  /**
+   * Category headings that carry an alert mark.
+   *
+   * The manuscript flagged its emergency category with a 🚩, but stage-1
+   * ingestion strips emoji from every book by design, so the marker was gone
+   * before typesetting ever saw it and the most urgent category in the index
+   * looked like all the others. Reinstated here as a drawn B&W symbol, keyed to
+   * the heading text — the same convention `alertPanel.headings` already uses.
+   * The manuscript is untouched.
+   */
+  urgentHeadings: readonly string[];
+}
+
 export interface TypesetBlockStyles {
   /** Printed glyphs for a scene break, e.g. "* * *". */
   sceneBreakMark: string;
@@ -276,4 +321,5 @@ export interface TypesetLayoutStandard {
   terminalMicroSection: TerminalMicroSectionPolicy;
   chapterTakeaway: ChapterTakeawayPolicy;
   alertPanel: AlertPanelPolicy;
+  quickAnswerIndex: QuickAnswerIndexPolicy;
 }
