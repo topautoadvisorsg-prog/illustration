@@ -15,6 +15,7 @@
     "qa:typeset": "tsx scripts/typeset-qa-layer1.ts",
     "qa:shoot": "tsx scripts/shoot-page.ts",
     "qa:fontprobe": "tsx scripts/font-embed-probe.ts",
+    "fonts:ttf": "tsx scripts/derive-ttf.ts",
     "storage:prune": "tsx scripts/db-guard.ts prune && tsx scripts/storage-prune.ts",
     "drizzle:generate": "drizzle-kit generate",
     "db:guard": "tsx scripts/db-guard.ts",

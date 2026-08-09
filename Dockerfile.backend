@@ -20,6 +20,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
+# THE TYPESET INTERIOR FACES, INSTALLED AS SYSTEM FONTS.
+#
+# Chromium converts any @font-face into Type3 glyph-drawing procedures, which
+# print RIPs commonly reject, and embeds proper Type0 CID subsets only for fonts
+# in the host font path. Proven both ways in backend/scripts/font-embed-probe.ts
+# — a TTF-backed webfont comes out Type3 as well, so the payload format is not
+# the variable; webfont-vs-system-font is.
+#
+# These TTFs are decompressed from the very WOFF2 assets the approved interior
+# was set in (backend/scripts/derive-ttf.ts), so glyph outlines and metrics are
+# identical and pagination cannot move. font-assets.ts then asks fontconfig what
+# is installed and stops emitting @font-face for those families, which is what
+# actually flips the embedding.
+#
+# The build FAILS if the two book faces are not resolvable afterwards: shipping
+# an image that silently substitutes Times for EB Garamond is the exact failure
+# this whole exercise exists to prevent.
+COPY backend/assets/fonts/ttf/*.ttf /usr/local/share/fonts/wildlands/
+RUN fc-cache -f \
+ && fc-list --format '%{family[0]}\n' | sort -u | grep -qx 'Archivo' \
+ && fc-list --format '%{family[0]}\n' | sort -u | grep -qx 'EB Garamond' \
+ && echo 'typeset faces installed and resolvable'
+
 # render-pdf.ts resolves Chromium via CHROMIUM_PATH first.
 ENV CHROMIUM_PATH=/usr/bin/chromium \
     PUPPETEER_SKIP_DOWNLOAD=true
