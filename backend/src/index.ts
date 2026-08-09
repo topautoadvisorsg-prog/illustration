@@ -6,6 +6,15 @@ import { activeStorageKind } from './services/storage/project-storage.js';
 
 async function main(): Promise<void> {
   const env = getEnv();
+  // Boot-time BUILD signal. A failed image build leaves the previous container
+  // running and answering /health exactly as before, so a deploy can appear to
+  // land while the old code keeps serving. Stating the commit on every boot
+  // means `railway logs` answers "which code is actually running?" without
+  // having to reason about deployment records.
+  logger.info(
+    { commit: process.env.RAILWAY_GIT_COMMIT_SHA ?? 'unknown', branch: process.env.RAILWAY_GIT_BRANCH ?? 'unknown' },
+    `booting build ${(process.env.RAILWAY_GIT_COMMIT_SHA ?? 'unknown').slice(0, 7)}`,
+  );
   // Boot-time DATABASE signal. Local dev and the deployment shared one Supabase
   // database until 2026-08-08, and nothing on screen ever said so — a local
   // probe silently mutated real production data. Every start now states which
