@@ -25,6 +25,11 @@ export const DEFAULT_TRIM: TrimSize = {
 /** Supported trim sizes (width×height in inches). Single global set for now;
  *  moves into per-publisher Standards when the Standard engine lands. */
 export const SUPPORTED_TRIMS: ReadonlyArray<{ widthIn: number; heightIn: number }> = [
+  // KDP standard trim, and the size the first typeset book is set at. It was
+  // missing here, so that book typeset and proofed at 5.5×8.5 for weeks and
+  // then threw `unsupported_trim` the moment it reached assembly: the list had
+  // only ever been extended for books that came through the page-render track.
+  { widthIn: 5.5, heightIn: 8.5 },
   { widthIn: 6, heightIn: 9 },
   { widthIn: 7, heightIn: 10 },
   { widthIn: 8.5, heightIn: 11 },

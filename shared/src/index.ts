@@ -785,6 +785,20 @@ export const ProjectConfigSchema = z.object({
    */
   typesetLayoutStandardId: z.string().min(1).optional(),
   /**
+   * CHAPTER-START POLICY for the typeset track.
+   *
+   * false (default): chapter 1 opens recto, every later chapter starts on the
+   * next available page. true: every chapter is forced onto a right-hand page,
+   * which inserts a blank before roughly half of them.
+   *
+   * It lives on the BOOK because it changes the page count, and the page count
+   * sizes the spine. It used to exist only as a preview query parameter, so the
+   * interior, the cover and the export could each be built under a different
+   * policy and none of them would notice; that is a mis-printed spine, not a
+   * bug in a preview.
+   */
+  typesetChaptersStartRecto: z.boolean().default(false),
+  /**
    * LOCAL LAYOUT OVERRIDES — per-block exceptions to the pinned standard.
    *
    * Keyed by stable block id (see `pipeline/typeset/block-identity.ts`), NEVER

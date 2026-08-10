@@ -278,6 +278,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [coverAR, setCoverAR] = useState(null); // full-wrap image aspect ratio (w/h), for spine fold lines
   const [cover, setCover] = useState(null);
   const [assembly, setAssembly] = useState(null);
+  const [delivery, setDelivery] = useState(null); // delivery check of the finished PDFs
   const [epubReport, setEpubReport] = useState(null); // Kindle EPUB build report (preview endpoint)
   const [status, setStatus] = useState({}); // real backend progress for the step checkmarks
   const [reviewResults, setReviewResults] = useState({}); // renderId -> { pass, issues, model } from AI text review
@@ -982,6 +983,17 @@ export default function ProductionConsole({ onExitToLegacy }) {
     } catch { /* cover PDF needs the cover artwork (Step 7 · Render & Review); interior is still valid without it */ }
     setAssembly({ ...d, coverPdfPath });
     return { notice: coverPdfPath ? `Book built: ${d.assembledPages} pages + print cover.` : `Interior built: ${d.assembledPages} pages. Generate the cover in Step 7 · Render & Review for a complete print package.` };
+  });
+
+  // Delivery check — opens the FINISHED files and reports what they contain
+  // (page size, TrimBox, embedded fonts, wrap geometry). Read-only and free.
+  // This was a script with the previous book's paths compiled into it, so no
+  // operator could run it on their own book without a shell and a developer.
+  const runDeliveryCheck = () => run("Checking the finished files", async () => {
+    const d = await api(`/api/projects/${project.id}/delivery-check`);
+    setDelivery(d);
+    const bad = (d.checks || []).filter((c) => c.status === "FAIL").length;
+    return { notice: bad ? `${bad} problem${bad === 1 ? "" : "s"} found — see the list.` : `Delivery check: ${d.status}.` };
   });
 
   // Kindle build report (chapters/entries/words/cover) from the read-only preview
@@ -1839,7 +1851,11 @@ export default function ProductionConsole({ onExitToLegacy }) {
                         )}
                         {((assembly.missing || []).length > 0 || (assembly.preflightFailures || []).length > 0 || (assembly.noPrintOutput || []).length > 0) && (
                           <>
-                            <div style={{ color: C.red, fontWeight: 600, marginTop: assembly.coverStale ? 12 : 0 }}>Some pages aren't book-ready yet. Go back to step 7 and render + approve these, then assemble again:</div>
+                            <div style={{ color: C.red, fontWeight: 600, marginTop: assembly.coverStale ? 12 : 0 }}>
+                              {assembly.track === "typeset"
+                                ? "The typeset interior isn't clean yet. Fix these in Step 7 · Render & Review (the typeset preview card), then build again:"
+                                : "Some pages aren't book-ready yet. Go back to step 7 and render + approve these, then assemble again:"}
+                            </div>
                             <ul style={{ marginTop: 6 }}>
                               {(assembly.missing || []).map((x, i) => <li key={`m${i}`}>{typeof x === "string" ? x : (x.pageKey || JSON.stringify(x))}</li>)}
                               {(assembly.preflightFailures || []).map((x, i) => <li key={`p${i}`} style={{ color: C.red }}>{(x.pageKey || x)} — preflight failed</li>)}
@@ -1847,6 +1863,50 @@ export default function ProductionConsole({ onExitToLegacy }) {
                             </ul>
                           </>
                         )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {project && (
+              <div style={S.card}>
+                <b>Delivery check</b>
+                <div style={{ fontSize: 12.5, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
+                  Opens the finished PDFs and reports what is actually inside them — page size, trim
+                  declaration, embedded fonts, and whether the cover wrap matches this interior's page
+                  count and paper. Read-only. Free. Run it before uploading to KDP.
+                </div>
+                <button style={{ ...S.btn(), marginTop: 10 }} onClick={() => runDeliveryCheck().catch(() => {})}>
+                  Check the finished files
+                </button>
+                {delivery && (
+                  <div style={{ marginTop: 12 }}>
+                    <span style={S.pill(delivery.status === "FAIL" ? C.red : delivery.status === "WARNING" ? C.orange : C.green)}>
+                      {delivery.status}
+                    </span>
+                    <table style={{ width: "100%", marginTop: 10, borderCollapse: "collapse", fontSize: 13 }}>
+                      <tbody>
+                        {(delivery.checks || []).map((c) => (
+                          <tr key={c.name} style={{ borderTop: `1px solid ${C.line}` }}>
+                            <td style={{ padding: "6px 8px 6px 0", whiteSpace: "nowrap", verticalAlign: "top", fontWeight: 600 }}>{c.label}</td>
+                            <td style={{ padding: "6px 8px 6px 0", whiteSpace: "nowrap", verticalAlign: "top", color: c.status === "FAIL" ? C.red : c.status === "WARNING" ? C.orange : C.green }}>{c.status}</td>
+                            <td style={{ padding: "6px 0", verticalAlign: "top", color: C.muted }}>{c.detail}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {delivery.interiorPath && (
+                        <a style={{ ...S.btn("ok"), textDecoration: "none", display: "inline-block" }} href={fileUrl(delivery.interiorPath)} target="_blank" rel="noreferrer">Download interior PDF</a>
+                      )}
+                      {delivery.coverPath && (
+                        <a style={{ ...S.btn("ok"), textDecoration: "none", display: "inline-block" }} href={fileUrl(delivery.coverPath)} target="_blank" rel="noreferrer">Download cover PDF</a>
+                      )}
+                    </div>
+                    {delivery.interior && (
+                      <div style={{ marginTop: 10, color: C.muted, fontSize: 12.5 }}>
+                        Fonts found: {(delivery.interior.fonts || []).map((f) => `${f.baseFont} (${f.subtype}${f.embedded ? ", embedded" : ", NOT embedded"})`).join(" · ") || "none"}
                       </div>
                     )}
                   </div>

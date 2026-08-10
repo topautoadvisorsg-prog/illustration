@@ -551,4 +551,58 @@ export async function registerWholePageRoutes(app: FastifyInstance): Promise<voi
       return reply.code(500).send({ error: 'Internal Server Error', message, statusCode: 500 });
     }
   });
+
+  // ── Delivery check: inspect the FINISHED files, in the browser ──────────────
+  // Reads the most recent exported interior and the current cover back off
+  // storage and reports what they actually contain — page size, TrimBox, fonts,
+  // wrap geometry. This existed only as a script with the previous book's paths
+  // hardcoded in it, so no operator could run it on their own book.
+  //
+  // Read-only and free: it opens files, it does not build or generate anything.
+  app.get('/api/projects/:projectId/delivery-check', async (request, reply) => {
+    const { projectId } = ProjectParamsSchema.parse(request.params);
+    const project = await getProject(projectId);
+    if (!project) {
+      return reply.code(404).send({ error: 'Not Found', message: 'Project not found.', statusCode: 404 });
+    }
+    const config = ProjectConfigSchema.parse(project.config ?? {});
+    const storage = getProjectStorage();
+
+    const { listExports } = await import('../db/repositories/exports.repo.js');
+    const { checkDelivery } = await import('../pipeline/book-assembly/delivery-check.js');
+
+    // The newest interior that actually produced a file. listExports is ordered
+    // oldest-first, and a blocked run records a FAILED row with no path.
+    const exportRow = [...(await listExports(projectId))]
+      .reverse()
+      .find((e) => e.kind === 'PREMIUM_PDF' && e.status === 'READY' && e.filePath);
+
+    // renderCoverPdf always writes here, so the cover has a stable location
+    // rather than a config field that could disagree with the file on disk.
+    const coverPath = `${projectId}/editions/COVER.pdf`;
+
+    const read = async (path: string | null | undefined): Promise<Buffer | null> => {
+      if (!path) return null;
+      try {
+        return await storage.readProjectFile(path);
+      } catch {
+        // A path that no longer resolves is reported as "not built yet" rather
+        // than crashing the check the operator ran to find that out.
+        return null;
+      }
+    };
+
+    const coverPdf = await read(coverPath);
+    const report = await checkDelivery({
+      config,
+      interiorPdf: await read(exportRow?.filePath),
+      coverPdf,
+    });
+    return {
+      ...report,
+      interiorPath: exportRow?.filePath ?? null,
+      coverPath: coverPdf ? coverPath : null,
+      exportedAt: exportRow?.createdAt ? new Date(exportRow.createdAt).toISOString() : null,
+    };
+  });
 }

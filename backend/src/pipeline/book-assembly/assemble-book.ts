@@ -10,7 +10,7 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto';
-import { ProjectConfigSchema } from '@wildlands/shared';
+import { ProjectConfigSchema, type ProjectConfig } from '@wildlands/shared';
 import { resolveGeometry } from '../publishing-standard/index.js';
 import { getProject } from '../../db/repositories/projects.repo.js';
 import { listPaginatedPagesForProject } from '../../db/repositories/pagination.repo.js';
@@ -18,6 +18,7 @@ import { listBookReadyRenders } from '../../db/repositories/whole-page-render.re
 import { recordExport } from '../../db/repositories/exports.repo.js';
 import { getProjectStorage } from '../../services/storage/project-storage.js';
 import { frontMatterStatus, resolveSpine, type SpinePage } from './spine-order.js';
+import { resolveTrack, type ProductionTrack } from './interior-artifact.js';
 import {
   pageCountAdvisory,
   validateAssembly,
@@ -42,6 +43,13 @@ export const COVER_STALE_MESSAGE =
 export interface AssemblyReport {
   projectId: string;
   runId: string;
+  /**
+   * Which track produced this interior. The console needs it: "render and
+   * approve these pages" is the right instruction for one track and nonsense
+   * for the other, and sending a typeset operator to the page-render stage was
+   * how they got lost.
+   */
+  track: ProductionTrack;
   blocked: boolean;
   frontMatter: 'absent' | 'included';
   expectedPages: number;
@@ -88,12 +96,133 @@ export interface AssembleBookOptions {
   chapters?: number[];
 }
 
+/**
+ * Assemble a TYPESET book.
+ *
+ * The interior already exists as one finished PDF with live vector text,
+ * embedded Type0 fonts and stamped artwork. There is nothing to merge and
+ * nothing to validate page by page: the typesetter's own report is the gate,
+ * and it is stricter than the per-page one (a book with vertical overflow or a
+ * missing section never gets this far).
+ *
+ * The PDF is stored UNCHANGED. Rasterising it to satisfy the page-render
+ * assembler would destroy the vector text, the fonts and the artwork, which are
+ * the entire reason this track exists.
+ */
+async function assembleTypesetBook(
+  projectId: string,
+  config: ProjectConfig,
+  geometry: ReturnType<typeof resolveGeometry>,
+  options: AssembleBookOptions,
+): Promise<AssemblyReport> {
+  const runId = randomUUID();
+  const scopeChapters = options.chapters?.length ? [...new Set(options.chapters)].sort((a, b) => a - b) : null;
+
+  const { buildTypesetInterior } = await import('../typeset/build-typeset-interior.js');
+  const interior = await buildTypesetInterior(projectId, config, {
+    chaptersStartRecto: config.typesetChaptersStartRecto,
+  });
+
+  // The typesetter's own failure conditions, stated as assembly blockers so the
+  // operator sees them in the same place as every other reason an export stops.
+  const problems: string[] = [];
+  for (const p of interior.report.verticalOverflowPages) problems.push(`page ${p} overflows its text area`);
+  for (const o of interior.orphanedIllustrations) problems.push(`illustration ${o.blockId}: ${o.reason}`);
+
+  const coverBuiltForPageCount = config.publishing.coverSync?.builtForPageCount ?? null;
+  const cover = coverSyncStatus({
+    hasCover: Boolean(config.publishing.coverAssetPath),
+    coverBuiltForPageCount,
+    interiorPageCount: interior.pageCount,
+    fullBook: scopeChapters === null,
+  });
+  const blocked = problems.length > 0 || cover.stale;
+
+  const report = (interiorPdfPath: string | null, bytes: number): AssemblyReport => ({
+    projectId,
+    runId,
+    track: 'typeset',
+    blocked,
+    // Typeset books carry their own title/copyright/contents pages, produced by
+    // the same standard as the body rather than as separate page rows.
+    frontMatter: 'included',
+    expectedPages: interior.pageCount,
+    assembledPages: interiorPdfPath ? interior.pageCount : 0,
+    spine: [],
+    validations: [
+      {
+        name: 'typeset_no_overflow',
+        ok: interior.report.verticalOverflowPages.length === 0,
+        detail: interior.report.verticalOverflowPages.length
+          ? `${interior.report.verticalOverflowPages.length} pages overflow their text area`
+          : `${interior.pageCount} pages, none overflowing`,
+      },
+      {
+        name: 'typeset_illustrations_placed',
+        ok: interior.orphanedIllustrations.length === 0,
+        detail: `${interior.stampedIllustrations.length} placed, ${interior.orphanedIllustrations.length} orphaned`,
+      },
+      {
+        name: 'cover_in_sync',
+        ok: !cover.stale,
+        detail: cover.stale
+          ? `cover was built for ${coverBuiltForPageCount} pages, interior is ${interior.pageCount}`
+          : 'cover matches the interior page count',
+      },
+    ],
+    missing: problems,
+    preflightFailures: [],
+    noPrintOutput: [],
+    dimensionFailures: [],
+    interiorPdfPath,
+    interiorPdfBytes: bytes,
+    artifactQuality: interiorPdfPath ? 'PRINT_READY' : null,
+    warnings: cover.stale ? [COVER_STALE_MESSAGE] : [],
+    finalPageCount: interior.pageCount,
+    pageCountAdvisory: pageCountAdvisory(interior.pageCount),
+    finalTrim: {
+      trimIn: { w: geometry.trimSize.widthIn, h: geometry.trimSize.heightIn },
+      bleedIn: geometry.trimSize.bleedIn,
+    },
+    scopeChapters,
+    coverStale: cover.stale,
+    coverBuiltForPageCount,
+  });
+
+  if (blocked) {
+    await recordExport({ projectId, kind: 'PREMIUM_PDF', status: 'FAILED', filePath: null });
+    return report(null, 0);
+  }
+
+  const stored = await getProjectStorage().writeProjectFile(
+    projectId,
+    ['exports', `interior-${runId}.pdf`],
+    interior.pdf,
+  );
+  await recordExport({
+    projectId,
+    kind: 'PREMIUM_PDF',
+    status: 'READY',
+    filePath: stored.relativePath,
+    sha256: createHash('sha256').update(interior.pdf).digest('hex'),
+    fileSizeBytes: interior.pdf.length,
+  });
+  return report(stored.relativePath, interior.pdf.length);
+}
+
 export async function assembleBook(projectId: string, options: AssembleBookOptions = {}): Promise<AssemblyReport> {
   // 0. Resolve the project geometry — the single source for the expected page
   //    size and the reported final trim (SPEC_GEOMETRY_RECONCILIATION §1).
   const project = await getProject(projectId);
   const config = ProjectConfigSchema.parse(project?.config ?? {});
   const geometry = resolveGeometry(config);
+
+  // 0b. Which track produced the interior. A typeset book has no page-render
+  //     rows at all, so the code below this point would block it for "missing"
+  //     every page of a book that is finished.
+  const { getProductionProfile } = await import('../production-profiles/registry.js');
+  const track = resolveTrack(getProductionProfile(config.productionProfileId)?.bodyRenderTrack);
+  if (track === 'typeset') return assembleTypesetBook(projectId, config, geometry, options);
 
   // 1. Expected pages, in spine order.
   const scopeChapters = options.chapters?.length
@@ -176,6 +305,7 @@ export async function assembleBook(projectId: string, options: AssembleBookOptio
   ): AssemblyReport => ({
     projectId,
     runId,
+    track: 'rendered-pages',
     blocked,
     frontMatter,
     expectedPages: spine.length,

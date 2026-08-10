@@ -492,26 +492,25 @@ async function resolveCoverPageCount(
   // Typeset track: the typesetter is the only authority on the page count, the
   // same way it is for the interior itself. Rendering here costs seconds and no
   // money, and it is the number the printed book will actually have.
-  const { renderTypesetBook } = await import('../typeset/render-typeset.js');
-  const { resolveTypesetLayoutStandard } = await import('../typeset/layout-standards/registry.js');
-  const { getProjectStorage } = await import('../../services/storage/project-storage.js');
-  const { sanitizeManuscript } = await import('../stage-1-ingestion/sanitize-manuscript.js');
-  const project = await getProject(projectId);
-  if (!project?.manuscriptPath) return 0;
-  const markdown = sanitizeManuscript(
-    (await getProjectStorage().readProjectFile(project.manuscriptPath)).toString('utf8'),
+  //
+  // Through the SAME builder the preview and the export use, under the book's
+  // own chapter-start policy. A second copy of this call lived here and passed
+  // a hardcoded policy, so the spine could be sized from a page count the
+  // interior never had.
+  const { buildTypesetInterior, TypesetInputMissingError } = await import(
+    '../typeset/build-typeset-interior.js'
   );
-  const standard = resolveTypesetLayoutStandard(
-    config.typesetLayoutStandardId ?? profile?.typesetLayoutStandardId ?? 'educational-nonfiction-typeset@1',
-  );
-  const { report } = await renderTypesetBook({
-    markdown,
-    config,
-    chaptersStartRecto: false,
-    layoutStandard: standard,
-    frontMatter: { publication: { year: new Date().getFullYear() } },
-  });
-  return report.totalPages;
+  try {
+    const { pageCount } = await buildTypesetInterior(projectId, config, {
+      chaptersStartRecto: config.typesetChaptersStartRecto,
+    });
+    return pageCount;
+  } catch (err) {
+    // No manuscript yet is "no interior", not a cover failure: zero pages is
+    // reported by the caller's own guard, which names the step to run.
+    if (err instanceof TypesetInputMissingError) return 0;
+    throw err;
+  }
 }
 
 export async function renderCoverPdf(projectId: string, options: RenderCoverOptions = {}): Promise<CoverRenderResult> {

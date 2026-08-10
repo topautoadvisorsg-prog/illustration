@@ -34,10 +34,6 @@ import { ingestManuscript } from '../pipeline/stage-1-ingestion/ingest-manuscrip
 import { UnsupportedManuscriptError } from '../pipeline/stage-1-ingestion/extract-manuscript.js';
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
 import { UserFacingError } from '../lib/user-facing-error.js';
-import {
-  stampIllustrations,
-  type StampedIllustration,
-} from '../pipeline/typeset/stamp-illustrations.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { timeOperation } from '../lib/timing.js';
 import { applyConfigPatch } from '../lib/merge-config.js';
@@ -1296,10 +1292,15 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
      * always opens recto regardless, and forcing the rest cost this book ten
      * blank pages for a convention it does not need past the opening.
      */
+    // Absent means "use the book's saved policy". Present means the operator
+    // moved the switch, and the new value is SAVED to the book before rendering
+    // — the cover and the export read it from there, and a preview that showed
+    // one page count while the spine was sized from another is exactly the
+    // failure this removes.
     recto: z
       .enum(['true', 'false'])
-      .default('false')
-      .transform((v) => v === 'true'),
+      .optional()
+      .transform((v) => (v === undefined ? undefined : v === 'true')),
   });
 
   app.get('/api/projects/:id/typeset-preview', async (request, reply) => {
@@ -1316,111 +1317,47 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       });
     }
 
-    const { getProjectStorage } = await import('../services/storage/project-storage.js');
-    const markdown = (await getProjectStorage().readProjectFile(project.manuscriptPath)).toString('utf8');
-    const config = parseProjectConfig(project);
+    let config = parseProjectConfig(project);
 
-    const { renderTypesetBook, TypesetUnavailableError } = await import(
-      '../pipeline/typeset/render-typeset.js'
-    );
-    const { getProductionProfile } = await import('../pipeline/production-profiles/registry.js');
-    const { resolveTypesetLayoutStandard, UnknownTypesetLayoutStandardError } = await import(
+    const { TypesetUnavailableError } = await import('../pipeline/typeset/render-typeset.js');
+    const { buildTypesetInterior } = await import('../pipeline/typeset/build-typeset-interior.js');
+    const { UnknownTypesetLayoutStandardError } = await import(
       '../pipeline/typeset/layout-standards/registry.js'
     );
-    const { EDUCATIONAL_NONFICTION_TYPESET_V1 } = await import(
-      '../pipeline/typeset/layout-standards/educational-nonfiction-v1.js'
-    );
 
-    // The page design comes from the book's layout standard, resolved through
-    // its production profile. Precedence: the PROJECT'S PIN wins over the
-    // profile default — that is what makes a pin a pin. A book approved on @1
-    // keeps rendering against @1 even after the profile starts naming @2.
-    const profile = getProductionProfile(config.productionProfileId);
-    const standardId =
-      config.typesetLayoutStandardId ??
-      profile.typesetLayoutStandardId ??
-      // A profile with no typeset standard (the field guide) still reaches this
-      // route today; v1 is the design it has been rendering all along.
-      EDUCATIONAL_NONFICTION_TYPESET_V1.id;
-
-    let layoutStandard;
-    try {
-      layoutStandard = resolveTypesetLayoutStandard(standardId);
-    } catch (err) {
-      if (err instanceof UnknownTypesetLayoutStandardError) {
-        throw new UserFacingError(err.message, {
-          code: 'Unknown Layout Standard',
-          errorCode: ERROR_CODES.UNCLASSIFIED,
-          statusCode: 409,
-        });
-      }
-      throw err;
+    // The chapter-start policy belongs to the book, because it changes the page
+    // count and the page count sizes the spine. Moving the switch changes the
+    // book, not just this preview.
+    if (query.recto !== undefined && query.recto !== config.typesetChaptersStartRecto) {
+      config = { ...config, typesetChaptersStartRecto: query.recto };
+      await updateProjectConfig(id, config);
+      request.log.info({ projectId: id, chaptersStartRecto: query.recto }, 'chapter-start policy changed');
     }
 
-    // Pin on the first successful typeset, so a later @2 cannot move a book
-    // that has already been rendered and reviewed.
-    if (!config.typesetLayoutStandardId) {
-      await updateProjectConfig(id, { ...config, typesetLayoutStandardId: standardId });
-      request.log.info({ projectId: id, standardId, profileId: profile.id }, 'pinned typeset layout standard');
-    }
-
-    const illustrations = config.illustrations ?? {};
-    const hasIllustrations = Object.keys(illustrations).length > 0;
-
     try {
-      const result = await renderTypesetBook({
-        markdown,
-        config,
-        chaptersStartRecto: query.recto,
-        layoutStandard,
-        // Title page, copyright page and contents, set in the same standard as
-        // the body. This makes the render two passes: a contents page states
-        // where sections start, and that depends on how long the contents is.
-        frontMatter: { publication: { year: new Date().getFullYear() } },
-        // The probe resolves an illustration's anchor block to a page and says
-        // where type actually ends on it. Only paid for when there is artwork.
-        deepProbe: hasIllustrations,
+      // The whole Track B body pipeline. Shared with assembly, the audits and
+      // delivery, so a preview and a final export cannot drift apart.
+      const result = await buildTypesetInterior(id, config, {
+        chaptersStartRecto: config.typesetChaptersStartRecto,
+        // Pin on the first successful typeset, so a later @2 cannot move a book
+        // that has already been rendered and reviewed.
+        onResolvedStandard: async (standardId) => {
+          await updateProjectConfig(id, { ...config, typesetLayoutStandardId: standardId });
+          request.log.info({ projectId: id, standardId }, 'pinned typeset layout standard');
+        },
       });
-
-      // Typesetting FINISHES before anything is drawn on top. Stamping cannot
-      // reflow a line, so page count, wrapping and the block-to-page map are the
-      // canonical ones whether or not this book has artwork.
-      let pdf = result.pdf;
-      let stampedIllustrations: StampedIllustration[] = [];
-      let orphanedIllustrations: { blockId: string; reason: string }[] = [];
-      if (hasIllustrations && result.probe) {
-        const { getProjectStorage: storageFor } = await import('../services/storage/project-storage.js');
-        const storage = storageFor();
-        const assets = new Map<string, Buffer>();
-        for (const art of Object.values(illustrations)) {
-          try {
-            assets.set(art.approvedAssetPath, await storage.readProjectFile(art.approvedAssetPath));
-          } catch {
-            // Deliberately left out of the map: the stamper reports it as an
-            // orphan rather than drawing a placeholder or failing the build.
-          }
-        }
-        const out = await stampIllustrations({
-          pdf: result.pdf,
-          illustrations,
-          assets,
-          probe: result.probe,
-          trim: { widthIn: config.trimSize.widthIn, heightIn: config.trimSize.heightIn },
-          margins: result.report.marginsIn,
-        });
-        pdf = out.pdf;
-        stampedIllustrations = out.stamped;
-        orphanedIllustrations = out.orphaned;
-        if (out.orphaned.length) {
-          request.log.warn({ projectId: id, orphaned: out.orphaned }, 'illustrations could not be stamped');
-        }
+      if (result.orphanedIllustrations.length) {
+        request.log.warn(
+          { projectId: id, orphaned: result.orphanedIllustrations },
+          'illustrations could not be stamped',
+        );
       }
 
       if (query.format === 'json') {
         return {
           report: result.report,
-          layoutStandardId: standardId,
-          productionProfileId: profile.id,
+          layoutStandardId: result.layoutStandardId,
+          productionProfileId: result.productionProfileId,
           // The addressable blocks of this render, so the review UI can offer an
           // override on a real block rather than on a page number.
           blocks: result.blocks,
@@ -1428,12 +1365,12 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           // An override whose block no longer exists is NAMED, never silently
           // ignored: the symptom otherwise is a page that quietly stops obeying
           // an exception someone deliberately made.
-          orphanedOverrides: result.overrides.orphaned,
-          illustrations,
+          orphanedOverrides: result.orphanedOverrides,
+          illustrations: config.illustrations ?? {},
           // Where each one landed in THIS render, page included, so the review
           // UI never has to guess or store a page number of its own.
-          stampedIllustrations,
-          orphanedIllustrations,
+          stampedIllustrations: result.stampedIllustrations,
+          orphanedIllustrations: result.orphanedIllustrations,
         };
       }
 
@@ -1443,9 +1380,19 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       reply.header('x-total-pages', String(result.report.totalPages));
       reply.header('x-blank-pages', String(result.report.blankPages.length));
       reply.header('x-overflow-pages', String(result.report.verticalOverflowPages.length));
-      reply.header('x-illustrated-pages', stampedIllustrations.map((s) => s.page).join(',') || 'none');
-      return reply.send(pdf);
+      reply.header(
+        'x-illustrated-pages',
+        result.stampedIllustrations.map((s) => s.page).join(',') || 'none',
+      );
+      return reply.send(result.pdf);
     } catch (err) {
+      if (err instanceof UnknownTypesetLayoutStandardError) {
+        throw new UserFacingError(err.message, {
+          code: 'Unknown Layout Standard',
+          errorCode: ERROR_CODES.UNCLASSIFIED,
+          statusCode: 409,
+        });
+      }
       if (err instanceof TypesetUnavailableError) {
         throw new UserFacingError(err.message, {
           code: 'Typesetting Unavailable',
