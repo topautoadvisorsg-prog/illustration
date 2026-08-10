@@ -2517,7 +2517,12 @@ function TypesetPreview({ project, api, fileUrlBase }) {
   const [err, setErr] = useState("");
   const [report, setReport] = useState(null);
   const [src, setSrc] = useState(null);
-  const [recto, setRecto] = useState(true);
+  // OFF by default. The body's first chapter always opens on a right-hand page
+  // regardless; this forces EVERY chapter to, which cost this book ten blank
+  // pages. The server defaults it off too, but the console used to send
+  // recto=true on every request and quietly overrode that — so the pagination
+  // policy looked like it had not been applied at all.
+  const [recto, setRecto] = useState(false);
   /** The addressable blocks of the last render, and this book's exceptions. */
   const [blocks, setBlocks] = useState([]);
   const [overrides, setOverrides] = useState({});
@@ -2617,8 +2622,11 @@ function TypesetPreview({ project, api, fileUrlBase }) {
         </button>
         <label style={{ fontSize: 12.5, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
           <input type="checkbox" checked={recto} onChange={(e) => setRecto(e.target.checked)} />
-          Chapters start on a right-hand page
-          <span style={{ color: C.muted }}>(adds a blank when one ends on a right page)</span>
+          Force EVERY chapter onto a right-hand page
+          <span style={{ color: C.muted }}>
+            (Chapter 1 always does. Turning this on adds a blank page before roughly half the
+            chapters — ten of them in this book.)
+          </span>
         </label>
       </div>
 
