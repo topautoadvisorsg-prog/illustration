@@ -981,6 +981,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return { notice: "Cover artwork generated." };
   });
 
+  // Fix ONLY the spine of an approved cover. One image-edit call against the
+  // existing artwork, masked to the spine, and only the spine column of the
+  // result is kept — the front and back stay byte-identical. Costs the same as
+  // a generation, but a full regenerate would throw away an approved cover:
+  // the model never draws the same thing twice.
+  const repairSpine = () => run("Repairing the spine (paid)", async () => {
+    const d = await api(`/api/projects/${project.id}/cover/repair-spine`, { method: "POST", body: "{}" });
+    setCover((c) => ({ ...(c || {}), ...d, _cb: Date.now() }));
+    return {
+      notice: d.spineChanged
+        ? `Spine repaired (${d.strip?.widthPx}px strip). Front and back unchanged; previous artwork kept.`
+        : "The spine came back unchanged — the model did not alter it. Nothing else was touched.",
+    };
+  });
+
   const assemble = () => run("Assembling the finished book", async () => {
     const d = await api(`/api/whole-page-render/project/${project.id}/assemble`, { method: "POST", body: "{}" });
     if (d.blocked) { setAssembly(d); return { notice: d.coverStale ? "Export blocked — the cover is out of date for the current page count. Regenerate it in Step 7 · Render & Review (the Cover card at the top)." : "Assembly blocked — finish the pages listed below, then build again." }; }
@@ -1686,7 +1701,18 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 <div style={{ ...S.card, marginTop: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                     <div style={{ fontWeight: 800, fontSize: 15 }}>Cover (full wrap: back | spine | front)</div>
-                    <button style={{ ...S.btn("spend"), margin: 0, fontSize: 12 }} onClick={() => genCover().catch(() => {})}>{cover ? "Regenerate cover" : "Generate cover"}</button>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      <button style={{ ...S.btn("spend"), margin: 0, fontSize: 12 }} onClick={() => genCover().catch(() => {})}>{cover ? "Regenerate cover" : "Generate cover"}</button>
+                      {cover && (
+                        <button
+                          style={{ ...S.btn("spend"), margin: 0, fontSize: 12 }}
+                          title="Sends THIS artwork back with a mask over the spine only. Front and back are kept byte-for-byte; a full regenerate would replace them with a different cover."
+                          onClick={() => { if (window.confirm("Fix the spine text only?\n\nThis costs one image call. Your front and back are kept exactly as they are — only the spine strip can change, and the current artwork is backed up first.")) repairSpine().catch(() => {}); }}
+                        >
+                          Fix spine text only
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>One continuous full-bleed image: back cover, spine, and front cover together{cover?.pageCount ? `; spine sized for ${cover.pageCount} interior pages` : ""}. It is a single file, so there is just one generate.</div>
                   {cover?.imagePath

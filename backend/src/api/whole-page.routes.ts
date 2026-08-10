@@ -569,6 +569,22 @@ export async function registerWholePageRoutes(app: FastifyInstance): Promise<voi
     }
   });
 
+  // ── Spine repair: fix ONLY the spine of an approved cover (PAID) ───────────
+  // One image-edit call against the existing artwork with a mask over the spine,
+  // and only the spine column of the result is kept. Everything else stays the
+  // approved cover, byte for byte. See pipeline/stage-6-layout/cover-spine-repair.ts.
+  app.post('/api/projects/:projectId/cover/repair-spine', async (request, reply) => {
+    const { projectId } = ProjectParamsSchema.parse(request.params);
+    try {
+      const { repairCoverSpine } = await import('../pipeline/stage-6-layout/cover-spine-repair.js');
+      return await repairCoverSpine(projectId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      request.log.error({ err }, 'cover spine repair failed');
+      return reply.code(500).send({ error: 'Internal Server Error', message, statusCode: 500 });
+    }
+  });
+
   // ── Delivery check: inspect the FINISHED files, in the browser ──────────────
   // Reads the most recent exported interior and the current cover back off
   // storage and reports what they actually contain — page size, TrimBox, fonts,
