@@ -716,12 +716,37 @@ ${fontLinkTags(t)}
 }
 
 /**
- * Paper thickness per interior page, in inches, from KDP's published figures.
+ * KDP FULL-WRAP COVER FIGURES — this file is the single source.
  *
- * This was a single constant fixed at the white-paper value. That was right for
- * the one book that had shipped and silently wrong for any book printed on
- * cream: on 154 pages the two differ by 0.038in, which is enough to drag the
- * front artwork around the fold, and nothing in the output reveals it.
+ * Quoted from Amazon's published specifications, with the sources below, so
+ * nobody has to work them out from memory or build a second calculator
+ * somewhere else. A spine wrong by a few hundredths of an inch prints with the
+ * front artwork creeping around the fold and the file gives no sign of it.
+ *
+ *   Spine width, black ink   white 0.002252in/page, cream 0.0025in/page
+ *   Bleed                    0.125in on top, bottom and outside edges
+ *   Cover width              bleed + back + spine + front + bleed
+ *   Cover height             bleed + trim height + bleed
+ *   Text safe area           at least 0.125in inside the trim lines
+ *   Spine text safe area     at least 0.0625in either side of the spine
+ *   Spine fold variance      allow 0.0625in either side of each fold line
+ *   Spine text eligibility   at least 79 pages (KDP_MIN_SPINE_TEXT_PAGES)
+ *   Minimum type size        7pt
+ *   Resolution               at least 300 DPI (see print-prep/cover-print.ts)
+ *   Barcode                  KDP adds its own to the back cover when none is
+ *                            supplied. It is NOT part of the artwork: nothing
+ *                            is reserved, nothing is drawn, and the design runs
+ *                            straight through that area. Keep readable COPY out
+ *                            of it; background is fine.
+ *
+ * Sources:
+ *   https://kdp.amazon.com/en_US/help/topic/G201953020   (cover, spine, safety)
+ *   https://kdp.amazon.com/en_US/help/topic/G201857950   (submission, 300 DPI)
+ *   https://kdp.amazon.com/help?topicId=G5HDYGP4BXLX4RUW (barcode)
+ *
+ * Paper thickness was a single constant fixed at the white value: right for the
+ * one book that had shipped, silently wrong for anything on cream. On 154 pages
+ * the two differ by 0.038in.
  */
 const PAGE_THICKNESS_IN = { white: 0.002252, cream: 0.0025 } as const;
 

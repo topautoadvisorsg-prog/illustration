@@ -36,8 +36,7 @@
     "qa:illustrations": "tsx scripts/illustration-candidates.ts",
     "art:page": "tsx scripts/render-illustration.ts",
     "art:publish": "tsx scripts/publish-illustration.ts",
-    "qa:grid": "tsx scripts/review-grid.ts",
-    "cover:canvas": "tsx scripts/cover-canvas.ts"
+    "qa:grid": "tsx scripts/review-grid.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",

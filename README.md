@@ -88,8 +88,7 @@ Names do not always say "cover" or "assembly". This map is the shortcut:
 |---|---|
 | Cover renderer + AI wrap artwork | `pipeline/stage-6-layout/render-chapter.ts` (`renderCoverPdf`, `generateCoverWrapArtwork`) |
 | Cover 300-DPI composition | `pipeline/print-prep/cover-print.ts` (`composeCoverPrint`) |
-| Cover dimensions / spine width | `pipeline/stage-6-layout/render-html.ts` (`computeCoverDimensions`) |
-| KDP wrap geometry reference | `pipeline/cover/kdp-geometry.ts` |
+| Cover dimensions / spine width / all KDP figures | `pipeline/stage-6-layout/render-html.ts` (`computeCoverDimensions`) — **single source, with the Amazon citations** |
 | Typeset interior | `pipeline/typeset/` (`render-typeset.ts`, `typeset-book.ts`, `front-matter.ts`) |
 | Illustration stamping | `pipeline/typeset/stamp-illustrations.ts` |
 | Final assembly | `scripts/build-local2.ts` (**runs locally**, see below) |
