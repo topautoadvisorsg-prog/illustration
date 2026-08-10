@@ -2570,34 +2570,11 @@ function TypesetPreview({ project, api, fileUrlBase }) {
     setOverrides((o) => { const next = { ...o }; delete next[blockId]; return next; });
   }, [api, project.id]);
 
-  /**
-   * Replace the artwork on a page. The placement SIZE is kept, so a replacement
-   * prints at the same size; the API refuses it if the new file cannot carry
-   * 300 native ppi at that size, rather than resampling it into looking fine.
-   */
-  const replaceArt = useCallback(async (stamped, file) => {
-    const buf = await file.arrayBuffer();
-    let binary = "";
-    const bytes = new Uint8Array(buf);
-    for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
-    await api(`/api/projects/${project.id}/illustrations/${stamped.blockId}`, {
-      method: "PUT",
-      body: JSON.stringify({
-        pngBase64: btoa(binary),
-        placementWidthIn: stamped.widthIn,
-        placementHeightIn: stamped.heightIn,
-        status: "approved",
-      }),
-    });
-    await build();
-  }, [api, project.id]);
-
-  const removeArt = useCallback(async (blockId) => {
-    await api(`/api/projects/${project.id}/illustrations/${blockId}`, { method: "DELETE" });
-    await build();
-  }, [api, project.id]);
-
-  const build = async () => {
+  // Declared before the callbacks that await it, and memoised, so those
+  // callbacks can list it as a dependency. CI builds treat a missing hook
+  // dependency as a compile error, and a plain function here is a new value on
+  // every render, which would defeat their memoisation anyway.
+  const build = useCallback(async () => {
     setBusy(true); setErr(""); setReport(null);
     try {
       const q = `recto=${recto ? "true" : "false"}`;
@@ -2623,7 +2600,34 @@ function TypesetPreview({ project, api, fileUrlBase }) {
     } finally {
       setBusy(false);
     }
-  };
+  }, [api, project.id, recto, fileUrlBase]);
+
+  /**
+   * Replace the artwork on a page. The placement SIZE is kept, so a replacement
+   * prints at the same size; the API refuses it if the new file cannot carry
+   * 300 native ppi at that size, rather than resampling it into looking fine.
+   */
+  const replaceArt = useCallback(async (stamped, file) => {
+    const buf = await file.arrayBuffer();
+    let binary = "";
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+    await api(`/api/projects/${project.id}/illustrations/${stamped.blockId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        pngBase64: btoa(binary),
+        placementWidthIn: stamped.widthIn,
+        placementHeightIn: stamped.heightIn,
+        status: "approved",
+      }),
+    });
+    await build();
+  }, [api, project.id, build]);
+
+  const removeArt = useCallback(async (blockId) => {
+    await api(`/api/projects/${project.id}/illustrations/${blockId}`, { method: "DELETE" });
+    await build();
+  }, [api, project.id, build]);
 
   const r = report;
   return (
