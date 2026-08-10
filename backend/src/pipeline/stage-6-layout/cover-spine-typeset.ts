@@ -68,7 +68,7 @@ function classifyRows(
   w: number,
   h: number,
   channels: number,
-): { isInk: boolean[]; bgLuma: number } {
+): { isInk: boolean[]; isClean: boolean[]; bgLuma: number } {
   const lumaAt = (x: number, y: number): number => {
     const i = (y * w + x) * channels;
     return 0.2126 * data[i]! + 0.7152 * data[i + 1]! + 0.0722 * data[i + 2]!;
@@ -81,13 +81,25 @@ function classifyRows(
   const spread = Math.max(18, (sorted[Math.floor(sorted.length * 0.98)]! - bgLuma) * 0.35);
 
   const isInk: boolean[] = [];
+  const isClean: boolean[] = [];
   for (let y = 0; y < h; y++) {
     let departing = 0;
-    for (let x = 0; x < w; x++) if (Math.abs(lumaAt(x, y) - bgLuma) > spread) departing++;
-    // A couple of stray pixels is grain, not a letter.
+    let maxDeparture = 0;
+    for (let x = 0; x < w; x++) {
+      const dev = Math.abs(lumaAt(x, y) - bgLuma);
+      if (dev > spread) departing++;
+      if (dev > maxDeparture) maxDeparture = dev;
+    }
+    // "Has lettering on it" — used to pick ink COLOURS, so it wants a real run
+    // of ink pixels rather than a stray one.
     isInk.push(departing > Math.max(2, w * 0.06));
+    // "Safe to copy as background" — a far stricter question, and a separate
+    // one. A row with a single faint pixel of an old letter is NOT clean: the
+    // first version conflated these two and smeared leftover lettering down the
+    // spine. Grain is allowed; anything that reads as ink is not.
+    isClean.push(maxDeparture <= spread * 0.6);
   }
-  return { isInk, bgLuma };
+  return { isInk, isClean, bgLuma };
 }
 
 /** Mean colour of the pixels in a row that ARE ink. Used to match type colour. */
@@ -110,34 +122,47 @@ function inkColourOfRows(
 }
 
 /**
- * Rebuild the spine background by copying whole rows of REAL background from the
- * nearest clean row. No colour is synthesised, so grain and tone come along.
+ * Rebuild the WHOLE spine background from a verified-clean block of real rows.
+ *
+ * The first version patched only the rows it judged inky, copying each from its
+ * nearest clean neighbour. That left ghosts: a row carrying a thin part of a
+ * letter fell under the "is this row inky" threshold, counted as clean, kept its
+ * leftover ink AND got copied into other rows, smearing the old lettering down
+ * the spine. Half-removing old type is worse than not trying.
+ *
+ * So: every row is replaced, and the source is the longest RUN of consecutive
+ * rows in which not a single pixel departs from the field. Tiling a run rather
+ * than repeating one row preserves grain in both directions, and the run is
+ * flipped on alternate repeats so the tiling itself leaves no rhythm to spot.
  */
 function rebuildBackground(
   data: Buffer,
   w: number,
   h: number,
   channels: number,
-  isInk: boolean[],
+  isClean: boolean[],
 ): Buffer {
-  const clean: number[] = [];
-  for (let y = 0; y < h; y++) if (!isInk[y]) clean.push(y);
-  if (clean.length === 0) throw new Error('spine has no clean rows to rebuild from');
-
-  const out = Buffer.from(data);
-  const nearestClean = (y: number): number => {
-    let best = clean[0]!, bestD = Math.abs(clean[0]! - y);
-    for (const c of clean) {
-      const d = Math.abs(c - y);
-      if (d < bestD) { best = c; bestD = d; }
+  // Longest consecutive run of strictly-clean rows.
+  let bestStart = -1, bestLen = 0, curStart = -1;
+  for (let y = 0; y <= h; y++) {
+    const clean = y < h && isClean[y];
+    if (clean && curStart < 0) curStart = y;
+    if (!clean && curStart >= 0) {
+      const len = y - curStart;
+      if (len > bestLen) { bestLen = len; bestStart = curStart; }
+      curStart = -1;
     }
-    return best;
-  };
+  }
+  if (bestLen < 4) throw new Error('spine has no clean run to rebuild the background from');
 
+  const out = Buffer.alloc(data.length);
+  const rowBytes = w * channels;
   for (let y = 0; y < h; y++) {
-    if (!isInk[y]) continue;
-    const src = nearestClean(y);
-    data.copy(out, y * w * channels, src * w * channels, (src + 1) * w * channels);
+    const cycle = Math.floor(y / bestLen);
+    const offset = y % bestLen;
+    // Flip alternate tiles so the repeat has no detectable period.
+    const src = bestStart + (cycle % 2 === 0 ? offset : bestLen - 1 - offset);
+    data.copy(out, y * rowBytes, src * rowBytes, (src + 1) * rowBytes);
   }
   return out;
 }
@@ -233,10 +258,10 @@ export async function typesetSpine(input: SpineTypesetInput): Promise<{
     .toBuffer({ resolveWithObject: true });
 
   const { data, info } = strip;
-  const { isInk, bgLuma } = classifyRows(data, info.width, info.height, info.channels);
+  const { isInk, isClean, bgLuma } = classifyRows(data, info.width, info.height, info.channels);
 
   const inkRows = isInk.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
-  const cleanCount = isInk.length - inkRows.length;
+  const cleanCount = isClean.filter(Boolean).length;
 
   // Ink colours lifted from the artwork itself: the title sits in the upper part
   // of the spine, the author in the lower. Matching what is already there beats
@@ -249,13 +274,13 @@ export async function typesetSpine(input: SpineTypesetInput): Promise<{
   // Background colour is measured for the report only. It is NEVER painted.
   const bgSample = inkRows.length
     ? (() => {
-        const y = isInk.findIndex((v) => !v);
+        const y = isClean.findIndex(Boolean);
         const i = (Math.max(0, y) * info.width + Math.floor(info.width / 2)) * info.channels;
         return { r: data[i]!, g: data[i + 1]!, b: data[i + 2]! };
       })()
     : { r: 0, g: 0, b: 0 };
 
-  const cleaned = rebuildBackground(data, info.width, info.height, info.channels, isInk);
+  const cleaned = rebuildBackground(data, info.width, info.height, info.channels, isClean);
   const cleanedPng = await sharp(cleaned, {
     raw: { width: info.width, height: info.height, channels: info.channels as 4 },
   }).png().toBuffer();
