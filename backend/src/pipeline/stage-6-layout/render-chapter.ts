@@ -464,6 +464,56 @@ export interface RenderCoverOptions {
   chapters?: number[];
 }
 
+/**
+ * Interior page count for the cover, for EITHER track.
+ *
+ * The spine is sized from this number, so getting it from the wrong place is a
+ * printing defect rather than a bug. It used to read the legacy planned-page
+ * table unconditionally, which returns zero rows for a typeset book: every
+ * typeset book therefore failed the cover with "no planned pages" even though
+ * its interior existed and its page count was known.
+ */
+async function resolveCoverPageCount(
+  projectId: string,
+  config: ProjectConfig,
+  scopeChapters: number[] | null,
+): Promise<number> {
+  const { getProductionProfile } = await import('../production-profiles/registry.js');
+  const { resolveTrack } = await import('../book-assembly/interior-artifact.js');
+  const profile = getProductionProfile(config.productionProfileId);
+  const track = resolveTrack(profile?.bodyRenderTrack);
+
+  if (track === 'rendered-pages') {
+    return (await listPaginatedPagesForProject(projectId)).filter(
+      (p) => p.section !== 'BODY' || !scopeChapters || scopeChapters.includes(p.chapterNumber),
+    ).length;
+  }
+
+  // Typeset track: the typesetter is the only authority on the page count, the
+  // same way it is for the interior itself. Rendering here costs seconds and no
+  // money, and it is the number the printed book will actually have.
+  const { renderTypesetBook } = await import('../typeset/render-typeset.js');
+  const { resolveTypesetLayoutStandard } = await import('../typeset/layout-standards/registry.js');
+  const { getProjectStorage } = await import('../../services/storage/project-storage.js');
+  const { sanitizeManuscript } = await import('../stage-1-ingestion/sanitize-manuscript.js');
+  const project = await getProject(projectId);
+  if (!project?.manuscriptPath) return 0;
+  const markdown = sanitizeManuscript(
+    (await getProjectStorage().readProjectFile(project.manuscriptPath)).toString('utf8'),
+  );
+  const standard = resolveTypesetLayoutStandard(
+    config.typesetLayoutStandardId ?? profile?.typesetLayoutStandardId ?? 'educational-nonfiction-typeset@1',
+  );
+  const { report } = await renderTypesetBook({
+    markdown,
+    config,
+    chaptersStartRecto: false,
+    layoutStandard: standard,
+    frontMatter: { publication: { year: new Date().getFullYear() } },
+  });
+  return report.totalPages;
+}
+
 export async function renderCoverPdf(projectId: string, options: RenderCoverOptions = {}): Promise<CoverRenderResult> {
   const project = await getProject(projectId);
   if (!project) throw new RenderBlockedError('Project not found.', 'not_found');
@@ -476,10 +526,14 @@ export async function renderCoverPdf(projectId: string, options: RenderCoverOpti
   const scopeChapters = options.chapters?.length
     ? Array.from(new Set(options.chapters)).sort((a, b) => a - b)
     : null;
-  const pageCount = (await listPaginatedPagesForProject(projectId)).filter(
-    (p) => p.section !== 'BODY' || !scopeChapters || scopeChapters.includes(p.chapterNumber),
-  ).length;
-  if (pageCount === 0) throw new RenderBlockedError('No planned pages found; run pagination/front matter before rendering the cover.', 'no_pages');
+  const pageCount = await resolveCoverPageCount(projectId, config, scopeChapters);
+  if (pageCount === 0) {
+    throw new RenderBlockedError(
+      'No interior pages found. Run the production step for this track before building the cover: ' +
+        'pagination for a rendered-page book, or the typeset preview for a typeset book.',
+      'no_pages',
+    );
+  }
   const dims = computeCoverDimensions(config, pageCount);
   const validation = validateCoverInputs(config, pageCount, dims);
   const coverArtPrompt = buildCoverWrapPrompt(config, pageCount, dims);

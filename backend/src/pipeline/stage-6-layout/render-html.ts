@@ -715,8 +715,15 @@ ${fontLinkTags(t)}
 </html>`;
 }
 
-/** Paper thickness per interior page (inches). KDP white paper ≈ 0.002252"/page. */
-const PAGE_THICKNESS_IN = 0.002252;
+/**
+ * Paper thickness per interior page, in inches, from KDP's published figures.
+ *
+ * This was a single constant fixed at the white-paper value. That was right for
+ * the one book that had shipped and silently wrong for any book printed on
+ * cream: on 154 pages the two differ by 0.038in, which is enough to drag the
+ * front artwork around the fold, and nothing in the output reveals it.
+ */
+const PAGE_THICKNESS_IN = { white: 0.002252, cream: 0.0025 } as const;
 
 export interface CoverDimensions {
   fullWidthIn: number;
@@ -734,7 +741,7 @@ export function coverAllowsSpineText(pageCount: number): boolean {
 /** KDP full-wrap cover dimensions for a given interior page count. */
 export function computeCoverDimensions(config: ProjectConfig, pageCount: number): CoverDimensions {
   const trim = config.trimSize;
-  const spineIn = Math.max(0.06, pageCount * PAGE_THICKNESS_IN);
+  const spineIn = Math.max(0.06, pageCount * PAGE_THICKNESS_IN[config.paperStock ?? 'white']);
   return {
     fullWidthIn: trim.widthIn * 2 + spineIn + trim.bleedIn * 2,
     fullHeightIn: trim.heightIn + trim.bleedIn * 2,

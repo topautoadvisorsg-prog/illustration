@@ -814,6 +814,18 @@ export const ProjectConfigSchema = z.object({
   // default caused render (7×10) vs print-prep (8.75×11.25) divergence —
   // see SPEC_GEOMETRY_RECONCILIATION. Geometry is resolved via resolveGeometry.
   trimSize: TrimSizeSchema.default({ widthIn: 8.5, heightIn: 11, bleedIn: 0.125 }),
+  /**
+   * Interior paper stock. Drives SPINE WIDTH, and nothing else.
+   *
+   * KDP: white 0.002252in per page, cream 0.0025in. On a 154-page book that is
+   * a 0.038in difference - enough to pull the front artwork around the fold, and
+   * invisible in the file. It was hardcoded to white, which was correct for the
+   * one book that had shipped and wrong for any book printed on cream.
+   *
+   * Defaults to white so every existing project keeps the geometry it was built
+   * and proofed with.
+   */
+  paperStock: z.enum(['white', 'cream']).default('white'),
   typography: TypographyConfigSchema.default({}),
   colorPalette: ColorPaletteSchema.default({}),
   imageGeneration: ImageGenerationConfigSchema.default({}),

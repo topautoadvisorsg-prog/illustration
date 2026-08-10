@@ -474,6 +474,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
         title: cfg.publishing?.title ?? cfg.title ?? "",
         subtitle: cfg.publishing?.subtitle ?? cfg.subtitle ?? "",
         coverDescription: cfg.publishing?.coverDescription ?? "",
+        paperStock: cfg.paperStock ?? "white",
         author: (authors && authors.length ? authors.join(", ") : cfg.authorName) ?? "",
         series: cfg.publishing?.series?.name ?? "",
         volume: cfg.volume ?? cfg.publishing?.series?.volumeNumber ?? 1,
@@ -559,6 +560,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
       subtitle: f.subtitle,
       authorName: f.author,
       trimSize: trimSize(f.trim),
+      paperStock: f.paperStock || "white",
       // The four values Setup owns: body size, leading, and the two font roles.
       // The API deep-merges, so per-role type sizes keep their stored values
       // instead of being reset to a schema default.
@@ -1269,6 +1271,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
                   </select>
                   <span style={{ fontWeight: 400, color: C.muted, fontSize: 12 }}>
                     Bleed follows the trim. A text interior prints with none; an illustrated page bleeds 0.125 in.
+                  </span>
+                </label>
+                {/* Paper stock sits beside trim because it is the other input to
+                    the printed geometry: it sets the SPINE WIDTH and nothing else.
+                    KDP cream is thicker than white, so the same page count gives a
+                    wider spine, and getting it wrong drags the front artwork around
+                    the fold with nothing in the file to show it. */}
+                <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 600 }}>Interior paper
+                  <select style={S.input} value={form.paperStock}
+                    onChange={(e) => setForm({ ...form, paperStock: e.target.value })}>
+                    <option value="white">White (0.002252 in / page)</option>
+                    <option value="cream">Cream (0.0025 in / page)</option>
+                  </select>
+                  <span style={{ fontWeight: 400, color: C.muted, fontSize: 12 }}>
+                    Sets the spine width on the cover. Cream is thicker, so the same book gets a wider spine.
                   </span>
                 </label>
                 {/* Body typography lives here, not in the renderer: it is a
