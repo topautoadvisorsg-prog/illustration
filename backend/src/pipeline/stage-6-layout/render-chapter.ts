@@ -450,9 +450,13 @@ function validateCoverInputs(config: ProjectConfig, pageCount: number, dimension
       message: config.publishing.coverAssetPath ? 'Cover art asset configured.' : 'No cover art asset configured; rendering typographic cover.',
     },
     {
+      // Reported as what actually happens. It used to say "2x1.2in barcode zone
+      // reserved on back cover", which stopped being true when the reserve was
+      // removed — that placeholder had been printing on proofs. A check that
+      // asserts a protection nobody applies is worse than no check.
       key: 'barcode_zone',
       ok: true,
-      message: '2x1.2in barcode zone reserved on back cover.',
+      message: 'No barcode drawn or reserved — KDP prints its own on the back cover. Artwork runs through; keep readable copy out of the lower right.',
     },
   ];
   return { checks, ready: checks.every((c) => c.ok) };
@@ -764,7 +768,11 @@ export function buildCoverWrapPrompt(
       textPlacement: [
         'front cover: calm upper/central title-safe zone and smaller lower author/imprint zone',
         'spine: visually calm vertical strip for system-set spine typography',
-        'back cover: readable negative space for system-set back-cover copy plus clean lower-right barcode zone',
+        // No "barcode zone". KDP prints its own barcode after press and we
+        // reserve nothing — a reserved box once landed on a printed proof. The
+        // only real requirement is that no readable copy sits where it lands,
+        // which the prompt states elsewhere as a rule rather than as a region.
+        'back cover: readable negative space for the back-cover copy, with the lower-right corner kept quiet and free of type',
       ].join('; '),
     },
     readingFieldGeometry: {
@@ -785,14 +793,14 @@ export function buildCoverWrapPrompt(
       // Operator cover art-direction (when supplied) drives a specific, curated
       // wrap scene; otherwise fall back to a generic establishing scene evoked by
       // the title. Either way it stays ONE continuous full-bleed wrap with calm
-      // zones for the system-set typography + barcode.
+      // zones for the typography the model itself bakes in.
       subject: coverArtDirection
         ? {
             primary: `Full-wrap cover artwork as ONE continuous full-bleed composition across back cover, spine, and front cover. ${coverArtDirection}`,
             supporting: [
               'front cover (right panel): the hero/focal subject of the art-direction, with depth and atmosphere; calm sky/space above for the title',
               'spine: the scene continues unbroken as a quiet vertical strip with low visual contrast',
-              'back cover (left panel): the same scene continuing, calmer, with restrained negative space for back-cover copy and a clean lower-right barcode zone',
+              'back cover (left panel): the same design continuing, calmer, with restrained negative space for the back-cover copy and a quiet lower-right corner carrying no type',
               'back cover: preserve calm negative space for publisher-set descriptive copy',
             ],
             environment: artLanguage.atmosphere,
