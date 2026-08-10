@@ -15,21 +15,116 @@ Operator Console (8 steps):
 
 ---
 
-## The render model (the thing to understand)
+## TWO PRODUCTION TRACKS — read this before changing anything
 
-This platform is **AI-first and whole-page**. The generated image **IS the finished
-page** — illustration **and all of its text baked in by the image model** (`gpt-image-2`),
-rendered as one full-bleed image. There is no separate typesetting pass and no
-boxed `<img>`. Only the barcode (on the cover) is engine-stamped.
+The platform builds books by **two different routes**, chosen per project by the
+production profile in Step 3 (Book Setup → "Book type"). They share the front of
+the pipeline, diverge in the middle, and are **supposed** to converge again at
+print-prep, cover and assembly.
 
-- **Interior pages** are rendered one finished image per page, then prepared for
-  print at **300 DPI** (sharp Lanczos upscale onto the 7×10 + bleed canvas, badge/
-  folio stamp, lossless PNG → single-page PDF). Code: `pipeline/whole-page-render/`
-  and `pipeline/print-prep/`.
-- **The cover** is a separate full-wrap asset (back · spine · front), its spine
-  sized from the interior page count, composed at **300 DPI** and embedded
-  losslessly. Code: `pipeline/stage-6-layout/render-chapter.ts` +
-  `pipeline/print-prep/cover-print.ts`.
+```text
+                     Project → Manuscript → Book Setup → Breakdown
+                                       │
+                 ┌─────────────────────┴─────────────────────┐
+                 │                                           │
+   TRACK A: AI WHOLE-PAGE                       TRACK B: DETERMINISTIC TYPESET
+   (Illustrated Field Guide)                    (Educational Nonfiction, B&W Digest)
+                 │                                           │
+   Paginate (character-grid estimate)           Paginate (Paged.js flows the book;
+                 │                              the renderer IS the authority)
+   Render every page as one AI image                        │
+   (text baked in by the model)                  Typeset interior PDF: live vector
+                 │                               text, embedded Type0 fonts,
+   Front/Back Matter (Step 6)                    front matter + TOC generated in
+                 │                               the same pass
+   Review & approve each page                                │
+                 │                               Illustrations STAMPED onto the
+   Print-Prep: 300 DPI compose per page          finished PDF, anchored to stable
+                 │                               block ids
+                 └─────────────────────┬─────────────────────┘
+                                       │
+                         Cover (full wrap: back | spine | front)
+                         Print-Prep composes cover art at 300 DPI
+                                       │
+                         Prebuild Audit → Final Assembly (local)
+                                       │
+                         Delivery Validation
+                                       │
+                        interior.pdf  +  cover.pdf  → KDP
+```
+
+### Which stages are shared, and which are track-specific
+
+| Stage | Track A (AI page) | Track B (typeset) |
+|---|---|---|
+| Project / Manuscript / Book Setup / Breakdown | shared | shared |
+| Paginate | plans pages for image generation | **produces the finished interior** |
+| Front & Back Matter (Step 6) | required | **not used** — built inside the typeset pass |
+| Render & Review (Step 7) | per-page image render + approval | **only the cover applies** |
+| Cover | shared | shared |
+| Print-Prep / DPI | per page + cover | cover only |
+| Assembly | merges approved page PDFs | *see gap below* |
+| Delivery validation | shared | shared |
+
+### ⚠ KNOWN GAP — Track B does not yet reach final assembly
+
+`scripts/build-local2.ts` assembles a book from **approved page renders**
+(`listBookReadyRenders` → one print PDF per page). A typeset book has none of
+those; its interior is a single finished PDF. So Track B currently stops after
+the typeset interior and its cover cannot be rendered either, because
+`renderCoverPdf()` derives the page count from the legacy pagination table
+(`listPaginatedPagesForProject`), which a typeset book does not populate.
+
+Closing this is an **input-contract change in the assembler**, not a rewrite.
+The typeset PDF must pass through intact — rasterising it back into page images
+to satisfy the old assembler would destroy the vector text, the embedded fonts
+and the stamped illustrations, which are the entire point of Track B.
+
+### Where the production code actually lives
+
+Names do not always say "cover" or "assembly". This map is the shortcut:
+
+| What | Where |
+|---|---|
+| Cover renderer + AI wrap artwork | `pipeline/stage-6-layout/render-chapter.ts` (`renderCoverPdf`, `generateCoverWrapArtwork`) |
+| Cover 300-DPI composition | `pipeline/print-prep/cover-print.ts` (`composeCoverPrint`) |
+| Cover dimensions / spine width | `pipeline/stage-6-layout/render-html.ts` (`computeCoverDimensions`) |
+| KDP wrap geometry reference | `pipeline/cover/kdp-geometry.ts` |
+| Typeset interior | `pipeline/typeset/` (`render-typeset.ts`, `typeset-book.ts`, `front-matter.ts`) |
+| Illustration stamping | `pipeline/typeset/stamp-illustrations.ts` |
+| Final assembly | `scripts/build-local2.ts` (**runs locally**, see below) |
+| Readiness / validation | `scripts/prebuild-audit.ts`, `scripts/validate-delivery.ts` |
+
+### Why final assembly runs locally
+
+The deployed backend **OOMs and returns 502** on assembly: the merge loads every
+print PDF into memory at once. The build therefore runs on the operator's
+machine with an enlarged Node heap and writes straight to local disk, which is
+also where KDP uploads from. This is a real operational constraint, not a
+preference. See `PUBLISHING_TO_KDP.md`.
+
+---
+
+## The AI whole-page render model (Track A)
+
+For Track A the generated image **IS the finished page** — illustration and all
+of its text baked in by the image model (`gpt-image-2`), rendered as one
+full-bleed image, with no separate typesetting pass and no boxed `<img>`.
+
+**This describes Track A only.** Track B typesets real text with Paged.js and
+keeps it vector; an earlier version of this README stated the platform had no
+typesetting pass at all, which sent at least one contributor off building a
+parallel system for capability that already existed.
+
+- **Interior pages (Track A)** are rendered one finished image per page, then
+  prepared for print at **300 DPI** (sharp Lanczos upscale onto the trim + bleed
+  canvas, badge/folio stamp, lossless PNG → single-page PDF). Code:
+  `pipeline/whole-page-render/` and `pipeline/print-prep/`.
+- **The cover (both tracks)** is a full-wrap asset (back · spine · front), its
+  spine sized from the interior page count, composed at **300 DPI** and embedded
+  losslessly. Generated artwork does **not** need to originate at final print
+  size; `composeCoverPrint` upscales it onto the 300 DPI canvas. Code:
+  `pipeline/stage-6-layout/render-chapter.ts` + `pipeline/print-prep/cover-print.ts`.
 - **Assembly** merges the approved per-page print PDFs into one interior PDF in
   spine order (lossless, `pdf-lib`). Code: `pipeline/book-assembly/`.
 
