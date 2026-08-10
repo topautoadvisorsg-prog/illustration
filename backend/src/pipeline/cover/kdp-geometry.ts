@@ -17,8 +17,8 @@
  *   Spine fold variance      allow 0.0625in either side of each fold line
  *   Spine text eligibility   at least 79 pages
  *   Minimum type size        7pt
- *   Barcode                  2 x 1.2in suggested (1.4 x 0.8in minimum),
- *                            at least 0.25in from the spine and from the trim
+ *   Barcode                  KDP places its own on the back cover when you do
+ *                            not supply one. It is NOT part of the artwork.
  *   Resolution               at least 300 DPI
  *
  * Sources:
@@ -82,8 +82,17 @@ export interface WrapGeometry {
   frontSafe: Rect;
   /** The strip on the spine that type may occupy. */
   spineTextSafe: Rect;
-  /** Keep clear for the barcode, bottom-right of the back panel. */
-  barcode: Rect;
+  /**
+   * Where KDP is likely to drop its own barcode on the back cover.
+   *
+   * ADVISORY ONLY, and never a design element. We do not draw a barcode, do not
+   * reserve a white rectangle, and never mention it to an image model: the back
+   * cover is designed as one continuous finished piece and the artwork runs
+   * straight through this area. The single practical rule is that no important
+   * READABLE COPY should sit here, because Amazon may cover it. Background,
+   * texture and colour underneath are fine.
+   */
+  barcodeAdvisory: Rect;
   /** True when this page count is allowed spine text at all. */
   spineTextAllowed: boolean;
   /** Usable spine height for type, in points. */
@@ -122,9 +131,10 @@ export function computeWrapGeometry(input: WrapInput): WrapGeometry {
     heightIn: spine.heightIn - SAFE_INSET_IN * 2,
   };
 
-  // Barcode sits bottom-right of the BACK panel, clear of both the trim edge
-  // and the spine fold.
-  const barcode: Rect = {
+  // Advisory region only: where KDP's own barcode tends to land. Nothing is
+  // reserved and nothing is drawn here; it exists so a reviewer can check that
+  // no essential copy has been placed under it.
+  const barcodeAdvisory: Rect = {
     xIn: back.xIn + back.widthIn - BARCODE_CLEARANCE_IN - BARCODE_IN.width,
     yIn: back.yIn + back.heightIn - BARCODE_CLEARANCE_IN - BARCODE_IN.height,
     widthIn: BARCODE_IN.width,
@@ -148,6 +158,9 @@ export function computeWrapGeometry(input: WrapInput): WrapGeometry {
     );
   }
   notes.push(
+    'Barcode: KDP adds its own to the back cover. Nothing is reserved for it and the artwork runs through that area; only keep important copy out of it.',
+  );
+  notes.push(
     `Fold lines can shift by up to ${SPINE_FOLD_VARIANCE_IN}in either way, so nothing that must stay on one panel may sit within that of a fold.`,
   );
 
@@ -167,7 +180,7 @@ export function computeWrapGeometry(input: WrapInput): WrapGeometry {
     backSafe: inset(back, SAFE_INSET_IN),
     frontSafe: inset(front, SAFE_INSET_IN),
     spineTextSafe,
-    barcode,
+    barcodeAdvisory,
     spineTextAllowed,
     spineTextCapacityPt,
     notes,

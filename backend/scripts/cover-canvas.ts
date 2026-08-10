@@ -57,7 +57,7 @@ show('front panel', g.front);
 show('back safe area', g.backSafe);
 show('front safe area', g.frontSafe);
 show('spine text safe', g.spineTextSafe);
-show('barcode keep-out', g.barcode);
+show('barcode advisory', g.barcodeAdvisory);
 console.log('');
 for (const n of g.notes) console.log(`  - ${n}`);
 
@@ -92,7 +92,7 @@ const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
   ${box(g.backSafe, '#2a9d8f', '3 3', 'safe', 'bottom')}
   ${box(g.frontSafe, '#2a9d8f', '3 3', 'safe', 'bottom')}
   ${box(g.spineTextSafe, '#6a4c93', '2 2', '')}
-  ${box(g.barcode, '#e76f51', '4 3', 'BARCODE KEEP-OUT', 'bottom')}
+  ${box(g.barcodeAdvisory, '#e76f51', '4 3', 'keep COPY out (art runs through)', 'bottom')}
   <text x="${toPx(g.spine.xIn + g.spine.widthIn / 2)}" y="${toPx(g.spine.yIn) + 34}"
         font-family="sans-serif" font-size="12" font-weight="700" fill="#6a4c93"
         transform="rotate(90 ${toPx(g.spine.xIn + g.spine.widthIn / 2)} ${toPx(g.spine.yIn) + 34})">SPINE ${f3(g.spineWidthIn)}in</text>
