@@ -153,3 +153,12 @@ qa-shots/
 qa/*
 !qa/approved-baseline-variable-fonts.json
 .font-instancing/
+
+# Local working data for the OCR / vision spot-check scripts. Four scripts read
+# these, so they are not junk - but they are machine-local inputs and outputs,
+# not source. A `git add -A` swept them into the repo once; this stops that.
+/eng.traineddata
+/ocr-*.json
+/page-context.json
+/spot-montage*.png
+/vision-calibration.json
