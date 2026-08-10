@@ -2522,6 +2522,11 @@ function TypesetPreview({ project, api, fileUrlBase }) {
   const [blocks, setBlocks] = useState([]);
   const [overrides, setOverrides] = useState({});
   const [orphaned, setOrphaned] = useState([]);
+  // Illustrations are stamped onto the finished PDF, so the pages below already
+  // show them. These carry the metadata the operator judges them by.
+  const [stampedArt, setStampedArt] = useState([]);
+  const [orphanedArt, setOrphanedArt] = useState([]);
+  const [artRecords, setArtRecords] = useState({});
   const [standardId, setStandardId] = useState("");
 
   // Revoke the previous object URL so repeated previews don't leak blobs.
@@ -2543,6 +2548,33 @@ function TypesetPreview({ project, api, fileUrlBase }) {
     setOverrides((o) => { const next = { ...o }; delete next[blockId]; return next; });
   }, [api, project.id]);
 
+  /**
+   * Replace the artwork on a page. The placement SIZE is kept, so a replacement
+   * prints at the same size; the API refuses it if the new file cannot carry
+   * 300 native ppi at that size, rather than resampling it into looking fine.
+   */
+  const replaceArt = useCallback(async (stamped, file) => {
+    const buf = await file.arrayBuffer();
+    let binary = "";
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+    await api(`/api/projects/${project.id}/illustrations/${stamped.blockId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        pngBase64: btoa(binary),
+        placementWidthIn: stamped.widthIn,
+        placementHeightIn: stamped.heightIn,
+        status: "approved",
+      }),
+    });
+    await build();
+  }, [api, project.id]);
+
+  const removeArt = useCallback(async (blockId) => {
+    await api(`/api/projects/${project.id}/illustrations/${blockId}`, { method: "DELETE" });
+    await build();
+  }, [api, project.id]);
+
   const build = async () => {
     setBusy(true); setErr(""); setReport(null);
     try {
@@ -2552,6 +2584,9 @@ function TypesetPreview({ project, api, fileUrlBase }) {
       setBlocks(meta.blocks || []);
       setOverrides(meta.layoutOverrides || {});
       setOrphaned(meta.orphanedOverrides || []);
+      setStampedArt(meta.stampedIllustrations || []);
+      setOrphanedArt(meta.orphanedIllustrations || []);
+      setArtRecords(meta.illustrations || {});
       setStandardId(meta.layoutStandardId || "");
       const pw = sessionStorage.getItem("wl_pw") || "";
       const res = await fetch(
@@ -2604,6 +2639,77 @@ function TypesetPreview({ project, api, fileUrlBase }) {
       {r && r.verticalOverflowPages.length > 0 && (
         <div style={{ color: C.red, fontSize: 12.5, marginTop: 8 }}>
           ⚠ Text may be clipped on page(s): {r.verticalOverflowPages.join(", ")}
+        </div>
+      )}
+
+      {(stampedArt.length > 0 || orphanedArt.length > 0) && (
+        <div style={{ ...S.card, marginTop: 12, borderColor: C.blue }}>
+          <b>Illustrations</b>
+          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
+            Stamped onto the finished PDF, never flowed into the text, so they cannot move a line.
+            Each is anchored to a stable block id and its page is resolved on every build.
+            Removing one restores the untouched typeset page.
+          </div>
+          {stampedArt.map((a) => {
+            const rec = artRecords[a.blockId] || {};
+            return (
+              <div key={a.blockId} style={{ ...S.card, marginTop: 10 }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+                  <b>Page {a.page}</b>
+                  <span style={S.pill(rec.status === "approved" ? C.green : C.orange)}>
+                    {rec.status || "draft"}
+                  </span>
+                  <span style={{ fontSize: 12.5, color: C.muted }}>anchor {a.blockId}</span>
+                </div>
+                <div style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.6 }}>
+                  placement {a.widthIn.toFixed(2)} × {a.heightIn.toFixed(2)} in
+                  {" · "}native {rec.nativeWidthPx}×{rec.nativeHeightPx}px
+                  {" · "}<b>{Math.round(a.nativePpi)} native ppi</b>{" "}
+                  <span style={{ color: a.nativePpi >= 300 ? C.green : C.red }}>
+                    {a.nativePpi >= 300 ? "meets the 300 print gate" : "UNDER the 300 print gate"}
+                  </span>
+                  {rec.version ? ` · v${rec.version}` : ""}
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <label style={{ ...S.ghost, display: "inline-block", cursor: "pointer" }}>
+                    Replace…
+                    <input
+                      type="file"
+                      accept="image/png"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const file = e.target.files && e.target.files[0];
+                        if (file) replaceArt(a, file).catch(() => {});
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    style={S.ghost}
+                    onClick={() => {
+                      if (window.confirm(`Remove the illustration on page ${a.page}? The typeset page underneath is restored exactly.`)) {
+                        removeArt(a.blockId).catch(() => {});
+                      }
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {orphanedArt.length > 0 && (
+            <div style={{ ...S.card, marginTop: 10, borderColor: C.red, color: C.red, fontSize: 12.5 }}>
+              ⚠ Not stamped, and NOT silently dropped:
+              <ul style={{ margin: "6px 0 0 18px" }}>
+                {orphanedArt.map((o) => (
+                  <li key={o.blockId}>
+                    {o.blockId} — {o.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
