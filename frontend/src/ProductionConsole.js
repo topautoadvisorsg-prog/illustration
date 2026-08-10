@@ -63,10 +63,17 @@ const BODY_FONTS = ["EB Garamond", "Cormorant Garamond", "Lora", "Archivo"];
 // deterministic typeset), the illustration policy, and which layout standard
 // the interior is rendered against. Mirrors the backend production-profile
 // registry; ids must match it exactly.
+// `track` mirrors the production profile's bodyRenderTrack. The two tracks share
+// the first four steps and diverge after Paginate, and several steps are simply
+// not part of one of them. Without this the console showed every operator every
+// step, which is how a typeset book ended up being told to go approve page
+// renders that its track never produces.
 const BOOK_TYPES = [
-  { id: "wildlands-field-guide", label: "Illustrated Field Guide (AI whole-page)" },
-  { id: "bw-educational-nonfiction", label: "Educational Nonfiction — B&W Digest (typeset)" },
+  { id: "wildlands-field-guide", label: "Illustrated Field Guide (AI whole-page)", track: "rendered-pages" },
+  { id: "bw-educational-nonfiction", label: "Educational Nonfiction — B&W Digest (typeset)", track: "typeset" },
 ];
+const trackOf = (profileId) =>
+  BOOK_TYPES.find((b) => b.id === profileId)?.track ?? "rendered-pages";
 const EMPTY_NEW_FORM = { title: "", subtitle: "", author: "" };
 
 const STEPS = [
@@ -1558,6 +1565,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
         {step === "matter" && (
           <Panel title="Build Front / Back Matter" sub="This BUILDS the structural pages — title, copyright, contents (TOC), glossary, index, sources, about. No render spend here.">
             <Guard project={project} setStep={setStep} />
+            {project && trackOf(form.productionProfileId) === "typeset" && (
+              <div style={{ ...S.card, borderColor: C.orange }}>
+                <div style={{ fontWeight: 700, color: C.orange }}>This step is not part of a typeset book</div>
+                <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5 }}>
+                  A typeset book builds its own title page, copyright page and contents inside the
+                  typeset pass, set in the same standard as the body — the contents page even needs
+                  two passes, because where sections start depends on how long the contents itself is.
+                  Building front matter here would create page rows that the typeset interior does not
+                  use. Go straight to the typeset preview.
+                </div>
+                <button style={{ ...S.btn(), marginTop: 10 }} onClick={() => setStep("render")}>
+                  Go to Step 7 · Render &amp; Review →
+                </button>
+              </div>
+            )}
             {project && (
               <>
                 {/* REVIEW — the safe, non-destructive place to look at FM/BM. */}
@@ -1807,7 +1829,12 @@ export default function ProductionConsole({ onExitToLegacy }) {
         )}
 
         {step === "assemble" && (
-          <Panel title="Build Book" sub="Merge every book-ready (approved + print-prepped) page into the interior PDF in spine order, and produce the full-wrap cover PDF (spine sized to the final page count). Blocks if anything is missing or fails preflight.">
+          <Panel
+            title="Build Book"
+            sub={trackOf(form.productionProfileId) === "typeset"
+              ? "Take the finished typeset interior exactly as the typesetter produced it — live text, embedded fonts, stamped artwork, nothing re-encoded — and produce the full-wrap cover PDF with the spine sized to its page count. Blocks on overflow, on artwork that could not be placed, or on a cover built for a different page count."
+              : "Merge every book-ready (approved + print-prepped) page into the interior PDF in spine order, and produce the full-wrap cover PDF (spine sized to the final page count). Blocks if anything is missing or fails preflight."}
+          >
             <Guard project={project} setStep={setStep} />
             {project && (
               <div style={S.card}>

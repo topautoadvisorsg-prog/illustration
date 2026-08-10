@@ -63,22 +63,47 @@ print-prep, cover and assembly.
 | Render & Review (Step 7) | per-page image render + approval | **only the cover applies** |
 | Cover | shared | shared |
 | Print-Prep / DPI | per page + cover | cover only |
-| Assembly | merges approved page PDFs | *see gap below* |
+| Assembly | merges approved page PDFs | stores the finished typeset PDF unchanged |
 | Delivery validation | shared | shared |
 
-### ⚠ KNOWN GAP — Track B does not yet reach final assembly
+### How Track B reaches the end of the factory
 
-`scripts/build-local2.ts` assembles a book from **approved page renders**
-(`listBookReadyRenders` → one print PDF per page). A typeset book has none of
-those; its interior is a single finished PDF. So Track B currently stops after
-the typeset interior and its cover cannot be rendered either, because
-`renderCoverPdf()` derives the page count from the legacy pagination table
-(`listPaginatedPagesForProject`), which a typeset book does not populate.
+`assembleBook()` branches on the track, which comes from the production
+profile's `bodyRenderTrack` — never guessed from what data happens to exist, so
+a half-populated project cannot silently change tracks.
 
-Closing this is an **input-contract change in the assembler**, not a rewrite.
-The typeset PDF must pass through intact — rasterising it back into page images
-to satisfy the old assembler would destroy the vector text, the embedded fonts
-and the stamped illustrations, which are the entire point of Track B.
+- **Track A** merges the approved per-page print PDFs in spine order.
+- **Track B** stores the finished typeset PDF **unchanged**. Rasterising it back
+  into page images to satisfy the page-render assembler would destroy the vector
+  text, the embedded fonts and the stamped illustrations, which are the entire
+  point of the track. Its gate is the typesetter's own report — vertical
+  overflow, unplaced artwork — plus the shared cover-sync gate.
+
+One builder produces the typeset interior for everyone:
+`pipeline/typeset/build-typeset-interior.ts`. The preview, the cover's page
+count, assembly and the delivery check all call it, so a preview and an export
+cannot disagree about the book. It reads the chapter-start policy from the
+project (`typesetChaptersStartRecto`) rather than a request parameter, because
+that policy changes the page count and the page count sizes the spine.
+
+`renderCoverPdf()` is track-aware through `resolveCoverPageCount()`; it used to
+read the legacy pagination table unconditionally and threw `no_pages` for every
+typeset book.
+
+### Before you build a new subsystem, read this map
+
+This platform has already shipped a printed book. If you are about to write a
+cover renderer, a spine calculator, a delivery validator or an assembler, it
+exists — trace the map below to the code that does it and change that instead.
+Two answers to "how wide is the spine" sitting in one repository is how a wrong
+one gets printed.
+
+That has gone wrong twice, in both directions: a parallel cover system was built
+for capability that had already shipped, and real capability sat unreachable
+inside scripts (`validate-delivery.ts` with one book's paths compiled into it,
+`font-embed-probe.ts`'s font walk) where nothing on the delivery path could call
+it. A script is where a capability goes to be forgotten. If an operator needs
+it, it belongs in a module with an endpoint and a control.
 
 ### Where the production code actually lives
 
@@ -90,9 +115,12 @@ Names do not always say "cover" or "assembly". This map is the shortcut:
 | Cover 300-DPI composition | `pipeline/print-prep/cover-print.ts` (`composeCoverPrint`) |
 | Cover dimensions / spine width / all KDP figures | `pipeline/stage-6-layout/render-html.ts` (`computeCoverDimensions`) — **single source, with the Amazon citations** |
 | Typeset interior | `pipeline/typeset/` (`render-typeset.ts`, `typeset-book.ts`, `front-matter.ts`) |
+| Typeset interior, as one call | `pipeline/typeset/build-typeset-interior.ts` (`buildTypesetInterior`) — **what every consumer should use** |
 | Illustration stamping | `pipeline/typeset/stamp-illustrations.ts` |
-| Final assembly | `scripts/build-local2.ts` (**runs locally**, see below) |
-| Readiness / validation | `scripts/prebuild-audit.ts`, `scripts/validate-delivery.ts` |
+| Assembly (both tracks) | `pipeline/book-assembly/assemble-book.ts` (`assembleBook`) |
+| Final assembly, Track A large books | `scripts/build-local2.ts` (**runs locally**, see below) |
+| Delivery check of the finished PDFs | `pipeline/book-assembly/delivery-check.ts`, `pdf-inspect.ts` — exposed at `GET /api/projects/:id/delivery-check` and in the Build Book step |
+| Readiness (Track A page state) | `scripts/prebuild-audit.ts` |
 
 ### Why final assembly runs locally
 
