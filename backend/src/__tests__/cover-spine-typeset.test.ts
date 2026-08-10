@@ -33,7 +33,8 @@ async function fixture(): Promise<Buffer> {
     }
   }
   // Bright "letters" in the spine column on a handful of row bands.
-  for (const [a, b] of [[60, 78], [95, 112], [180, 196], [210, 226]]) {
+  const bands: [number, number][] = [[60, 78], [95, 112], [180, 196], [210, 226]];
+  for (const [a, b] of bands) {
     for (let y = a; y <= b; y++) {
       for (let x = X + 8; x < X + SW - 8; x++) {
         const i = (y * W + x) * 3;
