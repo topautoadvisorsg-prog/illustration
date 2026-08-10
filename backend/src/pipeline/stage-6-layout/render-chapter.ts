@@ -597,8 +597,19 @@ export async function renderCoverPdf(projectId: string, options: RenderCoverOpti
   };
 }
 
-/** Generate and persist the full-wrap artwork layer. Exact cover typography and
- *  barcode elements are added deterministically during 300-DPI print prep. */
+/**
+ * Generate and persist the full-wrap cover artwork.
+ *
+ * THE IMAGE MODEL BAKES ALL COVER TYPOGRAPHY — title, subtitle, author, spine
+ * and back-cover copy — into the artwork itself; see `coverCopy` below, which
+ * the prompt passes through as "bake exactly, letter-for-letter", and
+ * `print-prep/cover-print.ts`, which stamps nothing and only upscales this art
+ * onto the 300-DPI canvas. This comment used to claim the opposite (that
+ * typography was added deterministically at print-prep), which is worth
+ * knowing: it means every word that will appear on the printed cover has to be
+ * correct in the config BEFORE this paid call, and there is no later stage that
+ * will fix it. No barcode is ever drawn or reserved — KDP prints its own.
+ */
 export async function generateCoverWrapArtwork(
   projectId: string,
   options: RenderCoverOptions = {},
@@ -752,8 +763,11 @@ export function buildCoverWrapPrompt(
       bodyBlocks: [],
       dropCap: null,
     },
-    // Exact copy remains structured on the shared spec for downstream cover
-    // composition, but assemblePagePrompt withholds it from the image model.
+    // Every word that will be PRINTED on the cover. assemblePagePrompt sends
+    // this to the image model under "bake exactly, letter-for-letter" — it does
+    // NOT withhold it, whatever this comment used to say. Anything wrong or
+    // missing here is wrong on the printed cover, and fixing it costs another
+    // paid generation.
     coverCopy: {
       title: title.toUpperCase(),
       subtitle: subtitle || undefined,
