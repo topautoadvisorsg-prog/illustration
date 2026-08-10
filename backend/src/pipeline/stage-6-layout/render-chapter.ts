@@ -609,10 +609,12 @@ export async function generateCoverWrapArtwork(
   const scopeChapters = options.chapters?.length
     ? Array.from(new Set(options.chapters)).sort((a, b) => a - b)
     : null;
-  const pageCount = (await listPaginatedPagesForProject(projectId)).filter(
-    (p) => p.section !== 'BODY' || !scopeChapters || scopeChapters.includes(p.chapterNumber),
-  ).length;
-  if (pageCount === 0) throw new RenderBlockedError('No planned pages found; run pagination/front matter before generating the cover.', 'no_pages');
+  // Track-aware, like renderCoverPdf. This read the legacy page table directly
+  // and a typeset book has no rows in it, so the PAID cover button threw
+  // `no_pages` for a finished 154-page book. Getting the count wrong here is
+  // worse than elsewhere: the spine width is baked into the artwork.
+  const pageCount = await resolveCoverPageCount(projectId, config, scopeChapters);
+  if (pageCount === 0) throw new RenderBlockedError('No interior pages found; build the interior before generating the cover.', 'no_pages');
 
   const dims = computeCoverDimensions(config, pageCount);
   const edition = await getDefaultEdition(projectId).catch(() => null);
@@ -674,6 +676,13 @@ export function buildCoverWrapPrompt(
     buildSeriesLine(config.publishing.series?.name, config.publishing.series?.volumeNumber ?? config.volume) ?? undefined;
   const sceneSubject = subtitle || title;
   const frontPanelXIn = config.trimSize.bleedIn + config.trimSize.widthIn + dims.spineIn;
+  // How THIS class of book wants its cover art described. The fallback is the
+  // field guide's original wording verbatim, so the book that already shipped
+  // produces the same prompt it always did.
+  const artLanguage = getProductionProfile(config.productionProfileId).coverArtLanguage ?? {
+    atmosphere: `a single continuous ${sceneSubject} wilderness panorama wrapping back-to-front; archival painterly naturalist atmosphere; the Cinematic Naturalist DNA of the interior plates, scaled up to a premium collector cover — never a flat poster or graphic design`,
+    mood: 'premium, cinematic, atmospheric, cohesive',
+  };
   const spec: WholePageSpec = {
     pageType: 'COVER_WRAP',
     layoutFamily: 'LAYOUT_A_ILLUSTRATION',
@@ -722,8 +731,8 @@ export function buildCoverWrapPrompt(
               'back cover (left panel): the same scene continuing, calmer, with restrained negative space for back-cover copy and a clean lower-right barcode zone',
               'back cover: preserve calm negative space for publisher-set descriptive copy',
             ],
-            environment: `a single continuous ${sceneSubject} wilderness panorama wrapping back-to-front; archival painterly naturalist atmosphere; the Cinematic Naturalist DNA of the interior plates, scaled up to a premium collector cover — never a flat poster or graphic design`,
-            mood: 'premium, cinematic, atmospheric, cohesive, calm enough for system typography',
+            environment: artLanguage.atmosphere,
+            mood: `${artLanguage.mood}, calm enough for system typography`,
           }
         : {
             primary: `Full-wrap cover artwork: a cinematic establishing scene evoking ${sceneSubject}${coverDescription ? ` (${coverDescription})` : ''}, as one continuous full-bleed composition across back cover, spine, and front cover.`,
@@ -733,8 +742,8 @@ export function buildCoverWrapPrompt(
               'back cover: restrained atmosphere of the same setting that supports readable copy',
               'back cover: preserve calm negative space for publisher-set descriptive copy',
             ],
-            environment: `setting evoked by "${sceneSubject}"${coverDescription ? `: ${coverDescription}` : ''}; archival painterly naturalist atmosphere; continuous wrap composition`,
-            mood: 'premium, cinematic, atmospheric, calm enough for system typography',
+            environment: `setting evoked by "${sceneSubject}"${coverDescription ? `: ${coverDescription}` : ''}; ${artLanguage.atmosphere}; continuous wrap composition`,
+            mood: `${artLanguage.mood}, calm enough for system typography`,
           },
     },
     pageText: {

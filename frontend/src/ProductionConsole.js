@@ -1404,7 +1404,25 @@ export default function ProductionConsole({ onExitToLegacy }) {
         {step === "paginate" && (
           <Panel title="Paginate" sub="Flow the chapter body into pages with the body flow engine (no spend). Reference sections use the two-column reference model.">
             <Guard project={project} setStep={setStep} />
-            {project && <TypesetPreview project={project} api={api} fileUrlBase={BACKEND} />}
+            {/* The typeset interior is REVIEWED in Step 7, with every other
+                edition, rather than here. Pagination is where pages are made;
+                Step 7 is the one place the operator looks at what came out. */}
+            {project && trackOf(form.productionProfileId) === "typeset" && (
+              <div style={{ ...S.card, borderColor: C.blue }}>
+                <b>This book's pages come from the typesetter</b>
+                <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5 }}>
+                  Nothing here needs running. The typeset interior — page count, blanks, overflow,
+                  illustrations, and the trim guides — is built and reviewed in <b>Step 7 · Render &amp; Review</b>,
+                  alongside the cover and the Kindle edition.
+                </div>
+                <button style={{ ...S.btn(), marginTop: 10 }} onClick={() => setStep("render")}>
+                  Go to Step 7 · Render &amp; Review →
+                </button>
+              </div>
+            )}
+            {project && trackOf(form.productionProfileId) !== "typeset" && (
+              <TypesetPreview project={project} api={api} fileUrlBase={BACKEND} />
+            )}
             {project && (
               <div style={S.card}>
                 <button style={S.btn()} onClick={() => doPaginate(false).catch(() => {})}>Paginate body</button>
@@ -1632,6 +1650,13 @@ export default function ProductionConsole({ onExitToLegacy }) {
         {step === "render" && (
           <Panel title="Render & Review" sub="The cover sits at the top as one full wrap (back, spine, front), then every interior page (front matter, body, back matter) below. Preview is free; rendering costs spend.">
             <Guard project={project} setStep={setStep} />
+            {/* THE INTERIOR, at the top of the one review surface. It used to
+                live in Step 5 · Paginate, so the operator reviewed the cover
+                and the Kindle edition here and had to go backwards a step to
+                look at the actual book. */}
+            {project && trackOf(form.productionProfileId) === "typeset" && (
+              <TypesetPreview project={project} api={api} fileUrlBase={BACKEND} />
+            )}
             {project && (
               <>
                 <button style={S.ghost} onClick={() => loadRenders().catch(() => {})}>↻ Load roster</button>
@@ -2627,6 +2652,9 @@ function TypesetPreview({ project, api, fileUrlBase }) {
   // recto=true on every request and quietly overrode that — so the pagination
   // policy looked like it had not been applied at all.
   const [recto, setRecto] = useState(false);
+  // Trim + text-area guides. Preview-only and never persisted: there is no path
+  // by which this can end up switched on in an exported interior.
+  const [guides, setGuides] = useState(false);
   /** The addressable blocks of the last render, and this book's exceptions. */
   const [blocks, setBlocks] = useState([]);
   const [overrides, setOverrides] = useState({});
@@ -2664,7 +2692,7 @@ function TypesetPreview({ project, api, fileUrlBase }) {
   const build = useCallback(async () => {
     setBusy(true); setErr(""); setReport(null);
     try {
-      const q = `recto=${recto ? "true" : "false"}`;
+      const q = `recto=${recto ? "true" : "false"}&guides=${guides ? "true" : "false"}`;
       const meta = await api(`/api/projects/${project.id}/typeset-preview?format=json&${q}`);
       setReport(meta.report);
       setBlocks(meta.blocks || []);
@@ -2687,7 +2715,7 @@ function TypesetPreview({ project, api, fileUrlBase }) {
     } finally {
       setBusy(false);
     }
-  }, [api, project.id, recto, fileUrlBase]);
+  }, [api, project.id, recto, guides, fileUrlBase]);
 
   /**
    * Replace the artwork on a page. The placement SIZE is kept, so a replacement
@@ -2734,6 +2762,15 @@ function TypesetPreview({ project, api, fileUrlBase }) {
           <span style={{ color: C.muted }}>
             (Chapter 1 always does. Turning this on adds a blank page before roughly half the
             chapters — ten of them in this book.)
+          </span>
+        </label>
+        <label style={{ fontSize: 12.5, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
+          <input type="checkbox" checked={guides} onChange={(e) => setGuides(e.target.checked)} />
+          Show trim guides
+          <span style={{ color: C.muted }}>
+            (<span style={{ color: "#cc2222" }}>red = trim</span>, where the paper is cut ·{" "}
+            <span style={{ color: C.blue }}>blue = text area</span>. Drawn for review only — they
+            are never in the exported interior, and they cannot move a line.)
           </span>
         </label>
       </div>

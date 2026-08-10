@@ -434,6 +434,16 @@ export interface TypesetHtmlInput {
   collectBlocks?: TypesetBlockRef[];
   /** Receives which overrides applied and which matched nothing. */
   overrideReport?: OverrideCssResult[];
+  /**
+   * REVIEW GUIDES — draw the trim edge and the text area on every page.
+   *
+   * For looking at, never for printing. The export path never sets this, and the
+   * guides are drawn with `outline`, which is painted outside the box and takes
+   * part in no layout calculation whatsoever. A guided render therefore has the
+   * same page count and the same line breaks as an unguided one, which the
+   * acceptance gate checks rather than assumes.
+   */
+  reviewGuides?: boolean;
 }
 
 /**
@@ -664,6 +674,21 @@ ${furn.suppressFurnitureOnBlank
 .pagedjs_margin-bottom-center .pagedjs_margin-content { justify-content: center; }
 .pagedjs_margin-top-right .pagedjs_margin-content,
 .pagedjs_margin-bottom-right .pagedjs_margin-content { justify-content: flex-end; }
+${input.reviewGuides
+  ? `
+/* REVIEW GUIDES — never printed. Drawn with OUTLINE, not border: an outline is
+   painted outside the box and occupies no space, so it cannot change a page
+   box, a text area, a line break or the page count. Anything that could is the
+   wrong tool here, because the whole point is to look at the real interior.
+
+   red   = TRIM, where the paper is cut. This book has zero bleed, so the trim
+           IS the page edge.
+   blue  = the TEXT AREA the margins define. Body type lives inside it; the
+           running head and the folio sit outside it on purpose, in the margin
+           boxes, which is exactly what an operator needs to see. */
+.pagedjs_pagebox { outline: 0.75pt solid #cc2222; outline-offset: -0.375pt; }
+.pagedjs_area { outline: 0.5pt dashed #2E6FB0; }`
+  : ''}
 
 html, body { margin: 0; padding: 0; background: #fff; color: #000; }
 /* JUSTIFICATION IS SET PER TYPOGRAPHIC ROLE, NEVER INHERITED.

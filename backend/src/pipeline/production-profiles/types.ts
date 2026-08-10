@@ -146,6 +146,25 @@ export interface BookProductionProfile {
   audienceBand: AudienceBand;
   /** Which Style DNA the edition defaults to (registry id). */
   defaultStyleDnaId: string;
+  /**
+   * How this book class's COVER ARTWORK is described to the image model.
+   *
+   * The wrap prompt stated "a single continuous wilderness panorama, archival
+   * painterly naturalist atmosphere, the Cinematic Naturalist DNA of the
+   * interior plates" for every book, because for a long time every book was a
+   * wildlife field guide. On a black-and-white puberty guide for boys 9-14 that
+   * instruction fights both the operator's art direction and the profile's own
+   * clear-line DNA.
+   *
+   * Optional: a profile that omits it keeps the field guide's original wording,
+   * so the book that already shipped is unaffected.
+   */
+  coverArtLanguage?: {
+    /** Setting and treatment. Sits after the operator's art direction. */
+    atmosphere: string;
+    /** Mood clause, alongside "calm enough for system typography". */
+    mood: string;
+  };
   /** Which publishing standard governs typography/palette/ornament. */
   publishingStandardId: string;
   /**

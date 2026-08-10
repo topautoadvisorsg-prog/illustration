@@ -41,6 +41,13 @@ export interface BuildTypesetInteriorOptions {
   /** Chapter-start policy. Chapter 1 is always recto; this forces the rest too. */
   chaptersStartRecto: boolean;
   /**
+   * Draw trim and text-area guides, for on-screen review only.
+   *
+   * Never set by assembly or the delivery path — an exported interior must have
+   * nothing on it that is not the book.
+   */
+  reviewGuides?: boolean;
+  /**
    * Called when the standard had to be resolved from the profile rather than a
    * project pin, so the caller can pin it. Only the request path should pin:
    * a read-only audit must not mutate the project it is auditing.
@@ -95,6 +102,7 @@ export async function buildTypesetInterior(
     markdown,
     config,
     chaptersStartRecto: options.chaptersStartRecto,
+    reviewGuides: options.reviewGuides,
     layoutStandard,
     // Title page, copyright page and contents, set in the same standard as the
     // body. This makes the render two passes: a contents page states where

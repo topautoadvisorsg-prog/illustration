@@ -1301,6 +1301,13 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       .enum(['true', 'false'])
       .optional()
       .transform((v) => (v === undefined ? undefined : v === 'true')),
+    // Trim + text-area guides, drawn for review. A preview-only concern: it is
+    // deliberately NOT stored on the project, so there is no way for it to be
+    // switched on when the export runs.
+    guides: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
   });
 
   app.get('/api/projects/:id/typeset-preview', async (request, reply) => {
@@ -1339,6 +1346,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       // delivery, so a preview and a final export cannot drift apart.
       const result = await buildTypesetInterior(id, config, {
         chaptersStartRecto: config.typesetChaptersStartRecto,
+        reviewGuides: query.guides,
         // Pin on the first successful typeset, so a later @2 cannot move a book
         // that has already been rendered and reviewed.
         onResolvedStandard: async (standardId) => {

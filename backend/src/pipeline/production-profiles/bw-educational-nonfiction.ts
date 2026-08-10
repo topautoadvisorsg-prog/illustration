@@ -49,6 +49,23 @@ export const BW_EDUCATIONAL_NONFICTION_PROFILE: BookProductionProfile = {
 
   // Clear-line B&W: reproduces well on uncoated stock at digest size.
   defaultStyleDnaId: 'bw-educational-clearline',
+
+  /**
+   * This cover is a designed object, not a painting of a place.
+   *
+   * The reader is a boy who would rather not be seen carrying a book about
+   * puberty, and the front has to survive being shrunk to an Amazon thumbnail —
+   * which rewards flat shapes, high contrast and a few large elements, and
+   * punishes atmosphere and fine detail. The field guide's painterly wilderness
+   * language produces the opposite of all of that.
+   */
+  coverArtLanguage: {
+    atmosphere:
+      'a designed graphic cover, not a painted scene: flat bold shapes, strong figure-ground contrast, ' +
+      'generous empty space and a tightly limited palette. It must still read at Amazon-thumbnail size, ' +
+      'so a few large elements rather than many small ones, and no fine texture or detail that disappears when scaled down',
+    mood: 'confident and matter-of-fact; unembarrassing to be seen carrying; never clinical, never cute, never coy',
+  },
   publishingStandardId: 'wildlands-v1.2',
   typesetLayoutStandardId: EDUCATIONAL_NONFICTION_TYPESET_V1.id,
 

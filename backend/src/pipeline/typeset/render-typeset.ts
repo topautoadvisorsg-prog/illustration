@@ -45,6 +45,12 @@ export interface RenderTypesetInput {
    * rewrap a line, and the passes are asserted to agree afterwards.
    */
   frontMatter?: { publication?: Record<string, unknown> };
+  /**
+   * Draw the trim edge and the text area on every page, for REVIEW ONLY.
+   * Passed straight through to the HTML builder; see `reviewGuides` there for
+   * why it cannot affect pagination.
+   */
+  reviewGuides?: boolean;
 }
 
 /**
