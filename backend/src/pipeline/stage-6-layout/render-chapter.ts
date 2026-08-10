@@ -517,6 +517,21 @@ async function resolveCoverPageCount(
   }
 }
 
+/**
+ * The cover's page count and wrap geometry, for callers that only need to
+ * DESCRIBE the cover — the KDP guide overlay, audits, reports.
+ *
+ * Exists so those callers stop deriving geometry of their own. The guide
+ * overlay used to draw 7x10 at a 24-page fallback over a 5.5x8.5 154-page book.
+ */
+export async function renderCoverGeometry(
+  projectId: string,
+  config: ProjectConfig,
+): Promise<{ pageCount: number; dims: ReturnType<typeof computeCoverDimensions> }> {
+  const pageCount = await resolveCoverPageCount(projectId, config, null);
+  return { pageCount, dims: computeCoverDimensions(config, pageCount) };
+}
+
 export async function renderCoverPdf(projectId: string, options: RenderCoverOptions = {}): Promise<CoverRenderResult> {
   const project = await getProject(projectId);
   if (!project) throw new RenderBlockedError('Project not found.', 'not_found');

@@ -170,11 +170,28 @@ export async function registerWholePageRoutes(app: FastifyInstance): Promise<voi
     try {
       const project = await getProject(parsed.data.projectId);
       if (!project) return reply.code(404).send({ error: 'Not Found', message: 'project_not_found', statusCode: 404 });
-      const coverPath = ProjectConfigSchema.parse(project.config).publishing.coverAssetPath;
+      const config = ProjectConfigSchema.parse(project.config);
+      const coverPath = config.publishing.coverAssetPath;
       if (!coverPath) return reply.code(404).send({ error: 'Not Found', message: 'No cover art set for this project.', statusCode: 404 });
       const art = await getProjectStorage().readProjectFile(coverPath);
-      const pageCount = (await listPaginatedPagesForProject(parsed.data.projectId)).length || 24;
-      const png = await composePaperbackGuidePreview(art, { pageCount });
+
+      // THE GUIDE MUST DESCRIBE THIS BOOK. It was drawn at the composer's
+      // defaults — 7x10, Premium Color thickness — over a page count read from
+      // the legacy table, which a typeset book leaves empty, so it fell through
+      // to 24. The overlay an operator uses to decide whether type is inside the
+      // trim was therefore showing a different book's wrap entirely.
+      //
+      // Geometry and spine now come from computeCoverDimensions, the same
+      // function the print file is built from, so the guide and the file cannot
+      // disagree.
+      const { renderCoverGeometry } = await import('../pipeline/stage-6-layout/render-chapter.js');
+      const { pageCount, dims } = await renderCoverGeometry(parsed.data.projectId, config);
+      const png = await composePaperbackGuidePreview(art, {
+        pageCount,
+        trimWidthIn: config.trimSize.widthIn,
+        trimHeightIn: config.trimSize.heightIn,
+        spineIn: dims.spineIn,
+      });
       reply.header('content-type', 'image/png');
       reply.header('cache-control', 'no-store');
       return reply.send(png);

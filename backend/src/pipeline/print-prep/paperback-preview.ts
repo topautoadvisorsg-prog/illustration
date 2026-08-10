@@ -12,6 +12,16 @@ export interface PaperbackPreviewOpts {
   trimHeightIn?: number;
   bleedIn?: number;
   perPageIn?: number; // paper thickness; Premium Color ≈ 0.002347
+  /**
+   * Spine width, when the caller already has it.
+   *
+   * Preferred over `perPageIn`: it lets the guide use the SAME number the print
+   * file was built from, rather than recomputing it from a thickness constant
+   * and possibly landing somewhere else. A guide that disagrees with the print
+   * file is worse than no guide — it is the picture the operator uses to decide
+   * whether the type is safe.
+   */
+  spineIn?: number;
   dpi?: number;
 }
 
@@ -23,7 +33,7 @@ export async function composePaperbackGuidePreview(coverArtPng: Buffer, o: Paper
   const PER_PAGE = o.perPageIn ?? 0.002347; // Premium Color
   const SAFE = 0.25;
   const pages = o.pageCount % 2 === 0 ? o.pageCount : o.pageCount + 1; // KDP needs even
-  const spine = +(pages * PER_PAGE).toFixed(3);
+  const spine = o.spineIn ?? +(pages * PER_PAGE).toFixed(3);
   const fullW = TRIM_W * 2 + spine + BLEED * 2;
   const fullH = TRIM_H + BLEED * 2;
   const dpi = o.dpi ?? 110;
