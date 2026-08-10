@@ -60,6 +60,13 @@ export interface TypesetBlockProbe {
   kind: string;
   /** Per line: [top, left, width] relative to the page box, 2dp. */
   lines: [number, number, number][];
+  /**
+   * Bottom edge of the block's last line box, relative to the page box.
+   * Measured rather than inferred from leading: illustration stamping needs to
+   * know where type actually STOPS on a page, and reconstructing that from line
+   * tops plus an estimated line height puts the art inside the final line.
+   */
+  bottomPx: number;
   textSha: string;
   chars: number;
 }
@@ -180,11 +187,13 @@ const DEEP_PROBE_JS = `(() => {
     const range = d.createRange();
     range.selectNodeContents(el);
     const lines = [];
+    let bottom = 0;
     const rects = range.getClientRects();
     for (let i = 0; i < rects.length; i++) {
       const b = rects[i];
       if (b.width < 0.5 && b.height < 0.5) continue; // collapsed artifacts
       lines.push([r2(b.top - origin.top), r2(b.left - origin.left), r2(b.width)]);
+      if (b.bottom - origin.top > bottom) bottom = b.bottom - origin.top;
     }
     const text = (el.textContent || '').replace(/\\s+/g, ' ').trim();
     const id = el.getAttribute('data-block-id');
@@ -195,6 +204,7 @@ const DEEP_PROBE_JS = `(() => {
       page: page,
       kind: el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).trim().split(/\\s+/).join('.') : ''),
       lines: lines,
+      bottomPx: r2(bottom),
       textSha: hash(text),
       chars: text.length,
     });

@@ -34,6 +34,10 @@ import { ingestManuscript } from '../pipeline/stage-1-ingestion/ingest-manuscrip
 import { UnsupportedManuscriptError } from '../pipeline/stage-1-ingestion/extract-manuscript.js';
 import { generateManifests } from '../pipeline/stage-1.5-manifests/generate-manifests.js';
 import { UserFacingError } from '../lib/user-facing-error.js';
+import {
+  stampIllustrations,
+  type StampedIllustration,
+} from '../pipeline/typeset/stamp-illustrations.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { timeOperation } from '../lib/timing.js';
 import { applyConfigPatch } from '../lib/merge-config.js';
@@ -1356,13 +1360,54 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       request.log.info({ projectId: id, standardId, profileId: profile.id }, 'pinned typeset layout standard');
     }
 
+    const illustrations = config.illustrations ?? {};
+    const hasIllustrations = Object.keys(illustrations).length > 0;
+
     try {
       const result = await renderTypesetBook({
         markdown,
         config,
         chaptersStartRecto: query.recto,
         layoutStandard,
+        // The probe resolves an illustration's anchor block to a page and says
+        // where type actually ends on it. Only paid for when there is artwork.
+        deepProbe: hasIllustrations,
       });
+
+      // Typesetting FINISHES before anything is drawn on top. Stamping cannot
+      // reflow a line, so page count, wrapping and the block-to-page map are the
+      // canonical ones whether or not this book has artwork.
+      let pdf = result.pdf;
+      let stampedIllustrations: StampedIllustration[] = [];
+      let orphanedIllustrations: { blockId: string; reason: string }[] = [];
+      if (hasIllustrations && result.probe) {
+        const { getProjectStorage: storageFor } = await import('../services/storage/project-storage.js');
+        const storage = storageFor();
+        const assets = new Map<string, Buffer>();
+        for (const art of Object.values(illustrations)) {
+          try {
+            assets.set(art.approvedAssetPath, await storage.readProjectFile(art.approvedAssetPath));
+          } catch {
+            // Deliberately left out of the map: the stamper reports it as an
+            // orphan rather than drawing a placeholder or failing the build.
+          }
+        }
+        const out = await stampIllustrations({
+          pdf: result.pdf,
+          illustrations,
+          assets,
+          probe: result.probe,
+          trim: { widthIn: config.trimSize.widthIn, heightIn: config.trimSize.heightIn },
+          margins: result.report.marginsIn,
+        });
+        pdf = out.pdf;
+        stampedIllustrations = out.stamped;
+        orphanedIllustrations = out.orphaned;
+        if (out.orphaned.length) {
+          request.log.warn({ projectId: id, orphaned: out.orphaned }, 'illustrations could not be stamped');
+        }
+      }
+
       if (query.format === 'json') {
         return {
           report: result.report,
@@ -1376,6 +1421,11 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           // ignored: the symptom otherwise is a page that quietly stops obeying
           // an exception someone deliberately made.
           orphanedOverrides: result.overrides.orphaned,
+          illustrations,
+          // Where each one landed in THIS render, page included, so the review
+          // UI never has to guess or store a page number of its own.
+          stampedIllustrations,
+          orphanedIllustrations,
         };
       }
 
@@ -1385,7 +1435,8 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       reply.header('x-total-pages', String(result.report.totalPages));
       reply.header('x-blank-pages', String(result.report.blankPages.length));
       reply.header('x-overflow-pages', String(result.report.verticalOverflowPages.length));
-      return reply.send(result.pdf);
+      reply.header('x-illustrated-pages', stampedIllustrations.map((s) => s.page).join(',') || 'none');
+      return reply.send(pdf);
     } catch (err) {
       if (err instanceof TypesetUnavailableError) {
         throw new UserFacingError(err.message, {
@@ -1410,7 +1461,20 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
   // `LayoutOverrideSchema` — spacing, page-breaking, an approved variant, a
   // note. There is no arbitrary-CSS field and no text field: the manuscript is
   // frozen, and an override changes how a block is SET, never what it says.
-  const OverrideParamsSchema = z.object({
+  /** Body for publishing or replacing an illustration. */
+const IllustrationUploadSchema = z.object({
+  pngBase64: z.string().min(1),
+  placementWidthIn: z.number().positive(),
+  placementHeightIn: z.number().positive(),
+  status: z.enum(['draft', 'approved']).optional(),
+  prompt: z.string().optional(),
+  model: z.string().optional(),
+  styleDnaId: z.string().optional(),
+  subject: z.string().optional(),
+  note: z.string().optional(),
+});
+
+const OverrideParamsSchema = z.object({
     id: z.string().uuid(),
     blockId: z.string().regex(/^[0-9a-f]{8}$/, 'A block id is 8 hex characters.'),
   });
@@ -1438,6 +1502,95 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     await updateProjectConfig(id, { ...config, layoutOverrides });
     request.log.info({ projectId: id, blockId, existed }, 'local layout override reset to standard');
     return { blockId, reset: existed, count: Object.keys(layoutOverrides).length };
+  });
+
+  /**
+   * Publish or replace the illustration anchored to a block.
+   *
+   * The asset is stored server-side and the record keeps the NATIVE pixel count,
+   * because native pixels over printed size is the only honest resolution
+   * figure. A placement that cannot clear 300 native ppi is refused here rather
+   * than resampled into looking acceptable, and an aspect mismatch is refused
+   * rather than stamped stretched.
+   */
+  app.put('/api/projects/:id/illustrations/:blockId', async (request, reply) => {
+    const { id, blockId } = OverrideParamsSchema.parse(request.params);
+    const body = IllustrationUploadSchema.parse(request.body ?? {});
+    const project = await getProject(id);
+    if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+    const config = parseProjectConfig(project);
+
+    const bytes = Buffer.from(body.pngBase64, 'base64');
+    const { default: sharpLib } = await import('sharp');
+    const meta = await sharpLib(bytes).metadata();
+    const nativeWidthPx = meta.width ?? 0;
+    const nativeHeightPx = meta.height ?? 0;
+    if (!nativeWidthPx || !nativeHeightPx) {
+      throw new UserFacingError('That file could not be read as a PNG.', {
+        code: 'Unreadable Illustration',
+        errorCode: ERROR_CODES.UNCLASSIFIED,
+        statusCode: 400,
+      });
+    }
+
+    const nativePpi = nativeWidthPx / body.placementWidthIn;
+    if (nativePpi < 300) {
+      throw new UserFacingError(
+        `${nativeWidthPx}px across ${body.placementWidthIn}in is ${Math.round(nativePpi)} native ppi, under the 300 print gate. ` +
+          'Enlarging the file would raise its pixel count without adding detail. Place it smaller, or regenerate it larger.',
+        { code: 'Illustration Under Resolution', errorCode: ERROR_CODES.UNCLASSIFIED, statusCode: 422 },
+      );
+    }
+    const nativeAspect = nativeWidthPx / nativeHeightPx;
+    const placeAspect = body.placementWidthIn / body.placementHeightIn;
+    if (Math.abs(nativeAspect - placeAspect) / nativeAspect > 0.01) {
+      throw new UserFacingError(
+        `The artwork is ${nativeAspect.toFixed(3)}:1 but the placement is ${placeAspect.toFixed(3)}:1. Stamping would distort it.`,
+        { code: 'Illustration Aspect Mismatch', errorCode: ERROR_CODES.UNCLASSIFIED, statusCode: 422 },
+      );
+    }
+
+    const version = (config.illustrations?.[blockId]?.version ?? 0) + 1;
+    const { getProjectStorage: storageFor } = await import('../services/storage/project-storage.js');
+    const stored = await storageFor().writeProjectFile(id, ["illustrations", `${blockId}-v${version}.png`], bytes);
+
+    const illustration = {
+      rawAssetPath: stored.relativePath,
+      approvedAssetPath: stored.relativePath,
+      version,
+      nativeWidthPx,
+      nativeHeightPx,
+      placementWidthIn: body.placementWidthIn,
+      placementHeightIn: body.placementHeightIn,
+      status: body.status ?? 'approved',
+      prompt: body.prompt,
+      model: body.model,
+      styleDnaId: body.styleDnaId,
+      subject: body.subject,
+      note: body.note,
+      createdAt: new Date().toISOString(),
+    };
+    const illustrations = { ...(config.illustrations ?? {}), [blockId]: illustration };
+    await updateProjectConfig(id, { ...config, illustrations });
+    request.log.info({ projectId: id, blockId, version, nativePpi: Math.round(nativePpi) }, 'illustration published');
+    return { blockId, illustration, nativePpi: Math.round(nativePpi), count: Object.keys(illustrations).length };
+  });
+
+  /**
+   * Remove an illustration. The typeset page underneath was never modified, so
+   * this restores it exactly by having nothing left to stamp.
+   */
+  app.delete('/api/projects/:id/illustrations/:blockId', async (request, reply) => {
+    const { id, blockId } = OverrideParamsSchema.parse(request.params);
+    const project = await getProject(id);
+    if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+    const config = parseProjectConfig(project);
+    const illustrations = { ...(config.illustrations ?? {}) };
+    const existed = blockId in illustrations;
+    delete illustrations[blockId];
+    await updateProjectConfig(id, { ...config, illustrations });
+    request.log.info({ projectId: id, blockId, existed }, 'illustration removed; typeset page restored');
+    return { blockId, removed: existed, count: Object.keys(illustrations).length };
   });
 
   app.post(

@@ -34,7 +34,8 @@
     "test": "vitest run",
     "qa:fingerprint": "tsx scripts/typeset-fingerprint.ts",
     "qa:illustrations": "tsx scripts/illustration-candidates.ts",
-    "art:page": "tsx scripts/render-illustration.ts"
+    "art:page": "tsx scripts/render-illustration.ts",
+    "art:publish": "tsx scripts/publish-illustration.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",

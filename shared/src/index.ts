@@ -21,6 +21,50 @@ export const EditionSchema = z.enum(['PREMIUM', 'KINDLE_EPUB']);
  * There is likewise no text field. The manuscript is frozen; an override
  * changes how a block is SET, never what it says.
  */
+
+/**
+ * A B&W illustration stamped onto a finished page.
+ *
+ * IDENTITY IS THE BLOCK, NEVER THE PAGE NUMBER. An illustration is anchored to
+ * the stable id of the last block on the page it decorates, and its page is
+ * RESOLVED on every build. Pagination moved four times during this book's QA;
+ * anything page-keyed would by now be pointing at unrelated content.
+ *
+ * Placement is stored as a physical SIZE, not a box. The safe region is
+ * recomputed from wherever the type actually ends on the resolved page and the
+ * illustration is centred inside it, so art approved at a given size keeps that
+ * size, and its native resolution, even if the page around it changes.
+ *
+ * The asset never enters the HTML. It is stamped onto the completed PDF, so it
+ * cannot reflow a line, and removing it restores the untouched typeset page.
+ */
+export const PageIllustrationSchema = z
+  .object({
+    /** Storage key of the asset as generated, kept so a replacement can be compared. */
+    rawAssetPath: z.string().min(1),
+    /** Storage key of the asset actually stamped. */
+    approvedAssetPath: z.string().min(1),
+    /** Bumped on every replacement so a cached render cannot serve stale art. */
+    version: z.number().int().min(1).default(1),
+    /** Native pixels of the generated asset. The resolution authority. */
+    nativeWidthPx: z.number().int().positive(),
+    nativeHeightPx: z.number().int().positive(),
+    /** Printed size. Native pixels over this is the only honest ppi figure. */
+    placementWidthIn: z.number().positive(),
+    placementHeightIn: z.number().positive(),
+    status: z.enum(['draft', 'approved']).default('draft'),
+    /** What produced it, so a replacement can start from the same brief. */
+    prompt: z.string().optional(),
+    model: z.string().optional(),
+    styleDnaId: z.string().optional(),
+    subject: z.string().optional(),
+    note: z.string().optional(),
+    createdAt: z.string().optional(),
+  })
+  .strict();
+
+export type PageIllustration = z.infer<typeof PageIllustrationSchema>;
+
 export const LayoutOverrideSchema = z
   .object({
     /** Extra space above the block, in em. Bounded: this is a nudge, not a layout. */
@@ -755,6 +799,11 @@ export const ProjectConfigSchema = z.object({
    *     manuscript      -> frozen, always
    */
   layoutOverrides: z.record(z.string(), LayoutOverrideSchema).default({}),
+  /**
+   * Illustrations, keyed by the stable block id they are anchored to. Same
+   * reasoning as layoutOverrides above: never keyed by page.
+   */
+  illustrations: z.record(z.string(), PageIllustrationSchema).default({}),
   editions: z.array(EditionSchema).default(['PREMIUM', 'KINDLE_EPUB']),
   volume: z.number().int().positive(),
   title: z.string().min(1),
