@@ -48,6 +48,8 @@ const standard = resolveTypesetLayoutStandard(profile.typesetLayoutStandardId!);
 const config = ProjectConfigSchema.parse({
   volume: 1,
   title: 'NO ONE TOLD ME THAT',
+  subtitle:
+    "The Complete Puberty Guide for Boys 9-14: Body Changes, Voice Cracks, Hygiene, Mood Swings, Confidence, and Every Awkward Question You'd Rather Google",
   authorName: 'Nolan Whitlow',
   productionProfileId: profile.id,
   typesetLayoutStandardId: standard.id,
@@ -61,14 +63,20 @@ const config = ProjectConfigSchema.parse({
   layoutOverrides: process.env.WL_OVERRIDES ? JSON.parse(process.env.WL_OVERRIDES) : {},
 });
 
-const html = buildTypesetHtml({
-  sections: parseTypesetSections(markdown),
+// Rendered through renderTypesetBook so the shots show the SAME book the
+// pipeline produces: front matter included, contents numbers resolved by its
+// second pass, and the current chapter-start policy. Building the HTML here
+// separately would quietly drift from what actually ships.
+const { renderTypesetBook } = await import('../src/pipeline/typeset/render-typeset.js');
+const rendered = await renderTypesetBook({
+  markdown,
   config,
-  margins: typesetMarginsForTrim(config.trimSize),
-  polyfillJs: await loadPagedPolyfill(),
+  chaptersStartRecto: false,
   layoutStandard: standard,
-  chaptersStartRecto: true,
+  frontMatter: { publication: { year: 2026 } },
 });
+const html = rendered.html;
+console.log(`book is ${rendered.report.totalPages} pages`);
 
 await mkdir(SHOTS, { recursive: true });
 

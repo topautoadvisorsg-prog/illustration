@@ -19,6 +19,7 @@
 import type { LayoutOverride, ProjectConfig, TrimSize } from '@wildlands/shared';
 import { slugifySection, stampBlockIds, type TypesetBlockRef } from './block-identity.js';
 import { bundledFontCss } from './font-assets.js';
+import { buildFrontMatterHtml, frontMatterCss, type TocEntry } from './front-matter.js';
 import { overrideCss, type OverrideCssResult } from './layout-overrides.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from './layout-standards/educational-nonfiction-v1.js';
 import { resolveTypesetDesign } from './layout-standards/resolve-design.js';
@@ -415,6 +416,15 @@ export interface TypesetHtmlInput {
    */
   chaptersStartRecto?: boolean;
   /**
+   * Title page, copyright page and contents, set in the same standard as the
+   * body. Omit entirely and the book renders exactly as it did before, which is
+   * what tests and the field-guide track rely on.
+   *
+   * `entries[].page` is null on the first pass and filled on the second; see
+   * front-matter.ts for why a contents page cannot resolve in one.
+   */
+  frontMatter?: { entries: TocEntry[]; publication?: Record<string, unknown> };
+  /**
    * Per-block exceptions to the standard, keyed by stable block id. Emitted as
    * the LAST rules in the stylesheet, so they win by source order rather than by
    * `!important` and the standard's own CSS stays readable.
@@ -536,11 +546,18 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
    * only; front and back matter keep the standard's policy, because the toggle
    * is about the premium chapter convention and not about whether a two-page
    * back-matter note has earned a blank verso in front of it.
+   *
+   * FIRST CHAPTER ONLY is forced recto, and that is handled as a separate rule
+   * below rather than here. Forcing EVERY chapter to a right-hand page bought
+   * ten parity blanks in a 159-page book: a lot of empty paper for a convention
+   * this book does not need past the opening of the body.
    */
   const startFor = (kind: TypesetSection['kind']): 'recto' | 'page' => {
     if (kind === 'chapter') return design.chaptersStartRecto ? 'recto' : 'page';
     return standard.sectionStart[kind];
   };
+  /** Index of the first chapter, which opens the body and does earn a recto. */
+  const firstChapterIndex = sections.findIndex((s) => s.kind === 'chapter');
 
   // The classic drop: the chapter heading begins about a third down the text
   // block, leaving white space above it.
@@ -561,7 +578,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
         s.title,
         collect,
       )[0]!;
-      return `<section class="tsec ${s.kind}" id="tsec-${i}" data-title="${escapeHtml(s.title)}" data-label="${escapeHtml(label)}" data-kind="${s.kind}" data-section-slug="${slug}">
+      return `<section class="tsec ${s.kind}${i === firstChapterIndex ? ' first-chapter' : ''}" id="tsec-${i}" data-title="${escapeHtml(s.title)}" data-label="${escapeHtml(label)}" data-kind="${s.kind}" data-section-slug="${slug}">
   ${opener}
   ${bodyToHtml(s.bodyLines, {
     micro: standard.terminalMicroSection,
@@ -682,6 +699,9 @@ body {
    worth a blank verso; a two-paragraph back-matter note is not. */
 .tsec.front { break-before: ${startFor('front')}; }
 .tsec.chapter { break-before: ${startFor('chapter')}; }
+/* The body opens on a right-hand page; later chapters take the next available
+   page, left or right. Forcing every chapter recto cost ten blank pages. */
+.tsec.first-chapter { break-before: recto; }
 .tsec.back { break-before: ${startFor('back')}; }
 /* Chapter opener: one centred heading block — "Chapter One" over the title,
    per CHAPTER_BOOK_STANDARD.md §3. Centring is declared on the block AND on
@@ -765,8 +785,10 @@ ul { list-style: disc; }
    adds none of its own — with margins it read as a gap, not a pointer. */
 .gl-arrow { width: .95em; margin: 0; }
 .gl-flag { width: .82em; height: .92em; vertical-align: -.12em; margin-right: .3em; }
+${input.frontMatter ? frontMatterCss({ headingFont: t.headingFont, bodyFont: t.bodyFont, bodyPt: t.bodyPt, displayPt: t.bodyPt * t.chapterTitleScale, labelPt: t.labelPt, captionPt: t.captionPt }) : ''}
 ${overrides.css}</style></head>
 <body>
+${input.frontMatter ? buildFrontMatterHtml({ config: input.config, entries: input.frontMatter.entries, publication: input.frontMatter.publication as never }) : ''}
 ${body}
 ${input.polyfillJs ? `${PAGED_DONE_HOOK}\n<script>${input.polyfillJs}</script>` : ''}
 </body></html>`;

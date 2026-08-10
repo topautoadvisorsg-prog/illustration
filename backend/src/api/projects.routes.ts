@@ -1291,10 +1291,14 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
   const TypesetQuerySchema = z.object({
     /** 'pdf' (default) streams it for an inline viewer; 'json' returns the report. */
     format: z.enum(['pdf', 'json']).default('pdf'),
-    /** Start every section on a recto. Costs a blank verso when one ends on a recto. */
+    /**
+     * Start EVERY chapter on a recto. Off by default: the body's first chapter
+     * always opens recto regardless, and forcing the rest cost this book ten
+     * blank pages for a convention it does not need past the opening.
+     */
     recto: z
       .enum(['true', 'false'])
-      .default('true')
+      .default('false')
       .transform((v) => v === 'true'),
   });
 
@@ -1369,6 +1373,10 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         config,
         chaptersStartRecto: query.recto,
         layoutStandard,
+        // Title page, copyright page and contents, set in the same standard as
+        // the body. This makes the render two passes: a contents page states
+        // where sections start, and that depends on how long the contents is.
+        frontMatter: { publication: { year: new Date().getFullYear() } },
         // The probe resolves an illustration's anchor block to a page and says
         // where type actually ends on it. Only paid for when there is artwork.
         deepProbe: hasIllustrations,

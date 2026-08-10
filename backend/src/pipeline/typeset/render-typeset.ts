@@ -10,6 +10,7 @@ import type { ProjectConfig } from '@wildlands/shared';
 import { loadPagedPolyfill, resolveChromiumPath } from '../stage-6-layout/render-pdf.js';
 import {
   buildTypesetHtml,
+  chapterLabel,
   parseTypesetSections,
   typesetMarginsForTrim,
   TYPESET_DONE_JS,
@@ -17,7 +18,8 @@ import {
   type TypesetReport,
 } from './typeset-book.js';
 import type { TypesetLayoutStandard } from './layout-standards/types.js';
-import type { TypesetBlockRef } from './block-identity.js';
+import { slugifySection, type TypesetBlockRef } from './block-identity.js';
+import type { TocEntry } from './front-matter.js';
 import type { OverrideCssResult } from './layout-overrides.js';
 
 export interface RenderTypesetInput {
@@ -33,6 +35,16 @@ export interface RenderTypesetInput {
    * change touching text metrics did not move a single line break.
    */
   deepProbe?: boolean;
+  /**
+   * Generate a title page, copyright page and contents ahead of the body.
+   *
+   * This makes the render TWO passes, because a contents page states where
+   * sections start and where they start depends on how long the contents is.
+   * Pass one learns the real start pages, pass two fills them in. The entry
+   * layout reserves a fixed-width slot for the number so arriving digits cannot
+   * rewrap a line, and the passes are asserted to agree afterwards.
+   */
+  frontMatter?: { publication?: Record<string, unknown> };
 }
 
 /**
@@ -261,15 +273,32 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
   const polyfillJs = await loadPagedPolyfill();
   const blocks: TypesetBlockRef[] = [];
   const overrideReport: OverrideCssResult[] = [];
-  const html = buildTypesetHtml({
-    ...input,
-    sections,
-    margins,
-    polyfillJs,
-    layoutStandard: input.layoutStandard,
-    collectBlocks: blocks,
-    overrideReport,
-  });
+
+  /** Contents entries for a pass. `page` is null until pass two knows it. */
+  const tocEntries = (pages: Map<string, number> | null): TocEntry[] =>
+    sections.map((s) => ({
+      slug: slugifySection(s.title),
+      label: chapterLabel(s, input.layoutStandard?.opener.labelFormat),
+      title: s.title,
+      kind: s.kind,
+      page: pages ? (pages.get(s.title) ?? null) : null,
+    }));
+
+  const htmlFor = (pages: Map<string, number> | null): string =>
+    buildTypesetHtml({
+      ...input,
+      sections,
+      margins,
+      polyfillJs,
+      layoutStandard: input.layoutStandard,
+      collectBlocks: blocks,
+      overrideReport,
+      frontMatter: input.frontMatter
+        ? { entries: tocEntries(pages), publication: input.frontMatter.publication }
+        : undefined,
+    });
+
+  let html = htmlFor(null);
 
   const { default: puppeteer } = await import('puppeteer-core');
   const browser = await puppeteer.launch({
@@ -278,13 +307,13 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--font-render-hinting=none'],
   });
   try {
-    const page = await browser.newPage();
+    let page = await browser.newPage();
     // Fonts are vendored into the document, so nothing is fetched at render
     // time and there is no network to go idle. Completion comes from Paged.js.
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 180_000 });
     await page.waitForFunction(TYPESET_DONE_JS, { timeout: 300_000, polling: 250 });
 
-    const measured = (await page.evaluate(MEASURE_JS)) as Omit<
+    let measured = (await page.evaluate(MEASURE_JS)) as Omit<
       TypesetReport,
       'trim' | 'marginsIn' | 'bodyPt' | 'lineHeight'
     >;
@@ -293,6 +322,46 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
       measured.sectionStarts.map((s) => s.title),
       sections.map((s) => s.title),
     );
+
+    // ── Second pass: the contents page, now that we know where things start ──
+    if (input.frontMatter) {
+      const pass1 = measured.sectionStarts.map((x) => ({ title: x.title, page: x.page }));
+      const pages = new Map<string, number>();
+      for (const x of measured.sectionStarts) if (x.page !== null) pages.set(x.title, x.page);
+
+      // A FRESH page, not setContent on this one. The completion flag lives on
+      // `window`, which survives setContent, so the second pass would see pass
+      // one's flag already true, return instantly, and measure a document
+      // Paged.js had not laid out yet — reporting zero sections.
+      await page.close();
+      page = await browser.newPage();
+      // Kept as the returned html so callers screenshot the book that was
+      // actually measured, contents numbers included, not the blank first pass.
+      html = htmlFor(pages);
+      await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 180_000 });
+      await page.waitForFunction(TYPESET_DONE_JS, { timeout: 300_000, polling: 250 });
+      measured = (await page.evaluate(MEASURE_JS)) as typeof measured;
+
+      // The numbers are laid into a fixed-width slot precisely so their arrival
+      // cannot rewrap an entry and move a section. If it moved anyway, the
+      // contents is now LYING about where things are, which is worse than no
+      // contents at all — so refuse rather than ship it.
+      const moved = measured.sectionStarts
+        .map((x, i) => ({ title: x.title, before: pass1[i]?.page ?? null, after: x.page }))
+        .filter((x) => x.before !== x.after)
+        .map((x) => `"${x.title}" p${x.before} -> p${x.after}`);
+      if (moved.length > 0) {
+        throw new TypesetIncompleteError(
+          'Filling in the contents page numbers changed the pagination, so the numbers it now shows are wrong. ' +
+            `${moved.length} section(s) moved: ${moved.slice(0, 5).join('; ')}. ` +
+            'The number slot is meant to be fixed-width; check .toc-page in front-matter.ts.',
+        );
+      }
+      assertTypesetComplete(
+        measured.sectionStarts.map((x) => x.title),
+        sections.map((x) => x.title),
+      );
+    }
 
     // Measured before page.pdf(), so the probe describes the same layout the
     // PDF is generated from rather than a state the printing pass may perturb.
