@@ -16,6 +16,10 @@ const sha = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex');
 function stubStorage() {
   const writes = new Map<string, string>();
   const storage: ProjectStorage = {
+    async listProjectFiles(projectId, folder) {
+      const prefix = `${projectId}/${folder}/`;
+      return [...writes.keys()].filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length));
+    },
     async writeProjectFile(projectId, parts, data) {
       const relativePath = [projectId, ...parts].join('/');
       const text = typeof data === 'string' ? data : data.toString('utf8');

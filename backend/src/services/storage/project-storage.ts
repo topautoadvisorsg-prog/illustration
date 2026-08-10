@@ -14,6 +14,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   S3Client,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getEnv, isPlaceholder } from '../../env.js';
@@ -34,6 +35,14 @@ export { LocalStorageService } from './local-storage.js';
 export interface ProjectStorage {
   writeProjectFile(projectId: string, parts: string[], data: Buffer | string): Promise<StoredFile>;
   readProjectFile(relativePath: string): Promise<Buffer>;
+  /**
+   * File names directly under a project folder, newest name last.
+   *
+   * Added because the cover spine repair wrote a timestamped backup of the
+   * approved artwork and then had no way to find it again. A backup that cannot
+   * be listed is not a backup; it is a file nobody will ever read.
+   */
+  listProjectFiles(projectId: string, folder: string): Promise<string[]>;
 }
 
 const BUCKET = 'project-files';
@@ -95,6 +104,13 @@ export class SupabaseStorageService implements ProjectStorage {
     }
     return Buffer.from(await data.arrayBuffer());
   }
+
+  async listProjectFiles(projectId: string, folder: string): Promise<string[]> {
+    await this.ensureBucket();
+    const { data, error } = await this.client.storage.from(BUCKET).list(`${projectId}/${folder}`, { limit: 200 });
+    if (error) throw new Error(`Supabase Storage list failed for ${projectId}/${folder}: ${error.message}`);
+    return (data ?? []).map((f) => f.name).sort();
+  }
 }
 
 /**
@@ -149,6 +165,17 @@ export class R2StorageService implements ProjectStorage {
     const bytes = await res.Body.transformToByteArray();
     return Buffer.from(bytes);
   }
+
+  async listProjectFiles(projectId: string, folder: string): Promise<string[]> {
+    const prefix = `${projectId}/${folder}/`;
+    const res = await this.client.send(
+      new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, MaxKeys: 200 }),
+    );
+    return (res.Contents ?? [])
+      .map((o) => (o.Key ?? '').slice(prefix.length))
+      .filter(Boolean)
+      .sort();
+  }
 }
 
 /**
@@ -170,6 +197,15 @@ export class FallbackStorageService implements ProjectStorage {
     // storage. The console reads R2; to surface one specific review image in the
     // Supabase-backed console, push just that file with scripts/_syncimg.ts.
     return this.primary.writeProjectFile(projectId, parts, data);
+  }
+
+  async listProjectFiles(projectId: string, folder: string): Promise<string[]> {
+    // Union of both stores: during the migration a backup can live in either.
+    const [a, b] = await Promise.all([
+      this.primary.listProjectFiles(projectId, folder).catch(() => [] as string[]),
+      this.secondary.listProjectFiles(projectId, folder).catch(() => [] as string[]),
+    ]);
+    return [...new Set([...a, ...b])].sort();
   }
 
   async readProjectFile(relativePath: string): Promise<Buffer> {

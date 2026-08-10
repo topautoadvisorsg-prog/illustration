@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { getEnv } from '../../env.js';
 
@@ -35,5 +35,13 @@ export class LocalStorageService {
 
   async readProjectFile(relativePath: string): Promise<Buffer> {
     return readFile(path.join(this.root, relativePath));
+  }
+
+  async listProjectFiles(projectId: string, folder: string): Promise<string[]> {
+    try {
+      return (await readdir(path.join(this.root, projectId, folder))).sort();
+    } catch {
+      return [];
+    }
   }
 }

@@ -68,6 +68,11 @@ export class CachedStorageService implements ProjectStorage {
     return result;
   }
 
+  /** Never cached: a listing is about what exists NOW, and a stale one is a lie. */
+  async listProjectFiles(projectId: string, folder: string): Promise<string[]> {
+    return this.inner.listProjectFiles(projectId, folder);
+  }
+
   async readProjectFile(relativePath: string): Promise<Buffer> {
     const cp = cachePathFor(relativePath);
     try {

@@ -585,6 +585,19 @@ export async function registerWholePageRoutes(app: FastifyInstance): Promise<voi
     }
   });
 
+  // ── Deterministic spine typesetting (FREE, no image model) ────────────────
+  app.post('/api/projects/:projectId/cover/typeset-spine', async (request, reply) => {
+    const { projectId } = ProjectParamsSchema.parse(request.params);
+    try {
+      const { typesetCoverSpineForProject } = await import('../pipeline/stage-6-layout/cover-spine-typeset.js');
+      return await typesetCoverSpineForProject(projectId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      request.log.error({ err }, 'deterministic spine typeset failed');
+      return reply.code(500).send({ error: 'Internal Server Error', message, statusCode: 500 });
+    }
+  });
+
   // ── Delivery check: inspect the FINISHED files, in the browser ──────────────
   // Reads the most recent exported interior and the current cover back off
   // storage and reports what they actually contain — page size, TrimBox, fonts,
