@@ -62,8 +62,12 @@ console.log('rendering …');
 const { pdf, report, probe } = await renderTypesetBook({
   markdown,
   config,
-  chaptersStartRecto: standard.chaptersStartRecto,
+  // Matches production: first chapter recto, the rest next-available, with
+  // front matter. Scanning a different pagination than the book actually has
+  // would report page numbers that do not exist.
+  chaptersStartRecto: false,
   layoutStandard: standard,
+  frontMatter: { publication: { year: new Date().getFullYear() } },
   deepProbe: true,
 });
 
@@ -149,6 +153,34 @@ for (const [i, s] of starts.entries()) {
 }
 
 candidates.sort((a, b) => b.emptyPct - a.emptyPct);
+
+// Every sparse page in the book, whether or not it ends a section. A page can
+// look empty for reasons that have nothing to do with a chapter ending, and the
+// operator is looking at ALL of them.
+const ILLUSTRATED = new Set([10, 25, 43, 76, 100, 126, 132, 147]);
+console.log('');
+console.log('EVERY PAGE UNDER 45% FILL');
+console.log(`  ${'page'.padEnd(6)} ${'empty'.padEnd(7)} state`);
+for (let p = 1; p <= report.totalPages; p++) {
+  if (blanks.has(p)) {
+    console.log(`  ${String(`p${p}`).padEnd(6)} ${'100%'.padEnd(7)} BLANK (parity)`);
+    continue;
+  }
+  const fill = fillByPage.get(p) ?? 0;
+  if (100 - fill < 45) continue;
+  const ends = starts.find((s, i) => {
+    const next = starts[i + 1]?.page ?? report.totalPages + 1;
+    let e = next - 1;
+    while (e > s.page && blanks.has(e)) e -= 1;
+    return e === p;
+  });
+  const tag = ILLUSTRATED.has(p)
+    ? 'illustrated'
+    : ends
+      ? `ends "${ends.title.slice(0, 40)}"`
+      : 'mid-section';
+  console.log(`  ${String(`p${p}`).padEnd(6)} ${`${Math.round(100 - fill)}%`.padEnd(7)} ${tag}`);
+}
 
 const byId = new Map((probe ?? []).map((b) => [`${b.blockId}#${b.frag}`, b]));
 

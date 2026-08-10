@@ -28,16 +28,23 @@ const MANUSCRIPT =
 const OUT = path.join(ROOT, 'qa-shots');
 const ART = path.join(OUT, 'art');
 
-/** Local asset per anchor, for compositing the thumbnails. */
+/**
+ * Local asset per anchor. Must match what production has stamped; the script
+ * asserts the pixel dimensions agree so a stale local file cannot make the grid
+ * show a book the server is not serving.
+ */
 const ASSETS: Record<string, string> = {
-  '2ed10c28': 'p6-art-raw.png',
-  'ddba8639': 'p22-art-raw.png',
-  'a3522a48': 'p41-art-raw.png',
-  'bba5d286': 'p77-art-raw.png',
-  'a9e01416': 'p102-art-raw.png',
-  '5d2cca2b': 'p129-art-raw.png',
-  '7014f98d': 'p136-art-raw.png',
-  '4a53a65a': 'p152-art-raw.png',
+  '2ed10c28': 'p6-art-raw.png',    // p10  Ch1
+  '89bad25b': 'p19-art-raw.png',   // p19  Ch3
+  'ddba8639': 'p22-art-raw.png',   // p25  Ch4
+  'a3522a48': 'p41-art-raw.png',   // p43  Ch7
+  'bba5d286': 'p77-art-raw.png',   // p76  Ch12
+  'a9e01416': 'p102-art-raw.png',  // p100 Ch16
+  'eda81b33': 'p112-art-raw.png',  // p112 Ch18
+  '214251c7': 'p119-art-raw.png',  // p119 Ch19
+  '5d2cca2b': 'p129-art-raw.png',  // p126 Ch20
+  '7014f98d': 'p136-art-raw.png',  // p132 Ch21
+  '4a53a65a': 'p152-art-raw.png',  // p147 Ch23
 };
 
 const { sanitizeManuscript } = await import('../src/pipeline/stage-1-ingestion/sanitize-manuscript.js');
@@ -154,6 +161,11 @@ try {
         .toBuffer();
     }
 
+    // Full-size copy of every illustrated page, so the artwork can be looked at
+    // properly rather than squinted at in a thumbnail grid.
+    if (byPage.has(n)) {
+      await writeFile(path.join(OUT, `illustrated-p${n}.png`), shot);
+    }
     const t = await sharp(shot).resize({ height: TH }).toBuffer();
     const tm = await sharp(t).metadata();
     thumbs.push({ page: n, buf: t, w: tm.width ?? 0, h: tm.height ?? 0 });

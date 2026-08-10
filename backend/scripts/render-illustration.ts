@@ -50,9 +50,22 @@ if (!Number.isFinite(pageArg) || pageArg < 1) {
 const SHOT_SCALE = 4;
 /** Breathing room between the last line of type and the top of the art. */
 const ART_GAP_IN = 0.22;
-/** The model's portrait canvas. */
-const GEN_W = 1024;
-const GEN_H = 1536;
+/**
+ * Canvas shapes the model offers. The one CLOSEST TO THE ART REGION is chosen
+ * per page, which is the whole point.
+ *
+ * Fixing this to portrait was a real defect, not a preference. The model paints
+ * the entire canvas whatever the mask says, and we keep only the region; when a
+ * short region sat inside a tall canvas we discarded most of the drawing. On a
+ * 711px region in a 1536px canvas that meant binning 608 rows of artwork, which
+ * is how a scene of two boys talking arrived as a pair of legs. Matching the
+ * canvas to the hole leaves nothing meaningful to throw away.
+ */
+const CANVASES: [number, number][] = [
+  [1024, 1536],
+  [1024, 1024],
+  [1536, 1024],
+];
 
 /**
  * RESOLUTION IS DECIDED BY PLACEMENT SIZE, NOT BY RESAMPLING.
@@ -104,14 +117,20 @@ const config = ProjectConfigSchema.parse({
 });
 
 const margins = typesetMarginsForTrim(trim);
-const html = buildTypesetHtml({
-  sections: parseTypesetSections(markdown),
+// Rendered through renderTypesetBook, not by building HTML here: the book that
+// ships has front matter and first-chapter-recto pagination, and generating art
+// against a different pagination would target page numbers that do not exist.
+const { renderTypesetBook } = await import('../src/pipeline/typeset/render-typeset.js');
+const rendered = await renderTypesetBook({
+  markdown,
   config,
-  margins,
-  polyfillJs: await loadPagedPolyfill(),
+  chaptersStartRecto: false,
   layoutStandard: standard,
-  chaptersStartRecto: standard.chaptersStartRecto,
+  frontMatter: { publication: { year: new Date().getFullYear() } },
 });
+const html = rendered.html;
+console.log(`book is ${rendered.report.totalPages} pages
+`);
 
 const chromium = resolveChromiumPath();
 if (!chromium) throw new Error('No Chromium. Set CHROMIUM_PATH.');
@@ -208,6 +227,16 @@ await writeFile(path.join(OUT, `p${pageArg}-canonical.png`), canonicalPng);
 // Then the crop fills the canvas edge to edge with no letterboxing, the art
 // region gets the full canvas width, and the model still sees genuine
 // typography sitting directly above where its drawing has to live.
+// Pick the canvas whose proportions are nearest the art region's, comparing in
+// log space so a 2x error either way counts the same.
+const regionAspect = artW / artH;
+const [GEN_W, GEN_H] = CANVASES.reduce((best, c) =>
+  Math.abs(Math.log(regionAspect / (c[0] / c[1]))) < Math.abs(Math.log(regionAspect / (best[0] / best[1]))) ? c : best,
+);
+console.log(
+  `CANVAS         ${GEN_W}x${GEN_H}  (region ${artW}x${artH}, aspect ${regionAspect.toFixed(2)} vs canvas ${(GEN_W / GEN_H).toFixed(2)})`,
+);
+
 const sliceW = artW;
 const wantSliceH = Math.round(sliceW * (GEN_H / GEN_W));
 const typeStripPx = Math.min(Math.max(wantSliceH - artH, 0), artTopPx);
@@ -282,75 +311,57 @@ await writeFile(path.join(OUT, `p${pageArg}-mask.png`), maskPng);
  * p49 pore cross-section), per the profile's subject-selection policy.
  */
 const SUBJECTS: Record<number, string> = {
-  6:
-    'A boy of about twelve sitting on the edge of his bed in an ordinary bedroom, evening, a lamp on, THIS book just opened on his knees. ' +
-    'He is at the very beginning of it, settling in to read. Calm and private. Nobody else in the room. ' +
-    'NOT sad, NOT worried, NOT hiding. DIFFERENT from other scenes in this book: interior bedroom at night, one figure only, seated on a bed rather than at a table.',
-  15:
-    'A DIAGRAM, no people at all. Four horizontal bars stacked vertically with generous space between them, like four lanes. ' +
-    'Each bar represents one person\'s timeline: they start at different points along the width and run for different lengths, and each has one simple filled marker somewhere along it. ' +
-    'The point being made visually: the same journey, begun and finished at different times, with no lane ahead of or behind any other. ' +
-    'Purely schematic and clean. No faces, no bodies, no arrows racing anyone, no finish line, no podium, no numbers, no labels.',
-  22:
-    'A DIAGRAM of proportion, drawn as three simple CLOTHED silhouette figures standing side by side in a row, same height. ' +
-    'They show one body changing in sequence: in the first, hands and feet are noticeably large for the frame; in the second, arms and legs have lengthened; in the third, the torso has caught up and the whole figure is in proportion. ' +
-    'Schematic and neutral, like a growth diagram in a school health book. Plain silhouette shapes with clean interior line, no facial detail, no skin detail, no nudity, nothing clinical or anatomical.',
-  28:
-    'A DIAGRAM, no people. A single clean line running left to right across the composition like a pitch trace: it holds steady, then jumps sharply up, dips down, wobbles twice, and settles into a steady line lower than where it began. ' +
-    'Beneath it, one small simple schematic icon of a voice box (a rounded shape with two horizontal folds inside) as an anchor. ' +
-    'The point: the jumps ARE the process working. No people, no faces, no musical notes, no text, no numbers, no axis labels.',
-  41:
-    'An OBJECT SEQUENCE, no people. Four everyday objects arranged in a clear left-to-right order with a single simple connecting line running through them: ' +
-    'a bar of soap, a folded towel, a deodorant stick, and a clean folded t-shirt. Each drawn plainly and completely, evenly spaced, same visual weight. ' +
-    'The point: it is a short routine you repeat, not a crisis. Still-life clarity. No hands, no figures, no bathroom scene, no packaging text, no brand marks.',
-  49:
-    'A DIAGRAM, no people. Two side-by-side cross-sections of a single skin pore, drawn large and simply, like a clean school-textbook figure. ' +
-    'On the left a clear pore: an open channel through a simple layered skin cross-section. On the right a blocked one: the same channel plugged near the surface so it cannot drain, with the area beneath it slightly swollen. ' +
-    'Schematic and clinical-neutral, flat-toned, no face, no body, no redness, no pus detail, nothing gruesome. No labels, no arrows with text, no numbers.',
-  77:
-    'An OBJECT METAPHOR, no people. A bicycle seen from the side, drawn cleanly and completely, with the BRAKE CABLE only part-installed: ' +
-    'the cable runs from the handlebar lever and stops partway along the frame, its end loose and not yet connected to the brake. ' +
-    'The handlebars are straight and the bike is upright and ready to ride. The point: steering already works, the brakes are still being fitted. ' +
-    'No rider, no crash, no motion lines, no anger imagery, no text.',
-  90:
-    'An everyday scene in a classroom. A boy of about twelve is halfway through raising his hand to answer, arm not yet fully up, expression composed but clearly mid-decision. ' +
-    'Around him three or four other students sit looking perfectly calm and ordinary. ' +
-    'The point: everyone in the room looks composed, and that tells you nothing about what they feel. ' +
-    'Undramatic. No teacher looming, no spotlight, no sweat drops, no visible panic, no thought bubbles, no text.',
-  102:
-    'Two boys of about twelve sitting side by side on a low brick wall outdoors in daylight, comfortable in each other\'s company and not talking. ' +
-    'One is leaning back on his hands, the other has his elbows on his knees; both look relaxed and ordinary. No phones anywhere in the picture. ' +
-    'The point: the friends you keep are the ones you do not have to perform for. ' +
-    'DIFFERENT from other scenes in this book: two peers, no adult present, outdoors on a wall rather than seated on a step or at a table.',
-  114:
-    'An OBJECT COMPARISON, no people. Two simple solid shapes resting side by side on a plain surface, clearly not able to interlock with each other: ' +
-    'their facing edges are different profiles, so they cannot join. Both shapes are intact, undamaged, well made and equally substantial; neither is broken, cracked, smaller or lesser. ' +
-    'The point: a no is information about fit, not about worth. Abstract and calm. No hearts, no faces, no people, no puzzle-piece cliché with a missing hole, no text.',
-  121:
-    'Two young people of about twelve standing facing each other in an ordinary setting, shown from roughly the waist up. ' +
-    'One holds out something offered; the other declines with a relaxed, open-palmed hand raised at chest height, and is completely at ease. ' +
-    'The one who offered is already accepting the answer, unbothered. The point: a no is a complete answer and nothing bad follows it. ' +
+  19:
+    'Three boys of the SAME age, about twelve, standing side by side in a school corridor by their lockers, in ordinary clothes. ' +
+    'They are visibly DIFFERENT in height and build: one noticeably taller, one shorter, one in between, and this is simply how they are. ' +
+    'All three are relaxed and unbothered, talking about something else entirely; nobody is comparing, measuring, sizing anyone up or looking self-conscious. ' +
+    'The idea the picture carries: same age, different timing, and no one is ahead or behind. ' +
+    'NOT a lineup, NOT a height chart, NOT a competition, no measuring marks on the wall, nobody looking sad or triumphant.',
+  31:
+    'An OBJECT, no people, drawn from a DISTANCE so the whole thing is visible and small in the frame. ' +
+    'A full acoustic guitar seen side-on, complete from headstock to base, standing upright and leaning against a plain wall. ' +
+    'A single hand reaches in from one side and rests on a TUNING PEG at the headstock, clearly turning it. ' +
+    'The guitar is intact and well made; it is being tuned, not repaired. ' +
+    'The idea the picture carries: the instrument got bigger, and it is being tuned to match. ' +
+    'Show the ENTIRE guitar with white space all round it. NOT a close-up, NOT a cropped body of the guitar, ' +
+    'no faces, no full figures, no broken strings, no musical notes, no text.',
+  50:
+    'A DIAGRAM, no people. Two lengths of PIPE seen from the SIDE as a cutaway, one above the other, drawn large and plain. ' +
+    'The TOP pipe is clear: the channel runs straight through it end to end and a couple of simple drops pass along it freely. ' +
+    'The BOTTOM pipe is identical except that a plug of material blocks the channel partway along, and nothing can get past it. ' +
+    'Side-on cutaway, NOT circles seen end-on, and the two pipes are otherwise identical so only the blockage differs. ' +
+    'The idea the picture carries: it is a blocked pipe, not a cleanliness problem. ' +
+    'Flat white background, no grey panel behind the figures, no skin, no face, no body, nothing clinical, no labels, no text.',
+  82:
+    'Two boys of about twelve walking side by side outdoors on an ordinary pavement in daylight, seen from the side. ' +
+    'FULL FIGURES, head to foot, both complete, drawn small enough in the frame that there is clear white space above both heads. ' +
+    'One is talking, plainly and without drama; the other is listening as they walk. ' +
+    'The idea the picture carries: telling one person is the whole first step, and it can happen while you are just walking somewhere. ' +
+    'Their FACES and whole bodies must be visible. NOT a close-up of legs or feet, NOT cropped at the waist. ' +
+    'Calm and ordinary: no tears, no hug, no arm round a shoulder, nobody sitting, no adult.',
+  88:
+    'A classroom drawn SIMPLY and from the FRONT, with plenty of white space and only TWO students visible. ' +
+    'A boy of about twelve is part-way through raising his hand, arm not yet fully up, expression composed but mid-decision. ' +
+    'One other student sits beside him looking perfectly calm and ordinary. Both are seen from the waist up at their desks, ' +
+    'FACES AND WHOLE HEADS VISIBLE, drawn far enough back that there is clear empty white above both of their heads. ' +
+    'Two plain desks and nothing else: no teacher, no rows of pupils, no wall displays, no clutter. ' +
+    'The idea the picture carries: everyone in the room looks composed, and that tells you nothing about what they feel. ' +
+    'No spotlight, no sweat drops, no panic, no thought bubbles, no text.',
+  112:
+    'Two young people of about twelve passing each other in a school corridor, walking in opposite directions, each carrying a bag or books. ' +
+    'One gives the other a small friendly nod in passing; the other returns it. Both are entirely at ease and both are carrying on their way. ' +
+    'Nothing is happening beyond two people who are fine with each other. ' +
+    'The idea the picture carries: it did not fit, and nothing is broken. ' +
+    'NOT a rejection scene, NOT an argument, NOT longing looks, nobody upset, nobody watching from the side, no hearts, no text.',
+  119:
+    'Two young people of about twelve standing facing each other in an ordinary setting, shown from the KNEES UP with clear space above their heads. ' +
+    'One holds out something offered; the other declines with a relaxed, open-palmed hand raised at chest height, completely at ease. ' +
+    'The one who offered is already accepting the answer, unbothered. ' +
+    'The idea the picture carries: a no is a complete answer and nothing bad follows it. ' +
+    'BOTH FIGURES MUST BE DRAWN COMPLETE, with the whole of both heads and plenty of white space above them, well inside the top edge. ' +
     'Calm and matter-of-fact. No conflict, no anger, no cowering, no pointing, no crowd, no text.',
-  129:
-    'An OBJECT scene, no people. A phone lying face-up on a desk with a completely BLANK screen, no icons, no text, no glow. ' +
-    'Beside the desk, an open door leads to a lit hallway, drawn simply. ' +
-    'The point: whatever wants to stay in the private space is exactly the thing to take out of it. ' +
-    'Quiet and undramatic. No hands, no faces, no notification symbols, no shadowy figures, no menace, no text on the screen or anywhere else.',
-  136:
-    'A conversation already underway, and an unremarkable one. A boy of about twelve and a parent sit SIDE BY SIDE on the front step of a house (or on a sofa), ' +
-    'both facing forward rather than at each other, which is how these conversations actually happen and what this chapter advises. ' +
-    'The parent is listening, unhurried; the boy is mid-sentence, relaxed, hands loose. ' +
-    'The idea the picture carries: the conversation turned out shorter and duller than the week he spent dreading it. ' +
-    'Ordinary and undramatic. NOT a big emotional moment, NOT a lecture, NOT comforting-after-crying. ' +
-    'No hugging, no tears, no hand on shoulder, no eye contact, no confrontation. Nobody is upset. ' +
-    'DIFFERENT from the kitchen scene elsewhere in this book: seat both figures together outdoors on a step, in daylight, with no table and no book present.',
-  152:
-    'The moment BEFORE a conversation starts. A boy of about twelve sits at an ordinary kitchen or dining table with this book open in front of him. ' +
-    'He has looked up from the page toward a trusted adult nearby who is doing something everyday and unremarkable (drying a dish, setting something down), ' +
-    'and his expression is that of someone deciding to ask. Nobody is speaking yet. ' +
-    'The idea the picture carries: the answer was not in the index, and the next step is asking someone. ' +
-    'Calm and ordinary. NOT dramatic, NOT sentimental, NOT clinical, NOT childish. No tears, no hugging, no comedy, no exaggerated expressions.',
 };
+
 const subject = SUBJECTS[pageArg];
 if (!subject) throw new Error(`no approved subject for page ${pageArg} — subjects are approved individually`);
 
@@ -379,13 +390,14 @@ const prompt = [
   `   are flat shapes, never rendered or brushed.`,
   `   Commit real black weight: large solid black masses (hair, dark clothing,`,
   `   shoes) should carry the drawing, not thin outlines around pale shapes.`,
-  `4. Everything is drawn COMPLETE and INSIDE the region. No figure or object may`,
-  `   be cut off by any edge of the region. Do not crop heads, bodies or limbs.`,
-  `   Primary figures and important props sit fully inside the boundary, and`,
-  `   background furniture and architecture should generally stay slightly clear`,
-  `   of the edges as well. An element may run to an edge only where the`,
-  `   composition genuinely benefits; it is never the default. Keep clean white`,
-  `   breathing room around the principal subject.`,
+  `4. LEAVE A CLEAR WHITE MARGIN AROUND THE WHOLE DRAWING. Imagine a border about`,
+  `   one tenth of the way in from every edge: NOTHING may cross into it. Not a`,
+  `   head, not a hand, not a foot, not a wall, not a floor, not furniture, not`,
+  `   scenery. The entire scene sits INSIDE that inner box, floating on white.`,
+  `   Every figure is drawn WHOLE - complete head, complete body - and framed`,
+  `   from far enough back that there is visible empty white above every head.`,
+  `   A cropped head, a cropped body, or a background that runs off the edge is`,
+  `   a DEFECT and the drawing will be rejected. Zoom OUT rather than in.`,
   `5. NO text, letters, words, numbers or symbols anywhere in the drawing.`,
   ``,
   `SUBJECT: ${subject}`,
@@ -454,6 +466,50 @@ if (placeOnly) {
     .extract({ left: maskArt.left, top: maskArt.top, width: maskArt.width, height: maskArt.height })
     .png()
     .toBuffer();
+
+  // HOW MUCH OF THE DRAWING ARE WE THROWING AWAY?
+  //
+  // The mask asks the model to paint inside the region. It does not have to
+  // obey, and it often does not: it composes across the whole canvas. Cropping
+  // to the region then AMPUTATES the drawing, and the result still looks like a
+  // finished picture, so nothing downstream notices. That is exactly how a
+  // scene of two boys walking arrived as two pairs of legs.
+  //
+  // So measure it. Ink outside the kept region is discarded artwork, and past a
+  // few percent the composition has been cut rather than framed.
+  const canvasGrey = await sharp(generated.pngBuffer).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const cw = canvasGrey.info.width;
+  const ch = canvasGrey.info.height;
+  let inkInside = 0;
+  let inkOutside = 0;
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      if (canvasGrey.data[y * cw + x] >= 200) continue;
+      const inside =
+        x >= maskArt.left && x < maskArt.left + maskArt.width && y >= maskArt.top && y < maskArt.top + maskArt.height;
+      if (inside) inkInside++;
+      else inkOutside++;
+    }
+  }
+  const discarded = inkOutside / Math.max(inkInside + inkOutside, 1);
+  console.log(
+    `  kept ${((maskArt.width * maskArt.height) / (cw * ch) * 100).toFixed(0)}% of the canvas; ` +
+      `${(discarded * 100).toFixed(1)}% of the drawn ink fell outside it`,
+  );
+  if (discarded > 0.08) {
+    await writeFile(rawArtPath, rawArt);
+    console.error(
+      [
+        '',
+        `REJECTED: ${(discarded * 100).toFixed(0)}% of the artwork lies outside the region we can use.`,
+        'Cropping it would cut the composition apart rather than frame it.',
+        'This is OUR geometry to fix, not a reason to re-roll the model:',
+        'match the canvas to the region, or place the art smaller.',
+      ].join(String.fromCharCode(10)),
+    );
+    process.exit(3);
+  }
+
   await writeFile(rawArtPath, rawArt);
 }
 
