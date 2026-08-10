@@ -630,7 +630,14 @@ export async function generateCoverWrapArtwork(
   const dims = computeCoverDimensions(config, pageCount);
   const edition = await getDefaultEdition(projectId).catch(() => null);
   const prompt = buildCoverWrapPrompt(config, pageCount, dims, edition?.styleDnaId);
-  const image = await generateImage({ prompt, size: '1536x1024', quality: 'high' });
+  const image = await generateImage({
+    // Kept in step with COVER_ART_CANVAS_PX, which the prompt's edge-crop
+    // warning is computed from. Changing one without the other tells the model
+    // to protect the wrong band.
+    size: `${COVER_ART_CANVAS_PX.w}x${COVER_ART_CANVAS_PX.h}`,
+    prompt,
+    quality: 'high',
+  });
 
   const storage = getProjectStorage();
   const promptStored = await storage.writeProjectFile(projectId, ['cover', 'cover-wrap.prompt.txt'], prompt);
@@ -662,6 +669,51 @@ export async function generateCoverWrapArtwork(
     dimensions: dims,
     scopeChapters,
   };
+}
+
+/**
+ * The image model's canvas. Must stay in step with the `size` passed to
+ * `generateImage` for the cover, because the safe band below is derived from it.
+ */
+export const COVER_ART_CANVAS_PX = { w: 1536, h: 1024 } as const;
+
+/**
+ * WHAT SURVIVES THE FIT ONTO THE WRAP — stated to the model in its own prompt.
+ *
+ * The model can only produce a few fixed canvas shapes, and none of them is the
+ * shape of a book wrap. `composeCoverPrint` resizes the art with `fit: 'cover'`,
+ * which fills the wrap and centre-crops the overflow. For this book that is
+ * 1536x1024 (1.500) fitted into 11.385x8.500 (1.340): the art is scaled until
+ * its HEIGHT fills, and 0.68in is then cut off EACH end of the wrap — 12% of the
+ * front panel's outer edge, on the side where a title block naturally sits.
+ *
+ * Nothing warned anyone about this. The previous book got away with it because
+ * its art was a wilderness panorama, where losing the outer inches is invisible.
+ * A designed cover with baked typography would lose words.
+ *
+ * The honest fix while the canvas shapes are fixed is to compose for the band
+ * that survives, so the crop removes only intentional bleed. The numbers are
+ * computed from the same geometry the compositor uses, never guessed.
+ */
+export function coverArtSafeBand(dims: ReturnType<typeof computeCoverDimensions>): string {
+  const dpi = 300;
+  const canvasW = Math.round(dims.fullWidthIn * dpi);
+  const canvasH = Math.round(dims.fullHeightIn * dpi);
+  const scale = Math.max(canvasW / COVER_ART_CANVAS_PX.w, canvasH / COVER_ART_CANVAS_PX.h);
+  const overflowX = (COVER_ART_CANVAS_PX.w * scale - canvasW) / 2;
+  const overflowY = (COVER_ART_CANVAS_PX.h * scale - canvasH) / 2;
+  const pctX = Math.ceil((overflowX / (COVER_ART_CANVAS_PX.w * scale)) * 100);
+  const pctY = Math.ceil((overflowY / (COVER_ART_CANVAS_PX.h * scale)) * 100);
+  const parts = [
+    'CRITICAL — EDGE CROP',
+    `the outer ${pctX}% of the LEFT edge and the outer ${pctX}% of the RIGHT edge of this image will be cut off and thrown away`,
+  ];
+  if (pctY > 0) parts.push(`the outer ${pctY}% of the TOP and BOTTOM will also be cut off`);
+  parts.push(
+    'every letter of typography, and every element that must be seen, belongs inside the remaining central area',
+    'let only background colour, texture and deliberate bleed run into the cropped margins',
+  );
+  return parts.join('; ');
 }
 
 export function buildCoverWrapPrompt(
@@ -707,6 +759,7 @@ export function buildCoverWrapPrompt(
         'full-wrap artwork canvas covering back cover, spine, and front cover as one continuous full-bleed composition',
         `full wrap ${dims.fullWidthIn.toFixed(3)} x ${dims.fullHeightIn.toFixed(3)} inches`,
         `spine width ${dims.spineIn.toFixed(3)} inches`,
+        coverArtSafeBand(dims),
       ].join('; '),
       textPlacement: [
         'front cover: calm upper/central title-safe zone and smaller lower author/imprint zone',
