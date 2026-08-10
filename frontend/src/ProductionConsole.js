@@ -51,7 +51,7 @@ const S = {
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 12, marginTop: 14 },
 };
 
-const EMPTY_SETUP_FORM = { title: "", subtitle: "", coverDescription: "", author: "", series: "", volume: 1, trim: "7x10", bodyPt: 11, lineHeight: 1.4, headingFont: "Cormorant Garamond", bodyFont: "EB Garamond", productionProfileId: "wildlands-field-guide", typesetLayoutStandardId: "", backBlurb: "", backFeatures: "", backAuthorBio: "" };
+const EMPTY_SETUP_FORM = { title: "", subtitle: "", coverDescription: "", coverArtDirection: "", author: "", series: "", volume: 1, trim: "7x10", bodyPt: 11, lineHeight: 1.4, headingFont: "Cormorant Garamond", bodyFont: "EB Garamond", productionProfileId: "wildlands-field-guide", typesetLayoutStandardId: "", backBlurb: "", backFeatures: "", backAuthorBio: "" };
 
 // The faces the renderer can actually produce. Free text here would silently
 // fall back to a generic at print time, so Setup offers only families the
@@ -482,6 +482,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
         title: cfg.publishing?.title ?? cfg.title ?? "",
         subtitle: cfg.publishing?.subtitle ?? cfg.subtitle ?? "",
         coverDescription: cfg.publishing?.coverDescription ?? "",
+        coverArtDirection: cfg.publishing?.coverArtDirection ?? "",
         paperStock: cfg.paperStock ?? "white",
         author: (authors && authors.length ? authors.join(", ") : cfg.authorName) ?? "",
         series: cfg.publishing?.series?.name ?? "",
@@ -551,6 +552,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
     const vol = Math.max(1, parseInt(f.volume, 10) || 1);
     const series = (f.series || "").trim();
     const coverDescription = (f.coverDescription || "").trim();
+    const coverArtDirection = (f.coverArtDirection || "").trim();
     // Back cover — three distinct pieces (data-driven, optional). Features is a
     // newline-per-item textarea → array. Omit the whole block when all empty.
     const blurb = (f.backBlurb || "").trim();
@@ -583,6 +585,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
         subtitle: f.subtitle,
         authors: f.author.split(",").map((a) => a.trim()).filter(Boolean),
         coverDescription: coverDescription || undefined,
+        coverArtDirection: coverArtDirection || undefined,
         series: series ? { name: series, volumeNumber: vol } : undefined,
         bookDescription,
       },
@@ -640,6 +643,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const setupOwnedOptionalPaths = () => {
     const paths = [];
     if (!(form.coverDescription || "").trim()) paths.push("publishing.coverDescription");
+    if (!(form.coverArtDirection || "").trim()) paths.push("publishing.coverArtDirection");
     if (!(form.series || "").trim()) paths.push("publishing.series");
     if (
       !(form.backBlurb || "").trim() &&
@@ -1362,6 +1366,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     </div>
                   </div>
                 ) : null}
+
+                <div style={{ marginTop: 22, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>Cover art direction</div>
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: 2, marginBottom: 4 }}>
+                    What the cover artwork should actually BE — the concept, the palette, what appears on
+                    the front, the spine and the back. This is the single field that decides what the paid
+                    cover generation produces; leave it blank and the model invents a generic scene from
+                    the title. Everything here reaches the image model, which also bakes the title,
+                    subtitle, author and back-cover copy into the artwork itself — so every word in the
+                    fields above has to be right <b>before</b> you generate.
+                  </div>
+                  <LabeledTextarea label="Cover art direction" rows={10}
+                    hint="Concept, palette, and what belongs on the front / spine / back. Say what to avoid as well as what to include."
+                    value={form.coverArtDirection} onChange={(v) => setForm({ ...form, coverArtDirection: v })} />
+                </div>
 
                 <div style={{ marginTop: 22, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>Back Cover</div>

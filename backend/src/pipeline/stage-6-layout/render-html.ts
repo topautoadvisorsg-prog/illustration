@@ -750,6 +750,24 @@ ${fontLinkTags(t)}
  */
 const PAGE_THICKNESS_IN = { white: 0.002252, cream: 0.0025 } as const;
 
+/**
+ * COVER BLEED — 0.125in on every outside edge, always.
+ *
+ * A cover is not a page and does not inherit the interior's bleed. KDP requires
+ * bleed on every paperback cover regardless of what the interior does, because
+ * the wrap is trimmed after printing.
+ *
+ * This used to read `config.trimSize.bleedIn`, which is the INTERIOR's setting.
+ * A text interior legitimately prints with no bleed, so this book — 5.5x8.5,
+ * bleedIn 0 — produced an 11.385 x 8.500in wrap: correct arithmetic, and 0.25in
+ * short in both directions of what KDP will accept. It was invisible because the
+ * only book that had shipped is an illustrated guide whose interior bleeds
+ * 0.125in anyway, so the two numbers happened to agree.
+ *
+ * Source: https://kdp.amazon.com/en_US/help/topic/G201953020
+ */
+export const COVER_BLEED_IN = 0.125;
+
 export interface CoverDimensions {
   fullWidthIn: number;
   fullHeightIn: number;
@@ -768,8 +786,8 @@ export function computeCoverDimensions(config: ProjectConfig, pageCount: number)
   const trim = config.trimSize;
   const spineIn = Math.max(0.06, pageCount * PAGE_THICKNESS_IN[config.paperStock ?? 'white']);
   return {
-    fullWidthIn: trim.widthIn * 2 + spineIn + trim.bleedIn * 2,
-    fullHeightIn: trim.heightIn + trim.bleedIn * 2,
+    fullWidthIn: trim.widthIn * 2 + spineIn + COVER_BLEED_IN * 2,
+    fullHeightIn: trim.heightIn + COVER_BLEED_IN * 2,
     spineIn,
   };
 }

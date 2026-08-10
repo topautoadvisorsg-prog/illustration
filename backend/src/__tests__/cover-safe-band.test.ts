@@ -24,12 +24,16 @@ const config = (over = {}) =>
 describe('coverArtSafeBand', () => {
   it('warns about the real horizontal crop for the 154-page cream digest wrap', () => {
     const dims = computeCoverDimensions(config(), 154);
-    // 11.385 x 8.500 wrap vs a 1.5 canvas: height governs, width is cropped.
-    expect(dims.fullWidthIn).toBeCloseTo(11.385, 3);
+    // 11.635 x 8.750 wrap vs a 1.5 canvas: height governs, width is cropped.
+    // The wrap carries KDP's 0.125in cover bleed even though this book's
+    // INTERIOR prints with none — see COVER_BLEED_IN.
+    expect(dims.fullWidthIn).toBeCloseTo(11.635, 3);
+    expect(dims.fullHeightIn).toBeCloseTo(8.75, 3);
+    expect(dims.spineIn).toBeCloseTo(0.385, 4);
 
     const band = coverArtSafeBand(dims);
     expect(band).toContain('EDGE CROP');
-    // 205px of 3825 scaled px is 5.36% -> ceil 6.
+    // 223px of 3938 scaled px is 5.67% -> ceil 6.
     expect(band).toMatch(/outer 6% of the LEFT edge/);
     expect(band).toMatch(/outer 6% of the RIGHT edge/);
     // Height fills exactly, so there is nothing to say about top and bottom.

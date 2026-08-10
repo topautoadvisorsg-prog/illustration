@@ -74,8 +74,10 @@ describe('checkDelivery', () => {
   });
 
   it('accepts a cover whose wrap matches the interior page count on cream stock', async () => {
-    // 154 pages × 0.0025in cream = 0.385in spine; 5.5×2 + 0.385 = 11.385in wide.
-    const cover = await pdfOf([{ w: 11.385, h: 8.5 }]);
+    // 154 pages × 0.0025in cream = 0.385in spine.
+    // 5.5×2 + 0.385 + 0.125×2 cover bleed = 11.635 × 8.750in. The cover bleeds
+    // even though this book's interior does not — KDP requires it on the wrap.
+    const cover = await pdfOf([{ w: 11.635, h: 8.75 }]);
     const r = await checkDelivery({ config, interiorPdf: await pdfOf(uniform(154)), coverPdf: cover });
 
     const geom = find(r, 'cover_geometry');
@@ -86,7 +88,7 @@ describe('checkDelivery', () => {
 
   it('fails a cover built for a different page count', async () => {
     // A wrap sized for 163 pages (spine 0.4075) against a 154-page interior.
-    const cover = await pdfOf([{ w: 11.4075, h: 8.5 }]);
+    const cover = await pdfOf([{ w: 11.6575, h: 8.75 }]);
     const r = await checkDelivery({ config, interiorPdf: await pdfOf(uniform(154)), coverPdf: cover });
 
     expect(find(r, 'cover_geometry').status).toBe('FAIL');
@@ -94,9 +96,9 @@ describe('checkDelivery', () => {
   });
 
   it('catches the white-stock spine on a cream book', async () => {
-    // Same 154 pages at the WHITE multiplier: 0.3468in spine, 11.347in wrap.
+    // Same 154 pages at the WHITE multiplier: 0.3468in spine, 11.597in wrap.
     // 0.038in narrower than cream — past tolerance, which is the point.
-    const cover = await pdfOf([{ w: 11.347, h: 8.5 }]);
+    const cover = await pdfOf([{ w: 11.597, h: 8.75 }]);
     const r = await checkDelivery({ config, interiorPdf: await pdfOf(uniform(154)), coverPdf: cover });
 
     expect(find(r, 'cover_geometry').status).toBe('FAIL');
