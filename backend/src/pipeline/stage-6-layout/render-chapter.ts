@@ -33,7 +33,7 @@ import { getProjectStorage, type ProjectStorage } from '../../services/storage/p
 import { listPaginatedPagesForProject } from '../../db/repositories/pagination.repo.js';
 import { logger } from '../../lib/logger.js';
 import { computePageGeometry } from './page-geometry.js';
-import { buildBookHtml, buildCoverHtml, buildPageHtml, computeCoverDimensions, type ChapterPageRender, type BookChapter } from './render-html.js';
+import { buildBookHtml, buildCoverHtml, buildPageHtml, computeCoverDimensions, COVER_BLEED_IN, type ChapterPageRender, type BookChapter } from './render-html.js';
 import { directLayout } from './layout-director.js';
 import { isChromiumAvailable, loadPagedPolyfill, renderHtmlToPdf } from './render-pdf.js';
 import { composeCoverPrint } from '../print-prep/cover-print.js';
@@ -720,6 +720,35 @@ export function coverArtSafeBand(dims: ReturnType<typeof computeCoverDimensions>
   return parts.join('; ');
 }
 
+/**
+ * WHERE TYPE IS ALLOWED TO SIT — the trim-safe area, stated as a percentage.
+ *
+ * The wrap carries 0.125in of bleed that is CUT OFF, and KDP wants readable copy
+ * a further 0.25in inside the cut. The first generated cover put the author name
+ * hard against the bottom edge of the image, which is inside the part that gets
+ * trimmed away — it would have been sliced on press.
+ *
+ * The model cannot be told "0.375 inches"; it composes in fractions of its
+ * canvas. So the inset is converted to a percentage of the generated image and
+ * stated as a floor, together with the technique that actually holds type off an
+ * edge: put a graphic element below it. Type given nothing to sit on drifts to
+ * the edge, which is what happened.
+ */
+export function coverTypeSafeArea(dims: ReturnType<typeof computeCoverDimensions>): string {
+  const SAFE_INSIDE_TRIM_IN = 0.25;
+  const insetIn = COVER_BLEED_IN + SAFE_INSIDE_TRIM_IN;
+  const pctV = Math.ceil((insetIn / dims.fullHeightIn) * 100);
+  const pctH = Math.ceil((insetIn / dims.fullWidthIn) * 100);
+  return [
+    'CRITICAL — TRIM SAFETY FOR TYPE',
+    `the outer ${insetIn.toFixed(3)} inches of this wrap is cut off or too close to the cut to trust`,
+    `NO letter of any text may sit within the outer ${pctV}% of the image height (top or bottom) or the outer ${pctH}% of the image width`,
+    'the author name in particular must NOT sit at the very bottom of the front panel — lift it well clear of the bottom edge',
+    'give the type something to sit on: place a graphic band, object or colour block BELOW the author name so the name is pushed up into the safe area rather than drifting down to the edge',
+    'the same on the back panel — a graphic element above the copy and another below it, holding the text block in the middle where it is safe',
+  ].join('; ');
+}
+
 export function buildCoverWrapPrompt(
   config: ProjectConfig,
   pageCount: number,
@@ -764,6 +793,7 @@ export function buildCoverWrapPrompt(
         `full wrap ${dims.fullWidthIn.toFixed(3)} x ${dims.fullHeightIn.toFixed(3)} inches`,
         `spine width ${dims.spineIn.toFixed(3)} inches`,
         coverArtSafeBand(dims),
+        coverTypeSafeArea(dims),
       ].join('; '),
       textPlacement: [
         'front cover: calm upper/central title-safe zone and smaller lower author/imprint zone',
@@ -787,8 +817,11 @@ export function buildCoverWrapPrompt(
       decorativeInitial: null,
     },
     illustrationDNA: {
+      // The COVER's DNA, which is not the interior's. See coverStyleDnaId.
       masterStyleBlock: assembleIllustrationDna(
-        styleDnaId ?? getProductionProfile(config.productionProfileId).defaultStyleDnaId,
+        styleDnaId ??
+          getProductionProfile(config.productionProfileId).coverStyleDnaId ??
+          getProductionProfile(config.productionProfileId).defaultStyleDnaId,
       ),
       // Operator cover art-direction (when supplied) drives a specific, curated
       // wrap scene; otherwise fall back to a generic establishing scene evoked by

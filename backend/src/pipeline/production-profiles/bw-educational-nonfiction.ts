@@ -50,6 +50,12 @@ export const BW_EDUCATIONAL_NONFICTION_PROFILE: BookProductionProfile = {
   // Clear-line B&W: reproduces well on uncoated stock at digest size.
   defaultStyleDnaId: 'bw-educational-clearline',
 
+  // The INTERIOR is black-and-white for print economy. The COVER is not: KDP
+  // prints every paperback cover in full colour regardless. Left to inherit the
+  // interior DNA, the cover generated in monochrome and quietly converted the
+  // art direction's cobalt and signal orange into tone.
+  coverStyleDnaId: 'graphic-trade-cover',
+
   /**
    * This cover is a designed object, not a painting of a place.
    *

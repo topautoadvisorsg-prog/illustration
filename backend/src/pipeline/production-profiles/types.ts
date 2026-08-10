@@ -147,6 +147,18 @@ export interface BookProductionProfile {
   /** Which Style DNA the edition defaults to (registry id). */
   defaultStyleDnaId: string;
   /**
+   * Which Style DNA the COVER uses. Defaults to `defaultStyleDnaId`.
+   *
+   * A cover is not an interior illustration, and a black-and-white book still
+   * has a colour cover — KDP prints every paperback cover in full colour
+   * whatever the interior costs. The first cover for NO ONE TOLD ME THAT came
+   * back beige and black because the interior's B&W clear-line DNA was driving
+   * it, and that DNA says "interpret any colour named in the subject purely as
+   * tone". The art direction asked for cobalt and orange; the DNA turned them
+   * into tone. The model did as it was told by the wrong instruction.
+   */
+  coverStyleDnaId?: string;
+  /**
    * How this book class's COVER ARTWORK is described to the image model.
    *
    * The wrap prompt stated "a single continuous wilderness panorama, archival

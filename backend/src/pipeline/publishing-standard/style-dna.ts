@@ -125,11 +125,61 @@ const BW_EDUCATIONAL_CLEARLINE: StyleDnaProfile = {
   palette: { paperHex: '#FFFFFF', inkHex: '#000000' },
 };
 
+// ── GRAPHIC TRADE COVER ───────────────────────────────────────────────────────
+//
+//    A COVER IS NOT AN INTERIOR ILLUSTRATION, AND A B&W BOOK STILL HAS A COLOUR
+//    COVER.
+//
+//    The first cover generated for NO ONE TOLD ME THAT came back beige and
+//    black. The art direction asked for cobalt and signal orange; the interior's
+//    clear-line DNA was driving the cover, and its colorMode says "render
+//    entirely in MONOCHROME with NO colour whatsoever; interpret any colour
+//    named in the subject purely as tone". The model obeyed the DNA and turned
+//    the palette into tone. Nothing was broken — the wrong DNA was in charge.
+//
+//    KDP prints every paperback cover in full colour regardless of what the
+//    interior costs to print, so a book whose pages are black-and-white for
+//    economy has no reason to throw away its cover.
+//
+//    This is also a different KIND of artwork: a designed retail object built
+//    from flat shapes and type that must survive being shrunk to a thumbnail —
+//    not a drawn illustration with line work and tonal modelling. The fields
+//    below are written for that, which is why "line work" here talks about shape
+//    edges rather than draughtsmanship.
+const GRAPHIC_TRADE_COVER: StyleDnaProfile = {
+  id: 'graphic-trade-cover',
+  label: 'Graphic Trade Cover — flat colour, thumbnail-first',
+  medium:
+    'Contemporary graphic book-cover design for commercial trade nonfiction: flat vector shapes, bold type, and a small cast of simple iconic objects. A DESIGNED object, not a painted or drawn scene — think a strong modern paperback front table display, not an illustration plate.',
+  mood:
+    'Confident, direct and current. Reads as something a reader would be happy to be seen holding. Never clinical, never cute, never babyish, never corporate-stock.',
+  referenceArtists:
+    'Modern commercial nonfiction jacket design and bold editorial poster work: flat colour blocking, decisive type hierarchy, simple iconic objects. NOT painted illustration, NOT engraving, NOT naturalist plates, NOT photographic collage.',
+  lineWork:
+    'Shapes are defined by flat colour edges rather than by drawn line. Any line used is deliberate, even and heavy enough to survive a thumbnail. No sketchiness, no cross-hatching, no rendered texture, no hand-wobble.',
+  lineInkPhrase:
+    'Where line is used it is a solid single colour from the palette, never a gradient and never an outline around everything.',
+  colorMode:
+    'FULL COLOUR. Use a tightly limited, deliberately chosen palette — typically one dominant saturated field colour, one high-contrast accent, and one light support tone, plus black for graphic weight. Flat fills only: NO gradients, NO airbrush, NO photographic shading, NO muddy blends. Colours must be fully saturated and clearly separated so the cover holds up at Amazon-thumbnail size. Honour the palette named in the art direction exactly; do NOT convert any named colour to grey, tone, sepia, kraft or monochrome.',
+  whitesPhrase:
+    'Empty space is a designed element, not leftover background: keep generous quiet areas so the title and the objects both breathe.',
+  naturalistPrecision:
+    'Objects are simplified to their most recognisable silhouette — readable instantly and from across a room. Include only as many as the composition needs. No faces, no bodies as the subject, no anatomical drawing, no realistic rendering.',
+  lighting:
+    'None. This is flat graphic design: form comes from colour separation and shape, never from a light source, shadow or highlight.',
+  paperTexture:
+    'Clean flat colour. No paper grain, no kraft or cardboard texture, no newsprint, no aging, no patina, no vignetting, no distressing.',
+  edges:
+    'Crisp, closed, deliberate edges. The full wrap reads as one designed object from back through spine to front.',
+  palette: { paperHex: '#FFFFFF', inkHex: '#000000' },
+};
+
 /** The registry. Add an edition look by adding a profile here — nothing else. */
 export const STYLE_DNA: Record<string, StyleDnaProfile> = {
   [CINEMATIC_NATURALIST_COLOR.id]: CINEMATIC_NATURALIST_COLOR,
   [BW_NATURALIST.id]: BW_NATURALIST,
   [BW_EDUCATIONAL_CLEARLINE.id]: BW_EDUCATIONAL_CLEARLINE,
+  [GRAPHIC_TRADE_COVER.id]: GRAPHIC_TRADE_COVER,
 };
 
 /** Default = the current production Color look (frozen reference standard). */
