@@ -51,7 +51,12 @@ const S = {
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 12, marginTop: 14 },
 };
 
-const EMPTY_SETUP_FORM = { title: "", subtitle: "", coverDescription: "", coverArtDirection: "", author: "", series: "", volume: 1, trim: "7x10", bodyPt: 11, lineHeight: 1.4, headingFont: "Cormorant Garamond", bodyFont: "EB Garamond", productionProfileId: "wildlands-field-guide", typesetLayoutStandardId: "", backBlurb: "", backFeatures: "", backAuthorBio: "" };
+/** Kept in step with DEFAULT_ACCURACY_NOTE in @wildlands/shared. */
+const DEFAULT_ACCURACY_NOTE =
+  "Medical accuracy: Health information in this book was researched and cross-checked against guidance " +
+  "from established pediatric and medical organizations and physician-reviewed sources.";
+
+const EMPTY_SETUP_FORM = { title: "", subtitle: "", coverDescription: "", coverArtDirection: "", author: "", series: "", volume: 1, trim: "7x10", bodyPt: 11, lineHeight: 1.4, headingFont: "Cormorant Garamond", bodyFont: "EB Garamond", productionProfileId: "wildlands-field-guide", typesetLayoutStandardId: "", backBlurb: "", backFeatures: "", backAuthorBio: "", accuracyNoteEnabled: false, accuracyNoteText: DEFAULT_ACCURACY_NOTE, accuracyReviewerName: "", accuracyReviewerCredentials: "" };
 
 // The faces the renderer can actually produce. Free text here would silently
 // fall back to a generic at print time, so Setup offers only families the
@@ -284,6 +289,8 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [showGuides, setShowGuides] = useState(true); // KDP-style trim/safe overlay on the page preview
   const [coverAR, setCoverAR] = useState(null); // full-wrap image aspect ratio (w/h), for spine fold lines
   const [cover, setCover] = useState(null);
+  const [preflight, setPreflight] = useState(null);
+  const [showPrompt, setShowPrompt] = useState(false);
   const [assembly, setAssembly] = useState(null);
   const [delivery, setDelivery] = useState(null); // delivery check of the finished PDFs
   const [epubReport, setEpubReport] = useState(null); // Kindle EPUB build report (preview endpoint)
@@ -324,6 +331,10 @@ export default function ProductionConsole({ onExitToLegacy }) {
   // Append the shared key as a query param so <img>/<iframe>/PDF loads (which
   // can't send an Authorization header) pass the gate too.
   const fileUrl = useCallback((p) => { const pw = sessionStorage.getItem("wl_pw") || ""; return `${BACKEND}/api/whole-page-render/file?path=${encodeURIComponent(p)}${pw ? `&k=${encodeURIComponent(pw)}` : ""}`; }, []);
+  // The blueprint is served by the preflight endpoint itself, so the operator is
+  // always looking at the reference image for the CURRENT spec rather than a
+  // stored copy that may predate the last Book Setup change.
+  const blueprintUrl = useCallback((projectId, cb) => { const pw = sessionStorage.getItem("wl_pw") || ""; return `${BACKEND}/api/projects/${projectId}/cover/preflight?format=blueprint&v=${cb}${pw ? `&k=${encodeURIComponent(pw)}` : ""}`; }, []);
 
   // Validate a candidate password against a protected endpoint (any non-401 = ok).
   const checkAuth = useCallback(async (candidate) => {
@@ -483,6 +494,10 @@ export default function ProductionConsole({ onExitToLegacy }) {
         subtitle: cfg.publishing?.subtitle ?? cfg.subtitle ?? "",
         coverDescription: cfg.publishing?.coverDescription ?? "",
         coverArtDirection: cfg.publishing?.coverArtDirection ?? "",
+        accuracyNoteEnabled: Boolean(cfg.publishing?.accuracyNote?.enabled),
+        accuracyNoteText: cfg.publishing?.accuracyNote?.text ?? DEFAULT_ACCURACY_NOTE,
+        accuracyReviewerName: cfg.publishing?.accuracyNote?.reviewerName ?? "",
+        accuracyReviewerCredentials: cfg.publishing?.accuracyNote?.reviewerCredentials ?? "",
         paperStock: cfg.paperStock ?? "white",
         author: (authors && authors.length ? authors.join(", ") : cfg.authorName) ?? "",
         series: cfg.publishing?.series?.name ?? "",
@@ -588,6 +603,14 @@ export default function ProductionConsole({ onExitToLegacy }) {
         coverArtDirection: coverArtDirection || undefined,
         series: series ? { name: series, volumeNumber: vol } : undefined,
         bookDescription,
+        // Reviewer fields are only sent when a name is actually given, so an
+        // empty box never becomes an empty claim on the copyright page.
+        accuracyNote: {
+          enabled: Boolean(f.accuracyNoteEnabled),
+          text: (f.accuracyNoteText || "").trim() || DEFAULT_ACCURACY_NOTE,
+          reviewerName: (f.accuracyReviewerName || "").trim() || undefined,
+          reviewerCredentials: (f.accuracyReviewerCredentials || "").trim() || undefined,
+        },
       },
     };
   }
@@ -973,6 +996,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
     const d = await api(`/api/whole-page-render/${pageId}/upload-manual`, { method: "POST", body: JSON.stringify({ imageBase64 }) });
     await loadRenders();
     return { notice: `Uploaded as v${d.render?.version} — review and approve it below.` };
+  });
+
+  // COVER PREFLIGHT — free. Resolves exactly what a paid generation would send:
+  // the geometry, the blueprint the model receives, the final prompt, the cost,
+  // and the checks that would block it. Nothing here spends.
+  const loadCoverPreflight = () => run("Checking the cover before spending", async () => {
+    const d = await api(`/api/projects/${project.id}/cover/preflight`);
+    setPreflight({ ...d, _cb: Date.now() });
+    return {
+      notice: d.blocked
+        ? "Preflight FAILED — generation is blocked. Fix the errors below."
+        : d.status === "WARNING"
+          ? "Preflight passed with warnings. Read them before generating."
+          : "Preflight passed. Safe to generate.",
+    };
   });
 
   const genCover = () => run("Generating cover (paid)", async () => {
@@ -1397,6 +1435,44 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     value={form.coverArtDirection} onChange={(v) => setForm({ ...form, coverArtDirection: v })} />
                 </div>
 
+                {/* ACCURACY NOTE — front matter for books making health/safety claims. */}
+                <div style={{ marginTop: 22, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>Accuracy note (front matter)</div>
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: 2, marginBottom: 8 }}>
+                    An optional line on the copyright page, for books making health, safety or other claims a
+                    reader could act on. Off by default. Edit the wording to match what was actually done.
+                  </div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                    <input type="checkbox" checked={Boolean(form.accuracyNoteEnabled)}
+                      onChange={(e) => setForm({ ...form, accuracyNoteEnabled: e.target.checked })} />
+                    Print an accuracy note on the copyright page
+                  </label>
+                  {form.accuracyNoteEnabled && (
+                    <>
+                      <LabeledTextarea label="Note text" rows={4}
+                        hint="Say what was actually done. Do not claim a professional reviewed the book unless one did — name them below if so."
+                        value={form.accuracyNoteText} onChange={(v) => setForm({ ...form, accuracyNoteText: v })} />
+                      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                        <div style={{ flex: "1 1 240px" }}>
+                          <LabeledInput label="Reviewer name (only if one actually reviewed it)"
+                            value={form.accuracyReviewerName}
+                            onChange={(v) => setForm({ ...form, accuracyReviewerName: v })} />
+                        </div>
+                        <div style={{ flex: "1 1 200px" }}>
+                          <LabeledInput label="Reviewer credentials"
+                            value={form.accuracyReviewerCredentials}
+                            onChange={(v) => setForm({ ...form, accuracyReviewerCredentials: v })} />
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11.5, color: C.orange, marginTop: 6, lineHeight: 1.5 }}>
+                        Saying the book was medically reviewed is a claim about a person. If the note says so and no
+                        reviewer is named, saving is rejected — that check lives in the schema, not this form, so it
+                        holds for the API and scripts too.
+                      </div>
+                    </>
+                  )}
+                </div>
+
                 <div style={{ marginTop: 22, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>Back Cover</div>
                   <div style={{ fontSize: 12, color: C.muted, marginTop: 2, marginBottom: 4 }}>
@@ -1702,7 +1778,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                     <div style={{ fontWeight: 800, fontSize: 15 }}>Cover (full wrap: back | spine | front)</div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                      <button style={{ ...S.btn("spend"), margin: 0, fontSize: 12 }} onClick={() => genCover().catch(() => {})}>{cover ? "Regenerate cover" : "Generate cover"}</button>
+                      <button
+                        style={{ ...S.ghost, margin: 0, fontSize: 12 }}
+                        title="Free. Shows the exact geometry, blueprint, prompt and cost that a paid generation would use."
+                        onClick={() => loadCoverPreflight().catch(() => {})}
+                      >
+                        Preflight (free)
+                      </button>
+                      <button
+                        style={{ ...S.btn("spend"), margin: 0, fontSize: 12, opacity: preflight?.blocked ? 0.45 : 1 }}
+                        disabled={Boolean(preflight?.blocked)}
+                        title={preflight?.blocked ? "Preflight failed — fix the errors before generating." : undefined}
+                        onClick={() => genCover().catch(() => {})}
+                      >
+                        {cover ? "Regenerate cover" : "Generate cover"}
+                      </button>
                       {cover && (
                         <button
                           style={{ ...S.btn("spend"), margin: 0, fontSize: 12 }}
@@ -1715,6 +1805,70 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     </div>
                   </div>
                   <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>One continuous full-bleed image: back cover, spine, and front cover together{cover?.pageCount ? `; spine sized for ${cover.pageCount} interior pages` : ""}. It is a single file, so there is just one generate.</div>
+
+                  {/* PREFLIGHT — everything that would be sent, before anything is spent. */}
+                  {preflight && (
+                    <div style={{ ...S.card, marginTop: 10, borderColor: preflight.blocked ? C.red : preflight.status === "WARNING" ? C.orange : C.line }}>
+                      <div style={{ fontWeight: 800, color: preflight.blocked ? C.red : preflight.status === "WARNING" ? C.orange : C.ink }}>
+                        Preflight: {preflight.status}{preflight.blocked ? " — GENERATION BLOCKED" : ""}
+                      </div>
+
+                      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginTop: 8, fontSize: 12 }}>
+                        <div>
+                          <div style={{ fontWeight: 700, marginBottom: 3 }}>Geometry</div>
+                          <div style={{ color: C.muted, lineHeight: 1.7 }}>
+                            {preflight.geometry.pageCount} pages · {preflight.geometry.paperStock} paper<br />
+                            spine <b>{preflight.geometry.spineIn.toFixed(4)}in</b><br />
+                            wrap <b>{preflight.geometry.fullWidthIn.toFixed(3)} × {preflight.geometry.fullHeightIn.toFixed(3)}in</b><br />
+                            print {preflight.geometry.printCanvas.widthPx}×{preflight.geometry.printCanvas.heightPx} @ {preflight.geometry.printCanvas.dpi}dpi<br />
+                            model {preflight.geometry.modelCanvas.widthPx}×{preflight.geometry.modelCanvas.heightPx}<br />
+                            crop keeps <b>{preflight.geometry.crop.survivingWidthPct.toFixed(1)}%</b> of width
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, marginBottom: 3 }}>Model &amp; cost</div>
+                          <div style={{ color: C.muted, lineHeight: 1.7 }}>
+                            {preflight.model.model} · quality {preflight.model.quality}<br />
+                            blueprint attached: <b>{preflight.model.usesBlueprint ? "yes" : "no"}</b><br />
+                            spine text: <b>{preflight.spineTextAllowed ? "yes" : "no (under 79pp)"}</b><br />
+                            colour: <b>{preflight.artDirection.fullColour ? "FULL COLOUR" : "monochrome"}</b><br />
+                            DNA: {preflight.artDirection.styleDnaId}<br />
+                            est. <b>${preflight.cost.estimatedUsd.toFixed(2)}</b> for one image
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 6, fontStyle: "italic" }}>{preflight.cost.basis}</div>
+
+                      <div style={{ marginTop: 10 }}>
+                        {preflight.checks.map((c) => (
+                          <div key={c.key} style={{ display: "flex", gap: 8, fontSize: 12, padding: "3px 0", alignItems: "baseline" }}>
+                            <span style={{ ...S.pill(c.status === "ERROR" ? C.red : c.status === "WARNING" ? C.orange : C.green), fontSize: 9.5, padding: "1px 6px", minWidth: 58, textAlign: "center" }}>{c.status}</span>
+                            <span><b>{c.label}</b> — <span style={{ color: C.muted }}>{c.detail}</span></span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Layout blueprint — the reference image the model receives</div>
+                          <a href={blueprintUrl(project.id, preflight._cb)} target="_blank" rel="noreferrer" title="Open full size" style={{ display: "block", width: 420, border: `1px solid ${C.line}`, borderRadius: 6, overflow: "hidden", cursor: "zoom-in" }}>
+                            <img alt="Cover layout blueprint" src={blueprintUrl(project.id, preflight._cb)} style={{ width: "100%", display: "block" }} />
+                          </a>
+                          <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4, maxWidth: 420 }}>
+                            Production guide only — none of it is printed. Red boxes are where text goes; the dimmed band is cropped off.
+                          </div>
+                        </div>
+                      </div>
+
+                      <button style={{ ...S.ghost, marginTop: 12, fontSize: 12 }} onClick={() => setShowPrompt((v) => !v)}>
+                        {showPrompt ? "Hide" : "Show"} the exact prompt ({preflight.prompt.length.toLocaleString()} chars)
+                      </button>
+                      {showPrompt && (
+                        <pre style={{ marginTop: 8, maxHeight: 420, overflow: "auto", background: "#0d1117", color: "#d7dde5", padding: 12, borderRadius: 6, fontSize: 11.5, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{preflight.prompt}</pre>
+                      )}
+                    </div>
+                  )}
                   {cover?.imagePath
                     ? (
                       <>

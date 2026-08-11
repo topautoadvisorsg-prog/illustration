@@ -648,15 +648,65 @@ export async function generateCoverWrapArtwork(
 
   const dims = computeCoverDimensions(config, pageCount);
   const edition = await getDefaultEdition(projectId).catch(() => null);
-  const prompt = buildCoverWrapPrompt(config, pageCount, dims, edition?.styleDnaId);
-  const image = await generateImage({
-    // Kept in step with COVER_ART_CANVAS_PX, which the prompt's edge-crop
-    // warning is computed from. Changing one without the other tells the model
-    // to protect the wrong band.
-    size: `${COVER_ART_CANVAS_PX.w}x${COVER_ART_CANVAS_PX.h}`,
-    prompt,
-    quality: 'high',
-  });
+
+  /**
+   * TWO ENGINES, ON PURPOSE, FOR NOW.
+   *
+   * The field guide's cover is the one that has actually been printed and sold.
+   * Its prompt is the interior assembler's, and every word of the field-guide
+   * language that is wrong for other books is RIGHT for that one. So it keeps
+   * the path it shipped on, byte for byte, until its next cover is due.
+   *
+   * Every other book class goes through the cover engine: its own prompt
+   * builder, a blueprint the model actually receives, and a preflight that
+   * refuses to spend on a spec that is already broken.
+   */
+  const isFieldGuide = getProductionProfile(config.productionProfileId).id === 'wildlands-field-guide';
+
+  let prompt: string;
+  let image: Awaited<ReturnType<typeof generateImage>>;
+
+  if (isFieldGuide) {
+    prompt = buildCoverWrapPrompt(config, pageCount, dims, edition?.styleDnaId);
+    image = await generateImage({
+      // Kept in step with COVER_ART_CANVAS_PX, which the prompt's edge-crop
+      // warning is computed from. Changing one without the other tells the model
+      // to protect the wrong band.
+      size: `${COVER_ART_CANVAS_PX.w}x${COVER_ART_CANVAS_PX.h}`,
+      prompt,
+      quality: 'high',
+    });
+  } else {
+    const { buildCoverRequest } = await import('../cover/build-cover-request.js');
+    const { generateImageFromBlueprint } = await import('../../services/openai/openai.js');
+    const req = await buildCoverRequest(projectId, config, { editionStyleDnaId: edition?.styleDnaId });
+
+    // FAIL CLOSED. The whole point of resolving the request before spending is
+    // that a known-bad spec never reaches a paid endpoint.
+    if (req.preflight.blocked) {
+      const failures = req.preflight.checks.filter((c) => c.status === 'ERROR');
+      throw new RenderBlockedError(
+        `Cover preflight failed, so nothing was generated and nothing was charged. ${failures
+          .map((c) => `${c.label}: ${c.detail}`)
+          .join(' ')}`,
+        'invalid_state',
+      );
+    }
+
+    prompt = req.prompt;
+    // The blueprint goes WITH the request. The prompt tells the model what to
+    // design; this tells it where everything belongs. Sent through the edit
+    // endpoint because that is the one that accepts a reference image.
+    image = await generateImageFromBlueprint({
+      prompt,
+      blueprintPng: req.blueprintPng,
+      size: `${req.spec.model.sizePx.widthPx}x${req.spec.model.sizePx.heightPx}` as never,
+    });
+    // Keep the blueprint beside the artwork: without it, a later reviewer cannot
+    // tell whether a misplaced element was the model ignoring the reference or
+    // the reference being wrong.
+    await getProjectStorage().writeProjectFile(projectId, ['cover', 'cover-blueprint.png'], req.blueprintPng);
+  }
 
   const storage = getProjectStorage();
   const promptStored = await storage.writeProjectFile(projectId, ['cover', 'cover-wrap.prompt.txt'], prompt);
@@ -786,7 +836,11 @@ export function buildCoverWrapPrompt(
   const seriesLine =
     buildSeriesLine(config.publishing.series?.name, config.publishing.series?.volumeNumber ?? config.volume) ?? undefined;
   const sceneSubject = subtitle || title;
-  const frontPanelXIn = config.trimSize.bleedIn + config.trimSize.widthIn + dims.spineIn;
+  // COVER bleed, not the interior's. A text interior legitimately prints with
+  // bleedIn 0, which put this book's front panel origin 0.125in left of where
+  // the front cover actually starts. Same class of bug COVER_BLEED_IN was
+  // introduced to kill, still living here.
+  const frontPanelXIn = COVER_BLEED_IN + config.trimSize.widthIn + dims.spineIn;
   // How THIS class of book wants its cover art described. The fallback is the
   // field guide's original wording verbatim, so the book that already shipped
   // produces the same prompt it always did.

@@ -360,6 +360,18 @@ const SUBJECTS: Record<number, string> = {
     'The idea the picture carries: a no is a complete answer and nothing bad follows it. ' +
     'BOTH FIGURES MUST BE DRAWN COMPLETE, with the whole of both heads and plenty of white space above them, well inside the top edge. ' +
     'Calm and matter-of-fact. No conflict, no anger, no cowering, no pointing, no crowd, no text.',
+  // Anchored to "One rule for all of it": if the first adult you tell doesn't
+  // take you seriously, tell another one. An OBJECT rather than a scene — the
+  // people-based framings of telling an adult all drift toward distress, which
+  // the profile's subject policy rules out, and the object type is under-used
+  // across the set.
+  150:
+    'An OBJECT, no people. A plain interior wall seen straight on, flat and simple, carrying THREE identical ordinary doors in a row with clear space between them. ' +
+    'The first two doors are shut. The THIRD door stands OPEN, and a simple wedge of light falls from it across the floor. ' +
+    'The doors are plain and well kept; nothing about the picture is bleak. ' +
+    'The idea the picture carries: you keep going along the row, and one of them opens. ' +
+    'Calm and matter-of-fact. NOT a dark corridor, NOT a maze, no menacing shadows, nobody knocking, nobody waiting, ' +
+    'no hands, no faces, no figures, no room visible through the opening, no numbers, no signs, no arrows, no labels, no text.',
 };
 
 const subject = SUBJECTS[pageArg];

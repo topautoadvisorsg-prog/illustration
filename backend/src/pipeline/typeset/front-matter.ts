@@ -87,6 +87,21 @@ export function buildFrontMatterHtml(input: FrontMatterInput): string {
   // Publication facts, each omitted when unknown. An ISBN in particular is
   // never fabricated: it is a registered identifier, and a plausible-looking
   // wrong one is far worse than none.
+  /**
+   * The accuracy note, when the book is set to carry one.
+   *
+   * Reads off the project, not off a caller argument, so it cannot be switched
+   * on for a preview and quietly off for the export. When a reviewer is named,
+   * their name is appended — that is the whole point of naming them.
+   */
+  const note = config.publishing.accuracyNote;
+  const accuracyNote =
+    note?.enabled && note.text.trim()
+      ? [note.text.trim(), note.reviewerName?.trim() ? `Reviewed by ${note.reviewerName.trim()}${note.reviewerCredentials?.trim() ? `, ${note.reviewerCredentials.trim()}` : ''}.` : '']
+          .filter(Boolean)
+          .join(' ')
+      : '';
+
   const facts: string[] = [];
   if (publication?.edition) facts.push(escapeHtml(publication.edition));
   if (publication?.publisher) facts.push(escapeHtml(publication.publisher));
@@ -121,6 +136,7 @@ export function buildFrontMatterHtml(input: FrontMatterInput): string {
     <p class="cp-line">Copyright &copy; ${year} ${escapeHtml(author)}</p>
     <p class="cp-rights">${escapeHtml(rights)}</p>
     ${publication?.disclaimer ? `<p class="cp-rights">${escapeHtml(publication.disclaimer)}</p>` : ''}
+    ${accuracyNote ? `<p class="cp-rights cp-accuracy">${escapeHtml(accuracyNote)}</p>` : ''}
     ${facts.length ? `<p class="cp-facts">${facts.join('<br>')}</p>` : ''}
   </div>
 </section>

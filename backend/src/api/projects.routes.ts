@@ -2600,6 +2600,70 @@ const OverrideParamsSchema = z.object({
     }
   });
 
+  /**
+   * COVER PREFLIGHT — everything that would be sent, before anything is spent.
+   *
+   * Free and repeatable. `?format=blueprint` returns the blueprint PNG itself so
+   * the console can show the operator the actual reference image the model will
+   * receive, rather than a drawing of one.
+   */
+  app.get('/api/projects/:id/cover/preflight', async (request, reply) => {
+    const { id } = ProjectParamsSchema.parse(request.params);
+    const project = await getProject(id);
+    if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+    const config = parseProjectConfig(project);
+
+    const { buildCoverRequest } = await import('../pipeline/cover/build-cover-request.js');
+    try {
+      const req = await buildCoverRequest(id, config);
+      if ((request.query as { format?: string } | undefined)?.format === 'blueprint') {
+        return reply.type('image/png').send(req.blueprintPng);
+      }
+      return reply.send({
+        blocked: req.preflight.blocked,
+        status: req.preflight.status,
+        checks: req.preflight.checks,
+        cost: req.preflight.cost,
+        prompt: req.prompt,
+        model: req.spec.model,
+        spineTextAllowed: req.spec.spineTextAllowed,
+        copy: req.spec.copy,
+        artDirection: {
+          styleDnaId: req.spec.art.styleDnaId,
+          fullColour: req.spec.art.fullColour,
+          operatorDirection: req.spec.art.operatorDirection ?? null,
+          atmosphere: req.spec.art.atmosphere,
+          mood: req.spec.art.mood,
+        },
+        geometry: {
+          pageCount: req.spec.geometry.pageCount,
+          paperStock: req.spec.geometry.paperStock,
+          trimIn: req.spec.geometry.trimIn,
+          bleedIn: req.spec.geometry.bleedIn,
+          spineIn: req.spec.geometry.dims.spineIn,
+          fullWidthIn: req.spec.geometry.dims.fullWidthIn,
+          fullHeightIn: req.spec.geometry.dims.fullHeightIn,
+          printCanvas: req.spec.geometry.printCanvas,
+          modelCanvas: req.spec.geometry.modelCanvas,
+          crop: {
+            scale: req.spec.geometry.crop.scale,
+            survivingWidthPct: req.spec.geometry.crop.survivingWidthPct,
+            survivingHeightPct: req.spec.geometry.crop.survivingHeightPct,
+            cropPerSideModelPxX: req.spec.geometry.crop.cropPerSideModelPxX,
+            cropPerSideModelPxY: req.spec.geometry.crop.cropPerSideModelPxY,
+          },
+        },
+        provenance: req.spec.provenance,
+      });
+    } catch (error) {
+      if (error instanceof RenderBlockedError) {
+        const status = renderErrorStatus(error.code);
+        return reply.code(status).send({ error: 'Render Blocked', message: error.message, statusCode: status });
+      }
+      throw error;
+    }
+  });
+
   app.post('/api/projects/:id/generate-cover-artwork', async (request, reply) => {
     const { id } = ProjectParamsSchema.parse(request.params);
     try {

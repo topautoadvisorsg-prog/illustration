@@ -592,6 +592,18 @@ export type PageQualityResolutionStatus = z.infer<typeof PageQualityResolutionSt
 // ── Front Matter v1 — generic publishing metadata (FRONT_MATTER_V1_SPEC.md §5).
 // Platform-level: NOTHING book-, brand-, or series-specific is hardcoded here.
 // Every field is data; templates and AI prompts read from this block only.
+/**
+ * Default accuracy note for health/safety titles.
+ *
+ * Deliberately describes what was DONE — research and cross-checking against
+ * published guidance — and claims nothing about a named professional having
+ * read the manuscript. Any book that has had a real review should say so
+ * explicitly, with the reviewer named.
+ */
+export const DEFAULT_ACCURACY_NOTE =
+  'Medical accuracy: Health information in this book was researched and cross-checked against guidance ' +
+  'from established pediatric and medical organizations and physician-reviewed sources.';
+
 export const PublishingMetadataSchema = z.object({
   /** Overrides project title/subtitle/author when present; falls back to them. */
   title: z.string().min(1).optional(),
@@ -612,6 +624,45 @@ export const PublishingMetadataSchema = z.object({
   printedIn: z.string().optional(),
   dedication: z.string().optional(),
   disclaimers: z.array(z.string()).default([]),
+  /**
+   * ACCURACY NOTE — an optional front-matter line for books that make health,
+   * safety or other claims a reader could act on.
+   *
+   * Off by default. Editable per book, because the honest wording depends
+   * entirely on what was actually done: a book cross-checked against published
+   * guidance and a book read by a named paediatrician are different claims and
+   * must not share a sentence.
+   *
+   * ─── THE GUARD ────────────────────────────────────────────────────────────
+   * "Medically reviewed by" is a statement about a person. It is refused unless
+   * `reviewerName` names one. This is enforced in the SCHEMA rather than in the
+   * form, so it holds for the API, a script, and a future UI equally — the
+   * claim is a liability, and a validation that only lives in a textarea is not
+   * a control.
+   */
+  accuracyNote: z
+    .object({
+      enabled: z.boolean().default(false),
+      text: z.string().default(DEFAULT_ACCURACY_NOTE),
+      /** The actual professional who reviewed it, when one did. */
+      reviewerName: z.string().optional(),
+      reviewerCredentials: z.string().optional(),
+    })
+    .superRefine((v, ctx) => {
+      const claimsReview = /medical(ly)?\s+(review|vetted|approved|checked)|reviewed\s+by\s+(a\s+)?(doctor|physician|paediatrician|pediatrician|md\b)/i.test(
+        v.text,
+      );
+      if (claimsReview && !v.reviewerName?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['text'],
+          message:
+            'This note claims a medical professional reviewed the book. Name them in reviewerName, or remove the claim. ' +
+            'Saying a book was medically reviewed when nobody reviewed it is a false statement about a health product.',
+        });
+      }
+    })
+    .default({ enabled: false, text: DEFAULT_ACCURACY_NOTE }),
   credits: z.string().optional(),
   additionalResources: z
     .object({ heading: z.string().min(1), items: z.array(z.string().min(1)) })
