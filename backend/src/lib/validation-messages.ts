@@ -72,6 +72,23 @@ export function friendlyIssueMessage(issue: ZodIssue, label: string): string {
       return `${label} must be one of: ${issue.options.join(', ')}.`;
     case 'invalid_string':
       return `${label} isn't formatted correctly.`;
+    case 'custom': {
+      /**
+       * A custom issue is the one kind that ALREADY has an operator-facing
+       * sentence: somebody wrote it in a `superRefine` precisely because the
+       * generic phrasing could not explain the rule.
+       *
+       * It was falling through to "X is invalid.", which threw that sentence
+       * away. The accuracy-note guard blocked saves in production without ever
+       * telling the operator that the note claims a medical review nobody
+       * performed — a rule you cannot comply with if you cannot read it.
+       *
+       * Zod's own placeholder for a message-less custom issue is "Invalid
+       * input"; that is not an explanation either, so it still falls back.
+       */
+      const authored = issue.message?.trim();
+      return authored && authored !== 'Invalid input' ? authored : `${label} is invalid.`;
+    }
     default:
       return `${label} is invalid.`;
   }

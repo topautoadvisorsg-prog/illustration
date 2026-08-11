@@ -1451,6 +1451,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
                     <>
                       <LabeledTextarea label="Note text" rows={4}
                         hint="Say what was actually done. Do not claim a professional reviewed the book unless one did — name them below if so."
+                        error={fieldError(errorState.fields, "accuracyNote.text")}
                         value={form.accuracyNoteText} onChange={(v) => setForm({ ...form, accuracyNoteText: v })} />
                       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                         <div style={{ flex: "1 1 240px" }}>
@@ -3382,10 +3383,14 @@ function LabeledInput({ label, value, onChange, error }) {
     </label>
   );
 }
-function LabeledTextarea({ label, value, onChange, rows = 4, hint }) {
+function LabeledTextarea({ label, value, onChange, rows = 4, hint, error }) {
   return (
     <label style={{ display: "block", marginTop: 10, fontSize: 13, fontWeight: 600 }}>{label}
-      <textarea style={{ ...S.input, minHeight: rows * 22, fontFamily: "inherit", resize: "vertical" }} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} />
+      <textarea style={{ ...S.input, minHeight: rows * 22, fontFamily: "inherit", resize: "vertical", ...(error ? { border: `2px solid ${C.red}` } : {}) }} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} />
+      {/* The rule, in full. A guard the operator cannot read is a guard they
+          cannot comply with, so this shows the whole sentence rather than
+          truncating it to fit. */}
+      {error ? <span style={{ display: "block", fontWeight: 400, color: C.red, fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>{error}</span> : null}
       {hint ? <span style={{ display: "block", fontWeight: 400, color: C.muted, fontSize: 12, marginTop: -2 }}>{hint}</span> : null}
     </label>
   );

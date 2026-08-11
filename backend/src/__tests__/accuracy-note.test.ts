@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema, DEFAULT_ACCURACY_NOTE } from '@wildlands/shared';
 import { buildFrontMatterHtml } from '../pipeline/typeset/front-matter.js';
+import { friendlyIssueMessage, issuesToFields } from '../lib/validation-messages.js';
 
 const book = (accuracyNote?: Record<string, unknown>) =>
   ProjectConfigSchema.parse({
@@ -71,5 +72,35 @@ describe('accuracy note', () => {
   it('the default wording makes no claim about a person', () => {
     expect(DEFAULT_ACCURACY_NOTE).not.toMatch(/reviewed by/i);
     expect(() => book({ enabled: true, text: DEFAULT_ACCURACY_NOTE })).not.toThrow();
+  });
+
+  /**
+   * The rule has to REACH the operator. A guard that blocks a save while saying
+   * only "Text is invalid." is a rule nobody can comply with.
+   */
+  it('surfaces the real reason to the operator, not a generic message', () => {
+    const parsed = ProjectConfigSchema.safeParse({
+      volume: 1,
+      title: 'T',
+      authorName: 'A',
+      trimSize: { widthIn: 5.5, heightIn: 8.5, bleedIn: 0 },
+      publishing: { accuracyNote: { enabled: true, text: 'Medically reviewed by a pediatrician.' } },
+    });
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+
+    const custom = parsed.error.issues.find((i) => i.code === 'custom')!;
+    const message = friendlyIssueMessage(custom, 'Text');
+    expect(message).not.toBe('Text is invalid.');
+    expect(message).toMatch(/name them in reviewerName|remove the claim/i);
+
+    const fields = issuesToFields(parsed.error.issues);
+    const field = fields.find((f) => f.path.endsWith('accuracyNote.text'))!;
+    expect(field.message).toMatch(/false statement about a health product/i);
+  });
+
+  it('still falls back for a custom issue with no authored message', () => {
+    const bare = { code: 'custom', path: ['x'], message: 'Invalid input' } as never;
+    expect(friendlyIssueMessage(bare, 'Text')).toBe('Text is invalid.');
   });
 });
