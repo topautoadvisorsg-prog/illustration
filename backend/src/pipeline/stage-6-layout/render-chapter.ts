@@ -710,18 +710,42 @@ export async function generateCoverWrapArtwork(
 
   const storage = getProjectStorage();
   const promptStored = await storage.writeProjectFile(projectId, ['cover', 'cover-wrap.prompt.txt'], prompt);
-  const imageStored = await storage.writeProjectFile(projectId, ['cover', 'cover-wrap-art.png'], image.pngBuffer);
+
+  // A generation is a VERSION, exactly like an upload. Writing to one fixed
+  // filename meant every paid render silently destroyed the previous cover,
+  // which is the wrong behaviour for the most expensive asset in the book.
+  const versions = config.publishing.coverVersions ?? [];
+  const version = versions.reduce((m, v) => Math.max(m, v.version), 0) + 1;
+  const previous = versions.find((v) => v.assetPath === config.publishing.coverAssetPath);
+  const imageStored = await storage.writeProjectFile(
+    projectId,
+    ['cover', `cover-wrap-art-v${version}.png`],
+    image.pngBuffer,
+  );
+  const createdAt = new Date().toISOString();
   await updateProjectConfig(projectId, {
     ...config,
     publishing: {
       ...config.publishing,
       coverAssetPath: imageStored.relativePath,
+      coverVersions: [
+        ...versions,
+        {
+          version,
+          assetPath: imageStored.relativePath,
+          source: 'generated' as const,
+          widthPx: image.widthPx,
+          heightPx: image.heightPx,
+          createdAt,
+          replacedVersion: previous?.version,
+        },
+      ],
       // Phase 0 sync record: the spine width is baked into THIS art at THIS page
       // count. Final export compares it against the live interior page count.
       coverSync: {
         builtForPageCount: pageCount,
         spineIn: dims.spineIn,
-        generatedAt: new Date().toISOString(),
+        generatedAt: createdAt,
       },
     },
   });

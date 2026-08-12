@@ -704,7 +704,35 @@ export const PublishingMetadataSchema = z.object({
    * still driven by the title/author/series fields, not this text.
    */
   coverArtDirection: z.string().optional(),
+  /** The CURRENT cover artwork. Points at whichever version is selected. */
   coverAssetPath: z.string().optional(),
+  /**
+   * COVER VERSION HISTORY.
+   *
+   * Until now the only way artwork could become the cover was a paid
+   * generation: `generateCoverWrapArtwork` wrote the asset and nothing else
+   * did. So a cover fixed outside the pipeline could never get back IN, and the
+   * console went on showing a superseded generation as if it were current.
+   *
+   * Every version is kept and none is overwritten, because the reason a cover
+   * gets replaced is usually a defect found late, and the previous one is the
+   * thing you fall back to when the replacement is worse.
+   */
+  coverVersions: z
+    .array(
+      z.object({
+        version: z.number().int().positive(),
+        assetPath: z.string().min(1),
+        source: z.enum(['generated', 'uploaded']),
+        widthPx: z.number().int().positive(),
+        heightPx: z.number().int().positive(),
+        createdAt: z.string(),
+        note: z.string().optional(),
+        /** Which version was current when this one arrived, for provenance. */
+        replacedVersion: z.number().int().positive().optional(),
+      }),
+    )
+    .default([]),
   // Cover/interior synchronization record (Phase 0 production gate). Captured
   // when the cover ARTWORK is generated — the spine width is baked into the art
   // at that page count. Final export compares builtForPageCount against the

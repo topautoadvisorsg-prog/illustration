@@ -2601,6 +2601,137 @@ const OverrideParamsSchema = z.object({
   });
 
   /**
+   * UPLOAD COVER ARTWORK — get an approved wrap into the platform without paying.
+   *
+   * Mirrors the illustration upload. Before this existed, `generateCoverWrapArtwork`
+   * was the ONLY writer of the cover asset, so artwork corrected outside the
+   * pipeline could never be made current: the console kept showing a superseded
+   * generation, and the only route back in was to pay for another one.
+   *
+   * Every version is retained. `select` switches the current pointer to an
+   * existing version without uploading anything, which is the undo.
+   */
+  app.put('/api/projects/:id/cover-artwork', async (request, reply) => {
+    const { id } = ProjectParamsSchema.parse(request.params);
+    const body = z
+      .object({
+        pngBase64: z.string().min(1).optional(),
+        /** Make an EXISTING version current instead of uploading. */
+        selectVersion: z.number().int().positive().optional(),
+        note: z.string().max(500).optional(),
+      })
+      .refine((v) => Boolean(v.pngBase64) || v.selectVersion !== undefined, {
+        message: 'Provide pngBase64 to upload, or selectVersion to switch to an existing version.',
+      })
+      .parse(request.body ?? {});
+
+    const project = await getProject(id);
+    if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+    const config = parseProjectConfig(project);
+    const versions = config.publishing.coverVersions ?? [];
+
+    // ── switch to an existing version ─────────────────────────────────────
+    if (body.selectVersion !== undefined) {
+      const target = versions.find((v) => v.version === body.selectVersion);
+      if (!target) {
+        throw new UserFacingError(`There is no cover version ${body.selectVersion} for this book.`, {
+          code: 'Unknown Cover Version',
+          errorCode: ERROR_CODES.UNCLASSIFIED,
+          statusCode: 404,
+        });
+      }
+      await updateProjectConfig(id, {
+        ...config,
+        publishing: { ...config.publishing, coverAssetPath: target.assetPath },
+      });
+      return reply.send({ ok: true, current: target, versions });
+    }
+
+    // ── upload a new version ──────────────────────────────────────────────
+    const bytes = Buffer.from(body.pngBase64!, 'base64');
+    const { default: sharpLib } = await import('sharp');
+    const meta = await sharpLib(bytes).metadata();
+    const widthPx = meta.width ?? 0;
+    const heightPx = meta.height ?? 0;
+    if (!widthPx || !heightPx) {
+      throw new UserFacingError('That file could not be read as a PNG.', {
+        code: 'Unreadable Cover Artwork',
+        errorCode: ERROR_CODES.UNCLASSIFIED,
+        statusCode: 400,
+      });
+    }
+
+    /**
+     * NATIVE resolution is recorded, not gated at 300.
+     *
+     * A 300-DPI gate here would reject the platform's OWN output: every cover
+     * this pipeline has ever produced — including the one that printed — is
+     * 1536x1024 from the image model, which is ~132 DPI across an 11.6in wrap,
+     * and `composeCoverPrint` Lanczos-upscales it onto the 300-DPI canvas. A
+     * rule the generator cannot satisfy is not a quality gate, it is a bug that
+     * makes the upload path useless for the artwork it exists to accept.
+     *
+     * So the figure is measured and stored, and only artwork small enough to be
+     * obviously wrong is refused.
+     */
+    const { renderCoverGeometry } = await import('../pipeline/stage-6-layout/render-chapter.js');
+    const { pageCount, dims } = await renderCoverGeometry(id, config);
+    const nativeDpi = widthPx / dims.fullWidthIn;
+    if (nativeDpi < 100) {
+      throw new UserFacingError(
+        `${widthPx}px across a ${dims.fullWidthIn.toFixed(3)}in wrap is only ${Math.round(nativeDpi)} DPI of real detail. ` +
+          'That is too little to print from at any size. Supply larger artwork.',
+        { code: 'Cover Under Resolution', errorCode: ERROR_CODES.UNCLASSIFIED, statusCode: 422 },
+      );
+    }
+
+    const version = versions.reduce((m, v) => Math.max(m, v.version), 0) + 1;
+    const previous = versions.find((v) => v.assetPath === config.publishing.coverAssetPath);
+    const stored = await getProjectStorage().writeProjectFile(
+      id,
+      ['cover', `cover-wrap-art-v${version}.png`],
+      bytes,
+    );
+    const entry = {
+      version,
+      assetPath: stored.relativePath,
+      source: 'uploaded' as const,
+      widthPx,
+      heightPx,
+      createdAt: new Date().toISOString(),
+      note: body.note,
+      replacedVersion: previous?.version,
+    };
+    await updateProjectConfig(id, {
+      ...config,
+      publishing: {
+        ...config.publishing,
+        coverAssetPath: stored.relativePath,
+        coverVersions: [...versions, entry],
+        // The uploaded wrap is built for THIS page count; record it so the
+        // export gate compares against the right number.
+        coverSync: { builtForPageCount: pageCount, spineIn: dims.spineIn, generatedAt: entry.createdAt },
+      },
+    });
+    request.log.info({ projectId: id, version, widthPx, heightPx, nativeDpi: Math.round(nativeDpi) }, 'cover artwork uploaded');
+    return reply.send({ ok: true, current: entry, versions: [...versions, entry] });
+  });
+
+  /** Cover version history, for the Step 7 picker. */
+  app.get('/api/projects/:id/cover-artwork', async (request, reply) => {
+    const { id } = ProjectParamsSchema.parse(request.params);
+    const project = await getProject(id);
+    if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+    const config = parseProjectConfig(project);
+    const versions = config.publishing.coverVersions ?? [];
+    return reply.send({
+      currentAssetPath: config.publishing.coverAssetPath ?? null,
+      versions,
+      current: versions.find((v) => v.assetPath === config.publishing.coverAssetPath) ?? null,
+    });
+  });
+
+  /**
    * COVER PREFLIGHT — everything that would be sent, before anything is spent.
    *
    * Free and repeatable. `?format=blueprint` returns the blueprint PNG itself so

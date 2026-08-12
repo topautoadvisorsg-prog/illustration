@@ -74,20 +74,29 @@ export function blueprintTextZones(spec: CoverSpec): TextZone[] {
 
   // FRONT — title block high-centre, author low. The gap between them is where
   // the art breathes, and it is why the title does not drift to the edge.
-  zones.push({ rect: band(frontSafe, 0.14, 0.34), label: 'TITLE', sample: spec.copy.title });
+  //
+  // TEXT_INSET matters. These zones used to span the FULL width of the safe
+  // area, which told the model it could set type right up to the safe line. It
+  // did, and the title then overshot: 0.038in past the TRIM and 0.288in outside
+  // safe on the printed wrap. Display type is set to fill its box, so the box
+  // has to stop before the boundary does.
+  const TEXT_INSET = 0.07;
+  const inset = (r: Rect): Rect => ({ x: r.x + r.w * TEXT_INSET, y: r.y, w: r.w * (1 - TEXT_INSET * 2), h: r.h });
+
+  zones.push({ rect: inset(band(frontSafe, 0.14, 0.34)), label: 'TITLE', sample: spec.copy.title });
   if (spec.copy.subtitle) {
-    zones.push({ rect: band(frontSafe, 0.36, 0.46), label: 'SUBTITLE', sample: spec.copy.subtitle });
+    zones.push({ rect: inset(band(frontSafe, 0.36, 0.46)), label: 'SUBTITLE', sample: spec.copy.subtitle });
   }
   if (spec.copy.coverDescription) {
     zones.push({
-      rect: band(frontSafe, 0.47, 0.55),
+      rect: inset(band(frontSafe, 0.47, 0.55)),
       label: 'COVER LINE',
       sample: spec.copy.coverDescription,
     });
   }
-  zones.push({ rect: band(frontSafe, 0.74, 0.84), label: 'AUTHOR', sample: spec.copy.author });
+  zones.push({ rect: inset(band(frontSafe, 0.74, 0.84)), label: 'AUTHOR', sample: spec.copy.author });
   if (spec.copy.seriesLine) {
-    zones.push({ rect: band(frontSafe, 0.86, 0.94), label: 'SERIES', sample: spec.copy.seriesLine });
+    zones.push({ rect: inset(band(frontSafe, 0.86, 0.94)), label: 'SERIES', sample: spec.copy.seriesLine });
   }
 
   // SPINE — a text zone here means "the model letters this". When code sets the
@@ -217,13 +226,20 @@ export function buildCoverBlueprintSvg(spec: CoverSpec): string {
   );
   label(W / 2, H * 0.975, 'ALL TEXT INSIDE THE RED LINE. Artwork may bleed past it; text may not.', 0.0105, RED, '700');
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" font-family="sans-serif">${o.join('')}</svg>`;
+  // The XML declaration is not decoration. Without it librsvg reads the bytes
+  // as latin-1, so an en-dash in a subtitle ("Boys 9–14") rasterised onto the
+  // blueprint as "9ã€"14". The model READS this image, so a garbled label is a
+  // garbled instruction — it could paint the mojibake onto the cover.
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" font-family="sans-serif">${o.join('')}</svg>`
+  );
 }
 
 /** The blueprint as a PNG, at the model's exact canvas size. */
 export async function renderCoverBlueprintPng(spec: CoverSpec): Promise<Buffer> {
   const svg = buildCoverBlueprintSvg(spec);
-  return sharp(Buffer.from(svg))
+  return sharp(Buffer.from(svg, 'utf8'))
     .resize(spec.geometry.modelCanvas.widthPx, spec.geometry.modelCanvas.heightPx, { fit: 'fill' })
     .png()
     .toBuffer();

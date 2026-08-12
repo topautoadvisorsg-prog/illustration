@@ -163,8 +163,33 @@ export function buildCoverPrompt(spec: CoverSpec): string {
     `  • The BACK-COVER text block starts no further left than ${pct(backSafe.leftPct)} and ends no further right than ${pct(backSafe.leftPct + backSafe.widthPct)}.`,
     `  • The FRONT-COVER text block starts no further left than ${pct(frontSafe.leftPct)} and ends no further right than ${pct(frontSafe.leftPct + frontSafe.widthPct)}.`,
     '  • If copy will not fit inside those bounds, set it SMALLER. Never widen the text block to the panel edge.',
+    // The title is the one that breaks this. It is display type, the model sets
+    // it to fill its box, and on the last render it overshot the safe line by
+    // 0.288in and the trim by 0.038in — the outer letters would have been cut.
+    `  • THE TITLE IS THE ONE THAT GOES WRONG. Set it so its longest line ENDS by ${pct(frontSafe.leftPct + frontSafe.widthPct - frontSafe.widthPct * 0.07)} of the width,`,
+    '    leaving a visible gap of clear background between the last letter and the red line. Do not let any letter of the title,',
+    '    subtitle or author touch or cross that line. If the title is too long to fit with that gap, set it smaller or break it',
+    '    onto another line — never let it run wider.',
     '  • Give the author name something to sit on — a shape, band or colour block beneath it — so it does not drift to the bottom edge.',
     '  • Artwork may run past every one of these lines. Type may not.',
+    '',
+    // CONTAINMENT, not persuasion.
+    //
+    // Telling a model "stay inside an invisible line" has now failed twice: the
+    // title is display type, it is set to fill its space, and there is nothing
+    // in the picture telling it where to stop. The author line has never had
+    // this problem because it sits on a graphic band — it has a visible thing
+    // holding it in. So give the title the same.
+    //
+    // This is a composition instruction, not a guide mark: the device is REAL
+    // artwork that prints, unlike the blueprint.
+    'CONTAIN THE TITLE — this is how you keep it off the edge:',
+    '  • The title block must sit ON or WITHIN a visible graphic element that is part of the design: a solid colour block,',
+    '    a panel, a heavy band, or a bold shape behind the lettering. Not a thin outline, not a decorative frame.',
+    '  • That element must itself have clear background on its left and right, well inside the red safe line. The type stops',
+    '    where the element stops, and the element stops before the edge does.',
+    '  • Use the same graphic language as the rest of the cover — the bold flat bands and blocks already in the art direction.',
+    '  • Result: nothing on the front panel is ever floating loose near an edge. Every line of type has something holding it in.',
     '',
     'NEVER:',
     ...negatives(spec).map((s) => `  • ${s}`),
