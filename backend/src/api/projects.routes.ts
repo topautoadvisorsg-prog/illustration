@@ -2640,9 +2640,21 @@ const OverrideParamsSchema = z.object({
           statusCode: 404,
         });
       }
+      // Restore the sync record that belongs to THIS artwork. Leaving the
+      // previous one in place would certify the page count of the version being
+      // switched away from, so a cover with the wrong spine would sail through
+      // the export gate. A version that predates the field clears coverSync
+      // instead, which makes the gate ask again rather than assume.
       await updateProjectConfig(id, {
         ...config,
-        publishing: { ...config.publishing, coverAssetPath: target.assetPath },
+        publishing: {
+          ...config.publishing,
+          coverAssetPath: target.assetPath,
+          coverSync:
+            target.builtForPageCount !== undefined && target.spineIn !== undefined
+              ? { builtForPageCount: target.builtForPageCount, spineIn: target.spineIn, generatedAt: target.createdAt }
+              : undefined,
+        },
       });
       return reply.send({ ok: true, current: target, versions });
     }
@@ -2701,6 +2713,8 @@ const OverrideParamsSchema = z.object({
       createdAt: new Date().toISOString(),
       note: body.note,
       replacedVersion: previous?.version,
+      builtForPageCount: pageCount,
+      spineIn: dims.spineIn,
     };
     await updateProjectConfig(id, {
       ...config,

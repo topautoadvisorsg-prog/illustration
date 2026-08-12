@@ -738,6 +738,8 @@ export async function generateCoverWrapArtwork(
           heightPx: image.heightPx,
           createdAt,
           replacedVersion: previous?.version,
+          builtForPageCount: pageCount,
+          spineIn: dims.spineIn,
         },
       ],
       // Phase 0 sync record: the spine width is baked into THIS art at THIS page

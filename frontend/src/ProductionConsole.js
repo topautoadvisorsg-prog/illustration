@@ -289,6 +289,7 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [showGuides, setShowGuides] = useState(true); // KDP-style trim/safe overlay on the page preview
   const [coverAR, setCoverAR] = useState(null); // full-wrap image aspect ratio (w/h), for spine fold lines
   const [cover, setCover] = useState(null);
+  const [coverVersions, setCoverVersions] = useState(null); // { currentAssetPath, versions[], current }
   const [preflight, setPreflight] = useState(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [assembly, setAssembly] = useState(null);
@@ -461,14 +462,28 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
   useEffect(() => { if (project?.id) loadStatus(project.id).catch(() => {}); else setStatus({}); }, [project?.id, loadStatus]);
 
-  // The full-wrap cover lives at a deterministic storage path. Probe it whenever
-  // the active project changes so an already-generated cover shows in the card
-  // without re-spending. If the image 404s (no cover yet), the <img> onError
-  // clears it back to "No cover generated yet."
-  useEffect(() => {
-    if (project?.id) setCover({ imagePath: `${project.id}/cover/cover-wrap-art.png`, _probe: true, _cb: Date.now() });
+  // Show the cover that is ACTUALLY current, not a guessed filename.
+  //
+  // This used to hard-code `cover/cover-wrap-art.png`. Once covers became
+  // versioned, that path is only ever version 1 — so approving or uploading a
+  // new wrap left Step 7 showing the OLD cover, which is precisely the kind of
+  // stale-artifact confusion the version history exists to end. Ask the backend
+  // which asset is current and render that. The old probe stays as the fallback
+  // for projects that predate versioning.
+  const loadCoverVersions = useCallback(async (projectId) => {
+    const d = await api(`/api/projects/${projectId}/cover-artwork`);
+    setCoverVersions(d);
+    if (d?.currentAssetPath) setCover({ imagePath: d.currentAssetPath, _probe: true, _cb: Date.now() });
     else setCover(null);
-  }, [project?.id]);
+    return d;
+  }, [api]);
+
+  useEffect(() => {
+    if (!project?.id) { setCover(null); setCoverVersions(null); return; }
+    loadCoverVersions(project.id).catch(() => {
+      setCover({ imagePath: `${project.id}/cover/cover-wrap-art.png`, _probe: true, _cb: Date.now() });
+    });
+  }, [project?.id, loadCoverVersions]);
 
   // Sync the Setup form with the OPEN project's real config. The project-list
   // endpoint omits `config`, so without this, visiting Setup on an existing book
@@ -1016,7 +1031,37 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const genCover = () => run("Generating cover (paid)", async () => {
     const d = await api(`/api/projects/${project.id}/generate-cover-artwork`, { method: "POST", body: "{}" });
     setCover({ ...d, _cb: Date.now() });
+    await loadCoverVersions(project.id).catch(() => {});
     return { notice: "Cover artwork generated." };
+  });
+
+  // Upload a finished wrap instead of generating one. Mirrors the illustration
+  // upload: the file becomes the next version, the previous one is kept, and
+  // the export gate is re-pointed at the page count this wrap was built for.
+  // Costs nothing — it is the escape hatch for artwork finished outside the
+  // platform, and the way an approved cover gets back in after a manual fix.
+  const uploadCover = (file) => run("Uploading cover artwork", async () => {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("Could not read that file."));
+      r.readAsDataURL(file);
+    });
+    const pngBase64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+    const d = await api(`/api/projects/${project.id}/cover-artwork`, {
+      method: "PUT",
+      body: JSON.stringify({ pngBase64, note: `Uploaded ${file.name}` }),
+    });
+    setCoverVersions((c) => ({ ...(c || {}), currentAssetPath: d.current.assetPath, versions: d.versions, current: d.current }));
+    setCover({ imagePath: d.current.assetPath, _probe: true, _cb: Date.now() });
+    return { notice: `Uploaded as version ${d.current.version} (${d.current.widthPx}×${d.current.heightPx}). The previous cover is kept.` };
+  });
+
+  const selectCoverVersion = (version) => run(`Switching to cover version ${version}`, async () => {
+    const d = await api(`/api/projects/${project.id}/cover-artwork`, { method: "PUT", body: JSON.stringify({ selectVersion: version }) });
+    setCoverVersions((c) => ({ ...(c || {}), currentAssetPath: d.current.assetPath, versions: d.versions, current: d.current }));
+    setCover({ imagePath: d.current.assetPath, _probe: true, _cb: Date.now() });
+    return { notice: `Version ${version} is now the cover. Nothing was deleted.` };
   });
 
   // Fix ONLY the spine of an approved cover. One image-edit call against the
@@ -1803,8 +1848,54 @@ export default function ProductionConsole({ onExitToLegacy }) {
                           Fix spine text only
                         </button>
                       )}
+                      <label
+                        style={{ ...S.ghost, margin: 0, fontSize: 12, cursor: "pointer", display: "inline-flex", alignItems: "center" }}
+                        title="Free. Put a finished wrap in as the next version — artwork fixed outside the platform, or a cover you made elsewhere. The previous version is kept."
+                      >
+                        Upload cover (free)
+                        <input
+                          type="file"
+                          accept="image/png"
+                          style={{ display: "none" }}
+                          onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadCover(f).catch(() => {}); }}
+                        />
+                      </label>
                     </div>
                   </div>
+
+                  {/* VERSION HISTORY — nothing is overwritten, so the previous
+                      cover is always one click away. */}
+                  {coverVersions?.versions?.length > 1 && (
+                    <div style={{ ...S.card, marginTop: 10 }}>
+                      <div style={{ fontWeight: 800, fontSize: 13 }}>Cover versions</div>
+                      <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>Every generation and upload is kept. Switching back deletes nothing.</div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+                        {coverVersions.versions.slice().sort((a, b) => b.version - a.version).map((v) => {
+                          const isCurrent = v.assetPath === coverVersions.currentAssetPath;
+                          return (
+                            <div key={v.version} style={{ width: 190, border: `2px solid ${isCurrent ? C.green : C.line}`, borderRadius: 6, padding: 6, background: isCurrent ? "rgba(0,140,60,0.06)" : "transparent" }}>
+                              <a href={`${fileUrl(v.assetPath)}&v=${v.version}`} target="_blank" rel="noreferrer" style={{ display: "block", border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden", background: "#000" }}>
+                                <img alt={`Cover version ${v.version}`} src={`${fileUrl(v.assetPath)}&v=${v.version}`} style={{ width: "100%", display: "block" }} />
+                              </a>
+                              <div style={{ fontSize: 11.5, fontWeight: 800, marginTop: 5 }}>
+                                v{v.version} · {v.source}{isCurrent ? " · CURRENT" : ""}
+                              </div>
+                              <div style={{ fontSize: 10.5, color: C.muted }}>
+                                {v.widthPx}×{v.heightPx}
+                                {v.builtForPageCount ? ` · ${v.builtForPageCount}pp · spine ${v.spineIn?.toFixed(4)}in` : " · page count unknown"}
+                              </div>
+                              {v.note && <div style={{ fontSize: 10.5, color: C.muted, marginTop: 3, lineHeight: 1.35 }}>{v.note}</div>}
+                              {!isCurrent && (
+                                <button style={{ ...S.ghost, margin: "6px 0 0", fontSize: 11, width: "100%" }} onClick={() => selectCoverVersion(v.version).catch(() => {})}>
+                                  Use this version
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>One continuous full-bleed image: back cover, spine, and front cover together{cover?.pageCount ? `; spine sized for ${cover.pageCount} interior pages` : ""}. It is a single file, so there is just one generate.</div>
 
                   {/* PREFLIGHT — everything that would be sent, before anything is spent. */}

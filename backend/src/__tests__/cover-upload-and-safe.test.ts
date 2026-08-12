@@ -51,6 +51,36 @@ describe('cover version history', () => {
       book({ publishing: { coverVersions: [{ version: 1, assetPath: '', source: 'generated', widthPx: 10, heightPx: 10, createdAt: 'x' }] } }),
     ).toThrow();
   });
+
+  /**
+   * Each version carries the page count its spine was drawn for. Without it,
+   * switching back to an older cover leaves `coverSync` certifying the page
+   * count of the version you switched AWAY from — so a wrap with the wrong
+   * spine passes the export gate.
+   */
+  it('carries the page count and spine each version was built for', () => {
+    const cfg = book({
+      publishing: {
+        coverVersions: [
+          { version: 1, assetPath: 'p/v1.png', source: 'generated', widthPx: 1536, heightPx: 1024, createdAt: 'a', builtForPageCount: 154, spineIn: 0.385 },
+          { version: 2, assetPath: 'p/v2.png', source: 'uploaded', widthPx: 1536, heightPx: 1024, createdAt: 'b', builtForPageCount: 156, spineIn: 0.39 },
+        ],
+      },
+    });
+    const [v1, v2] = cfg.publishing.coverVersions;
+    expect(v1!.builtForPageCount).toBe(154);
+    expect(v1!.spineIn).toBeCloseTo(0.385, 4);
+    expect(v2!.builtForPageCount).toBe(156);
+    // The two spines genuinely differ, which is the whole reason to track it.
+    expect(v1!.spineIn).not.toBe(v2!.spineIn);
+  });
+
+  it('still accepts versions recorded before the page count was tracked', () => {
+    const cfg = book({
+      publishing: { coverVersions: [{ version: 1, assetPath: 'p/v1.png', source: 'generated', widthPx: 1536, heightPx: 1024, createdAt: 'a' }] },
+    });
+    expect(cfg.publishing.coverVersions[0]!.builtForPageCount).toBeUndefined();
+  });
 });
 
 describe('front-cover text zones stay off the safe line', () => {

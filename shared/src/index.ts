@@ -730,6 +730,18 @@ export const PublishingMetadataSchema = z.object({
         note: z.string().optional(),
         /** Which version was current when this one arrived, for provenance. */
         replacedVersion: z.number().int().positive().optional(),
+        /**
+         * The interior page count this wrap's spine was sized for.
+         *
+         * Carried per version so switching back to an older cover also restores
+         * the right `coverSync`. Without it, selecting version 1 after
+         * uploading version 2 leaves the export gate certifying version 2's
+         * page count while version 1's artwork is what ships — a wrong spine
+         * that passes the check. Optional because versions recorded before this
+         * field existed genuinely do not know.
+         */
+        builtForPageCount: z.number().int().positive().optional(),
+        spineIn: z.number().positive().optional(),
       }),
     )
     .default([]),
