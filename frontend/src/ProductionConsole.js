@@ -329,6 +329,53 @@ export default function ProductionConsole({ onExitToLegacy }) {
     return data;
   }, []);
 
+  /**
+   * Where the trim, safe area and spine folds actually fall on the wrap preview.
+   *
+   * This used to derive the spine from the displayed image's aspect ratio:
+   *   spine = imageAR × fullHeight − 2×trimWidth − 2×bleed
+   * which assumes the file on screen IS the print wrap. It is not. The stored
+   * artwork is the image model's own 1536×1024 canvas, and `composeCoverPrint`
+   * centre-crops that to the wrap. So the sum read 1.5 × 8.75 − 11 − 0.25 =
+   * 1.875in of spine on a book whose spine is 0.3900in, and drew the fold lines
+   * roughly two inches away from the folds. Guides that wrong are worse than no
+   * guides — they are why a title crossing the trim could look fine on screen.
+   *
+   * Now: take the real spine from the version record (the page count its art was
+   * built for), compute the wrap from the trim, and map print inches onto
+   * whatever image is being displayed by inverting the same centre-crop. If the
+   * displayed file already IS the composed wrap, the mapping is the identity.
+   */
+  const coverGuides = useMemo(() => {
+    const td = trimSize(form.trim);
+    const current = coverVersions?.current;
+    const spineIn = current?.spineIn ?? preflight?.geometry?.spineIn ?? null;
+    if (!spineIn || !coverAR) return null;
+    // KDP's cover bleed is always 0.125in, independent of the interior's.
+    const BLEED = 0.125, SAFE = 0.25;
+    const fullWidthIn = 2 * BLEED + 2 * td.widthIn + spineIn;
+    const fullHeightIn = 2 * BLEED + td.heightIn;
+    const printAR = fullWidthIn / fullHeightIn;
+    const survivingW = Math.min(1, printAR / coverAR);
+    const survivingH = Math.min(1, coverAR / printAR);
+    const originX = (1 - survivingW) / 2, originY = (1 - survivingH) / 2;
+    const px = (inches) => (originX + (inches / fullWidthIn) * survivingW) * 100;
+    const py = (inches) => (originY + (inches / fullHeightIn) * survivingH) * 100;
+    return {
+      spineIn,
+      fullWidthIn,
+      fullHeightIn,
+      pageCount: current?.builtForPageCount ?? preflight?.geometry?.pageCount ?? "?",
+      safeLeftPct: px(BLEED + SAFE),
+      safeRightPct: px(fullWidthIn - BLEED - SAFE),
+      safeTopPct: py(BLEED + SAFE),
+      safeBottomPct: py(fullHeightIn - BLEED - SAFE),
+      foldLeftPct: px(BLEED + td.widthIn),
+      foldRightPct: px(BLEED + td.widthIn + spineIn),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.trim, coverVersions, preflight, coverAR]);
+
   // Append the shared key as a query param so <img>/<iframe>/PDF loads (which
   // can't send an Authorization header) pass the gate too.
   const fileUrl = useCallback((p) => { const pw = sessionStorage.getItem("wl_pw") || ""; return `${BACKEND}/api/whole-page-render/file?path=${encodeURIComponent(p)}${pw ? `&k=${encodeURIComponent(pw)}` : ""}`; }, []);
@@ -1970,26 +2017,17 @@ export default function ProductionConsole({ onExitToLegacy }) {
                               The spine is derived from the wrap image's real aspect ratio, so it is
                               correct for whatever spine width / page count the cover was built with —
                               no hardcoded constant. Review-only DOM lines, never baked into the export. */}
-                          {showGuides && <div style={{ position: "absolute", top: "6.31%", bottom: "6.31%", left: "4.39%", right: "4.39%", border: "1.5px dashed #2f8a3f", pointerEvents: "none", boxSizing: "border-box" }} />}
-                          {showGuides && (() => {
-                            const td = trimSize(form.trim);
-                            const fullH = td.heightIn + 2 * td.bleedIn;
-                            const fullW = coverAR ? coverAR * fullH : null;
-                            const spineIn = fullW ? fullW - 2 * td.widthIn - 2 * td.bleedIn : null;
-                            if (!fullW || !spineIn || spineIn <= 0) return null;
-                            const leftPct = ((td.bleedIn + td.widthIn) / fullW) * 100;
-                            const rightPct = ((td.bleedIn + td.widthIn + spineIn) / fullW) * 100;
-                            return (
-                              <>
-                                <div style={{ position: "absolute", top: 0, bottom: 0, left: `${leftPct}%`, width: 0, borderLeft: "1.5px dashed #e08a2e", pointerEvents: "none" }} />
-                                <div style={{ position: "absolute", top: 0, bottom: 0, left: `${rightPct}%`, width: 0, borderLeft: "1.5px dashed #e08a2e", pointerEvents: "none" }} />
-                              </>
-                            );
-                          })()}
+                          {showGuides && coverGuides && (
+                            <>
+                              <div style={{ position: "absolute", top: `${coverGuides.safeTopPct}%`, bottom: `${100 - coverGuides.safeBottomPct}%`, left: `${coverGuides.safeLeftPct}%`, right: `${100 - coverGuides.safeRightPct}%`, border: "1.5px dashed #2f8a3f", pointerEvents: "none", boxSizing: "border-box" }} />
+                              <div style={{ position: "absolute", top: 0, bottom: 0, left: `${coverGuides.foldLeftPct}%`, width: 0, borderLeft: "1.5px dashed #e08a2e", pointerEvents: "none" }} />
+                              <div style={{ position: "absolute", top: 0, bottom: 0, left: `${coverGuides.foldRightPct}%`, width: 0, borderLeft: "1.5px dashed #e08a2e", pointerEvents: "none" }} />
+                            </>
+                          )}
                         </a>
                         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.muted, marginTop: 6, cursor: "pointer" }}>
                           <input type="checkbox" checked={showGuides} onChange={(e) => setShowGuides(e.target.checked)} />
-                          Show guides — <span style={{ color: "#2f8a3f" }}>green = text-safe</span> · <span style={{ color: "#e08a2e" }}>orange = spine folds</span>{coverAR ? ` (spine ≈ ${(coverAR * (trimSize(form.trim).heightIn + 0.25) - 2 * trimSize(form.trim).widthIn - 0.25).toFixed(3)}in)` : ""}
+                          Show guides — <span style={{ color: "#2f8a3f" }}>green = text-safe</span> · <span style={{ color: "#e08a2e" }}>orange = spine folds</span>{coverGuides ? ` (spine ${coverGuides.spineIn.toFixed(4)}in for ${coverGuides.pageCount}pp · wrap ${coverGuides.fullWidthIn.toFixed(2)}×${coverGuides.fullHeightIn.toFixed(2)}in)` : ""}
                         </label>
                         <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Click the wrap to open it full-size and read every word. Back cover (left) · spine (center) · front cover (right).</div>
                         <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
