@@ -131,4 +131,24 @@ describe('entry parity counting', () => {
   it('does not count a numbered list item as an entry heading', () => {
     expect(countNumberedEntries('1. first thing\n2. second thing\n')).toBe(0);
   });
+
+  /**
+   * Measured on the shipped New England manuscript: 75 numbered catalog entries
+   * among 178 h3 headings, producing 127 entry rows. Hazards, primers and other
+   * unnumbered sections legitimately become entries. An equality check called
+   * that book BLOCKED — it is on sale. The rule is a floor, not equality.
+   */
+  it('counts only numbered headings, not every heading — the two differ by design', () => {
+    const md = [
+      '## INTRODUCTION',
+      '### Welcome to the Wilderness',
+      '### Hazard 1 — Extreme Weather',
+      '## THE CATALOG',
+      '### 1. Black Bear',
+      '### 2. Grey Wolf',
+    ].join('\n');
+    expect(countNumberedEntries(md)).toBe(2);
+    // Four other headings exist and may each become an entry; that is not a defect.
+    expect((md.match(/^#{2,3}\s+\S/gm) ?? []).length).toBe(6);
+  });
 });

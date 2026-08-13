@@ -214,16 +214,36 @@ export async function auditReadiness(projectId: string): Promise<ReadinessReport
     try {
       const markdown = (await getProjectStorage().readProjectFile(project.manuscriptPath)).toString('utf8');
       const numbered = countNumberedEntries(markdown);
+      /**
+       * A FLOOR, not an equality.
+       *
+       * Equality was wrong and blocked New England, which has shipped: that
+       * manuscript carries 75 numbered catalog entries among 178 h3 headings,
+       * and hazards, primers and other non-numbered sections legitimately
+       * become entries too — 127 in total. More entries than numbered headings
+       * is a richer book, not a broken parser.
+       *
+       * FEWER entries than numbered headings is the real defect this guards:
+       * it means the parser dropped catalog entries, which is exactly the
+       * mis-grouping that bit the Canadian Rockies onboarding.
+       */
       if (numbered === 0) {
         checks.push(na('entry-parity', 'Entry count vs source', 'The manuscript uses no numbered entry headings, so there is nothing to compare.'));
-      } else if (numbered === entryRows.length) {
-        checks.push(pass('entry-parity', 'Entry count vs source', `${numbered} numbered headings, ${entryRows.length} entries`));
+      } else if (entryRows.length >= numbered) {
+        checks.push(
+          pass(
+            'entry-parity',
+            'Entry count vs source',
+            `${numbered} numbered heading(s) in the source, ${entryRows.length} entries produced — none dropped. ` +
+              'Counts differ legitimately when unnumbered sections also become entries.',
+          ),
+        );
       } else {
         checks.push(
           fail(
             'entry-parity',
             'Entry count vs source',
-            `The source has ${numbered} numbered entry headings but ${entryRows.length} entries were produced.`,
+            `The source has ${numbered} numbered entry headings but only ${entryRows.length} entries were produced — ${numbered - entryRows.length} were dropped.`,
             'The breakdown parser did not hold on this manuscript. Re-run breakdown and compare chapter grouping before spending.',
           ),
         );
