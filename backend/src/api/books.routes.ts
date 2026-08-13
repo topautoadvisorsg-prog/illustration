@@ -99,15 +99,58 @@ export function configFromBrief(brief: z.infer<typeof BriefSchema>): ProjectConf
   });
 }
 
+// ── response contracts ──────────────────────────────────────────────────────
+// Declared, not just returned. `/api/docs` is generated from these, and the
+// README now points operators and agents at that spec as the live route
+// reference — a route with no schema documents nothing and quietly breaks that
+// promise. It is also the house convention (see this folder's README).
+
+const ReadinessCheckSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  status: z.enum(['PASS', 'WARN', 'FAIL', 'NA']),
+  detail: z.string(),
+  fix: z.string().optional(),
+});
+
+const ReadinessReportSchema = z.object({
+  projectId: z.string(),
+  title: z.string(),
+  status: z.enum(['READY', 'WARNING', 'BLOCKED']),
+  checks: z.array(ReadinessCheckSchema),
+  nextAction: z.string(),
+  generatedAt: z.string(),
+});
+
+const IntakeOptionsResponseSchema = z.object({
+  trimPresets: z.array(z.object({ id: z.string(), widthIn: z.number(), heightIn: z.number(), bleedIn: z.number() })),
+  paperStocks: z.array(z.string()),
+  productionProfiles: z.array(z.object({ id: z.string(), label: z.string() })),
+});
+
+const IntakeResponseSchema = z.object({
+  projectId: z.string(),
+  created: z.boolean(),
+  message: z.string().optional(),
+  steps: z
+    .array(z.object({ step: z.string(), status: z.enum(['DONE', 'SKIPPED', 'FAILED']), detail: z.string() }))
+    .optional(),
+  readiness: ReadinessReportSchema,
+});
+
 export async function registerBookRoutes(app: FastifyInstance): Promise<void> {
   /** What a brief may legally name. Lets a client build a valid brief without guessing. */
-  app.get('/api/books/intake-options', async () => ({
-    trimPresets: Object.entries(TRIM_PRESETS).map(([id, size]) => ({ id, ...size })),
-    paperStocks: ['cream', 'white'],
-    productionProfiles: listProductionProfiles(),
-  }));
+  app.get(
+    '/api/books/intake-options',
+    { schema: { response: { 200: IntakeOptionsResponseSchema } } },
+    async () => ({
+      trimPresets: Object.entries(TRIM_PRESETS).map(([id, size]) => ({ id, ...size })),
+      paperStocks: ['cream', 'white'],
+      productionProfiles: listProductionProfiles(),
+    }),
+  );
 
-  app.post('/api/books/intake', async (request, reply) => {
+  app.post('/api/books/intake', { schema: { response: { 200: IntakeResponseSchema, 201: IntakeResponseSchema } } }, async (request, reply) => {
     const body = IntakeBodySchema.parse(request.body ?? {});
     const { brief } = body;
 
@@ -202,10 +245,19 @@ export async function registerBookRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** The pre-spend gate. Free, deterministic, read-only. */
-  app.get('/api/projects/:id/readiness', async (request, reply) => {
-    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const project = await getProject(id);
-    if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
-    return reply.send(await auditReadiness(id));
-  });
+  app.get(
+    '/api/projects/:id/readiness',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: ReadinessReportSchema, 404: z.object({ error: z.string(), message: z.string(), statusCode: z.number() }) },
+      },
+    },
+    async (request, reply) => {
+      const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+      const project = await getProject(id);
+      if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      return reply.send(await auditReadiness(id));
+    },
+  );
 }
