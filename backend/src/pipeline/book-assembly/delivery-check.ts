@@ -144,6 +144,26 @@ export async function checkDelivery(input: {
         : `${pc} pages, within the 24–828 paperback range`,
   });
 
+  /**
+   * EVEN PAGE COUNT. Sheets are folded into signatures, so a print block is
+   * always an even number of pages.
+   *
+   * This has to FAIL rather than warn, because KDP does not reject an odd
+   * interior — it rounds UP and prints the extra leaf itself. The book then has
+   * one more page than the spine was calculated for, and the cover is cut
+   * fractionally wrong with nothing anywhere reporting a problem. Padding
+   * deliberately keeps the block and the spine describing the same book.
+   */
+  checks.push({
+    name: 'page_count_parity',
+    label: 'Page count parity',
+    status: pc % 2 === 0 ? 'PASS' : 'FAIL',
+    detail:
+      pc % 2 === 0
+        ? `${pc} pages, even`
+        : `${pc} pages is odd. KDP will round up to ${pc + 1} and print the extra leaf, but the spine here is sized for ${pc} — pad the interior to ${pc + 1} and rebuild the cover.`,
+  });
+
   // Cover. Optional, because the interior is deliverable and reviewable before
   // the cover exists; when it does exist its geometry must match THIS interior.
   let cover: PdfFacts | null = null;
