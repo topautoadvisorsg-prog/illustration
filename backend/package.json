@@ -10,6 +10,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "drizzle-kit migrate && node dist/index.js",
     "smoke": "tsx scripts/smoke-test.ts",
+    "mcp": "tsx src/mcp/server.ts",
     "audit:manuscript": "tsx scripts/audit-manuscript.ts",
     "vendor:fonts": "tsx scripts/vendor-fonts.ts",
     "qa:typeset": "tsx scripts/typeset-qa-layer1.ts",
