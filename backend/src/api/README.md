@@ -1,128 +1,87 @@
 # API
 
-Fastify route handlers for the Wildlands operator console and pipeline stages.
+Fastify route handlers for the Wildlands operator console, the MCP server, and
+the pipeline stages.
 
-## Current Status
+## The route list is generated, not written here
 
-Implemented foundation routes:
+A hand-maintained table of every endpoint is how this file went stale: it
+claimed auth was unenforced (it is enforced), described the breakdown stage as
+"Claude manifest generation" (it is deterministic and calls no model), and was
+missing seven of the twelve route modules.
 
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/health` | Backend and database health check |
-| `POST` | `/api/projects` | Create a project with default Wildlands config |
-| `GET` | `/api/projects` | List projects |
-| `GET` | `/api/projects/:id` | Read one project |
-| `PATCH` | `/api/projects/:id/config` | Save visible operator config, including layout library metadata |
-| `POST` | `/api/projects/:id/manuscript` | Store manuscript and run deterministic Stage 1 outline parsing |
-| `POST` | `/api/projects/:id/manifests` | Run Stage 1.5 Claude manifest generation and persist locked manifests |
-| `GET` | `/api/projects/:id/manifests` | Read persisted manifests |
-| `POST` | `/api/projects/:id/plan` | Run Stage 2 page planning |
-| `GET` | `/api/projects/:id/pages` | Read persisted page rows and planner output fields |
-| `POST` | `/api/projects/:id/text-fit-preview` | Run text-fit preview before image spend |
-| `GET` | `/api/projects/:id/image-library` | Search/filter reusable project image assets |
-| `GET` | `/api/projects/:id/cost-estimate` | Estimate project image cost from generated-image count |
-| `GET` | `/api/projects/:id/production-dashboard` | Read project-wide production status, queues, chapter readiness, and export state |
-| `GET` | `/api/projects/:id/chapters/:chapterNumber/operator-intelligence` | Read chapter readiness, blockers, and next action |
-| `POST` | `/api/projects/:id/chapters/:chapterNumber/format-calibration` | Compare publishing standards against one chapter without mutating the project |
-| `POST` | `/api/projects/:id/chapters/:chapterNumber/render` | Render one chapter PDF preview |
-| `POST` | `/api/projects/:id/pages/:pageKey/render` | Render one focused page PDF proof |
-| `POST` | `/api/projects/:id/render-book` | Render/stitch book PDF and run KDP preflight |
-| `GET` | `/api/agents` | Read backend agent contracts for the operator UI |
-| `POST` | `/api/pages/:pageId/generate-image` | Generate one page illustration from its locked prompt |
-| `GET` | `/api/pages/:pageId/images` | List generated image versions for one page |
-| `GET` | `/api/images/:imageId/file` | Stream a generated/upscaled library asset preview |
-| `POST` | `/api/pages/:pageId/images/reuse` | Reuse a library asset as a new version on another page |
-| `POST` | `/api/pages/:pageId/images/:version/approve` | Approve and lock an image version |
-| `POST` | `/api/pages/:pageId/images/:version/reject` | Reject an image version with an optional note |
-| `POST` | `/api/pages/:pageId/images/:version/set-active` | Set a historical version active |
-| `POST` | `/api/pages/:pageId/regenerate` | Regenerate one page image with an operator addendum |
-| `POST` | `/api/pages/:pageId/upscale` | Upscale approved art and run the DPI gate |
-| `GET` | `/api/content-types` | Read the content-type guide used by the planner |
-| `GET` | `/api/render-check` | Render one sample PDF page without DB dependency |
-| `GET` | `/api/render-check-chapter` | Render one sample chapter PDF without DB dependency |
-| `GET` | `/api/intelligence/overview` | Read Publishing Intelligence dashboard counts |
-| `GET` | `/api/intelligence/items` | Search/list knowledge records |
-| `POST` | `/api/intelligence/experiments` | Record an experiment |
-| `POST` | `/api/intelligence/decisions` | Record a publishing decision |
-| `POST` | `/api/intelligence/standards` | Lock a versioned publishing standard |
-| `POST` | `/api/intelligence/sops` | Create a versioned SOP |
-| `POST` | `/api/intelligence/lessons` | Record a lesson learned |
-| `POST` | `/api/intelligence/print-reviews` | Start a print proof review |
-| `POST` | `/api/intelligence/print-findings` | Add a print proof finding |
-| `POST` | `/api/intelligence/cost-events` | Record an API/render/storage cost |
-| `POST` | `/api/intelligence/evidence` | Attach evidence to a knowledge record |
-| `POST` | `/api/intelligence/links` | Link records for lineage |
-| `POST` | `/api/intelligence/experiments/:id/promote-decision` | Promote experiment into a decision |
-| `POST` | `/api/intelligence/decisions/:id/promote-standard` | Promote decision into a locked standard |
+**The live list is the OpenAPI spec**, registered in `server.ts` and served at:
 
-Routes not implemented yet:
+```
+/api/docs
+```
 
-- EPUB export endpoints
-- auth-protected operator sessions
+That is generated from the Zod schemas on the routes themselves, so it cannot
+drift from the code.
+
+## Route modules
+
+One file per domain, all registered in `server.ts`.
+
+| Module | Domain |
+|---|---|
+| `health.routes.ts` | liveness + database check |
+| `projects.routes.ts` | projects, config, manuscript, manifests, cover, typeset preview |
+| `books.routes.ts` | **book intake** and the **readiness gate** |
+| `pagination.routes.ts` | Pagination v1 (self-gates on `PAGINATION_V1_ENABLED`) |
+| `pages.routes.ts` | per-page image generation, versions, approval, upscale |
+| `whole-page.routes.ts` | AI whole-page render track (self-gates on `WHOLE_PAGE_RENDER_ENABLED`) |
+| `subject-badges.routes.ts` | deterministic subject/badge metadata cleanup |
+| `supervisor.routes.ts` | no-spend pipeline supervisor, returns a PipelineReport |
+| `epub.routes.ts` | Kindle EPUB build + preview |
+| `review-workflow.routes.ts` | review queues and sign-off |
+| `agents.routes.ts` | agent contracts for the operator UI |
+| `diagnostics.routes.ts` | environment and storage diagnostics |
+
+## Starting points
+
+**Onboarding a book** — `POST /api/books/intake` takes a brief plus a manuscript
+and returns a project that is already ingested, broken down where the track uses
+it, paginated, and audited. `GET /api/books/intake-options` returns what a brief
+may legally name, so a client never has to guess a profile id.
+
+**Before spending** — `GET /api/projects/:id/readiness`. Free, deterministic,
+read-only. Returns `READY | WARNING | BLOCKED` with a per-check reason and fix.
+See `docs/DROP_A_BOOK.md`.
+
+**Before a paid cover** — `GET /api/projects/:id/cover/preflight` shows the exact
+geometry, blueprint, prompt and cost that a generation would use, and fails
+closed. Nothing about a cover should be run before reading it.
+
+## Auth
+
+Enforced. `server.ts` installs an `onRequest` hook: when `CONSOLE_PASSWORD` is
+set, every request must present it as `Authorization: Bearer <password>`, or as
+a `k=` query parameter for `<img>` / `<iframe>` / PDF loads that cannot send a
+header.
 
 ## Conventions
 
-- Route groups live in one file per domain.
-- Handlers validate request and response payloads with Zod schemas from
-  `@wildlands/shared`.
-- Handlers call backend services and pipeline stages; business logic should not
-  live inside route functions.
-- Route responses should expose enough state for the operator UI and reviewer
-  debugging.
-- Publishing Intelligence routes should preserve lineage and auditability; do
-  not replace promotion workflows with ad hoc notes.
-
-## Auth Status
-
-Auth is not enforced yet. V1 plans single-user auth, but current route tests and
-Railway smoke checks run without a bearer token.
-
-Do not assume these routes are production-secure until auth middleware and tests
-are added.
+- One route group per domain file.
+- Validate request and response payloads with Zod schemas from
+  `@wildlands/shared`. The response schemas are what generate `/api/docs`.
+- Business logic lives in `pipeline/` and `services/`, not in handlers. The
+  intake route composes other routes through `app.inject` for exactly this
+  reason: intake and the console then run the same code and cannot drift.
+- Errors go through the centralized handler and carry
+  `{ message, fields, action, errorCode, correlationId }` — never raw Zod paths.
+  See `docs/ERROR_HANDLING_STANDARD.md`.
+- Anything that spends money is split into a free preflight and an explicit
+  spend call. See `docs/COST_CONTROL_POLICY.md`.
 
 ## Debugging
-
-Health check:
 
 ```bash
 curl http://localhost:8001/health
 ```
 
-Create a project:
-
 ```bash
-curl -X POST http://localhost:8001/api/projects \
-  -H "Content-Type: application/json" \
-  -d "{\"title\":\"The Wildlands Field Guide\"}"
-```
-
-Run planner:
-
-```bash
-curl -X POST http://localhost:8001/api/projects/{projectId}/plan
-```
-
-Refresh Publishing Intelligence:
-
-```bash
-curl http://localhost:8001/api/intelligence/overview
-curl "http://localhost:8001/api/intelligence/items?type=STANDARD"
-```
-
-Record a small experiment:
-
-```bash
-curl -X POST http://localhost:8001/api/intelligence/experiments \
-  -H "Content-Type: application/json" \
-  -d "{\"title\":\"Typography Test\",\"hypothesis\":\"11.5pt improves readability\",\"testPerformed\":\"Compare rendered pages\",\"tags\":[\"typography\"]}"
-```
-
-Save project config before planning:
-
-```bash
-curl -X PATCH http://localhost:8001/api/projects/{projectId}/config \
-  -H "Content-Type: application/json" \
-  -d "{\"config\":{...}}"
+curl -H "Authorization: Bearer $CONSOLE_PASSWORD" http://localhost:8001/api/projects/{id}/readiness
 ```
 
 ## Tests

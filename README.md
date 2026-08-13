@@ -15,6 +15,35 @@ Operator Console (8 steps):
 
 ---
 
+## Starting a new book — `docs/DROP_A_BOOK.md`
+
+You do not have to walk the eight steps by hand to onboard a book.
+
+**Console:** Step 1 → **Drop a book in**. Pick the manuscript, name the book,
+choose the book type and trim. One button creates the project, ingests the
+manuscript, runs the stages that book's track actually uses, and finishes with a
+readiness report.
+
+**Agent:** an MCP server (`yarn workspace @wildlands/backend mcp`) exposes the
+same operations as tools. Free tools and spending tools are separated, and the
+spending ones refuse to run without explicit confirmation.
+
+**Before spending on anything**, run the free gate — `GET /api/projects/:id/readiness`
+or the "Check readiness (free)" button. It is deterministic and read-only, and
+it answers whether the book is set up correctly enough to be worth paying for:
+that the production profile, layout standard and Style DNA genuinely resolve
+rather than silently falling back, that the breakdown parser did not drop
+entries, that no other book's region has leaked into these prompts, that print
+faces are vendored rather than fetched mid-render, and that a cover is
+geometrically buildable.
+
+Its checks are chosen by the book's track — a typeset book is not asked for
+pagination it never uses. The rule it lives by is that **a check may only fail
+on evidence**; anything else is a warning or N/A, because a gate that fails a
+book you already shipped is a gate you learn to ignore.
+
+---
+
 ## TWO PRODUCTION TRACKS — read this before changing anything
 
 The platform builds books by **two different routes**, chosen per project by the

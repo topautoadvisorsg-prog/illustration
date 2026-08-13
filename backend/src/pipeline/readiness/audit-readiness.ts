@@ -17,7 +17,7 @@
  * a FAIL — a gate that cries wolf gets ignored, and an ignored gate is worse
  * than no gate.
  */
-import type { ProjectConfig } from '@wildlands/shared';
+import { ProjectConfigSchema } from '@wildlands/shared';
 
 import { listEntriesForProject } from '../../db/repositories/entries.repo.js';
 import { listManifests, listPages } from '../../db/repositories/manifests.repo.js';
@@ -80,7 +80,12 @@ function otherBookRegions(rows: Array<{ id: string; subtitle: string | null }>, 
 export async function auditReadiness(projectId: string): Promise<ReadinessReport> {
   const project = await getProject(projectId);
   if (!project) throw new Error(`Project ${projectId} not found`);
-  const config = project.config as ProjectConfig;
+  // PARSE, do not cast. `config` is raw jsonb, and the schema supplies defaults
+  // for `publishing`, `typography`, `trimSize` and more. Casting skips all of
+  // them, so a config that relies on a default would be audited differently
+  // from how the rest of the platform reads it — the gate would answer about a
+  // book that does not exist. Every other route parses; this one now does too.
+  const config = ProjectConfigSchema.parse(project.config);
   const checks: ReadinessCheck[] = [];
 
   // ── 1. Source material ────────────────────────────────────────────────────

@@ -106,6 +106,16 @@ describe('track-aware checks', () => {
     expect(standard?.type.bodyFont).toBeTruthy();
   });
 
+  /**
+   * Intake must not run breakdown and pagination on a typeset book either. It
+   * would build manifests and page rows nothing reads, and a parse failure on
+   * either would report a perfectly good book as a broken intake.
+   */
+  it('a typeset brief resolves to the track that skips breakdown and pagination', () => {
+    const cfg = configFromBrief(brief());
+    expect(getProductionProfile(cfg.productionProfileId).bodyRenderTrack).toBe('typeset');
+  });
+
   it('every face the typeset standard names is vendored, not fetched at render time', () => {
     const standard = TYPESET_LAYOUT_STANDARDS[getProductionProfile('bw-educational-nonfiction').typesetLayoutStandardId!]!;
     const { missing } = bundledFontCss([standard.type.headingFont, standard.type.bodyFont]);

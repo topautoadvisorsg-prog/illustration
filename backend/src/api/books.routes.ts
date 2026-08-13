@@ -20,7 +20,7 @@ import { ProjectConfigSchema, type ProjectConfig } from '@wildlands/shared';
 
 import { createProject, getProject, listProjects } from '../db/repositories/projects.repo.js';
 import { auditReadiness } from '../pipeline/readiness/audit-readiness.js';
-import { isKnownProductionProfile, listProductionProfiles } from '../pipeline/production-profiles/registry.js';
+import { getProductionProfile, isKnownProductionProfile, listProductionProfiles } from '../pipeline/production-profiles/registry.js';
 import { UserFacingError } from '../lib/user-facing-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 
@@ -178,9 +178,20 @@ export async function registerBookRoutes(app: FastifyInstance): Promise<void> {
         ...(body.manuscript.fileBase64 ? { fileBase64: body.manuscript.fileBase64 } : {}),
       });
       if (uploaded && !body.setupOnly) {
-        const broke = await call('breakdown', `/api/projects/${projectId}/manifests`);
-        if (broke) await call('paginate', `/api/projects/${projectId}/paginate`, { mode: 'safe', confirmOrphanRenders: false });
-        else steps.push({ step: 'paginate', status: 'SKIPPED', detail: 'breakdown did not succeed' });
+        // Breakdown and pagination belong to the AI whole-page track. Running
+        // them on a typeset book would build manifests and page rows that
+        // nothing ever reads, and a parse failure on either would report the
+        // intake as broken for a book that is perfectly fine.
+        const track = getProductionProfile(brief.productionProfileId).bodyRenderTrack;
+        if (track === 'typeset') {
+          const reason = 'not used by the typeset track — page breaks come from the typesetter';
+          steps.push({ step: 'breakdown', status: 'SKIPPED', detail: reason });
+          steps.push({ step: 'paginate', status: 'SKIPPED', detail: reason });
+        } else {
+          const broke = await call('breakdown', `/api/projects/${projectId}/manifests`);
+          if (broke) await call('paginate', `/api/projects/${projectId}/paginate`, { mode: 'safe', confirmOrphanRenders: false });
+          else steps.push({ step: 'paginate', status: 'SKIPPED', detail: 'breakdown did not succeed' });
+        }
       }
     } else {
       steps.push({ step: 'manuscript', status: 'SKIPPED', detail: 'no manuscript in the brief' });
