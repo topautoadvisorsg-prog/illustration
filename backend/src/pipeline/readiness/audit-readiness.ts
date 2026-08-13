@@ -28,6 +28,7 @@ import { STYLE_DNA, listStyleDna } from '../publishing-standard/style-dna.js';
 import { computeCoverDimensions } from '../stage-6-layout/render-html.js';
 import { isKnownTypesetLayoutStandard, TYPESET_LAYOUT_STANDARDS } from '../typeset/layout-standards/registry.js';
 import { resolveStandardId } from '../typeset/build-typeset-interior.js';
+import { bundledFontCss } from '../typeset/font-assets.js';
 
 export type ReadinessStatus = 'PASS' | 'WARN' | 'FAIL' | 'NA';
 
@@ -169,16 +170,40 @@ export async function auditReadiness(projectId: string): Promise<ReadinessReport
     listEntriesForProject(projectId),
   ]);
 
-  if (manifestRows.length === 0) {
-    checks.push(fail('breakdown', 'Breakdown', 'No manifests. The manuscript has not been broken down.', 'Run Step 4 (POST /api/projects/:id/manifests).'));
-  } else {
-    checks.push(pass('breakdown', 'Breakdown', `${manifestRows.length} manifest(s)`));
-  }
+  // Breakdown and pagination belong to the AI whole-page track. A typeset book
+  // goes manuscript → Paged.js and legitimately has neither: NO ONE TOLD ME
+  // THAT shipped 156 printed pages with zero manifest rows. Demanding them of
+  // every book made this gate report BLOCKED on a book that was already at the
+  // printer, which is precisely the cry-wolf failure that gets a gate ignored.
+  const track = getProductionProfile(profileId).bodyRenderTrack;
 
-  if (pageRows.length === 0) {
-    checks.push(fail('pagination', 'Pagination', 'No pages. Pagination has not run.', 'Run Step 5 (POST /api/projects/:id/paginate).'));
+  if (track === 'typeset') {
+    checks.push(
+      na(
+        'breakdown',
+        'Breakdown',
+        'Not used by this book: the typeset track goes from manuscript straight to the typesetter, so there are no manifests to build.',
+      ),
+    );
+    checks.push(
+      na(
+        'pagination',
+        'Pagination',
+        'Not used by this book: page breaks come from the typesetter itself, not from the planner.',
+      ),
+    );
   } else {
-    checks.push(pass('pagination', 'Pagination', `${pageRows.length} pages, ${entryRows.length} entries`));
+    if (manifestRows.length === 0) {
+      checks.push(fail('breakdown', 'Breakdown', 'No manifests. The manuscript has not been broken down.', 'Run Step 4 (POST /api/projects/:id/manifests).'));
+    } else {
+      checks.push(pass('breakdown', 'Breakdown', `${manifestRows.length} manifest(s)`));
+    }
+
+    if (pageRows.length === 0) {
+      checks.push(fail('pagination', 'Pagination', 'No pages. Pagination has not run.', 'Run Step 5 (POST /api/projects/:id/paginate).'));
+    } else {
+      checks.push(pass('pagination', 'Pagination', `${pageRows.length} pages, ${entryRows.length} entries`));
+    }
   }
 
   // ── 4. Did the parser actually hold on THIS manuscript? ───────────────────
@@ -235,8 +260,55 @@ export async function auditReadiness(projectId: string): Promise<ReadinessReport
     }
   }
 
+  // ── 5b. Print faces must be VENDORED, not fetched at render time ──────────
+  // A render that reaches for Google Fonts produces a different book depending
+  // on the network, and a missing face silently substitutes. Only meaningful on
+  // the typeset track, which is the one that sets real type.
+  if (track === 'typeset') {
+    try {
+      // The two font ROLES the operator picks per book. The standard carries
+      // the defaults; project typography overrides them.
+      const standard = TYPESET_LAYOUT_STANDARDS[standardId];
+      const families = [
+        ...new Set(
+          [
+            config.typography?.headingFont ?? standard?.type?.headingFont,
+            config.typography?.bodyFont ?? standard?.type?.bodyFont,
+          ].filter((f): f is string => typeof f === 'string' && f.length > 0),
+        ),
+      ];
+      if (families.length === 0) {
+        checks.push(na('fonts', 'Print faces', 'This standard does not name font families directly.'));
+      } else {
+        const { bundled, missing, systemInstalled } = bundledFontCss(families);
+        if (missing.length > 0) {
+          checks.push(
+            fail(
+              'fonts',
+              'Print faces',
+              `${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} not vendored and would be fetched at render time or silently substituted.`,
+              'Vendor the face into backend/assets/fonts as base64 @font-face. A render must not depend on the network.',
+            ),
+          );
+        } else {
+          checks.push(
+            pass(
+              'fonts',
+              'Print faces',
+              `${bundled.length} vendored${systemInstalled.length ? `, ${systemInstalled.length} from the host font path` : ''}: ${families.join(', ')}`,
+            ),
+          );
+        }
+      }
+    } catch (err) {
+      checks.push(warn('fonts', 'Print faces', `Could not check: ${err instanceof Error ? err.message : String(err)}`, 'Inspect the layout standard\'s font list.'));
+    }
+  }
+
   // ── 6. Layout monoculture ─────────────────────────────────────────────────
-  if (pageRows.length === 0) {
+  if (track === 'typeset') {
+    checks.push(na('layout-variety', 'Layout variety', 'Not used by this book: the typeset track has one continuous design, not per-page layouts.'));
+  } else if (pageRows.length === 0) {
     checks.push(na('layout-variety', 'Layout variety', 'No pages yet.'));
   } else {
     const distinct = new Set(pageRows.map((p) => p.layoutTemplate).filter(Boolean));

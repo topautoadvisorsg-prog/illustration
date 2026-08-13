@@ -11,7 +11,9 @@ import { ProjectConfigSchema } from '@wildlands/shared';
 
 import { briefHash, configFromBrief, resolveTrim, type IntakeBody } from '../api/books.routes.js';
 import { countNumberedEntries } from '../pipeline/readiness/audit-readiness.js';
-import { isKnownProductionProfile } from '../pipeline/production-profiles/registry.js';
+import { getProductionProfile, isKnownProductionProfile } from '../pipeline/production-profiles/registry.js';
+import { TYPESET_LAYOUT_STANDARDS } from '../pipeline/typeset/layout-standards/registry.js';
+import { bundledFontCss } from '../pipeline/typeset/font-assets.js';
 
 const brief = (over: Record<string, unknown> = {}) => ({
   title: 'NO ONE TOLD ME THAT',
@@ -80,6 +82,34 @@ describe('intake idempotency', () => {
       intake: { briefHash: 'abc123', takenInAt: '2026-08-13T00:00:00Z' },
     });
     expect(cfg.intake?.briefHash).toBe('abc123');
+  });
+});
+
+/**
+ * The gate must not cry wolf.
+ *
+ * The first live run reported BLOCKED on NO ONE TOLD ME THAT — a book that was
+ * already printed — because it demanded breakdown manifests and paginated page
+ * rows of every project. Those belong to the AI whole-page track. A typeset
+ * book goes manuscript → Paged.js and legitimately has neither. A gate that
+ * fails a shipped book is a gate the operator learns to ignore.
+ */
+describe('track-aware checks', () => {
+  it('the two tracks are distinguishable from the profile alone', () => {
+    expect(getProductionProfile('bw-educational-nonfiction').bodyRenderTrack).toBe('typeset');
+    expect(getProductionProfile('wildlands-field-guide').bodyRenderTrack).toBe('ai-whole-page');
+  });
+
+  it('the typeset profile names both font roles, so the vendored-face check has something to check', () => {
+    const standard = TYPESET_LAYOUT_STANDARDS[getProductionProfile('bw-educational-nonfiction').typesetLayoutStandardId!];
+    expect(standard?.type.headingFont).toBeTruthy();
+    expect(standard?.type.bodyFont).toBeTruthy();
+  });
+
+  it('every face the typeset standard names is vendored, not fetched at render time', () => {
+    const standard = TYPESET_LAYOUT_STANDARDS[getProductionProfile('bw-educational-nonfiction').typesetLayoutStandardId!]!;
+    const { missing } = bundledFontCss([standard.type.headingFont, standard.type.bodyFont]);
+    expect(missing).toEqual([]);
   });
 });
 
