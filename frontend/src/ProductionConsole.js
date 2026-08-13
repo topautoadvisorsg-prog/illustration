@@ -290,6 +290,11 @@ export default function ProductionConsole({ onExitToLegacy }) {
   const [coverAR, setCoverAR] = useState(null); // full-wrap image aspect ratio (w/h), for spine fold lines
   const [cover, setCover] = useState(null);
   const [coverVersions, setCoverVersions] = useState(null); // { currentAssetPath, versions[], current }
+  // Book intake — one action that replaces create → upload → breakdown → paginate.
+  const [intakeOptions, setIntakeOptions] = useState(null); // registries, fetched so the form cannot offer an invalid profile
+  const [intakeFile, setIntakeFile] = useState(null);
+  const [intakeForm, setIntakeForm] = useState({ title: "", subtitle: "", authorName: "", productionProfileId: "", trimPreset: "5.5x8.5", paperStock: "cream" });
+  const [readiness, setReadiness] = useState(null);
   const [preflight, setPreflight] = useState(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [assembly, setAssembly] = useState(null);
@@ -509,6 +514,21 @@ export default function ProductionConsole({ onExitToLegacy }) {
 
   useEffect(() => { if (project?.id) loadStatus(project.id).catch(() => {}); else setStatus({}); }, [project?.id, loadStatus]);
 
+  // Load the registries so the intake form can only offer a profile that
+  // actually resolves. Hardcoding the list here is how it drifts from the
+  // backend and starts offering a book type that no longer exists.
+  useEffect(() => {
+    let cancelled = false;
+    api("/api/books/intake-options")
+      .then((d) => {
+        if (cancelled || !d) return;
+        setIntakeOptions(d);
+        setIntakeForm((f) => (f.productionProfileId ? f : { ...f, productionProfileId: d.productionProfiles?.[0]?.id ?? "" }));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [api]);
+
   // Show the cover that is ACTUALLY current, not a guessed filename.
   //
   // This used to hard-code `cover/cover-wrap-art.png`. Once covers became
@@ -697,6 +717,61 @@ export default function ProductionConsole({ onExitToLegacy }) {
     setProject(d.project); setProjects((c) => [d.project, ...c.filter((p) => p.id !== d.project.id)]);
     setNewForm(EMPTY_NEW_FORM);
     return { notice: `Created “${d.project.title}”.` };
+  });
+
+  /**
+   * BOOK INTAKE — the whole onboarding in one action.
+   *
+   * The old path was create → Book Setup → upload → breakdown → paginate, with
+   * the operator assembling a config by hand and nothing anywhere telling them
+   * whether the result was safe to spend on. This does all of it and finishes
+   * with the readiness report. It spends nothing.
+   */
+  const takeInBook = () => run("Taking the book in", async () => {
+    const isText = /\.(md|markdown|txt)$/i.test(intakeFile.name);
+    const payload = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onerror = () => reject(new Error("Could not read that file."));
+      r.onload = () => {
+        if (isText) resolve({ filename: intakeFile.name, markdown: String(r.result) });
+        else {
+          const s = String(r.result);
+          resolve({ filename: intakeFile.name, fileBase64: s.slice(s.indexOf(",") + 1) });
+        }
+      };
+      if (isText) r.readAsText(intakeFile); else r.readAsDataURL(intakeFile);
+    });
+
+    const d = await api("/api/books/intake", {
+      method: "POST",
+      body: JSON.stringify({
+        brief: {
+          title: intakeForm.title.trim(),
+          subtitle: intakeForm.subtitle.trim() || undefined,
+          authorName: intakeForm.authorName.trim(),
+          productionProfileId: intakeForm.productionProfileId,
+          trimPreset: intakeForm.trimPreset,
+          paperStock: intakeForm.paperStock,
+        },
+        manuscript: payload,
+      }),
+    });
+    setReadiness(d.readiness);
+    await loadProjects().catch(() => {});
+    const opened = (await api("/api/projects")).projects.find((p) => p.id === d.projectId);
+    if (opened) setProject(opened);
+    setIntakeFile(null);
+    return {
+      notice: d.created
+        ? `Took in “${intakeForm.title.trim()}”. Readiness: ${d.readiness.status}.`
+        : `That exact brief was already taken in; opened the existing book. Readiness: ${d.readiness.status}.`,
+    };
+  });
+
+  const checkReadiness = () => run("Checking readiness", async () => {
+    const d = await api(`/api/projects/${project.id}/readiness`);
+    setReadiness(d);
+    return { notice: `Readiness: ${d.status}. ${d.nextAction}` };
   });
 
   // Close the open book without deleting anything: clears the active project,
@@ -1334,6 +1409,53 @@ export default function ProductionConsole({ onExitToLegacy }) {
                 Creating a new book closes the one that's open. Nothing is deleted — reopen it any time from the list above.
               </div>
             </div>
+
+            {/* DROP A BOOK — one action instead of six steps. Creates the
+                project, ingests the manuscript, runs breakdown and pagination,
+                and reports whether it is safe to start spending. Costs nothing. */}
+            <div style={{ ...S.card, borderColor: C.green }}>
+              <b>Drop a book in</b>
+              <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>
+                Pick a manuscript and the kind of book it is. This creates the project, ingests the file, runs the
+                breakdown and pagination, and finishes with a readiness report. No spend.
+              </div>
+              <LabeledInput label="Book title" value={intakeForm.title} onChange={(v) => setIntakeForm({ ...intakeForm, title: v })} />
+              <LabeledInput label="Subtitle (also the region the illustrator reads)" value={intakeForm.subtitle} onChange={(v) => setIntakeForm({ ...intakeForm, subtitle: v })} />
+              <LabeledInput label="Author / pen name" value={intakeForm.authorName} onChange={(v) => setIntakeForm({ ...intakeForm, authorName: v })} />
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+                <label style={{ fontSize: 12, color: C.muted }}>
+                  Kind of book<br />
+                  <select style={S.input} value={intakeForm.productionProfileId} onChange={(e) => setIntakeForm({ ...intakeForm, productionProfileId: e.target.value })}>
+                    {(intakeOptions?.productionProfiles ?? []).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                  </select>
+                </label>
+                <label style={{ fontSize: 12, color: C.muted }}>
+                  Trim<br />
+                  <select style={S.input} value={intakeForm.trimPreset} onChange={(e) => setIntakeForm({ ...intakeForm, trimPreset: e.target.value })}>
+                    {(intakeOptions?.trimPresets ?? []).map((t) => <option key={t.id} value={t.id}>{t.id} in</option>)}
+                  </select>
+                </label>
+                <label style={{ fontSize: 12, color: C.muted }}>
+                  Paper<br />
+                  <select style={S.input} value={intakeForm.paperStock} onChange={(e) => setIntakeForm({ ...intakeForm, paperStock: e.target.value })}>
+                    {(intakeOptions?.paperStocks ?? ["cream", "white"]).map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label style={{ ...S.ghost, display: "inline-flex", alignItems: "center", cursor: "pointer", marginTop: 10 }}>
+                {intakeFile ? `Manuscript: ${intakeFile.name}` : "Choose manuscript (.md / .txt / .docx)"}
+                <input type="file" accept=".md,.markdown,.txt,.docx" style={{ display: "none" }}
+                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) setIntakeFile(f); }} />
+              </label>
+              <button
+                style={{ ...S.btn(), opacity: intakeFile && intakeForm.title.trim() && intakeForm.authorName.trim() ? 1 : 0.45 }}
+                disabled={!intakeFile || !intakeForm.title.trim() || !intakeForm.authorName.trim()}
+                onClick={() => takeInBook().catch(() => {})}
+              >
+                Take it in →
+              </button>
+              {readiness && <ReadinessReport report={readiness} />}
+            </div>
           </Panel>
         )}
 
@@ -1863,6 +1985,8 @@ export default function ProductionConsole({ onExitToLegacy }) {
             {project && (
               <>
                 <button style={S.ghost} onClick={() => loadRenders().catch(() => {})}>↻ Load roster</button>
+                <button style={S.ghost} title="Free. Deterministic check that this book is set up correctly enough to spend on." onClick={() => checkReadiness().catch(() => {})}>Check readiness (free)</button>
+                {readiness && <ReadinessReport report={readiness} />}
                 {renders?.merged && (
                   <button style={{ ...S.btn("spend"), fontSize: 13 }} onClick={() => { if (window.confirm(`Render all ${renders.merged.filter((m) => m.status === "NOT RENDERED").length} not-yet-rendered page(s)? This costs spend.`)) renderAll(() => true).catch(() => {}); }}>Render all pending →</button>
                 )}
@@ -2494,6 +2618,39 @@ function LoginScreen({ onLogin }) {
 }
 function Panel({ title, sub, children }) {
   return (<div><h1 style={S.h1}>{title}</h1><p style={S.sub}>{sub}</p>{children}</div>);
+}
+
+/**
+ * The pre-spend gate, rendered.
+ *
+ * Shows every check, not just the failures — an operator needs to see that the
+ * region-leak check RAN and was clean, not merely that nothing complained.
+ * A gate you cannot see is a gate you do not trust.
+ */
+function ReadinessReport({ report }) {
+  const tone = { PASS: C.green, WARN: C.orange, FAIL: C.red, NA: C.muted };
+  const headline = report.status === "BLOCKED" ? C.red : report.status === "WARNING" ? C.orange : C.green;
+  return (
+    <div style={{ ...S.card, marginTop: 12, borderColor: headline }}>
+      <div style={{ fontWeight: 800, color: headline }}>
+        Readiness: {report.status}
+        {report.status === "BLOCKED" && " — do not spend yet"}
+      </div>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{report.nextAction}</div>
+      <div style={{ marginTop: 8 }}>
+        {report.checks.map((c) => (
+          <div key={c.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "5px 0", borderTop: `1px solid ${C.line}` }}>
+            <span style={{ ...S.pill(tone[c.status]), minWidth: 44, textAlign: "center", flexShrink: 0 }}>{c.status}</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700 }}>{c.label}</div>
+              <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.4 }}>{c.detail}</div>
+              {c.fix && <div style={{ fontSize: 11.5, color: tone[c.status], marginTop: 2, lineHeight: 1.4 }}>→ {c.fix}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 function Guard({ project, setStep }) {
   if (project) return null;

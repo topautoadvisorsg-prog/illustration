@@ -951,6 +951,21 @@ export const ProjectConfigSchema = z.object({
   /** Front Matter v1 — generic publishing metadata. Additive + optional so
    *  every existing project config parses unchanged. */
   publishing: PublishingMetadataSchema.default({}),
+  /**
+   * BOOK INTAKE provenance, set by `POST /api/books/intake`.
+   *
+   * `briefHash` makes intake idempotent: re-posting the same brief and
+   * manuscript returns the project it already created instead of a twin. This
+   * schema is not `.strict()`, so unknown keys are STRIPPED rather than
+   * rejected — a hash parked here without a declared field would vanish on the
+   * first config parse and every retry would make another book.
+   */
+  intake: z
+    .object({
+      briefHash: z.string().min(1),
+      takenInAt: z.string(),
+    })
+    .optional(),
 });
 
 export const CreateProjectRequestSchema = z.object({
