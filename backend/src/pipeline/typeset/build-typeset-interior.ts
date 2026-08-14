@@ -23,6 +23,7 @@ import { renderTypesetBook } from './render-typeset.js';
 import type { TypesetReport } from './typeset-book.js';
 import type { TypesetBlockRef } from './block-identity.js';
 import { stampIllustrations, type StampedIllustration } from './stamp-illustrations.js';
+import { padInteriorToEven } from './pad-to-even.js';
 
 export interface TypesetInterior {
   pdf: Buffer;
@@ -139,10 +140,23 @@ export async function buildTypesetInterior(
     orphanedIllustrations = out.orphaned;
   }
 
+  /* Last step, once nothing can reflow. An odd block would otherwise be sized
+     for a spine one leaf narrower than the book KDP actually prints. The report
+     carries the padded count too, because the spine is computed from it. */
+  const padded = await padInteriorToEven(pdf);
+  pdf = padded.pdf;
+  const report = padded.added
+    ? {
+        ...result.report,
+        totalPages: padded.pageCount,
+        blankPages: [...result.report.blankPages, padded.pageCount],
+      }
+    : result.report;
+
   return {
     pdf,
-    pageCount: result.report.totalPages,
-    report: result.report,
+    pageCount: padded.pageCount,
+    report,
     blocks: result.blocks,
     layoutStandardId: standardId,
     productionProfileId: profile.id,
