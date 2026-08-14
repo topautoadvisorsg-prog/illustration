@@ -25,10 +25,12 @@
  * one would silently change what the PAGE looks like.)
  */
 import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from './educational-nonfiction-v1.js';
+import { EDUCATIONAL_NONFICTION_TYPESET_V2 } from './educational-nonfiction-v2.js';
 import type { TypesetLayoutStandard } from './types.js';
 
 export const TYPESET_LAYOUT_STANDARDS: Record<string, TypesetLayoutStandard> = {
   [EDUCATIONAL_NONFICTION_TYPESET_V1.id]: EDUCATIONAL_NONFICTION_TYPESET_V1,
+  [EDUCATIONAL_NONFICTION_TYPESET_V2.id]: EDUCATIONAL_NONFICTION_TYPESET_V2,
 };
 
 export class UnknownTypesetLayoutStandardError extends Error {

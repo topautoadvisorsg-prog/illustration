@@ -63,10 +63,29 @@ describe('typeset layout standard registry', () => {
     expect(ids).not.toContain('educational-nonfiction-typeset@latest');
   });
 
+  /**
+   * The invariant is that a newer standard is REPORTED, never applied — a book
+   * approved on @1 must keep rendering as @1 until someone re-pins it. The
+   * previous version of this test asserted "there is nothing to move to",
+   * which encoded a temporary fact about the registry rather than the rule, and
+   * broke the moment @2 was registered.
+   */
   it('reports upgrades without applying them', () => {
-    // Only @1 is registered today, so there is nothing to move to.
-    expect(availableUpgrades('educational-nonfiction-typeset@1')).toEqual([]);
+    expect(availableUpgrades('educational-nonfiction-typeset@1')).toContain('educational-nonfiction-typeset@2');
     expect(availableUpgrades('unversioned')).toEqual([]);
+    // Reported, not applied: resolving @1 still yields @1.
+    expect(resolveTypesetLayoutStandard('educational-nonfiction-typeset@1').id).toBe('educational-nonfiction-typeset@1');
+  });
+
+  it('@2 differs from @1 only in justification', () => {
+    const v1 = resolveTypesetLayoutStandard('educational-nonfiction-typeset@1');
+    const v2 = resolveTypesetLayoutStandard('educational-nonfiction-typeset@2');
+    expect(v1.paragraphs.justify).toBe(true);
+    expect(v2.paragraphs.justify).toBe(false);
+    expect(v2.trim).toEqual(v1.trim);
+    expect(v2.margins).toEqual(v1.margins);
+    expect(v2.type).toEqual(v1.type);
+    expect(v2.opener).toEqual(v1.opener);
   });
 });
 
