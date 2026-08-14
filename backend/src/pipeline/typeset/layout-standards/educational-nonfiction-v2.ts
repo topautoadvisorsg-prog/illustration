@@ -37,15 +37,20 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V2: TypesetLayoutStandard = {
     ...EDUCATIONAL_NONFICTION_TYPESET_V1.paragraphs,
     justify: false,
     /**
-     * QA found nine section headings sitting at a page foot with only one or
-     * two lines beneath them. `break-after: avoid` is already on h3 and IS
-     * working — that is why no heading is ever left with zero lines. What was
-     * missing is orphan control: the following paragraph split and left one or
-     * two lines behind. Three is the conventional minimum.
+     * ORPHANS/WIDOWS STAY AT 2. Raising them to 3 was tried and reverted.
      *
-     * v1 declares 2/2 and keeps it.
+     * QA asked for `orphans: 3; widows: 3` to fix nine headings sitting at a
+     * page foot with one or two lines beneath them. Measured on the real book,
+     * it fixed none of them — the same nine headings on the same nine pages —
+     * because this Paged.js does not honour the properties at all. The same
+     * build orphaned TWO illustrations, pushing their chapter-ending regions
+     * below the approved placement, one by 0.02in.
+     *
+     * Paged.js here honours `break-inside: avoid` and `break-before: page`. It
+     * ignores `break-after: avoid`, `orphans` and `widows`. All three were
+     * tested against the rendered PDF rather than assumed.
      */
-    orphans: 3,
-    widows: 3,
+    orphans: 2,
+    widows: 2,
   },
 };
