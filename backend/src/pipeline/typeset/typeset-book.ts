@@ -706,7 +706,11 @@ body {
   font-family: '${t.bodyFont}', Georgia, serif;
   font-size: ${t.bodyPt}pt; line-height: ${t.lineHeight};
   hyphens: auto; -webkit-hyphens: auto;
-  orphans: 2; widows: 2;
+  /* From the layout standard, not hardcoded. These fields existed on
+     TypesetParagraphPolicy and were being ignored here, so a standard could
+     declare orphans/widows and get 2/2 regardless. v1 declares 2/2, so this
+     changes nothing for books already approved on it. */
+  orphans: ${para.orphans}; widows: ${para.widows};
   text-align: left; text-align-last: left;
 }
 

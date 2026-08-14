@@ -36,5 +36,16 @@ export const EDUCATIONAL_NONFICTION_TYPESET_V2: TypesetLayoutStandard = {
   paragraphs: {
     ...EDUCATIONAL_NONFICTION_TYPESET_V1.paragraphs,
     justify: false,
+    /**
+     * QA found nine section headings sitting at a page foot with only one or
+     * two lines beneath them. `break-after: avoid` is already on h3 and IS
+     * working — that is why no heading is ever left with zero lines. What was
+     * missing is orphan control: the following paragraph split and left one or
+     * two lines behind. Three is the conventional minimum.
+     *
+     * v1 declares 2/2 and keeps it.
+     */
+    orphans: 3,
+    widows: 3,
   },
 };
