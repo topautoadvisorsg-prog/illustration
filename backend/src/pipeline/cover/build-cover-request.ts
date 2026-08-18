@@ -50,7 +50,11 @@ async function resolvePageCount(
 export async function buildCoverRequest(
   projectId: string,
   config: ProjectConfig,
-  options: { editionStyleDnaId?: string } = {},
+  options: {
+    editionStyleDnaId?: string;
+    /** Who sets the author name. See CoverSpec.authorTypeSetBy. */
+    authorTypeSetBy?: 'deterministic' | 'ai';
+  } = {},
 ): Promise<CoverRequest> {
   const env = getEnv();
   const { pageCount, source } = await resolvePageCount(projectId, config);
@@ -62,6 +66,7 @@ export async function buildCoverRequest(
     pageCountSource: source,
     model: env.OPENAI_IMAGE_MODEL,
     editionStyleDnaId: options.editionStyleDnaId,
+    authorTypeSetBy: options.authorTypeSetBy,
   });
 
   const prompt = buildCoverPrompt(spec);

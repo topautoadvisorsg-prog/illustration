@@ -174,12 +174,64 @@ const GRAPHIC_TRADE_COVER: StyleDnaProfile = {
   palette: { paperHex: '#FFFFFF', inkHex: '#000000' },
 };
 
+// ── Photographic realist cover. The counterpart to GRAPHIC_TRADE_COVER: same
+//    job — a commercial trade cover that survives a thumbnail — opposite means.
+//
+//    WHY IT EXISTS. `graphic-trade-cover` does not merely prefer flat design, it
+//    FORBIDS the alternative: "NOT painted illustration", "NO photographic
+//    shading", "Flat fills only". An operator asking for a photographic cover
+//    under that DNA is overruled by the DNA every time, silently, and the result
+//    returns flat however the art direction is worded. Three DIRT RICH covers
+//    were generated that way before anyone read the profile.
+//
+//    The fix is a SECOND registered look, never a loosening of the first: a book
+//    approved on the flat style must keep rendering flat.
+const PHOTOGRAPHIC_TRADE_COVER: StyleDnaProfile = {
+  id: 'photographic-trade-cover',
+  label: 'Photographic Trade Cover — realist, thumbnail-first',
+  medium:
+    'A photographic, photorealistic cover image for commercial trade nonfiction: a real scene, convincingly lit and ' +
+    'textured, as though shot on location for a serious practical book. NOT flat graphic design, NOT vector shapes, ' +
+    'NOT a painted illustration, NOT a cartoon.',
+  mood:
+    'Grounded, capable, abundant and honest. Premium adult nonfiction. Ordinary and achievable rather than estate-like: ' +
+    'real wear on real materials. Never staged, never stock-photo glossy, never idyllic.',
+  referenceArtists:
+    'Contemporary documentary and editorial photography, and the photographic covers of serious practical nonfiction. ' +
+    'NOT flat vector design, NOT engraving, NOT naturalist plates, NOT cartoon or storybook illustration.',
+  lineWork:
+    'There is no drawn line. Form comes from photographic detail, depth of field and real texture. Edges are the edges ' +
+    'of real objects.',
+  lineInkPhrase: 'No ink and no outlines of any kind — this is a photographic image.',
+  colorMode:
+    'FULL COLOUR, naturalistic. Real daylight colour with a warm earthy bias. Rich saturated darks that stay detailed ' +
+    'rather than crushing to black, and highlights that hold texture. Gradients, shadow and photographic shading are ' +
+    'REQUIRED, not forbidden. Never flat fills, never posterised, never monochrome or sepia unless the art direction ' +
+    'asks for it.',
+  whitesPhrase:
+    'Bright areas are real light — sky, haze, sunlit surfaces — carrying texture rather than reading as blank paper.',
+  naturalistPrecision:
+    'Objects are photographically real and correctly proportioned: real plants of the named species, real timber, real ' +
+    'birds. Detail is high, but must never fight the title — keep the busiest detail away from the type.',
+  lighting:
+    'Real directional daylight with believable shadows and falloff. Warm and low is preferred over flat midday. Light ' +
+    'is what gives the image its depth, so it must never be neutralised.',
+  paperTexture:
+    'None. This is a photographic surface, not a printed or aged one: no paper grain, no kraft, no newsprint, no ' +
+    'artificial vignetting, no distressing.',
+  edges:
+    'The photograph runs to the edges of the wrap and continues through the bleed. The full wrap reads as one ' +
+    'continuous photographic scene from back through spine to front.',
+  palette: { paperHex: '#FFFFFF', inkHex: '#000000' },
+};
+
 /** The registry. Add an edition look by adding a profile here — nothing else. */
 export const STYLE_DNA: Record<string, StyleDnaProfile> = {
   [CINEMATIC_NATURALIST_COLOR.id]: CINEMATIC_NATURALIST_COLOR,
   [BW_NATURALIST.id]: BW_NATURALIST,
   [BW_EDUCATIONAL_CLEARLINE.id]: BW_EDUCATIONAL_CLEARLINE,
   [GRAPHIC_TRADE_COVER.id]: GRAPHIC_TRADE_COVER,
+  [PHOTOGRAPHIC_TRADE_COVER.id]: PHOTOGRAPHIC_TRADE_COVER,
 };
 
 /** Default = the current production Color look (frozen reference standard). */

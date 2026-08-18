@@ -33,7 +33,11 @@ function negatives(spec: CoverSpec): string[] {
   const out = [
     'Do NOT draw any guide line, dashed line, red box, tinted panel, label, arrow, measurement, or any other mark from the layout reference. Those exist only to position content.',
     'Do NOT render a barcode, ISBN, price box, or publisher logo. Amazon prints the barcode itself over the artwork after press.',
-    'Do NOT leave a blank panel, card, plate, banner, or cutout waiting for text to be added later. There is no later step: whatever type you do not paint will not exist.',
+    // Scoped: with deterministic author placement there IS a later step for the
+    // author name, and this line would otherwise order the model to paint it.
+    spec.authorTypeSetBy === 'deterministic'
+      ? 'Do NOT leave a blank panel, card, plate, banner, or cutout waiting for text. Every string listed above EXCEPT the author name must be painted by you; the author name is set afterwards onto clean artwork.'
+      : 'Do NOT leave a blank panel, card, plate, banner, or cutout waiting for text to be added later. There is no later step: whatever type you do not paint will not exist.',
     'Do NOT add page numbers, captions, watermarks, signatures, crop marks, or registration marks.',
     'Do NOT spill any text past the red safe line, and do NOT place text in the dimmed outer band.',
   ];
@@ -99,7 +103,21 @@ export function buildCoverPrompt(spec: CoverSpec): string {
   );
   if (copy.subtitle) out.push(`  FRONT — SUBTITLE: "${copy.subtitle}"`);
   if (copy.coverDescription) out.push(`  FRONT — COVER LINE: "${copy.coverDescription}"`);
-  out.push(`  FRONT — AUTHOR: "${copy.author}"`);
+  if (spec.authorTypeSetBy === 'deterministic') {
+    // Same lesson as the spine, learned the same way. The model has a strong
+    // convention that the author sits at the very bottom of a cover and follows
+    // it over any stated bound: four DIRT RICH generations put the name at
+    // 90-96% of the height after being told to end by 86%. So it is not asked
+    // for at all, and code places it afterwards at an exact height.
+    out.push(
+      '  FRONT — AUTHOR: DO NOT PAINT THE AUTHOR NAME. Paint no author name, byline, signature or credit anywhere',
+      '  on the front cover. Leave the lower third of the front panel as clean, uninterrupted artwork with no',
+      '  lettering, no sign, no plaque, no label and no banner. The author name is added afterwards by the',
+      '  typesetting system, so anything you paint there has to be removed.',
+    );
+  } else {
+    out.push(`  FRONT — AUTHOR: "${copy.author}"`);
+  }
   if (copy.seriesLine) out.push(`  FRONT — SERIES: "${copy.seriesLine}"`);
 
   if (!spec.spineTextAllowed) {

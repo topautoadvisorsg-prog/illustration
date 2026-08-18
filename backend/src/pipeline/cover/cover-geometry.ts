@@ -33,10 +33,30 @@ import { computeCoverDimensions, COVER_BLEED_IN, type CoverDimensions } from '..
 
 /**
  * KDP wants readable copy at least this far INSIDE the trim line. KDP's stated
- * minimum is 0.125in; 0.25in is the recommended figure and what we hold type to.
+ * minimum is 0.125in; 0.25in is the recommended figure.
  * Source: https://kdp.amazon.com/en_US/help/topic/G201953020
+ *
+ * ─── WHY THIS IS 0.40 AND NOT KDP'S 0.25 ──────────────────────────────────
+ * The blueprint drew the safe box at 0.25in, but `dirt-rich-cover-pdf.ts`
+ * VERIFIES the finished wrap against 0.375in. The model was therefore told a
+ * looser bound than the checker enforces, and copy that satisfied the drawn
+ * box still failed the check.
+ *
+ * It is worse than an inconsistency, because the model does not honour the
+ * drawn box exactly — it sets type to its own sense of margin and drifts
+ * outward. `composeCoverPrint` then centre-crops ~9-11% of the canvas width,
+ * and that drift is what gets eaten: DIRT RICH back copy was painted 0.753in
+ * clear and arrived 0.187in from the cut. Telling the model to try harder does
+ * not fix it; the box has to stop earlier than the boundary does, so that the
+ * drift still lands inside.
+ *
+ * 0.40in is taken from the cover that came out right — NO ONE TOLD ME THAT
+ * holds type at 8.5% of its canvas. On DIRT RICH's wider wrap 0.40in lands on
+ * the same 8.5%, so both books now protect type equally. Raising this only
+ * ever moves type further from the cut, so it cannot make an existing cover
+ * less safe.
  */
-export const SAFE_INSIDE_TRIM_IN = 0.25;
+export const SAFE_INSIDE_TRIM_IN = 0.4;
 
 /** KDP allows 0.0625in of fold variance either side of each spine fold. */
 export const SPINE_FOLD_VARIANCE_IN = 0.0625;

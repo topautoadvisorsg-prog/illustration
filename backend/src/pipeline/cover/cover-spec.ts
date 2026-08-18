@@ -93,6 +93,21 @@ export interface CoverSpec {
    * 'ai' keeps the old behaviour for the book that already shipped that way.
    */
   spineTypeSetBy: 'deterministic' | 'ai';
+  /**
+   * WHO SETS THE AUTHOR NAME. Same reasoning as the spine, learned the same way.
+   *
+   * An image model has a strong learned convention that the author's name sits
+   * at the very bottom of a front cover, and it follows that convention over any
+   * instruction to the contrary. Measured on DIRT RICH: the type-safety block
+   * permits type down to 95.9% of the canvas height, the art direction demanded
+   * the name end by 86%, and four consecutive generations placed it at 90-96% —
+   * hard against the trim, which is exactly what it must never be.
+   *
+   * 'deterministic' therefore asks the model for artwork with NO author lettering
+   * and lets code place the name at an exact height afterwards. 'ai' keeps the
+   * old behaviour for covers already approved that way.
+   */
+  authorTypeSetBy: 'deterministic' | 'ai';
   provenance: {
     resolvedAt: string;
     pageCountSource: 'typeset' | 'rendered-pages';
@@ -124,6 +139,7 @@ export interface BuildCoverSpecInput {
   editionStyleDnaId?: string;
   quality?: CoverModelConfig['quality'];
   spineTypeSetBy?: 'deterministic' | 'ai';
+  authorTypeSetBy?: 'deterministic' | 'ai';
 }
 
 /**
@@ -178,6 +194,8 @@ export function buildCoverSpec(input: BuildCoverSpecInput): CoverSpec {
   };
 
   const spineTypeSetBy = input.spineTypeSetBy ?? 'deterministic';
+  // Defaults to 'ai' so existing books are untouched; a book opts in.
+  const authorTypeSetBy = input.authorTypeSetBy ?? 'ai';
   const rawDirection = (config.publishing.coverArtDirection ?? '').trim();
   const direction =
     spineTypeSetBy === 'deterministic' ? withoutSpineLetteringDirection(rawDirection) : rawDirection;
@@ -202,6 +220,7 @@ export function buildCoverSpec(input: BuildCoverSpecInput): CoverSpec {
     geometry: resolveCoverGeometry(config, pageCount, MODEL_CANVAS),
     spineTextAllowed: coverAllowsSpineText(pageCount),
     spineTypeSetBy,
+    authorTypeSetBy,
     model: {
       model: input.model,
       sizePx: { widthPx: MODEL_CANVAS.widthPx, heightPx: MODEL_CANVAS.heightPx },
