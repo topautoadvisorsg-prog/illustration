@@ -22,6 +22,7 @@ import {
   deleteProject,
   getProject,
   listProjects,
+  replaceWorkingManuscript,
   setManuscript,
   setProjectStatus,
   updateProjectConfig,
@@ -1273,6 +1274,170 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         throw error;
       }
       return { manuscript: buf.toString('utf8'), relativePath: project.manuscriptPath };
+    },
+  );
+
+  // ── REPLACE THE WORKING MANUSCRIPT ────────────────────────────────────────
+  //
+  // A downstream stage (figure placement, marker stripping, a repair pass)
+  // rewrites the DERIVED manuscript while the canonical source stays fixed.
+  // `POST /manuscript` cannot express that: it reconstitutes BOTH artifacts from
+  // whatever bytes it is handed, so using it here would silently record the
+  // derivative as the canonical source and destroy the book's provenance.
+  //
+  // The alternative people reach for is writing the object straight into storage
+  // and updating the row separately. That is how a project ends up claiming one
+  // hash while holding another. This endpoint exists so the two move together.
+  //
+  // OPTIMISTIC PRECONDITIONS. The caller states what it believes the world looks
+  // like — current working hash, canonical hash, and the hash it expects to
+  // produce. Every one is checked against the stored row before anything is
+  // written, and the supplied bytes are re-hashed server-side rather than
+  // trusted. A stale pipeline replaying against a project that has moved on is
+  // rejected instead of overwriting someone else's work.
+  const ReplaceWorkingBodySchema = z.object({
+    markdown: z.string().min(1),
+    /** What the caller believes is stored now. Rejected as a conflict if wrong. */
+    expectedCurrentWorkingSha256: z.string().regex(/^[0-9a-f]{64}$/),
+    /** Canonical must be exactly this, and is never written. */
+    expectedCanonicalSha256: z.string().regex(/^[0-9a-f]{64}$/),
+    /** What the supplied bytes must hash to. Verified server-side. */
+    expectedNewSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  });
+  const ReplaceWorkingResponseSchema = z.object({
+    applied: z.boolean(),
+    alreadyInTargetState: z.boolean(),
+    relativePath: z.string(),
+    manuscriptSha256: z.string(),
+    canonicalManuscriptSha256: z.string().nullable(),
+  });
+
+  app.post(
+    '/api/projects/:id/working-manuscript',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        body: ReplaceWorkingBodySchema,
+        response: {
+          200: ReplaceWorkingResponseSchema,
+          404: ApiErrorSchema,
+          409: ApiErrorSchema,
+          422: ApiErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = ProjectParamsSchema.parse(request.params);
+      const body = ReplaceWorkingBodySchema.parse(request.body);
+
+      // Read the row IMMEDIATELY before mutating, never from a cached copy.
+      const project = await getProject(id);
+      if (!project) {
+        return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
+      }
+      if (!project.manuscriptPath) {
+        return reply.code(409).send({
+          error: 'Conflict',
+          message: 'This project has no working manuscript yet. Ingest one before replacing it.',
+          statusCode: 409,
+        });
+      }
+
+      // The canonical precondition is checked FIRST and on every path, including
+      // the idempotent one: this endpoint's entire purpose is that canonical does
+      // not move, so a caller wrong about it is wrong about the book.
+      if (project.canonicalManuscriptSha256 !== body.expectedCanonicalSha256) {
+        return reply.code(409).send({
+          error: 'Conflict',
+          message:
+            `Canonical manuscript is ${project.canonicalManuscriptSha256 ?? '(none)'}, ` +
+            `caller expected ${body.expectedCanonicalSha256}. Refusing to touch the working copy of a ` +
+            'book whose source is not the one the caller thinks it is.',
+          statusCode: 409,
+        });
+      }
+
+      const actualNewSha = createHash('sha256').update(body.markdown, 'utf8').digest('hex');
+      if (actualNewSha !== body.expectedNewSha256) {
+        return reply.code(422).send({
+          error: 'Unprocessable Entity',
+          message:
+            `Supplied manuscript hashes to ${actualNewSha}, but the request declared ` +
+            `${body.expectedNewSha256}. The bytes and the intent disagree; nothing was written.`,
+          statusCode: 422,
+        });
+      }
+
+      // Already there. Re-running a pipeline must be safe, so this reports the
+      // state rather than rewriting identical bytes and bumping the row.
+      if (project.manuscriptSha256 === body.expectedNewSha256) {
+        return {
+          applied: false,
+          alreadyInTargetState: true,
+          relativePath: project.manuscriptPath,
+          manuscriptSha256: project.manuscriptSha256,
+          canonicalManuscriptSha256: project.canonicalManuscriptSha256,
+        };
+      }
+
+      if (project.manuscriptSha256 !== body.expectedCurrentWorkingSha256) {
+        return reply.code(409).send({
+          error: 'Conflict',
+          message:
+            `Working manuscript is ${project.manuscriptSha256 ?? '(none)'}, ` +
+            `caller expected ${body.expectedCurrentWorkingSha256}. The project moved since the ` +
+            'caller last read it; nothing was written.',
+          statusCode: 409,
+        });
+      }
+
+      // Same key, so the working manuscript keeps its path and nothing has to be
+      // re-pointed. `parts` is everything after the project id.
+      const parts = project.manuscriptPath.split('/').slice(1);
+      const { getProjectStorage } = await import('../services/storage/project-storage.js');
+      const storage = getProjectStorage();
+
+      // Kept for rollback: if the row cannot be updated, the bytes must go back,
+      // otherwise storage would hold a manuscript the project does not claim.
+      const previousBytes = await storage.readProjectFile(project.manuscriptPath);
+
+      const stored = await storage.writeProjectFile(id, parts, body.markdown);
+
+      // Trust the read, not the write. A short or retried PUT that "succeeded"
+      // still has to prove it landed before the row is allowed to point at it.
+      const readBack = await storage.readProjectFile(stored.relativePath);
+      const storedSha = createHash('sha256').update(readBack).digest('hex');
+      if (storedSha !== actualNewSha) {
+        await storage.writeProjectFile(id, parts, previousBytes);
+        return reply.code(409).send({
+          error: 'Conflict',
+          message: `Stored object hashes to ${storedSha}, expected ${actualNewSha}. Previous bytes restored.`,
+          statusCode: 409,
+        });
+      }
+
+      let updated;
+      try {
+        updated = await replaceWorkingManuscript(id, {
+          manuscriptPath: stored.relativePath,
+          manuscriptSha256: actualNewSha,
+        });
+      } catch (err) {
+        await storage.writeProjectFile(id, parts, previousBytes);
+        throw err;
+      }
+      if (!updated) {
+        await storage.writeProjectFile(id, parts, previousBytes);
+        return reply.code(404).send({ error: 'Not Found', message: 'Project disappeared mid-update', statusCode: 404 });
+      }
+
+      return {
+        applied: true,
+        alreadyInTargetState: false,
+        relativePath: updated.manuscriptPath!,
+        manuscriptSha256: updated.manuscriptSha256!,
+        canonicalManuscriptSha256: updated.canonicalManuscriptSha256,
+      };
     },
   );
 

@@ -120,6 +120,40 @@ export async function setManuscript(
   return row ?? null;
 }
 
+/**
+ * Replace ONLY the derived working manuscript. Canonical provenance is not a
+ * parameter, so this operation cannot alter it even by mistake.
+ *
+ * --- WHY THIS IS SEPARATE FROM setManuscript ------------------------------
+ * `setManuscript` records BOTH artifacts and is correct for ingestion, where the
+ * canonical source is genuinely being (re)established. Downstream stages are a
+ * different job: a figure pipeline rewrites the working manuscript many times
+ * while the canonical source must never move. Reusing the ingestion call for
+ * that means passing canonical values back in on every hop, and the day someone
+ * passes the derivative instead, the book quietly loses the ability to prove
+ * what it came from. That has already happened once on this platform.
+ *
+ * So the narrow operation takes only what it may change. The columns it must not
+ * touch are absent from the SET clause entirely — the guarantee is structural,
+ * not a matter of the caller being careful.
+ */
+export async function replaceWorkingManuscript(
+  id: string,
+  working: { manuscriptPath: string; manuscriptSha256: string },
+): Promise<ProjectRow | null> {
+  const db = getDb();
+  const [row] = await db
+    .update(projects)
+    .set({
+      manuscriptPath: working.manuscriptPath,
+      manuscriptSha256: working.manuscriptSha256,
+      updatedAt: new Date(),
+    })
+    .where(eq(projects.id, id))
+    .returning();
+  return row ?? null;
+}
+
 export async function setProjectStatus(id: string, status: ProjectStatus): Promise<ProjectRow | null> {
   const db = getDb();
   const [row] = await db
