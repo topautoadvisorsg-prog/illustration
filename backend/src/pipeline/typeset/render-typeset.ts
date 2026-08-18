@@ -25,6 +25,8 @@ import type { OverrideCssResult } from './layout-overrides.js';
 export interface RenderTypesetInput {
   markdown: string;
   config: ProjectConfig;
+  /** Figure assets as data URIs, keyed by the name used in `![caption](name)`. */
+  images?: Record<string, string>;
   margins?: TypesetMargins;
   chaptersStartRecto?: boolean;
   /** The project's pinned layout standard. Omitted only by tests. */
@@ -146,6 +148,26 @@ const MEASURE_JS = `(() => {
       if (p) verticalOverflowPages.push(Number(p.getAttribute('data-page-number')));
     }
   });
+  // HORIZONTAL overflow, measured on CONTENT elements rather than on the page
+  // container. The container's scrollWidth is a Paged.js artifact and produces
+  // false alarms (see the note above) — but a paragraph whose text cannot fit
+  // its own measure reports scrollWidth > clientWidth honestly, and that is the
+  // case that matters: a 120-character URL with nowhere to break leaves the text
+  // block and runs off the trim, silently, on a page that otherwise checks out.
+  const horizontalOverflow = [];
+  d.querySelectorAll('.pagedjs_page_content p, .pagedjs_page_content li, .pagedjs_page_content pre, .pagedjs_page_content td, .pagedjs_page_content th, .pagedjs_page_content h2, .pagedjs_page_content h3, .pagedjs_page_content h4').forEach(function (el) {
+    const dx = el.scrollWidth - el.clientWidth;
+    if (dx > 1) {
+      const holder = el.hasAttribute('data-block-id') ? el : el.closest('[data-block-id]');
+      horizontalOverflow.push({
+        page: pageNumOf(el),
+        blockId: holder ? holder.getAttribute('data-block-id') : null,
+        tag: el.tagName.toLowerCase(),
+        overflowPx: Math.round(dx),
+        preview: (el.textContent || '').trim().slice(0, 80),
+      });
+    }
+  });
   const blankPages = [];
   d.querySelectorAll('.pagedjs_page').forEach(function (p) {
     if ((p.textContent || '').replace(/\\s/g, '').length < 4) {
@@ -169,6 +191,7 @@ const MEASURE_JS = `(() => {
     totalPages: d.querySelectorAll('.pagedjs_page').length,
     sectionStarts: sectionStarts,
     verticalOverflowPages: verticalOverflowPages,
+    horizontalOverflow: horizontalOverflow,
     blankPages: blankPages,
     pageBlocks: pageBlocks,
   };
@@ -292,6 +315,7 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
 
   const htmlFor = (pages: Map<string, number> | null): string =>
     buildTypesetHtml({
+      images: input.images,
       ...input,
       sections,
       margins,

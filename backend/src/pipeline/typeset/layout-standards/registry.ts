@@ -26,11 +26,16 @@
  */
 import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from './educational-nonfiction-v1.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V2 } from './educational-nonfiction-v2.js';
+import { TRADE_NONFICTION_GUIDE_TYPESET_V1 } from './trade-nonfiction-guide-v1.js';
 import type { TypesetLayoutStandard } from './types.js';
 
 export const TYPESET_LAYOUT_STANDARDS: Record<string, TypesetLayoutStandard> = {
   [EDUCATIONAL_NONFICTION_TYPESET_V1.id]: EDUCATIONAL_NONFICTION_TYPESET_V1,
   [EDUCATIONAL_NONFICTION_TYPESET_V2.id]: EDUCATIONAL_NONFICTION_TYPESET_V2,
+  // A different FAMILY, not a version of the educational line: different trim,
+  // different reader, different components. Registering it leaves both
+  // educational versions exactly as they were approved.
+  [TRADE_NONFICTION_GUIDE_TYPESET_V1.id]: TRADE_NONFICTION_GUIDE_TYPESET_V1,
 };
 
 export class UnknownTypesetLayoutStandardError extends Error {

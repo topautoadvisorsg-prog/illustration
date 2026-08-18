@@ -99,9 +99,38 @@ export async function buildTypesetInterior(
   const illustrations = config.illustrations ?? {};
   const hasIllustrations = Object.keys(illustrations).length > 0;
 
+  /**
+   * INLINE FIGURES — `![caption](asset-name)` in the manuscript.
+   *
+   * Resolved from `<project>/illustrations/<name>` into data URIs so the render
+   * carries its own assets rather than reaching for the filesystem mid-layout,
+   * the same rule the vendored type faces follow.
+   *
+   * Distinct from the STAMPING path below: a stamped illustration is drawn into
+   * space left at the foot of a page, while an inline figure occupies space in
+   * the flow and pagination accounts for it. A text-dense book has no leftover
+   * space to stamp into, so its figures belong in the flow.
+   */
+  const images: Record<string, string> = {};
+  for (const m of markdown.matchAll(/^!\[[^\]]*\]\(([^)]+)\)(?:\{\d{1,3}%\})?$/gm)) {
+    const name = m[1]!.trim();
+    if (images[name]) continue;
+    try {
+      const bytes = await storage.readProjectFile([projectId, 'illustrations', name].join('/'));
+      const ext = name.split('.').pop()?.toLowerCase();
+      const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : 'image/png';
+      images[name] = `data:${mime};base64,${bytes.toString('base64')}`;
+    } catch {
+      // Left unresolved deliberately. The renderer then leaves the reference as
+      // literal text, so a missing figure is VISIBLE on the page rather than
+      // silently absent from a printed book.
+    }
+  }
+
   const result = await renderTypesetBook({
     markdown,
     config,
+    images,
     chaptersStartRecto: options.chaptersStartRecto,
     reviewGuides: options.reviewGuides,
     layoutStandard,

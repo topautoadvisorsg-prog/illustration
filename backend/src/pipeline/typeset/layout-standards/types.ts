@@ -123,6 +123,21 @@ export interface TypesetChapterOpener {
   blockMarginBottomEm: number;
   /** Centre the label and title. */
   centered: boolean;
+  /**
+   * Which form of the chapter title the opener prints.
+   *
+   * `parsed` (default) the title with any leading `Chapter N:` removed, so the
+   *          number appears once, in the generated kicker.
+   * `source` the author's heading exactly as written, e.g.
+   *          `Chapter 1: Backyard Me v1.0`. Pair with `labelFormat: 'none'`,
+   *          or the number prints twice.
+   *
+   * The PARSER preserves both forms and decides nothing; this is where the
+   * decision lives, because it is a question about how a page looks. OPTIONAL,
+   * and absent means `parsed` — which is identical to the old behaviour for any
+   * manuscript that never put a number in its title.
+   */
+  titleSource?: 'parsed' | 'source';
 }
 
 export interface TypesetPageFurniture {
@@ -263,6 +278,147 @@ export interface QuickAnswerIndexPolicy {
   urgentHeadings: readonly string[];
 }
 
+/**
+ * LONG-TOKEN WRAPPING — where a line is allowed to break inside a long,
+ * unspaced run of characters.
+ *
+ * A URL is one token. At a 4.6in measure a 120-character source link is roughly
+ * 1.7x the column, and with nothing to break on it simply runs out of the text
+ * block and off the page. DIRT RICH's `Where I Checked` carries 65 of them, so
+ * this is the difference between a printable back matter and an unprintable one.
+ *
+ * ─── WHY BREAK OPPORTUNITIES, NOT `overflow-wrap` ─────────────────────────
+ * `overflow-wrap: break-word` breaks wherever the line happens to end, so a URL
+ * splits mid-word and reads as two broken fragments. Publishers break URLs AFTER
+ * structural punctuation — a slash, a dot, a hyphen — so each fragment still
+ * reads as part of an address. That is a decision about WHERE, which CSS has no
+ * way to express, so the break opportunities are placed in the markup as `<wbr>`
+ * and the browser chooses among them.
+ *
+ * `breakAnywhereFallback` is the last resort for a token with no punctuation at
+ * all to break on: better an ugly break than ink outside the trim.
+ *
+ * OPTIONAL on a standard, and absent means `none` — the behaviour every book
+ * shipped with. An existing standard is not edited to add it.
+ */
+export interface LongTokenWrappingPolicy {
+  /**
+   * `none`               leave long tokens alone (what shipped).
+   * `after-punctuation`  break opportunities after / . - ? & = _ # , ; :
+   * `anywhere`           any character boundary. Blunt; for tabular matter.
+   */
+  mode: 'none' | 'after-punctuation' | 'anywhere';
+  /** Only tokens at least this long are touched. Ordinary prose is untouched. */
+  minTokenLength: number;
+  /** Allow an ugly mid-token break when a long token offers no other. */
+  breakAnywhereFallback: boolean;
+}
+
+/**
+ * TABLES — a real tabular grid, not prose.
+ *
+ * The typesetter had no table capability at all. A GFM pipe table fell through
+ * to the paragraph branch and printed as rows of literal `|` characters, so a
+ * book with tables could not be set. DIRT RICH carries three, including a 7x22
+ * crop chart its own text calls the most-consulted page in the book.
+ *
+ * ─── WHY THIS IS OPTIONAL ─────────────────────────────────────────────────
+ * Absent means pipe rows keep falling through to prose, exactly as before. That
+ * matters more than it looks: the whole-page-track manuscripts DO contain pipe
+ * tables (National Parks 46 rows, the two Wildlands volumes 35 and 22). They do
+ * not use this renderer today, but making tables opt-in means that if one is
+ * ever typeset, it cannot silently change shape because a capability arrived
+ * underneath it.
+ *
+ * `typePt` is deliberately its own size rather than a scale of `bodyPt`: a table
+ * is scanned, not read, and it sets tighter than running text at the same
+ * nominal size.
+ */
+export interface TypesetTableStyles {
+  /** Table type size in points. Independent of `bodyPt` — see above. */
+  typePt: number;
+  /** Padding inside each cell, in em of the table's own size. */
+  cellPaddingEm: number;
+  /** Rule under the header row. The one heavy line in the table. */
+  headerRulePt: number;
+  /** Hairline between body rows. 0 for an open, ruleless table. */
+  rowRulePt: number;
+  /**
+   * `keep-together` forbids a page break inside the table. Correct for a
+   * reference table that must be readable in one view, and the reason DIRT
+   * RICH's Table C.1 is specified not to break across a turn.
+   * `allow-break` lets a long table run over pages.
+   */
+  breakPolicy: 'keep-together' | 'allow-break';
+  /** Repeat the header on each page. Only meaningful with `allow-break`. */
+  repeatHeader: boolean;
+}
+
+/**
+ * PREFORMATTED / FENCED BLOCKS — content whose SHAPE is its meaning.
+ *
+ * A fenced block in a manuscript is a diagram made of characters: a site plan, a
+ * layout sketch, an aligned figure. Reflowed as prose it stops meaning anything.
+ * The typesetter had no fence handling, so a fence fell through to the paragraph
+ * branch and its alignment was destroyed — the same corruption Manuscript
+ * Studio's `layout-export.ts` already inflicted on DIRT RICH's Appendix E.
+ *
+ * ─── THE FONT IS PART OF THIS CONTRACT ────────────────────────────────────
+ * `family` MUST name a face vendored in `backend/assets/fonts`. A generic
+ * `monospace` would resolve to whatever the render host happens to have, which
+ * is precisely the non-determinism the vendored-font rule exists to prevent.
+ *
+ * And a monospace face is not sufficient on its own: the face must also CARRY
+ * the glyphs. Measured on DIRT RICH's Appendix E, all eleven currently vendored
+ * faces are missing 18 of its 22 non-ASCII characters — every box-drawing and
+ * block-element glyph. Naming a face here that cannot draw the content produces
+ * a page of tofu, silently. Check coverage before pinning one.
+ */
+export interface TypesetPreformattedStyles {
+  /** A family vendored in `backend/assets/fonts`. Never a generic keyword. */
+  family: string;
+  typePt: number;
+  /** Leading, as a multiple. Tight: these are diagrams, not reading matter. */
+  lineHeight: number;
+  /**
+   * `as-set`            print at `typePt` and let a wide block overrun.
+   * `shrink-to-measure` scale down so the widest line fits the text block.
+   */
+  fit: 'as-set' | 'shrink-to-measure';
+  /** Never split the block across a page. A half-diagram is not a diagram. */
+  keepTogether: boolean;
+  paddingEm: number;
+}
+
+/**
+ * CHECKLIST — a list the reader is meant to TICK, with a real printed box.
+ *
+ * The manuscript writes these as GFM task items (`- [ ] Sun mapped at four
+ * times of day`). Without this policy the bullet branch treats `[ ]` as ordinary
+ * text, so the page prints a literal open bracket, a space and a close bracket
+ * next to a bullet — which is not a checkbox, and DIRT RICH's Appendix D says in
+ * its own text that the reader is meant to tick them.
+ *
+ * The box is DRAWN from the standard rather than typed as a glyph: the ballot
+ * characters (U+2610 and friends) are missing from every vendored text face, so
+ * a typed box would fall back to whatever the render host had, or to nothing.
+ * The same reasoning as the arrow and flag glyphs elsewhere in the renderer.
+ *
+ * OPTIONAL. Absent means task items render exactly as they always did.
+ */
+export interface TypesetChecklistStyles {
+  /** Box edge length, in em of the item's type size. */
+  boxSizeEm: number;
+  /** Rule weight of the box, in points. Thin enough not to shout. */
+  boxStrokePt: number;
+  /** Gap between the box and the item text, in em. */
+  boxGapEm: number;
+  /** Space between items, in em. Ticking needs a little more room than prose. */
+  itemSpacingEm: number;
+  /** Keep an item and its box together across a page break. */
+  keepItemTogether: boolean;
+}
+
 export interface TypesetBlockStyles {
   /** Printed glyphs for a scene break, e.g. "* * *". */
   sceneBreakMark: string;
@@ -322,4 +478,25 @@ export interface TypesetLayoutStandard {
   chapterTakeaway: ChapterTakeawayPolicy;
   alertPanel: AlertPanelPolicy;
   quickAnswerIndex: QuickAnswerIndexPolicy;
+  /**
+   * OPTIONAL. Absent means `none`, which is exactly how every book rendered
+   * before this existed — an approved standard is never edited to add a
+   * capability it was not approved with.
+   */
+  longTokens?: LongTokenWrappingPolicy;
+  /**
+   * OPTIONAL. Absent means pipe rows are not read as tables — the behaviour
+   * every shipped book has. See `TypesetTableStyles`.
+   */
+  tables?: TypesetTableStyles;
+  /**
+   * OPTIONAL. Absent means fenced blocks are not recognised — the behaviour
+   * every shipped book has. See `TypesetPreformattedStyles`.
+   */
+  preformatted?: TypesetPreformattedStyles;
+  /**
+   * OPTIONAL. Absent means `- [ ]` items render as ordinary bullets with the
+   * brackets printed as text — the behaviour every shipped book has.
+   */
+  checklist?: TypesetChecklistStyles;
 }

@@ -107,6 +107,21 @@ export function isSystemInstalled(family: string): boolean {
  * Resolve the requested families against the vendored assets. Duplicates are
  * collapsed so a book whose heading and body face match embeds one copy.
  */
+/**
+ * Families that must ALWAYS embed, even when the host has them installed.
+ *
+ * System deference is right for the book faces and wrong for the preformatted
+ * face. DejaVu Sans Mono ships by default on most Linux images, so deferring
+ * would hand the render whatever copy that image happens to carry — and the
+ * whole reason this face is vendored is a guarantee about which GLYPHS are
+ * present. A host copy that is older, patched or subsetted breaks that guarantee
+ * invisibly, which is precisely what the coverage test exists to prevent.
+ *
+ * Safe against the Type3 concern documented above: that is triggered by VARIABLE
+ * fonts, and this is a static instance, so it embeds as Type0 either way.
+ */
+const ALWAYS_EMBED = new Set(['dejavu sans mono']);
+
 export function bundledFontCss(families: string[]): BundledFonts {
   const unique = [...new Set(families.filter(Boolean))];
   const parts: string[] = [];
@@ -117,7 +132,7 @@ export function bundledFontCss(families: string[]): BundledFonts {
   for (const family of unique) {
     // A family the host can resolve itself must be left to the host: emitting
     // an @font-face for it would override the installed face and hand us Type3.
-    if (isSystemInstalled(family)) {
+    if (!ALWAYS_EMBED.has(family.trim().toLowerCase()) && isSystemInstalled(family)) {
       systemInstalled.push(family);
       continue;
     }

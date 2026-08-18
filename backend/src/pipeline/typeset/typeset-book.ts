@@ -27,7 +27,11 @@ import type {
   AlertPanelPolicy,
   ChapterLabelFormat,
   ChapterTakeawayPolicy,
+  LongTokenWrappingPolicy,
   TerminalMicroSectionPolicy,
+  TypesetChecklistStyles,
+  TypesetPreformattedStyles,
+  TypesetTableStyles,
   TypesetLayoutStandard,
 } from './layout-standards/types.js';
 
@@ -63,6 +67,22 @@ export interface TypesetSection {
   /** Chapter number when the heading declared one. */
   number: number | null;
   title: string;
+  /**
+   * The heading EXACTLY as the manuscript wrote it, before any number was split
+   * out of it. For `## Chapter 1: Backyard Me v1.0` the parser reports
+   * `number: 1` and `title: 'Backyard Me v1.0'`, and this keeps the original
+   * `'Chapter 1: Backyard Me v1.0'`.
+   *
+   * The parser's job is to READ structure, never to decide how it prints.
+   * Whether a chapter sets as a generated kicker over a short title, or as the
+   * author's own one-line heading, belongs to the layout standard
+   * (`opener.titleSource`) — and a standard cannot make that choice if the
+   * parser has already thrown the original away.
+   *
+   * Equal to `title` for any heading that declared no number, so a reader of
+   * this field always gets something sensible.
+   */
+  sourceTitle: string;
   bodyLines: string[];
 }
 
@@ -106,25 +126,146 @@ const ALERT_FLAG =
   '<path d="M4 23V1.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>' +
   '<path d="M6 2.2h16l-4.2 6.4 4.2 6.4H6z" fill="currentColor"/></svg>';
 
-function inlineMarkdown(s: string): string {
-  return escapeHtml(s)
+/**
+ * A break opportunity, carried through escaping as a private-use character and
+ * turned into `<wbr>` at the very end.
+ *
+ * It has to be a sentinel rather than literal `<wbr>` markup because the marks
+ * are placed BEFORE `escapeHtml`, which would otherwise escape them into visible
+ * text. Placing them before escaping is itself deliberate: doing it afterwards
+ * would mean splitting `&amp;` and `&#39;` down the middle.
+ */
+const WBR = String.fromCharCode(0xe000);
+
+/** Where a URL may break. Everything here is structural punctuation. */
+const URL_BREAK_AFTER = /([/?&=_.,;:#-])/g;
+
+/**
+ * Characters that mean a token is carrying markdown, not just text. Tokens
+ * holding any of them are left completely alone: inserting a sentinel inside
+ * `**bold**` or a `[link](url)` would stop the emphasis pass matching, and a
+ * silently unbolded word is a worse defect than a long URL.
+ */
+const MARKDOWN_SIGNIFICANT = /[*`[\]()<>]/;
+
+const URL_LIKE = /^(https?:\/\/|www\.)/i;
+
+/**
+ * Place break opportunities inside long tokens. See `LongTokenWrappingPolicy`.
+ *
+ * Deliberately narrow. It touches a token only when the token is long enough to
+ * be a real overflow risk AND carries no markdown, and it prefers URLs — the
+ * case this exists for — over long words in prose, which hyphenation would
+ * normally handle and which are not what runs off the page.
+ */
+function markLongTokenBreaks(s: string, policy?: LongTokenWrappingPolicy): string {
+  if (!policy || policy.mode === 'none') return s;
+  return s.replace(/\S+/g, (token) => {
+    if (MARKDOWN_SIGNIFICANT.test(token)) return token;
+    if (token.length < policy.minTokenLength && !URL_LIKE.test(token)) return token;
+    if (policy.mode === 'anywhere') return token.split('').join(WBR);
+    const marked = token.replace(URL_BREAK_AFTER, `$1${WBR}`);
+    // A long token with nothing structural to break on — a 60-character
+    // unbroken identifier — still has to fit. CSS handles that case; see
+    // `breakAnywhereFallback` in the stylesheet.
+    return marked;
+  });
+}
+
+function inlineMarkdown(s: string, longTokens?: LongTokenWrappingPolicy): string {
+  return escapeHtml(markLongTokenBreaks(s, longTokens))
     .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*]+?)\*/g, '$1<em>$2</em>')
     .replace(/→/g, XREF_ARROW)
-    .replace(/🚩/g, ALERT_FLAG);
+    .replace(/🚩/g, ALERT_FLAG)
+    .replace(new RegExp(WBR, 'g'), '<wbr>');
+}
+
+/**
+ * A chapter heading that carries its own number, e.g.
+ * `Chapter 1: Backyard Me v1.0`, `Chapter 11 — Backyard Me Now`,
+ * `Chapter 3. Composting`.
+ *
+ * The separator is REQUIRED. `Chapter 4 What to Plant First` is not matched, and
+ * that is deliberate: without a separator there is no non-guessing way to tell a
+ * numbered chapter heading from a section that merely opens with the word.
+ */
+const SELF_NUMBERED_CHAPTER = /^chapter\s+(\d+)\s*[:.–—-]\s*(.+)$/i;
+
+/** An H1 that is a STRUCTURAL MARKER rather than a section of the book. */
+const H1_STRUCTURE_MARKER = /^(chapter\s+\d+|front\s+matter|back\s+matter)/i;
+
+/**
+ * Which heading convention a manuscript uses.
+ *
+ *   `marked`        `# Chapter N` + `## Title`, `# FRONT MATTER` / `# BACK MATTER`.
+ *                   H1 declares structure; H2 is a section or an entry inside one.
+ *   `self-numbered` No structural H1 markers at all. `## Chapter N: Title` carries
+ *                   its own number and H1 is a top-level division.
+ *
+ * ─── WHY THIS IS DECIDED UP FRONT ─────────────────────────────────────────
+ * The two conventions assign OPPOSITE meanings to the same heading levels, so
+ * role inference has to know which one it is reading before it starts. Deciding
+ * per-heading instead was tried and regressed two shipped books: the Wildlands
+ * manuscripts use `# CHAPTER N` markers AND happen to contain some
+ * `## Chapter N: ...` H2s further down, so a per-heading rule promoted seven
+ * entry headings to chapters and relabelled a run of sections.
+ *
+ * A single up-front decision makes the guarantee structural: a manuscript with
+ * any marker H1 takes the original code path exactly, so it cannot move.
+ */
+export type HeadingConvention = 'marked' | 'self-numbered';
+
+export function detectHeadingConvention(markdown: string): HeadingConvention {
+  let sawSelfNumbered = false;
+  for (const raw of markdown.split('\n')) {
+    const line = raw.replace(/\s+$/, '');
+    const h2 = line.match(/^##\s+(.*)$/);
+    if (h2) {
+      if (SELF_NUMBERED_CHAPTER.test(h2[1]!.trim())) sawSelfNumbered = true;
+      continue;
+    }
+    const h1 = line.match(/^#\s+(.*)$/);
+    // Any structural marker at all settles it: this is the original convention.
+    if (h1 && H1_STRUCTURE_MARKER.test(h1[1]!.trim())) return 'marked';
+  }
+  return sawSelfNumbered ? 'self-numbered' : 'marked';
 }
 
 /**
  * Split a manuscript into typesettable sections using its own headings.
  *
  *   `# Chapter N` followed by `## Title`  -> chapter (title from the H2)
+ *   `## Chapter N: Title`                 -> chapter (number split from title)
  *   `# FRONT MATTER` / `# BACK MATTER`    -> matter, each following H2 a section
  *   `###` / `####`                        -> subheads inside a section
  *   `---`                                 -> scene break
  *
  * The manuscript's own title block is dropped: a title page is generated matter,
  * not manuscript prose, so typesetting it here would duplicate it later.
+ *
+ * ─── WHY THIS READS MORE THAN ONE SHAPE ───────────────────────────────────
+ * It used to read only the first and third shapes. A manuscript that numbered
+ * its chapters in the H2 itself and used bare H1s for its back matter — an
+ * entirely ordinary nonfiction layout — hit the title-block rule on EVERY H1 and
+ * had those sections discarded along with all their body text.
+ *
+ * Measured on DIRT RICH: 16 sections instead of 24, zero chapters recognised,
+ * and The Practical Bits, Appendices A-F and the Glossary silently gone. It did
+ * not error. The every-section invariant compares the render against THIS
+ * function's output, so a section dropped here is a section the invariant never
+ * knew to look for — it compared the truncated list against itself and passed.
+ * That is why `canonical-inventory.ts` re-derives the expected sections straight
+ * from the manuscript instead of trusting anything downstream of this parser.
+ *
+ * Both additions are STRICTLY ADDITIVE: each fires only where the old code would
+ * have dropped content on the floor.
+ *   - the H2 chapter shape is read only when no `# Chapter N` is already pending,
+ *     so a book using the original two-line shape cannot double-count;
+ *   - a bare H1 defaults to `back` only once chapters have started AND no
+ *     explicit matter marker is in force, which is exactly the case that used to
+ *     be mislabelled `front`.
  */
 export function parseTypesetSections(markdown: string): TypesetSection[] {
   const out: TypesetSection[] = [];
@@ -133,6 +274,16 @@ export function parseTypesetSections(markdown: string): TypesetSection[] {
   let matter: 'front' | 'back' | null = null;
   /** True once a chapter or matter marker has appeared — see the bare-H1 rule. */
   let seenStructure = false;
+  /** True once any chapter has been read. Only consulted in the new convention. */
+  let seenChapter = false;
+  /**
+   * Decided once, before a single heading is read. In `marked` this function
+   * behaves exactly as it did before C1, line for line — that is the regression
+   * guarantee, and it is structural rather than a matter of testing carefully.
+   */
+  const selfNumbered = detectHeadingConvention(markdown) === 'self-numbered';
+  /** Back-matter inference is a self-numbered-convention rule only. */
+  const unmarked = (): 'front' | 'back' => (selfNumbered && seenChapter ? 'back' : 'front');
 
   for (const raw of markdown.split('\n')) {
     const line = raw.replace(/\s+$/, '');
@@ -142,7 +293,7 @@ export function parseTypesetSections(markdown: string): TypesetSection[] {
     if (h1) {
       const t = h1[1]!.trim();
       const ch = t.match(/^chapter\s+(\d+)/i);
-      if (ch) { pendingChapter = Number(ch[1]); matter = null; seenStructure = true; current = null; continue; }
+      if (ch) { pendingChapter = Number(ch[1]); matter = null; seenStructure = true; seenChapter = true; current = null; continue; }
       if (/^front\s+matter$/i.test(t)) { matter = 'front'; seenStructure = true; current = null; continue; }
       if (/^back\s+matter$/i.test(t)) { matter = 'back'; seenStructure = true; current = null; continue; }
       // A bare H1 BEFORE any chapter or matter marker is the manuscript's own
@@ -151,17 +302,35 @@ export function parseTypesetSections(markdown: string): TypesetSection[] {
       // push every chapter two pages later. After structure has started, a bare
       // H1 is a real standalone section and is kept.
       if (!seenStructure) { pendingChapter = null; current = null; continue; }
-      current = { kind: matter ?? 'front', number: null, title: t, bodyLines: [] };
+      // Once the chapters have run, an unmarked H1 is back matter. Appendices, a
+      // glossary and a source list are not front matter, and calling them front
+      // gives them the front-matter start policy — which on a recto-start
+      // standard buys a blank verso in front of each one.
+      current = { kind: matter ?? unmarked(), number: null, title: t, sourceTitle: t, bodyLines: [] };
       out.push(current);
       pendingChapter = null;
       continue;
     }
 
     if (h2) {
+      const t = h2[1]!.trim();
+      const self = selfNumbered && pendingChapter === null ? t.match(SELF_NUMBERED_CHAPTER) : null;
+      if (self) {
+        seenStructure = true;
+        seenChapter = true;
+        matter = null;
+        current = { kind: 'chapter', number: Number(self[1]), title: self[2]!.trim(), sourceTitle: t, bodyLines: [] };
+        out.push(current);
+        continue;
+      }
       current = {
-        kind: pendingChapter !== null ? 'chapter' : (matter ?? 'front'),
+        // Same rule as the bare H1 above, for the same reason: `Where I Checked`
+        // and `About the Author` are H2s that follow the appendices, and calling
+        // them front matter is wrong in both role and start policy.
+        kind: pendingChapter !== null ? 'chapter' : (matter ?? unmarked()),
         number: pendingChapter,
-        title: h2[1]!.trim(),
+        title: t,
+        sourceTitle: t,
         bodyLines: [],
       };
       out.push(current);
@@ -183,6 +352,82 @@ export function parseTypesetSections(markdown: string): TypesetSection[] {
  */
 const SCENE_BREAK = '<p class="scene-break">* * *</p>';
 
+// ── Tables (C2) ─────────────────────────────────────────────────────────────
+
+type CellAlign = 'left' | 'right' | 'center';
+
+/**
+ * Split a pipe row into cells.
+ *
+ * Splits on UNESCAPED pipes only, so a cell may contain a literal `\|`. Leading
+ * and trailing pipes are optional, per GFM — `a | b` and `| a | b |` are the
+ * same row.
+ */
+export function splitTableRow(row: string): string[] {
+  let t = row.trim();
+  if (t.startsWith('|')) t = t.slice(1);
+  if (t.endsWith('|') && !t.endsWith('\\|')) t = t.slice(0, -1);
+  return t
+    .split(/(?<!\\)\|/)
+    .map((c) => c.trim().replace(/\\\|/g, '|'));
+}
+
+/** `|---|:--:|--:|` — the row that turns the line above it into a header. */
+export function isDelimiterRow(row: string | undefined): boolean {
+  if (!row) return false;
+  const t = row.trim();
+  if (!t.includes('|') || !t.includes('-')) return false;
+  const cells = splitTableRow(t);
+  return cells.length > 0 && cells.every((c) => /^:?-{2,}:?$/.test(c));
+}
+
+/**
+ * Column alignment from the delimiter row. `:--` left, `--:` right, `:-:`
+ * centre, bare `--` left by default.
+ *
+ * Padded to the header width so a malformed delimiter row cannot leave a column
+ * with no alignment — the cell still has to render.
+ */
+export function alignmentsFrom(delimiter: string, columns: number): CellAlign[] {
+  const cells = splitTableRow(delimiter);
+  const out: CellAlign[] = [];
+  for (let i = 0; i < columns; i++) {
+    const c = cells[i] ?? '';
+    const l = c.startsWith(':');
+    const r = c.endsWith(':');
+    out.push(l && r ? 'center' : r ? 'right' : 'left');
+  }
+  return out;
+}
+
+/**
+ * Build the table markup.
+ *
+ * Every authored cell is emitted, including empty ones and any beyond the header
+ * width: a table is DATA, and quietly dropping a cell because a row is ragged
+ * would be exactly the silent content loss this engine work exists to stop. A
+ * short row is padded so the grid stays rectangular.
+ */
+function tableHtml(
+  header: string[],
+  align: CellAlign[],
+  rows: string[][],
+  inline: (s: string) => string,
+): string {
+  const columns = Math.max(header.length, ...rows.map((r) => r.length), 1);
+  const at = (i: number): CellAlign => align[i] ?? 'left';
+  const cell = (tag: 'th' | 'td', text: string, i: number): string =>
+    `<${tag} class="ta-${at(i)}">${inline(text)}</${tag}>`;
+  const pad = (r: string[]): string[] =>
+    r.length >= columns ? r : [...r, ...Array(columns - r.length).fill('')];
+
+  const thead = `<thead><tr>${pad(header).map((c, i) => cell('th', c, i)).join('')}</tr></thead>`;
+  const tbody = `<tbody>${rows
+    .map((r) => `<tr>${pad(r).map((c, i) => cell('td', c, i)).join('')}</tr>`)
+    .join('')}</tbody>`;
+  return `<table class="tset-table" data-columns="${columns}" data-rows="${rows.length}">${thead}${tbody}</table>`;
+}
+
 interface BodyHtmlOptions {
   micro?: TerminalMicroSectionPolicy;
   takeaway?: ChapterTakeawayPolicy;
@@ -200,10 +445,22 @@ interface BodyHtmlOptions {
   sectionTitle?: string;
   /** Receives one ref per emitted block. See `block-identity.ts`. */
   collect?: TypesetBlockRef[];
+  /** Where long tokens may break. Absent leaves them intact, as they shipped. */
+  longTokens?: LongTokenWrappingPolicy;
+  /** Table styling. Absent means pipe rows are not read as tables at all. */
+  tables?: TypesetTableStyles;
+  /** Fenced-block styling. Absent means fences are not recognised. */
+  preformatted?: TypesetPreformattedStyles;
+  /** Checklist styling. Absent means task items stay ordinary bullets. */
+  checklist?: TypesetChecklistStyles;
+  /** asset name -> data URI. Absent means `![...]()` stays literal text. */
+  images?: Record<string, string>;
 }
 
 function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
   const { micro, takeaway, alert } = opts;
+  /** Local alias so every inline call carries the policy without repeating it. */
+  const inline = (s: string): string => inlineMarkdown(s, opts.longTokens);
   const html: string[] = [];
   let para: string[] = [];
   let list: string[] = [];
@@ -212,10 +469,29 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
   let quote: string[] = [];
   let flushNext = true;
 
+  /** A GFM task item: `[ ] text` or `[x] text`, after the bullet is stripped. */
+  const TASK_ITEM = /^\[([ xX])\]\s+(.*)$/;
+
   const closeList = (): void => {
     if (!list.length) return;
     const tag = listKind === 'ol' ? 'ol' : 'ul';
-    html.push(`<${tag}>${list.map((li) => `<li>${inlineMarkdown(li)}</li>`).join('')}</${tag}>`);
+    // A CHECKLIST only when the standard asks for one AND every item is a task
+    // item. A mixed list is left alone: half-boxed, half-bulleted would read as
+    // a mistake, and guessing which half was meant is not the renderer's call.
+    const allTasks = list.every((li) => TASK_ITEM.test(li));
+    if (opts.checklist && tag === 'ul' && allTasks) {
+      const items = list
+        .map((li) => {
+          const m = TASK_ITEM.exec(li)!;
+          const ticked = m[1]!.toLowerCase() === 'x';
+          // The box is drawn, not typed — see TypesetChecklistStyles.
+          return `<li class="ck-item"><span class="ck-box${ticked ? ' ck-ticked' : ''}"></span><span class="ck-text">${inline(m[2]!)}</span></li>`;
+        })
+        .join('');
+      html.push(`<ul class="checklist">${items}</ul>`);
+    } else {
+      html.push(`<${tag}>${list.map((li) => `<li>${inline(li)}</li>`).join('')}</${tag}>`);
+    }
     list = [];
     listKind = null;
     flushNext = false;
@@ -241,7 +517,7 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
     const first = lines[0]?.trim() ?? '';
     const m = /^\*\*(.+)\*\*$/.exec(first);
     if (m) {
-      label = `<p class="callout-label">${inlineMarkdown(m[1]!)}</p>`;
+      label = `<p class="callout-label">${inline(m[1]!)}</p>`;
       lines.shift();
     }
     const body = lines
@@ -249,7 +525,7 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
       .split(/\n\s*\n/)
       .map((p) => p.replace(/\s*\n\s*/g, ' ').trim())
       .filter(Boolean)
-      .map((p) => `<p>${inlineMarkdown(p)}</p>`)
+      .map((p) => `<p>${inline(p)}</p>`)
       .join('');
     html.push(`<blockquote class="callout">${label}${body}</blockquote>`);
     quote = [];
@@ -261,18 +537,102 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
     // entry rather than being joined into a paragraph. Joining them is what
     // turned the emergency block into one unscannable justified slab.
     if (opts.quickAnswerEntries) {
-      for (const line of para) html.push(`<p class="qa-entry">${inlineMarkdown(line)}</p>`);
+      for (const line of para) html.push(`<p class="qa-entry">${inline(line)}</p>`);
       para = [];
       flushNext = false;
       return;
     }
-    html.push(`<p${flushNext ? ' class="first"' : ''}>${inlineMarkdown(para.join(' '))}</p>`);
+    html.push(`<p${flushNext ? ' class="first"' : ''}>${inline(para.join(' '))}</p>`);
     para = [];
     flushNext = false;
   };
 
-  for (const line of lines) {
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li]!;
     const t = line.trim();
+
+    // ── Inline figure ────────────────────────────────────────────────────
+    // `![caption](asset-name)` on its own line becomes a figure IN THE FLOW, so
+    // the typesetter reserves its height and pagination accounts for it.
+    //
+    // Deliberately not the stamping path: stamping draws art into whatever space
+    // is left at the foot of a page, which suits an illustrated book with room
+    // to spare. This book runs 94 of 119 pages at 90-100% full, so there is no
+    // such space — anchoring by stamp pushed both figures 5 and 8 pages away
+    // from the text they illustrate. A figure in the flow stays put.
+    // `![caption](asset)` optionally followed by `{70%}` to set the printed
+    // width as a fraction of the text measure. Without it a figure fills the
+    // measure, which is right for a chart and too heavy for a small vignette —
+    // a chapter-end plate and a full-width diagram are different jobs.
+    const fig = opts.images ? t.match(/^!\[([^\]]*)\]\(([^)]+)\)(?:\{(\d{1,3})%\})?$/) : null;
+    if (fig) {
+      const src = opts.images![fig[2]!.trim()];
+      if (src) {
+        closeQuote(); closeList(); closePara();
+        const caption = fig[1]!.trim();
+        // Clamped: a figure may not exceed the measure, and a sub-10% figure is
+        // a typo rather than an intention.
+        const pct = fig[3] ? Math.min(100, Math.max(10, Number(fig[3]))) : 100;
+        const style = pct === 100 ? '' : ` style="width:${pct}%"`;
+        html.push(
+          `<figure class="tset-figure"><img src="${src}" alt="${escapeHtml(caption)}"${style}>` +
+            (caption ? `<figcaption>${inline(caption)}</figcaption>` : '') +
+            `</figure>`,
+        );
+        flushNext = true;
+        continue;
+      }
+      // Unknown asset: fall through to normal text rather than emit a broken
+      // image. A missing figure must be visible, not silently blank.
+    }
+
+    // ── Preformatted / fenced blocks (C3) ────────────────────────────────
+    // Everything between the fences is emitted VERBATIM: escaped, but with no
+    // inline markdown pass, no long-token marking, no whitespace collapsing.
+    // The shape is the content — a `**` inside a site plan is two asterisks in
+    // a drawing, not an instruction to embolden.
+    if (opts.preformatted && /^(```|~~~)/.test(t)) {
+      closeQuote(); closeList(); closePara();
+      const marker = t.slice(0, 3);
+      const content: string[] = [];
+      let j = li + 1;
+      for (; j < lines.length; j++) {
+        if (lines[j]!.trim().startsWith(marker)) break;
+        content.push(lines[j]!);
+      }
+      // An unterminated fence consumes the rest of the section rather than
+      // silently reverting to prose: losing the shape is the failure mode this
+      // branch exists to prevent, so fail towards preserving it.
+      li = j;
+      html.push(
+        `<pre class="tset-pre" data-lines="${content.length}">${escapeHtml(content.join('\n'))}</pre>`,
+      );
+      flushNext = true;
+      continue;
+    }
+
+    // ── Tables (C2) ──────────────────────────────────────────────────────
+    // Consumes several lines at once, so it needs the index. Recognised only
+    // when the standard declares a table policy AND the row is followed by a
+    // delimiter row — the two-line signature is what distinguishes a table from
+    // a paragraph that happens to contain a pipe.
+    if (opts.tables && t.startsWith('|') && isDelimiterRow(lines[li + 1])) {
+      closeQuote(); closeList(); closePara();
+      const header = splitTableRow(t);
+      const align = alignmentsFrom(lines[li + 1]!, header.length);
+      const rows: string[][] = [];
+      let j = li + 2;
+      for (; j < lines.length; j++) {
+        const rt = lines[j]!.trim();
+        if (!rt.startsWith('|')) break;
+        rows.push(splitTableRow(rt));
+      }
+      li = j - 1;
+      html.push(tableHtml(header, align, rows, inline));
+      flushNext = true;
+      continue;
+    }
+
     // A blank line inside a quote is a paragraph break, not the end of it.
     if (!t) {
       if (quote.length) { quote.push(''); continue; }
@@ -298,12 +658,12 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
       continue;
     }
     const h4 = t.match(/^####\s+(.*)$/);
-    if (h4) { closeList(); closePara(); html.push(`<h4>${inlineMarkdown(h4[1]!)}</h4>`); flushNext = true; continue; }
+    if (h4) { closeList(); closePara(); html.push(`<h4>${inline(h4[1]!)}</h4>`); flushNext = true; continue; }
     const h3 = t.match(/^###\s+(.*)$/);
     if (h3) {
       closeList(); closePara();
       const isUrgent = (opts.urgentHeadings ?? []).some((h) => h.toLowerCase() === h3[1]!.trim().toLowerCase());
-      html.push(`<h3${isUrgent ? ' class="urgent"' : ''}>${isUrgent ? ALERT_FLAG : ''}${inlineMarkdown(h3[1]!)}</h3>`);
+      html.push(`<h3${isUrgent ? ' class="urgent"' : ''}>${isUrgent ? ALERT_FLAG : ''}${inline(h3[1]!)}</h3>`);
       flushNext = true;
       continue;
     }
@@ -349,8 +709,40 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
   }
 
   /** Every block carries a stable id; overrides target these, never pages. */
+  /**
+   * KEEP A HEADING WITH THE TEXT IT INTRODUCES.
+   *
+   * A subhead alone at the foot of a page, its content starting overleaf, reads
+   * as a mistake: the reader turns the page to find out what it was for.
+   *
+   * `break-after: avoid` is the CSS for this and Paged.js here IGNORES it — the
+   * same finding already recorded for `orphans`/`widows` in the layout standard.
+   * What it does honour is `break-inside: avoid`, so the heading and the block
+   * after it are wrapped in one indivisible unit and travel together.
+   *
+   * Only a PARAGRAPH is paired. Binding a heading to a table, a figure or a list
+   * could drag a large object onto a new page and open a bigger hole than the
+   * one being closed.
+   */
+  const keepHeadingsWithText = (blocks: string[]): string[] => {
+    const out: string[] = [];
+    for (let i = 0; i < blocks.length; i++) {
+      const cur = blocks[i]!;
+      const next = blocks[i + 1];
+      const isHeading = /^<h[34][ >]/.test(cur);
+      const nextIsPara = Boolean(next && /^<p[ >]/.test(next) && !next.includes('scene-break'));
+      if (isHeading && nextIsPara) {
+        out.push(`<div class="keep-with-next">${cur}${next}</div>`);
+        i++;
+        continue;
+      }
+      out.push(cur);
+    }
+    return out;
+  };
+
   const finish = (): string =>
-    stampBlockIds(html, opts.sectionSlug ?? '', opts.sectionTitle ?? '', opts.collect).join('\n');
+    stampBlockIds(keepHeadingsWithText(html), opts.sectionSlug ?? '', opts.sectionTitle ?? '', opts.collect).join('\n');
 
   // A recognised closing beat becomes the takeaway component: compact, kept
   // whole, and kept WITH the chapter content before it. Checked before the
@@ -401,6 +793,14 @@ export interface TypesetHtmlInput {
   sections: TypesetSection[];
   config: ProjectConfig;
   margins?: TypesetMargins;
+  /**
+   * Figure assets, keyed by the name used in `![caption](name)`, as data URIs.
+   *
+   * Data URIs rather than file paths, for the same reason the type faces are
+   * vendored: a print render must not depend on anything outside the document
+   * at render time. Absent means figure syntax stays literal text.
+   */
+  images?: Record<string, string>;
   /** Paged.js polyfill source. Omit for a browser-free HTML string (tests). */
   polyfillJs?: string;
   /**
@@ -582,7 +982,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
       const slug = slugifySection(s.title);
       const opener = stampBlockIds(
         [
-          `<header class="opener">${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}<h2>${escapeHtml(s.title)}</h2></header>`,
+          `<header class="opener">${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}<h2>${escapeHtml(op.titleSource === 'source' ? s.sourceTitle : s.title)}</h2></header>`,
         ],
         slug,
         s.title,
@@ -600,6 +1000,11 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
     sectionSlug: slug,
     sectionTitle: s.title,
     collect,
+    longTokens: standard.longTokens,
+    tables: standard.tables,
+    preformatted: standard.preformatted,
+    checklist: standard.checklist,
+    images: input.images,
   })}
 </section>`;
     })
@@ -616,7 +1021,14 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
   // Fonts come from vendored assets so the printed interior is reproducible
   // offline. Only families with no bundled asset fall back to the CDN, and that
   // fallback is a dev convenience — see font-assets.ts.
-  const fonts = bundledFontCss([t.headingFont, t.bodyFont]);
+  // The preformatted face is only embedded for a book that actually sets a
+  // fenced block — it is a complete unsubsetted TTF (~444KB of base64), and a
+  // text-only book must not carry it.
+  const fonts = bundledFontCss(
+    standard.preformatted
+      ? [t.headingFont, t.bodyFont, standard.preformatted.family]
+      : [t.headingFont, t.bodyFont],
+  );
   const fontQuery = fonts.missing
     .map((f) => `family=${f.replace(/\s+/g, '+')}:ital,wght@0,400;0,500;0,600;1,400`)
     .join('&');
@@ -806,6 +1218,81 @@ ul { list-style: disc; }
   text-align: ${qa.justify ? 'justify' : 'left'};
   ${qa.justify ? '' : 'hyphens: none; -webkit-hyphens: none;'}
   ${qa.keepEntryTogether ? 'break-inside: avoid;' : ''} }
+${
+  standard.longTokens && standard.longTokens.mode !== 'none' && standard.longTokens.breakAnywhereFallback
+    ? `/* Long-token fallback. The break opportunities placed as <wbr> handle every
+   URL that has punctuation to break on; this catches the token that has none,
+   where the only alternative is ink outside the trim. Scoped to paragraphs so it
+   cannot reflow a heading. Emitted ONLY when the standard asks for it, so a book
+   approved without this rule does not silently acquire it. */
+p { overflow-wrap: break-word; }`
+    : ''
+}
+${
+  standard.tables
+    ? `/* Tables (C2). A grid, not prose: no first-line indent, no justification,
+   and the header carrying the one heavy rule. Emitted only when the standard
+   declares a table policy. */
+table.tset-table { width: 100%; border-collapse: collapse; margin: 1em 0;
+  font-size: ${standard.tables.typePt}pt; line-height: 1.25;
+  ${standard.tables.breakPolicy === 'keep-together' ? 'break-inside: avoid;' : ''} }
+table.tset-table th, table.tset-table td {
+  padding: ${standard.tables.cellPaddingEm}em; vertical-align: top;
+  text-indent: 0; hyphens: none; -webkit-hyphens: none;
+  ${standard.tables.rowRulePt > 0 ? `border-bottom: ${standard.tables.rowRulePt}pt solid rgba(0,0,0,.28);` : ''} }
+table.tset-table th { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 600;
+  text-align: left; border-bottom: ${standard.tables.headerRulePt}pt solid rgba(0,0,0,.85); }
+${standard.tables.repeatHeader ? 'table.tset-table thead { display: table-header-group; }' : ''}
+table.tset-table tr { break-inside: avoid; }
+.ta-left { text-align: left; } .ta-right { text-align: right; } .ta-center { text-align: center; }`
+    : ''
+}
+${
+  standard.preformatted
+    ? `/* Preformatted / fenced blocks (C3). Whitespace is the content, so it is
+   preserved exactly and never justified, indented or hyphenated. The family is
+   a vendored face by contract — see TypesetPreformattedStyles. */
+pre.tset-pre { font-family: '${standard.preformatted.family}', monospace;
+  font-size: ${standard.preformatted.typePt}pt; line-height: ${standard.preformatted.lineHeight};
+  white-space: pre; text-indent: 0; text-align: left; hyphens: none; -webkit-hyphens: none;
+  margin: 1em 0; padding: ${standard.preformatted.paddingEm}em;
+  ${standard.preformatted.keepTogether ? 'break-inside: avoid;' : ''}
+  ${standard.preformatted.fit === 'shrink-to-measure' ? 'max-width: 100%; overflow: hidden;' : ''} }`
+    : ''
+}
+${
+  standard.checklist
+    ? `/* Checklist (Appendix D). A DRAWN box, not a typed glyph: the ballot
+   characters are absent from every vendored text face, so a typed box would
+   fall back to the render host or to nothing at all. Flex keeps a wrapped
+   item's second line aligned with its first instead of running under the box. */
+ul.checklist { list-style: none; margin: .7em 0; padding: 0; }
+ul.checklist li.ck-item { display: flex; align-items: flex-start; text-indent: 0;
+  margin: 0 0 ${standard.checklist.itemSpacingEm}em;
+  ${standard.checklist.keepItemTogether ? 'break-inside: avoid;' : ''} }
+.ck-box { flex: 0 0 auto; width: ${standard.checklist.boxSizeEm}em; height: ${standard.checklist.boxSizeEm}em;
+  border: ${standard.checklist.boxStrokePt}pt solid #000;
+  margin-right: ${standard.checklist.boxGapEm}em;
+  /* Sit on the first line's baseline rather than its box top. */
+  margin-top: .18em; }
+.ck-text { flex: 1 1 auto; }`
+    : ''
+}
+/* Inline figures. Kept whole so a chart never splits across a page turn, and
+   capped at the text measure so a figure cannot reach past the type block. */
+/* A heading and the paragraph it introduces, bound so a page break cannot fall
+   between them. See keepHeadingsWithText in bodyToHtml. */
+.keep-with-next { break-inside: avoid; }
+figure.tset-figure { margin: 1.1em 0; break-inside: avoid; text-align: center; }
+/* Centred as a BLOCK with auto margins rather than by inheriting text-align.
+   A percentage-width inline image only centres if every ancestor keeps the
+   alignment; one left-aligned wrapper anywhere in the chain pins it left with
+   all the slack on one side, which is exactly how it printed. */
+figure.tset-figure img { display: block; max-width: 100%; height: auto;
+  margin-left: auto; margin-right: auto; }
+figure.tset-figure figcaption { font-family: '${t.bodyFont}', Georgia, serif;
+  font-size: ${t.captionPt}pt; line-height: 1.25; text-align: left;
+  text-indent: 0; margin-top: .4em; }
 /* Glyphs the text faces do not carry, drawn as vector rather than typed. Sized
    and coloured from the surrounding type so they sit on the same line as text
    instead of reading as pasted-in icons. */
@@ -837,6 +1324,25 @@ export interface TypesetReport {
   sectionStarts: TypesetSectionStart[];
   /** Pages whose content box reports vertical overflow (real clipping risk). */
   verticalOverflowPages: number[];
+  /**
+   * Content elements whose text is wider than its own measure — ink leaving the
+   * text block sideways.
+   *
+   * Measured per ELEMENT, never on the Paged.js page container, whose horizontal
+   * scrollWidth is a container artifact. The case this catches is a long
+   * unbreakable token, typically a source URL: it runs off the trim while page
+   * count, section count and vertical overflow all report clean.
+   *
+   * Empty on every book that shipped before this was measured — the check is new,
+   * not the behaviour.
+   */
+  horizontalOverflow: {
+    page: number | null;
+    blockId: string | null;
+    tag: string;
+    overflowPx: number;
+    preview: string;
+  }[];
   /** Pages that are effectively empty — recto-start parity blanks. */
   blankPages: number[];
   /**

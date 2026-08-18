@@ -40,7 +40,15 @@ export type BlockKind =
   | 'alert-panel'
   | 'takeaway'
   | 'tail-unit'
-  | 'scene-break';
+  | 'scene-break'
+  /**
+   * A real data table (C2). Only ever produced when a standard declares a
+   * `tables` policy, so no previously-approved book gains one — and because no
+   * existing block was ever classified `table`, no existing block id moves.
+   */
+  | 'table'
+  /** Preformatted / fenced content (C3), set verbatim in a mono face. */
+  | 'pre';
 
 export interface TypesetBlockRef {
   blockId: string;
@@ -120,6 +128,8 @@ export function blockKindOf(html: string): BlockKind {
   if (html.startsWith('<h4')) return 'h4';
   if (html.startsWith('<ul')) return 'ul';
   if (html.startsWith('<ol')) return 'ol';
+  if (html.startsWith('<table')) return 'table';
+  if (html.startsWith('<pre')) return 'pre';
   return 'p';
 }
 
