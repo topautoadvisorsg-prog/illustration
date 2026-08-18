@@ -37,6 +37,11 @@ Thumbs.db
 
 # Pipeline artifacts (per-project, never committed)
 backend/storage/
+# The server actually resolves its storage root to backend/backend/storage --
+# the doubled segment is real. The single-segment rule above never matched it,
+# so 125MB of built interiors and covers sat untracked but NOT ignored, one
+# `git add -A` away from being committed.
+backend/backend/storage/
 spikes/output/
 spike-output/
 
