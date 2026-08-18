@@ -138,7 +138,13 @@ console.log('note: the figure pipeline overwrites this working copy on its way t
 const body = {
   brief: {
     title: 'DIRT RICH',
-    subtitle: "A Beginner's Guide to Backyard Homesteading",
+    // The subtitle PRINTS ON THE TITLE PAGE and must match the approved cover.
+    // A short working subtitle was carried here from an early draft and shipped
+    // into a production intake, which put one subtitle on the cover and another
+    // on page 1 of an otherwise byte-identical book. Metadata gets no hash and no
+    // gate, so nothing caught it until the rendered title page was diffed.
+    subtitle:
+      'Build a Backyard Homestead on a Quarter Acre: Grow Vegetables, Raise Chickens for Eggs and Meat, and Preserve the Harvest',
     authorName: 'Abby Fenwick',
     volume: 1,
     trimPreset: '6x9',
