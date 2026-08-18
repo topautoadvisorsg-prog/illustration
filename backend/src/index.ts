@@ -2,10 +2,40 @@ import { getEnv } from './env.js';
 import { dbBanner, describeDbEnvironment } from './lib/db-environment.js';
 import { logger } from './lib/logger.js';
 import { buildServer } from './server.js';
-import { activeStorageKind } from './services/storage/project-storage.js';
+import {
+  activeStorageKind,
+  hasIgnoredProductionStorageCredentials,
+} from './services/storage/project-storage.js';
+
+/**
+ * PROCESS LIFECYCLE — so a dev-server restart during a long request is visible.
+ *
+ * `tsx watch` restarts by killing this process and starting a new one. From
+ * outside, that is indistinguishable from a request that hangs: the client waits
+ * forever on a connection nothing will ever answer. It has already happened once
+ * mid-render here and cost an hour of misdiagnosis.
+ *
+ * Deliberately hooks only `exit` — an observer, not a handler. Adding a SIGTERM
+ * listener would REPLACE Node's default terminate-on-signal behaviour, which is
+ * a behaviour change in the shutdown path, and this is instrumentation.
+ * A restart therefore reads as: an exit line, then a boot line with a new pid.
+ */
+function logProcessLifecycle(): void {
+  const startedAt = Date.now();
+  logger.info({ pid: process.pid, node: process.version }, `process START pid=${process.pid}`);
+  process.on('exit', (code) => {
+    // Must stay synchronous: nothing async runs during 'exit'.
+    logger.info(
+      { pid: process.pid, code, uptimeMs: Date.now() - startedAt },
+      `process EXIT pid=${process.pid} code=${code} after ${Date.now() - startedAt}ms` +
+        ' — if this lands mid-request, the request was killed, not hung',
+    );
+  });
+}
 
 async function main(): Promise<void> {
   const env = getEnv();
+  logProcessLifecycle();
   // Boot-time BUILD signal. A failed image build leaves the previous container
   // running and answering /health exactly as before, so a deploy can appear to
   // land while the old code keeps serving. Stating the commit on every boot
@@ -32,10 +62,21 @@ async function main(): Promise<void> {
   // Boot-time persistence signal: confirms on every deploy whether generated
   // images/PDFs are going to durable Supabase Storage or ephemeral local disk.
   const storage = activeStorageKind();
-  if (storage === 'supabase') {
-    logger.info({ storage, env: env.NODE_ENV }, 'project storage: durable (Supabase) — files persist across redeploys');
+  if (storage === 'supabase' || storage === 'r2') {
+    logger.info({ storage, env: env.NODE_ENV }, `project storage: durable (${storage}) — files persist across redeploys`);
   } else {
-    logger.warn({ storage, env: env.NODE_ENV }, 'project storage: EPHEMERAL local disk — files will be LOST on redeploy (Supabase not configured)');
+    logger.warn({ storage, env: env.NODE_ENV }, 'project storage: EPHEMERAL local disk — files will be LOST on redeploy');
+  }
+  // Production credentials present in a process that is not production. They are
+  // IGNORED, not used — but say so, because the alternative is a developer
+  // believing their writes are local while they land in the production bucket.
+  // That is exactly how a dev intake put a manuscript into production R2.
+  if (hasIgnoredProductionStorageCredentials()) {
+    logger.warn(
+      { appEnvironment: env.APP_ENVIRONMENT, storage },
+      'production storage credentials are present but IGNORED: APP_ENVIRONMENT is not "production", ' +
+        'so this process uses LOCAL disk. Nothing it writes can reach the production bucket.',
+    );
   }
   const server = await buildServer();
   await server.listen({ host: env.HOST, port: env.PORT });

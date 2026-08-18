@@ -1311,9 +1311,31 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
   });
 
   app.get('/api/projects/:id/typeset-preview', async (request, reply) => {
+    /**
+     * STAGE TIMING — instrumentation only, no behaviour change.
+     *
+     * This route was observed three times to never return, while the backend
+     * simultaneously stopped answering /health. `buildTypesetInterior` was then
+     * measured standalone and is healthy: 124 pages in ~9s, twice in a row, with
+     * the event loop never blocking. So the fault is somewhere in this handler
+     * around it, and the only way to find out is to say where it got to.
+     *
+     * `mark` logs entry and exit for each stage with elapsed-since-request-start,
+     * so a truncated log names the stage that never finished.
+     */
+    const t0 = Date.now();
+    const mark = (stage: string, phase: 'enter' | 'exit', extra?: Record<string, unknown>): void => {
+      request.log.info({ typesetStage: stage, phase, msSinceStart: Date.now() - t0, ...extra }, `typeset-preview ${phase} ${stage}`);
+    };
+
+    mark('request-parse', 'enter');
     const { id } = ProjectParamsSchema.parse(request.params);
     const query = TypesetQuerySchema.parse(request.query ?? {});
+    mark('request-parse', 'exit', { projectId: id, format: query.format ?? 'pdf', recto: query.recto, guides: query.guides });
+
+    mark('project-lookup', 'enter');
     const project = await getProject(id);
+    mark('project-lookup', 'exit', { found: Boolean(project) });
     if (!project) return reply.code(404).send({ error: 'Not Found', message: 'Project not found', statusCode: 404 });
     if (!project.manuscriptPath) {
       throw new UserFacingError('No manuscript on file. Upload one before previewing the typeset interior.', {
@@ -1324,13 +1346,23 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       });
     }
 
+    mark('config-parse', 'enter');
     let config = parseProjectConfig(project);
+    mark('config-parse', 'exit', {
+      productionProfileId: config.productionProfileId,
+      typesetLayoutStandardId: config.typesetLayoutStandardId,
+    });
 
+    // Dynamic imports: the first request pays module-resolution and compile cost
+    // for the whole typeset pipeline. Timed separately because "slow once" and
+    // "hangs forever" look identical from outside the request.
+    mark('dynamic-imports', 'enter');
     const { TypesetUnavailableError } = await import('../pipeline/typeset/render-typeset.js');
     const { buildTypesetInterior } = await import('../pipeline/typeset/build-typeset-interior.js');
     const { UnknownTypesetLayoutStandardError } = await import(
       '../pipeline/typeset/layout-standards/registry.js'
     );
+    mark('dynamic-imports', 'exit');
 
     // The chapter-start policy belongs to the book, because it changes the page
     // count and the page count sizes the spine. Moving the switch changes the
@@ -1342,6 +1374,7 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     }
 
     try {
+      mark('buildTypesetInterior', 'enter');
       // The whole Track B body pipeline. Shared with assembly, the audits and
       // delivery, so a preview and a final export cannot drift apart.
       const result = await buildTypesetInterior(id, config, {
@@ -1354,6 +1387,11 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           request.log.info({ projectId: id, standardId }, 'pinned typeset layout standard');
         },
       });
+      mark('buildTypesetInterior', 'exit', {
+        pages: result.pageCount,
+        pdfBytes: result.pdf.length,
+        sections: result.report.sectionStarts.length,
+      });
       if (result.orphanedIllustrations.length) {
         request.log.warn(
           { projectId: id, orphaned: result.orphanedIllustrations },
@@ -1362,7 +1400,12 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
       }
 
       if (query.format === 'json') {
-        return {
+        // The JSON branch is itself a suspect: `blocks` carries one entry per
+        // addressable block in the whole book and Fastify has to stringify all of
+        // it. Timed rather than assumed. The payload is unchanged — it is built
+        // into a local so the marks can bracket it.
+        mark('serialize-json', 'enter', { blocks: result.blocks.length });
+        const payload = {
           report: result.report,
           layoutStandardId: result.layoutStandardId,
           productionProfileId: result.productionProfileId,
@@ -1380,8 +1423,11 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
           stampedIllustrations: result.stampedIllustrations,
           orphanedIllustrations: result.orphanedIllustrations,
         };
+        mark('serialize-json', 'exit');
+        return payload;
       }
 
+      mark('reply-send-pdf', 'enter', { pdfBytes: result.pdf.length });
       reply.header('content-type', 'application/pdf');
       reply.header('content-disposition', 'inline; filename="typeset-preview.pdf"');
       // Surfaced as headers so the viewer can show counts without re-parsing.
@@ -1392,7 +1438,11 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         'x-illustrated-pages',
         result.stampedIllustrations.map((s) => s.page).join(',') || 'none',
       );
-      return reply.send(result.pdf);
+      // `send` hands the buffer to the socket; the client may still be receiving
+      // after this resolves, so the exit mark means "handed off", not "delivered".
+      const sent = reply.send(result.pdf);
+      mark('reply-send-pdf', 'exit');
+      return sent;
     } catch (err) {
       if (err instanceof UnknownTypesetLayoutStandardError) {
         throw new UserFacingError(err.message, {

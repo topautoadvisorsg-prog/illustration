@@ -225,7 +225,43 @@ export class FallbackStorageService implements ProjectStorage {
  * (tests/dev). Callers use this instead of `new LocalStorageService()` so files
  * persist across redeploys.
  */
-export function isR2StorageConfigured(): boolean {
+/**
+ * ─── DEV/PROD STORAGE ISOLATION ───────────────────────────────────────────
+ * A process that is not production must NEVER resolve to production object
+ * storage, whatever credentials happen to be in its environment.
+ *
+ * This is not hypothetical. A developer machine loaded a `.env` carrying real R2
+ * and Supabase credentials, with `NODE_ENV=production` left set. The database
+ * guard did its job — the row went to the local `wildlands_dev` Postgres — but
+ * storage had no equivalent guard, so `getProjectStorage()` handed back
+ * R2-backed storage and a local dev intake wrote a manuscript straight into the
+ * production bucket. Nothing errored. Nothing warned. The two halves of the same
+ * project ended up in two different environments.
+ *
+ * So storage now follows the same rule the production-database guard already
+ * follows: `APP_ENVIRONMENT` is what a process BELIEVES IT IS, and only
+ * `production` may touch production storage. It fails safe rather than fail
+ * open — credentials being present is not consent to use them.
+ *
+ * `NODE_ENV` is deliberately NOT the signal. It was `production` on the machine
+ * described above, which is exactly how this happened; it is a build/runtime
+ * mode, not a statement about which environment's data you are allowed to write.
+ */
+function isProductionProcess(): boolean {
+  return getEnv().APP_ENVIRONMENT === 'production';
+}
+
+/**
+ * True when production credentials are present in a process that is not allowed
+ * to use them. Reported at startup so the situation is visible rather than
+ * silently corrected.
+ */
+export function hasIgnoredProductionStorageCredentials(): boolean {
+  return !isProductionProcess() && (rawR2Configured() || rawSupabaseConfigured());
+}
+
+/** Credential presence ONLY — no environment gate. Internal. */
+function rawR2Configured(): boolean {
   const env = getEnv();
   return (
     !isPlaceholder(env.R2_ACCOUNT_ID) &&
@@ -234,9 +270,25 @@ export function isR2StorageConfigured(): boolean {
   );
 }
 
-export function isSupabaseStorageConfigured(): boolean {
+function rawSupabaseConfigured(): boolean {
   const env = getEnv();
   return !isPlaceholder(env.SUPABASE_URL) && !isPlaceholder(env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/**
+ * Is production R2 storage BOTH configured AND permitted for this process?
+ *
+ * The environment gate is inside the predicate rather than at the call site on
+ * purpose: every caller that asks "is R2 configured?" is really asking "should I
+ * use R2?", and a gate that has to be remembered separately is a gate that gets
+ * forgotten.
+ */
+export function isR2StorageConfigured(): boolean {
+  return isProductionProcess() && rawR2Configured();
+}
+
+export function isSupabaseStorageConfigured(): boolean {
+  return isProductionProcess() && rawSupabaseConfigured();
 }
 
 /** 'r2'/'supabase' = durable; 'local-ephemeral' = wiped on every Railway redeploy. */
@@ -246,7 +298,6 @@ export function activeStorageKind(): 'r2' | 'supabase' | 'local-ephemeral' {
 }
 
 export function getProjectStorage(): ProjectStorage {
-  const env = getEnv();
   let inner: ProjectStorage;
   if (isR2StorageConfigured()) {
     const r2 = new R2StorageService();
@@ -255,11 +306,16 @@ export function getProjectStorage(): ProjectStorage {
     inner = isSupabaseStorageConfigured() ? new FallbackStorageService(r2, new SupabaseStorageService()) : r2;
   } else if (isSupabaseStorageConfigured()) {
     inner = new SupabaseStorageService();
-  } else if (env.NODE_ENV === 'production') {
+  } else if (isProductionProcess()) {
     // Local disk is EPHEMERAL on Railway — anything written is lost on the next
     // redeploy/restart, which silently destroyed the image library before. Never
     // fall back to it in production: fail loudly so the misconfiguration is caught
     // immediately instead of being discovered later as a vanished library.
+    //
+    // Gated on APP_ENVIRONMENT rather than NODE_ENV: a dev box with NODE_ENV
+    // left at 'production' would otherwise refuse to start rather than quietly
+    // use local disk, which is the correct behaviour for the real production
+    // service and the wrong behaviour for a laptop.
     throw new Error(
       'PERSISTENT STORAGE NOT CONFIGURED: neither the R2 (R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY) nor ' +
         'the Supabase (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY) storage credentials are set in production. Refusing to ' +
@@ -267,6 +323,9 @@ export function getProjectStorage(): ProjectStorage {
         'R2 (preferred) or Supabase Storage env vars on the backend service.',
     );
   } else {
+    // NOT a production process: local disk, always, whatever credentials exist.
+    // This is the isolation guarantee — reached by exhaustion, because the two
+    // production branches above are unreachable outside a production process.
     inner = new LocalStorageService();
   }
   // Wrap with a read/write-through LOCAL cache so each IMMUTABLE render is
