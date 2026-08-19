@@ -1,5 +1,8 @@
 # DIRT RICH — production provenance
 
+> **Current approved production revision: Rev 2.** Rev 1 is retained below rather
+> than rewritten — it is what the first printed artifact was built from.
+
 Record of what production contains for this book and how the approved artifact was
 reproduced there. **Evidence, not a runbook.** Nothing here is executable, and there
 is deliberately no book-specific production mutation script in the repo: the one
@@ -123,3 +126,100 @@ A promotion workflow carrying `canonical → working → assets → transformati
 layout standard → render` would still have shipped that defect. **The promoted
 package has to include the brief**, and a book should not be callable
 production-ready when its own metadata does not match the approved artifact's.
+
+
+---
+
+# REVISION 2 — corrected data charts
+
+Rev 1 shipped two charts that contradicted the manuscript. Rev 2 replaces both.
+Everything else in the book is unchanged: same canonical source, same seven other
+figures, same layout standard, same 126 pages.
+
+## What was wrong
+
+**Figure 5.1 (p39).** The bar was labelled `$20.30` on an axis that stopped at
+`$20`, so it could not reach its own stated value and was drawn below the top
+gridline. The `$2.95` label was struck through by the dashed $4 reference line
+and overlapped the annotation, because that bar tops out *below* the line and
+there was never room between the two.
+
+**Figure 10.1 (p87).** April and May were drawn as 6-12; the manuscript states
+**6-10**. July and August ran off the top of the plot area instead of stopping at
+their stated 6-12, leaving the year's peak unreadable. A factual error in the
+chapter whose argument is that the spikes, not the average, are the truth.
+
+Both were ~285 DPI at printed size, under the 300 standard.
+
+## What replaced them
+
+Redrawn deterministically in code rather than generated, so every bar's pixel
+geometry is computed from its value and the drawing cannot disagree with the
+number. 2776 x 1876 — exactly 2x the originals, identical aspect ratio to five
+decimals, so the placed height is unchanged and pagination cannot move on this
+account. ~570 DPI at the printed 4.87in width.
+
+## Versioned asset identities, and why
+
+| Asset | SHA-256 |
+|---|---|
+| `figure-5-1-cost-per-dozen-v2.png` | `44a8212406dd9537a5d708ae639592074ebbba55188161c59dcbd401418399b0` |
+| `figure-10-1-hours-per-week-v2.png` | `532da3ec7e10b0dcc7cfa6647f9c67d8af109bdf466eca0871543d9fdd92ec21` |
+
+The Rev 1 keys were left untouched in storage.
+
+**This is not cosmetic naming.** The first attempt replaced the bytes under the
+existing keys. The upload succeeded and both objects verified in the bucket by
+hash — and the very next render still embedded the Rev 1 images at their old
+1388x938 dimensions while reporting 126 pages, no overflow, all illustrations
+placed, and PRINT_READY. Nothing failed. `cached-storage.ts` serves reads from a
+local cache on the stated assumption that project files are immutable, so new
+bytes at an existing key are invisible to the renderer.
+
+New content therefore gets a new key. A redeploy would have flushed the cache and
+hidden the defect instead of respecting it.
+
+## Rev 2 chain
+
+| Stage | SHA-256 |
+|---|---|
+| Canonical source | `bc27f4d50bb22be1eb4d0f4d83fa4041d97983cbbabc91077e496ee2205b358c` (unchanged) |
+| 1. Inline figures | `a12b3edff82128548ccbbff4b35d596df43200a7f4c3210f1f7cc47de0d7e304` |
+| 2. Six interior plates | `2639524595103d7822e48158ee2eda21aa3d5f48298716e9168e03032d09711a` |
+| 3. Appendix E site plan | `5e127f11ec3c627b5435f3d6f16eeb3f14a12598639baa1a381c89b3e0e3aa69` |
+
+The working hash moved off Rev 1's `0376567e` because the manuscript genuinely
+changed: two image references now name the versioned assets. Preserving the old
+hash would have been a lie.
+
+## Rev 2 render
+
+| | |
+|---|---|
+| Page count | **126** |
+| Blank pages | `[126]` |
+| Overflow | none |
+| Export | `a4e2bbda-645f-4583-9123-7d24ab515c9c/exports/interior-40dc4d56-78be-4c04-8b20-5029f01ccbc1.pdf` |
+| Interior SHA-256 | `acf869b685925207dd83a2ffce7764e7a0a755bb17d65d4bd56cdd4f7f13e610` |
+| Bytes | 25,819,824 |
+
+## Verification
+
+Against the previous production render, **zero pages differ in text**, and only
+p39 and p87 differ at all:
+
+```
+p39:  1388x938 @ 351.0x237.0pt  ->  2776x1876 @ 351.0x237.0pt
+p87:  1388x938 @ 351.0x237.0pt  ->  2776x1876 @ 351.0x237.0pt
+```
+
+The drawn size is identical; only the source resolution changed. The two charts
+were extracted back out of the finished PDF and checked against the manuscript
+values rather than trusted because placement reported success.
+
+One known difference between every PRODUCTION render and the locally rendered
+Rev 1 artifact `f9f5f2b5`: eight characters sit on p9 instead of p10 (p9 1847 ->
+1855, p10 1834 -> 1826). It is present in the first production render, predates
+Rev 2, and does not change the page count. It went unnoticed initially because
+the check concatenated pages 2-126 and so could not see text moving *across* a
+page boundary.

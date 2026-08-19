@@ -42,11 +42,11 @@ const value = (n: string): string | undefined => {
 const MANIFEST: Record<string, string> = {
   'p13-soil-profile.png': '225782897bd75cc0ddb08584fb067fb1b559c9eca8eb63fefcc04167b3511a7f',
   'p21-raised-bed.png': '305053c0e8e2a8344a84da2ea4f62609e44896f1ddf1ba316221225ad0c87eed',
-  'figure-5-1-cost-per-dozen.png': 'f218f8cc43adf33695f39d87a6c7c2611c2bbc3c0c0232d827ddd41d70cc6087',
+  'figure-5-1-cost-per-dozen-v2.png': '44a8212406dd9537a5d708ae639592074ebbba55188161c59dcbd401418399b0',
   'p47-coop-dusk.png': 'af9ba6e93a83ca48b1b1a61a2b4a6cd24af58594bbaa2ce88fb96d2132d7d963',
   'p57-zucchini.png': 'd64f218ec4ef6e1ad661adeae4bce6a3937ff3b3f2713effd5bf9c071ea5c2f0',
   'p83-january-garden.png': '287ea5c543439877666ffda1b03924bb589621b38716f956dea94d20130b6754',
-  'figure-10-1-hours-per-week.png': '1f952e825686196606b726742badb57ff8498695a7094745bbeea79f1c1df5fe',
+  'figure-10-1-hours-per-week-v2.png': '532da3ec7e10b0dcc7cfa6647f9c67d8af109bdf466eca0871543d9fdd92ec21',
   'p99-quarter-acre.png': 'f863e8091093fdf79687e5833885741d96c3e5ff02369a4915e06cd9f4f86729',
   'figure-E-1-site-plan.svg': '40e4bab171ea446cf4a13956d72dda4a1e1e48738b8fabbdb21df65f953d591f',
 };

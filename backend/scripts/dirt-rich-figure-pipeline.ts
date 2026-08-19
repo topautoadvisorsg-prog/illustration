@@ -62,20 +62,48 @@ const ASSET_DIR =
  */
 const STAGE_SHA = {
   canonical: 'bc27f4d50bb22be1eb4d0f4d83fa4041d97983cbbabc91077e496ee2205b358c',
+  inlineFigures: 'a12b3edff82128548ccbbff4b35d596df43200a7f4c3210f1f7cc47de0d7e304',
+  interiorPlates: '2639524595103d7822e48158ee2eda21aa3d5f48298716e9168e03032d09711a',
+  working: '5e127f11ec3c627b5435f3d6f16eeb3f14a12598639baa1a381c89b3e0e3aa69',
+} as const;
+
+/**
+ * REVISION 1, retained rather than overwritten.
+ *
+ * Rev 1 shipped two data charts that disagreed with the manuscript: Figure 5.1's
+ * bar was labelled $20.30 on an axis that stopped at $20, and Figure 10.1 drew
+ * April/May as 6-12 where the source says 6-10 while July/August ran off the top
+ * of the plot. Rev 2 replaces both with deterministically drawn charts.
+ *
+ * The figures were given NEW KEYS rather than new bytes under the old ones. The
+ * storage layer caches reads on the stated assumption that project files are
+ * immutable, so replacing bytes at an existing key is invisible to the renderer:
+ * the Rev 2 assets were uploaded, verified in the bucket by hash, and the very
+ * next render still embedded the Rev 1 images at their old dimensions while
+ * reporting 126 pages, no overflow and PRINT_READY. Nothing failed. Versioned
+ * identities honour that contract instead of fighting it.
+ *
+ *   canonical      bc27f4d5  (unchanged - same source manuscript)
+ *   inlineFigures  a00d8107
+ *   interiorPlates 7be864f9
+ *   working        0376567e  -> interior f9f5f2b5, the approved Rev 1 book
+ */
+const REV1_STAGE_SHA = {
   inlineFigures: 'a00d81078d38ca5d31ddd3d9539ba56cad379de6a5481e599ecc713717ebd7f7',
   interiorPlates: '7be864f99e80dd71b400fd130f9e39265d41b67178ce901bcd6fb495e9132c72',
   working: '0376567eecc0576fb9932511dcb79648530948e8c1d35d79dc3684ed4657405d',
 } as const;
+void REV1_STAGE_SHA;
 
 /** Every asset the finished manuscript references, with the bytes it must be. */
 const ASSETS: Record<string, string> = {
   'p13-soil-profile.png': '225782897bd75cc0ddb08584fb067fb1b559c9eca8eb63fefcc04167b3511a7f',
   'p21-raised-bed.png': '305053c0e8e2a8344a84da2ea4f62609e44896f1ddf1ba316221225ad0c87eed',
-  'figure-5-1-cost-per-dozen.png': 'f218f8cc43adf33695f39d87a6c7c2611c2bbc3c0c0232d827ddd41d70cc6087',
+  'figure-5-1-cost-per-dozen-v2.png': '44a8212406dd9537a5d708ae639592074ebbba55188161c59dcbd401418399b0',
   'p47-coop-dusk.png': 'af9ba6e93a83ca48b1b1a61a2b4a6cd24af58594bbaa2ce88fb96d2132d7d963',
   'p57-zucchini.png': 'd64f218ec4ef6e1ad661adeae4bce6a3937ff3b3f2713effd5bf9c071ea5c2f0',
   'p83-january-garden.png': '287ea5c543439877666ffda1b03924bb589621b38716f956dea94d20130b6754',
-  'figure-10-1-hours-per-week.png': '1f952e825686196606b726742badb57ff8498695a7094745bbeea79f1c1df5fe',
+  'figure-10-1-hours-per-week-v2.png': '532da3ec7e10b0dcc7cfa6647f9c67d8af109bdf466eca0871543d9fdd92ec21',
   'p99-quarter-acre.png': 'f863e8091093fdf79687e5833885741d96c3e5ff02369a4915e06cd9f4f86729',
   'figure-E-1-site-plan.svg': '40e4bab171ea446cf4a13956d72dda4a1e1e48738b8fabbdb21df65f953d591f',
 };
@@ -91,11 +119,11 @@ const markerTag = (line: string): string | null => {
 // ── stage 1 — from dirt-rich-inline-figures.ts ───────────────────────────
 const FIGURES: Record<string, { asset: string; caption: string }> = {
   'FIGURE 5.1': {
-    asset: 'figure-5-1-cost-per-dozen.png',
+    asset: 'figure-5-1-cost-per-dozen-v2.png',
     caption: '**Figure 5.1.** What a dozen backyard eggs actually cost.',
   },
   'FIGURE 10.1': {
-    asset: 'figure-10-1-hours-per-week.png',
+    asset: 'figure-10-1-hours-per-week-v2.png',
     caption: '**Figure 10.1.** Hours per week, by month. A floating bar is a range, not an average.',
   },
 };
@@ -283,5 +311,5 @@ if (OUT) {
   writeFileSync(OUT, s3, 'utf8');
   console.log(`wrote ${OUT}`);
 }
-console.log('PIPELINE CLEAN — canonical bc27f4d5… reproduces working 0376567e… deterministically.');
+console.log(`PIPELINE CLEAN — canonical ${STAGE_SHA.canonical.slice(0, 8)}… reproduces working ${STAGE_SHA.working.slice(0, 8)}… deterministically.`);
 }
