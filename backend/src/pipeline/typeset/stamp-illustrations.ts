@@ -146,10 +146,24 @@ export async function stampIllustrations(input: StampInput): Promise<StampResult
     const xIn = regionLeftIn + (regionWIn - wIn) / 2;
     const topIn = regionTopIn + (regionHIn - hIn) / 2;
 
-    const png = await doc.embedPng(asset);
+    /**
+     * JPEG IS EMBEDDED AS JPEG, so a grey plate stays grey.
+     *
+     * `embedPng` expands a greyscale PNG to DeviceRGB. The pixels are still
+     * neutral, but the page then declares a colour space in a book printed
+     * black-and-white — and KDP prices an interior by what its pages declare,
+     * not by whether the ink happens to be neutral. A single RGB image can move
+     * a whole book onto colour pricing.
+     *
+     * `embedJpg` preserves DeviceGray for a single-component JPEG, so an
+     * interior plate can be genuinely grey in the file. PNG is still accepted
+     * for anything already approved that way.
+     */
+    const isJpeg = asset.length > 3 && asset[0] === 0xff && asset[1] === 0xd8 && asset[2] === 0xff;
+    const image = isJpeg ? await doc.embedJpg(asset) : await doc.embedPng(asset);
     // PDF user space is bottom-left origin; the geometry above is top-down.
     const yIn = input.trim.heightIn - topIn - hIn;
-    page.drawImage(png, {
+    page.drawImage(image, {
       x: xIn * PT_PER_IN,
       y: yIn * PT_PER_IN,
       width: wIn * PT_PER_IN,
