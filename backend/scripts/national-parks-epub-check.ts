@@ -207,6 +207,27 @@ console.log('\n4. ILLUSTRATIONS');
   const fixedPx = imgTags.filter((t) => /width\s*=\s*"?\d+px/i.test(t) || /style="[^"]*\b\d+px/i.test(t));
   if (fixedPx.length === 0) pass('responsive images', 'no fixed pixel dimensions — the device controls size');
   else fail('responsive images', `${fixedPx.length} image(s) carry fixed px sizing`);
+
+  /**
+   * A CAP ON THE BARE ELEMENT, not only on the classed selectors.
+   *
+   * "No fixed px in the markup" is not the same as "fits the screen". Every rule
+   * capping image width was written against a class, and a plate emitted without
+   * one of those classes fell back to its intrinsic size: a 1067px engraving
+   * rendered at 1067px on a 375px phone and pushed the whole chapter 700px wide,
+   * every line needing a horizontal swipe to finish. Neither EPUBCheck nor
+   * Kindle Previewer reports it — it is valid markup that simply looks wrong,
+   * and Kindle's own reader hides it by constraining images itself.
+   */
+  const styles = entries
+    .filter((e) => /\.css$/i.test(nameOf(e)))
+    .map((e) => e.getData().toString('utf8'))
+    .join('\n');
+  if (/(^|[\s,{}])img\s*\{[^}]*max-width\s*:\s*100%/m.test(styles)) {
+    pass('image width cap', 'the bare img element is capped at 100% — no plate can outgrow the screen');
+  } else {
+    fail('image width cap', 'no `img { max-width: 100% }` rule; an unclassed image renders at its intrinsic size');
+  }
 }
 
 // ── 6. Reflowability ───────────────────────────────────────────────────────

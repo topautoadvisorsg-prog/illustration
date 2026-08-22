@@ -44,10 +44,10 @@ const ARTIFACTS = {
 
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
   pbInterior: '1e7cb467e630287d6994eb62cfadf4be716c2f262e45d18662e6b61ef5d9b3ac',
-  pbCover: 'ac77632ea1dcff7c9e7008b5f0f2b39988661130462e8eef1f2f31961399aefe',
+  pbCover: 'f8f9316b9a1c3f28714b590b852b3b0429e4ae64fd388870a64ab1a04aa0fc02',
   hcInterior: '1e7cb467e630287d6994eb62cfadf4be716c2f262e45d18662e6b61ef5d9b3ac',
   hcCover: 'e2f64fd3e40d7fd6c597e24c7c8989bf134af249bb09aab52ab330c640b51093',
-  epub: '6ebcf56b23fae3510a25fe19de8ac245bc72fdabe9d7952ef31ee9e02e52b78b',
+  epub: '2c013d1da3cadf0418edeaf3dfff6b4705e8318beaab2ab951c57a209e41d95d',
   kindleCover: '661feafbc4d3df250b4fb2555d3d7857a1614cf0f2af1ca75a9727a7c340ea72',
 };
 

@@ -114,6 +114,55 @@ describe('typesetBodyToHtml', () => {
     });
   });
 
+  describe('callouts', () => {
+    // 7 NATIONAL PARKS writes all sixteen of its skip boxes as
+    // `> ### SKIP IT / DO THIS INSTEAD`. `inline()` has no heading branch, so
+    // that line reached the shipped ebook with its hashes intact — sixteen
+    // callouts opening with literal markdown on the reader's screen.
+    it('lifts a heading on the first line into the callout label', () => {
+      const { html } = typesetBodyToHtml(['> ### SKIP IT / DO THIS INSTEAD', '> **Skip:** the queue.']);
+      expect(html).toContain('<p class="callout-label">SKIP IT / DO THIS INSTEAD</p>');
+      expect(html).not.toContain('###');
+    });
+
+    it('lifts a fully bold first line into the label too', () => {
+      const { html } = typesetBodyToHtml(['> **NOBODY WARNED ME**', '> The shuttle stops at four.']);
+      expect(html).toContain('<p class="callout-label">NOBODY WARNED ME</p>');
+    });
+
+    // Every `>` line used to become its own <blockquote>, so a three-line aside
+    // came out as three separate boxes and a blank `>` line produced an empty
+    // one.
+    it('keeps a run of quote lines as ONE callout', () => {
+      const { html } = typesetBodyToHtml(['> First line', '> and its continuation.', '', 'After.']);
+      expect(html.match(/<blockquote/g)).toHaveLength(1);
+      expect(html).toContain('<p>First line and its continuation.</p>');
+    });
+
+    it('treats a blank quote line as a paragraph break, not the end of the quote', () => {
+      const { html } = typesetBodyToHtml(['> One.', '>', '> Two.']);
+      expect(html.match(/<blockquote/g)).toHaveLength(1);
+      expect(html.match(/<p>/g)).toHaveLength(2);
+      expect(html).not.toContain('<p></p>');
+    });
+
+    // Two skip boxes run back to back with no blank line between them. The
+    // label rule only looks at a quote's first line, so without a break the
+    // second heading would be buried in the first callout's body and print raw.
+    it('starts a new callout when a heading follows quote content', () => {
+      const { html } = typesetBodyToHtml([
+        '> ### FIRST BOX',
+        '> Body one.',
+        '> ### SECOND BOX',
+        '> Body two.',
+      ]);
+      expect(html.match(/<blockquote/g)).toHaveLength(2);
+      expect(html).toContain('<p class="callout-label">FIRST BOX</p>');
+      expect(html).toContain('<p class="callout-label">SECOND BOX</p>');
+      expect(html).not.toContain('###');
+    });
+  });
+
   describe('inline emphasis', () => {
     it('escapes before emphasising, so the manuscript cannot inject markup', () => {
       const { html } = typesetBodyToHtml(['A <script> and **bold** and *italic*.']);

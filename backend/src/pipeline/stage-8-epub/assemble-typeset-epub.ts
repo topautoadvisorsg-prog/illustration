@@ -207,6 +207,7 @@ export function typesetBodyToHtml(
   let para: string[] = [];
   let list: string[] = [];
   let listKind: 'ul' | 'ol' | null = null;
+  let quote: string[] = [];
 
   const countWords = (s: string): number => s.trim().split(/\s+/).filter(Boolean).length;
 
@@ -223,15 +224,68 @@ export function typesetBodyToHtml(
     list = [];
     listKind = null;
   };
+
+  /**
+   * A run of `>` lines is ONE callout, set the way the print edition sets it.
+   *
+   * Every `>` line used to become its own `<blockquote><p>`, with whatever it
+   * contained passed straight to `inline()`. Two defects came out of that in the
+   * shipped ebook, both of them plain on the first phone screen that showed one:
+   *
+   *   - `> ### SKIP IT / DO THIS INSTEAD` printed its hashes. `inline()` has no
+   *     heading branch, and this book writes all sixteen of its skip boxes that
+   *     way, so sixteen callouts opened with literal markdown.
+   *   - a blank `>` line produced an empty `<blockquote><p></p></blockquote>`,
+   *     and a three-line aside came out as three separate boxes instead of one.
+   *
+   * Deliberately mirrors `closeQuote` in `typeset-book.ts`, rule for rule: a
+   * first line that is entirely bold, or a heading, becomes the callout's label
+   * on its own line; blank-line-separated runs inside one quote stay separate
+   * paragraphs. The two editions have to agree about what a callout is.
+   */
+  const flushQuote = (): void => {
+    if (!quote.length) return;
+    const lines = [...quote];
+    quote = [];
+    const first = lines[0]?.trim() ?? '';
+    const m = /^\*\*(.+)\*\*$/.exec(first) ?? /^#{1,4}\s+(.+)$/.exec(first);
+    let label = '';
+    if (m) {
+      label = `<p class="callout-label">${inline(m[1]!.trim())}</p>`;
+      words += countWords(m[1]!);
+      lines.shift();
+    }
+    const body = lines
+      .join('\n')
+      .split(/\n\s*\n/)
+      .map((p) => p.replace(/\s*\n\s*/g, ' ').trim())
+      .filter(Boolean)
+      .map((p) => {
+        words += countWords(p);
+        return `<p>${inline(p)}</p>`;
+      })
+      .join('');
+    if (!label && !body) return;
+    out.push(`<blockquote class="callout">${label}${body}</blockquote>`);
+  };
+
   const flushAll = (): void => {
     flushPara();
     flushList();
+    flushQuote();
   };
 
   for (let i = 0; i < body.length; i += 1) {
     const line = body[i]!.replace(/\s+$/, '');
 
     if (!line.trim()) {
+      // A blank line inside a quote is a paragraph break, not the end of it —
+      // the same rule the print edition follows, so a two-paragraph aside stays
+      // one callout in both editions.
+      if (quote.length) {
+        quote.push('');
+        continue;
+      }
       flushAll();
       continue;
     }
@@ -361,10 +415,19 @@ export function typesetBodyToHtml(
     }
 
     if (/^\s*>/.test(line)) {
-      flushAll();
-      const q = line.replace(/^\s*>\s?/, '');
-      words += countWords(q);
-      out.push(`<blockquote><p>${inline(q)}</p></blockquote>`);
+      flushPara();
+      flushList();
+      const inner = line.replace(/^\s*>\s?/, '');
+      /**
+       * A HEADING inside a quote opens a NEW callout.
+       *
+       * This book runs two skip boxes back to back with no blank line between
+       * them. Without this, the second heading would be swallowed into the first
+       * callout's body — where the label rule, which only looks at the first
+       * line, would never see it, and the hashes would print again.
+       */
+      if (/^#{1,6}\s+\S/.test(inner) && quote.some((q) => q.trim())) flushQuote();
+      quote.push(inner);
       continue;
     }
 

@@ -38,6 +38,17 @@ import { toRoman } from '../publishing-standard/index.js';
 /** Minimal reader-theme-friendly CSS — relative units only (no fixed px) so
  *  Kindle reflow is never broken. The device controls fonts/colors. */
 const EPUB_CSS = [
+  // NOTHING MAY BE WIDER THAN THE SCREEN, at any reader font size.
+  //
+  // A reflowable book is read at whatever size its reader has chosen, and the
+  // accessibility settings go a long way up. At 250% on a 320px phone the word
+  // "INTRODUCTION" alone is 512px wide, and a single unbreakable word pushes the
+  // whole document sideways — every line of that chapter then needs a horizontal
+  // swipe to finish. Allowing a break inside a word as a LAST RESORT costs
+  // nothing at ordinary sizes, where no break is ever needed. Measured across
+  // all 24 documents at 320 and 375px, at 100/150/200/250%.
+  'body { overflow-wrap: break-word; }',
+  'h1, h2, h3, h4, h5, h6 { overflow-wrap: break-word; word-break: break-word; }',
   'h1 { font-size: 1.6em; margin: 1em 0 0.3em; }',
   'h2 { font-size: 1.3em; margin: 1.2em 0 0.2em; }',
   'h3 { font-size: 1.1em; margin: 1em 0 0.2em; }',
@@ -54,6 +65,20 @@ const EPUB_CSS = [
   'p.subtitle { font-size: 1.1em; font-style: italic; }',
   'p.author { font-size: 1.1em; margin-top: 1em; }',
   'section.entry { margin: 0 0 1.5em; }',
+  // EVERY image is capped at the column width, not just the classed ones.
+  //
+  // `img.hero` and `img.figimg` each carried their own max-width and the bare
+  // element had none, so a plate emitted without one of those classes fell back
+  // to its intrinsic size. A 1067px-wide engraving on a 375px phone rendered at
+  // 1067px and pushed the page 700px wide — every line of that chapter needing a
+  // horizontal swipe to finish. Kindle's own reader happens to constrain images
+  // and hid it; a standards-compliant renderer does not, and neither EPUBCheck
+  // nor Kindle Previewer flags it, because it is valid markup that simply looks
+  // wrong. The blanket rule comes FIRST so the specific rules still win.
+  'img { max-width: 100%; height: auto; }',
+  // Chapter-end and divider plates: their own screen space, centred.
+  'div.plate { margin: 1.2em 0; text-align: center; page-break-inside: avoid; break-inside: avoid; }',
+  'div.plate img { display: block; margin: 0 auto; max-height: 85vh; width: auto; }',
   // Hero illustrations: responsive, centered. max-height caps a tall plate so its
   // header (and the first lines) always have room on the SAME screen instead of
   // the title being shoved to the next page. height:auto keeps the aspect ratio.
@@ -79,7 +104,18 @@ const EPUB_CSS = [
   // Tables reflow badly by nature; keep them readable rather than pretty. The
   // 100% width lets a device shrink columns instead of clipping them.
   'table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }',
-  'th, td { border: 1px solid #999; padding: 0.35em 0.5em; vertical-align: top; }',
+  // Cells may break INSIDE a word as a last resort.
+  //
+  // "width: 100%" only lets a device shrink columns down to their minimum
+  // content width, which is the longest unbreakable word in the column. At the
+  // reader's default size that is comfortably under a phone's measure; at 200%
+  // it is not, and the two-column and three-column tables pushed the page 157px
+  // wide, then 287px at 250% — every line of that chapter needing a sideways
+  // swipe because of one table. Allowing a word to break rescues it at every
+  // size and changes nothing at the default, where no break is needed. Measured
+  // at 100/150/200/250% before and after.
+  'th, td { border: 1px solid #999; padding: 0.35em 0.5em; vertical-align: top; ' +
+    'overflow-wrap: break-word; word-break: break-word; }',
   'th { font-weight: bold; }',
   // A table too wide to be a grid on a phone, set as labelled records instead.
   // Sized in em so it follows the reader's chosen text size like everything else.
@@ -89,6 +125,16 @@ const EPUB_CSS = [
   "p.stk-field { margin: 0 0 0.2em; text-indent: 0; }",
   "span.stk-label { font-weight: bold; }",
   'blockquote { margin: 1em 1.5em; font-style: italic; }',
+  // The callout, the reflowable equivalent of the print edition's ruled aside.
+  // Indented from the left with a rule rather than boxed: a box on a phone is
+  // mostly border, and a reader may be at any font size.
+  'blockquote.callout { margin: 1.1em 0; padding-left: 0.9em; border-left: 2px solid currentColor; ' +
+    'font-style: italic; page-break-inside: avoid; break-inside: avoid; }',
+  'blockquote.callout p { margin: 0; }',
+  'blockquote.callout p + p { margin-top: 0.5em; }',
+  // The label sits on its own line with the aside beneath it, upright against
+  // the italic body so it reads as a heading and not as the first sentence.
+  'p.callout-label { font-style: normal; font-weight: 600; margin: 0 0 0.4em; }',
   'ul, ol { margin: 0 0 0.8em 1.2em; padding-left: 1em; }',
   'li { margin: 0 0 0.35em; }',
   'code { font-family: monospace; font-size: 0.95em; }',

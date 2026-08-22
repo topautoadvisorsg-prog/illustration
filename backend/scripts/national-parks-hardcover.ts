@@ -24,6 +24,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { getKdpCoverDimensions } from '../src/pipeline/publishing-standard/kdp-cover-specs.js';
+import { extendSkyUpward, planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
 
 const ART = process.argv[2];
 const INTERIOR = process.argv[3];
@@ -163,28 +164,7 @@ const padded = sidePad === 0
  */
 const SKY_BAND_FRACTION = 0.5;
 const skyBandPx = Math.round(scaledH * SKY_BAND_FRACTION);
-const placed = skyStretch === 0
-  ? padded
-  : await sharp({ create: { width: W, height: H, channels: 3, background: '#000' } })
-      .composite([
-        {
-          input: await sharp(padded)
-            .extract({ left: 0, top: 0, width: W, height: skyBandPx })
-            .resize(W, skyBandPx + skyStretch, { fit: 'fill', kernel: 'lanczos3' })
-            .toBuffer(),
-          left: 0,
-          top: 0,
-        },
-        {
-          input: await sharp(padded)
-            .extract({ left: 0, top: skyBandPx, width: W, height: scaledH - skyBandPx })
-            .toBuffer(),
-          left: 0,
-          top: skyBandPx + skyStretch,
-        },
-      ])
-      .png()
-      .toBuffer();
+const placed = await extendSkyUpward(padded, W, scaledH, H, SKY_BAND_FRACTION);
 console.log(`sky band   : top ${(skyBandPx / DPI).toFixed(2)}in stretched to ${((skyBandPx + skyStretch) / DPI).toFixed(2)}in (${((skyStretch / skyBandPx) * 100).toFixed(0)}%)`);
 
 // ── Spine type, set by code, sized from the HARDCOVER spine safe area ──────
@@ -192,135 +172,45 @@ const spineLeftPx = Math.round(spineL * DPI);
 const spineWpx = Math.round(d.spineIn * DPI);
 const safeStripPx = Math.round(d.spineSafeWidthIn * DPI);
 
-const SPINE_FONT = 'Georgia, serif';
-const CREAM = '#F2E8D5';
-const titleCapFor = (px: number): number => Math.round(px * 0.69);
-
 const TITLE = '7 National Parks Without the Rookie Mistakes';
 const AUTHOR = 'Tom Everett';
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-/**
- * HOW LONG THE TYPE ACTUALLY IS, measured rather than assumed.
- *
- * Spine text used to be placed at fixed fractions of the wrap height — the title
- * centred at -6% and the author at +20% — with nothing anywhere checking how long
- * either string rendered. That works until a title is long, and this one is
- * forty-four characters. On the hardcover the title ran straight through the
- * author and the two printed on top of each other.
- *
- * A string's ink length scales linearly with font size, so one measurement at a
- * reference size answers every size. The text is rasterised on its own and the
- * transparent margin trimmed off; what is left is the real extent, kerning,
- * letter-spacing, descenders and all.
- */
-const REF_PX = 200;
-async function inkLengthPx(text: string, weight: number): Promise<number> {
-  const canvasW = REF_PX * text.length;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${REF_PX * 3}">
-    <text x="${canvasW / 2}" y="${REF_PX * 1.5}" text-anchor="middle" dominant-baseline="middle"
-          font-family="${SPINE_FONT}" font-size="${REF_PX}" font-weight="${weight}"
-          fill="#fff" letter-spacing="1">${esc(text)}</text>
-  </svg>`;
-  const { info } = await sharp(Buffer.from(svg)).trim().toBuffer({ resolveWithObject: true });
-  return info.width;
-}
-
-const titleRefPx = await inkLengthPx(TITLE, 600);
-const authorRefPx = await inkLengthPx(AUTHOR, 400);
 
 /**
  * The type sits inside the spine SAFE area in both directions: KDP's spine safe
  * width across, and its safe height along. `GAP_IN` is the clear space between
- * the end of the title and the start of the author block — enough that the two
+ * the end of the title and the start of the author block -- enough that the two
  * read as separate blocks rather than one run of words.
+ *
+ * Set through the shared spine typesetter, which MEASURES both strings before
+ * placing them and carries them on a dark halo rather than a painted strip. The
+ * measuring is why this spine works: placed at the old fixed fractions of the
+ * wrap height, a forty-four character title on a 10.4in spine ran straight
+ * through the author block and the two printed on top of each other.
  */
 const GAP_IN = 0.5;
-const safeLenPx = Math.round(d.spineSafeHeightIn * DPI);
-const gapPx = Math.round(GAP_IN * DPI);
+const plan = await planSpineType({
+  title: TITLE,
+  author: AUTHOR,
+  wrapHeightPx: H,
+  spineWidthPx: spineWpx,
+  foldSafeWidthPx: safeStripPx,
+  safeLengthPx: Math.round(d.spineSafeHeightIn * DPI),
+  gapPx: Math.round(GAP_IN * DPI),
+});
 
-/** The size the strip width allows, before any length constraint. */
-const widthLimitedPx = Math.floor((safeStripPx / 0.69) * 0.62);
-
-/**
- * Shrink until the title, the gap and the author all fit along the safe height.
- * On this book the width limit wins and no shrinking happens — but a longer title
- * or a thinner spine would silently overrun without this, which is exactly how
- * the paperback ended up with its first six characters off the top of the spine.
- */
-let titlePx = widthLimitedPx;
-const lengthAt = (px: number): number =>
-  Math.round((titleRefPx * px) / REF_PX) + gapPx + Math.round((authorRefPx * px * 0.72) / REF_PX);
-while (titlePx > 8 && lengthAt(titlePx) > safeLenPx) titlePx -= 1;
-if (titlePx < widthLimitedPx) {
-  console.log(`spine fit  : title reduced ${widthLimitedPx} -> ${titlePx}px so the type fits the spine length`);
-}
-
-const authorPx = Math.floor(titlePx * 0.72);
-const titleLenPx = Math.round((titleRefPx * titlePx) / REF_PX);
-const authorLenPx = Math.round((authorRefPx * authorPx) / REF_PX);
-const titleCapPx = titleCapFor(titlePx);
-const clearPerSidePx = Math.round((spineWpx - titleCapPx) / 2);
-
-console.log(`\nspine strip: ${spineWpx}px, safe area ${safeStripPx}px (${d.spineSafeWidthIn} in)`);
-console.log(`spine type : title ${titlePx}px (cap ${titleCapPx}px), author ${authorPx}px`);
-console.log(`clearance  : ${(clearPerSidePx / DPI).toFixed(4)} in per side`);
+console.log(`
+spine strip: ${spineWpx}px, safe area ${safeStripPx}px (${d.spineSafeWidthIn} in)`);
+console.log(`spine type : title ${plan.titlePx}px (cap ${plan.titleCapPx}px), author ${plan.authorPx}px`);
+console.log(`clearance  : ${(plan.clearPerSidePx / DPI).toFixed(4)} in per side`);
 console.log(
-  `spine length: title ${(titleLenPx / DPI).toFixed(2)} in + gap ${GAP_IN} in + author ` +
-    `${(authorLenPx / DPI).toFixed(2)} in = ${((titleLenPx + gapPx + authorLenPx) / DPI).toFixed(2)} in ` +
+  `spine length: title ${(plan.titleLengthPx / DPI).toFixed(2)} in + gap ${GAP_IN} in + author ` +
+    `${(plan.authorLengthPx / DPI).toFixed(2)} in = ${(plan.totalLengthPx / DPI).toFixed(2)} in ` +
     `of ${d.spineSafeHeightIn} in safe`,
 );
-if (titleLenPx + gapPx + authorLenPx > safeLenPx) {
-  throw new Error('spine type does not fit the safe height even at the minimum size');
-}
-
-/**
- * Author pinned to the foot of the safe area, title centred in what is left above
- * it. Both blocks are positioned from their measured length, so neither can run
- * off an end or into the other.
- *
- * Coordinates are in the rotated frame, where x runs down the spine from the top
- * and 0 is the middle of the wrap.
- */
-const safeTopX = -safeLenPx / 2;
-const safeBotX = safeLenPx / 2;
-const authorCentreX = safeBotX - authorLenPx / 2;
-const titleFieldTop = safeTopX;
-const titleFieldBot = authorCentreX - authorLenPx / 2 - gapPx;
-const titleCentreX = (titleFieldTop + titleFieldBot) / 2;
-/**
- * A DARK HALO, not a solid strip.
- *
- * The artwork now runs continuously through the spine, which is what it should
- * do -- and it means the spine type crosses pale sky in the upper third and dark
- * canyon lower down. Cream on cream is unreadable, and painting a solid band
- * behind it would put back exactly the artificial strip this edition exists to
- * remove.
- *
- * So each line is stroked with a soft dark outline underneath the fill
- * (`paint-order: stroke`), the same device the approved front title uses against
- * the photograph. The type reads on any background and the illustration stays
- * unbroken.
- */
-const HALO = '#101a14';
-const haloPx = Math.max(3, Math.round(titlePx * 0.14));
-const spineSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${spineWpx}" height="${H}">
-  <g transform="translate(${spineWpx / 2}, ${H / 2}) rotate(90)">
-    <text x="${titleCentreX}" y="0" text-anchor="middle" dominant-baseline="middle"
-          font-family="${SPINE_FONT}" font-size="${titlePx}" font-weight="600"
-          fill="${CREAM}" stroke="${HALO}" stroke-width="${haloPx}" stroke-opacity="0.85"
-          paint-order="stroke fill" stroke-linejoin="round"
-          letter-spacing="1">${esc(TITLE)}</text>
-    <text x="${authorCentreX}" y="0" text-anchor="middle" dominant-baseline="middle"
-          font-family="${SPINE_FONT}" font-size="${authorPx}" font-weight="400"
-          fill="${CREAM}" stroke="${HALO}" stroke-width="${Math.max(2, Math.round(authorPx * 0.14))}" stroke-opacity="0.85"
-          paint-order="stroke fill" stroke-linejoin="round"
-          letter-spacing="1">${esc(AUTHOR)}</text>
-  </g>
-</svg>`;
+if (plan.reducedToFit) console.log('spine fit  : size reduced so the type fits the spine length');
 
 const wrap = await sharp(placed)
-  .composite([{ input: Buffer.from(spineSvg), left: spineLeftPx, top: 0 }])
+  .composite([{ input: Buffer.from(plan.svg), left: spineLeftPx, top: 0 }])
   .jpeg({ quality: 92, chromaSubsampling: '4:4:4' })
   .toBuffer();
 

@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
+import { extendSkyUpward, planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
 
 const ART = process.argv[2];
 const INTERIOR = process.argv[3];
@@ -95,24 +96,17 @@ const body = await sharp(ART)
   .extract({ left: sideCrop, top: 0, width: W, height: scaledH })
   .toBuffer();
 
-// Edge-stretch, never mirror: a mirrored band once reflected a sign upside down.
-// Stretching the outermost sky rows cannot duplicate an object.
-const placed = skyStretch === 0
-  ? body
-  : await sharp({ create: { width: W, height: H, channels: 3, background: '#000' } })
-      .composite([
-        {
-          input: await sharp(body)
-            .extract({ left: 0, top: 0, width: W, height: 40 })
-            .resize(W, skyStretch, { fit: 'fill', kernel: 'lanczos3' })
-            .toBuffer(),
-          left: 0,
-          top: 0,
-        },
-        { input: body, left: 0, top: skyStretch },
-      ])
-      .png()
-      .toBuffer();
+/**
+ * Edge-stretch, never mirror: a mirrored band once reflected a sign upside down.
+ *
+ * The stretch is spread across the TOP HALF of the image, not the top forty
+ * rows. The first version of this took forty rows to the full missing height —
+ * a several-hundred-per-cent stretch of a sliver, which smeared whatever texture
+ * those rows happened to hold into visible vertical streaks across the top of
+ * the finished wrap. Sky is a smooth gradient: stretching half the image by
+ * 15% is invisible, stretching a sliver of it by 400% is not.
+ */
+const placed = await extendSkyUpward(body, W, scaledH, H);
 
 // ── Spine type, set by code ────────────────────────────────────────────────
 const spineLeftPx = Math.round((BLEED + TRIM_W) * DPI);
@@ -121,54 +115,50 @@ const spineWpx = Math.round(spineIn * DPI);
 const safeStripIn = spineIn - FOLD_VARIANCE_IN * 2;
 const safeStripPx = Math.round(safeStripIn * DPI);
 
-/**
- * Georgia, not the vendored interior faces.
- *
- * sharp rasterises SVG through librsvg, which resolves families through
- * fontconfig and CANNOT see the TTFs vendored for the interior — Archivo, Lora
- * and EB Garamond all render byte-identical, every one of them silently falling
- * back to DejaVu Sans. Georgia is verifiably resolvable here and is the face the
- * shipped DIRT RICH spine was set in.
- */
-const SPINE_FONT = 'Georgia, serif';
-const CREAM = '#F2E8D5';
-
-/**
- * Sized from the fold-safe strip, not from taste. Georgia's caps are ~0.69em,
- * so the cap height must fit inside `safeStripPx` with clearance either side.
- */
-const titlePx = Math.floor((safeStripPx / 0.69) * 0.62);
-const authorPx = Math.floor(titlePx * 0.72);
-const titleCapPx = Math.round(titlePx * 0.69);
-const clearPerSidePx = Math.round((spineWpx - titleCapPx) / 2);
-
-console.log(`\nspine strip: ${spineWpx}px wide, fold-safe ${safeStripPx}px`);
-console.log(`spine type : title ${titlePx}px (cap ${titleCapPx}px), author ${authorPx}px`);
-console.log(`clearance  : ${clearPerSidePx}px = ${(clearPerSidePx / DPI).toFixed(4)}in per side (need >= ${FOLD_VARIANCE_IN})`);
-if (clearPerSidePx / DPI < FOLD_VARIANCE_IN) throw new Error('spine type too wide for the fold variance');
-
 const TITLE = '7 National Parks Without the Rookie Mistakes';
 const AUTHOR = 'Tom Everett';
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /**
- * Rotated -90 so the spine reads top-to-bottom when the book stands on a shelf,
- * which is the American convention. The two lines are centred as ONE GROUP about
- * the mid-height, so the strip does not read lopsided.
+ * Type may occupy the trim height less a quarter inch at head and foot. The wrap
+ * is taller than that by the bleed, and type running to the very ends of a
+ * perfect-bound spine reads as a mistake even when it survives the trim.
  */
-const spineSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${spineWpx}" height="${H}">
-  <g transform="translate(${spineWpx / 2}, ${H / 2}) rotate(90)">
-    <text x="${-H * 0.06}" y="0" text-anchor="middle" dominant-baseline="middle"
-          font-family="${SPINE_FONT}" font-size="${titlePx}" font-weight="600"
-          fill="${CREAM}" letter-spacing="1">${esc(TITLE)}</text>
-    <text x="${H * 0.20}" y="0" text-anchor="middle" dominant-baseline="middle"
-          font-family="${SPINE_FONT}" font-size="${authorPx}" font-weight="400"
-          fill="${CREAM}" letter-spacing="1">${esc(AUTHOR)}</text>
-  </g>
-</svg>`;
+const SPINE_SAFE_LEN_IN = TRIM_H - 0.5;
+const GAP_IN = 0.5;
+
+/**
+ * Set through the shared spine typesetter, which MEASURES both strings before
+ * placing them and carries them on a dark halo.
+ *
+ * This spine used to place the title at a fixed -6% of the wrap height and the
+ * author at +20%, in flat cream with no outline. Two defects came out of that on
+ * the finished cover: nothing checked the type's length, and cream painted
+ * straight onto a continuous illustration disappeared wherever the illustration
+ * went bright. "7 Nati" was invisible against the sunlit sky while the rest of
+ * the title read perfectly against dark rock.
+ */
+const plan = await planSpineType({
+  title: TITLE,
+  author: AUTHOR,
+  wrapHeightPx: H,
+  spineWidthPx: spineWpx,
+  foldSafeWidthPx: safeStripPx,
+  safeLengthPx: Math.round(SPINE_SAFE_LEN_IN * DPI),
+  gapPx: Math.round(GAP_IN * DPI),
+});
+
+console.log(`\nspine strip: ${spineWpx}px wide, fold-safe ${safeStripPx}px`);
+console.log(`spine type : title ${plan.titlePx}px (cap ${plan.titleCapPx}px), author ${plan.authorPx}px`);
+console.log(`clearance  : ${plan.clearPerSidePx}px = ${(plan.clearPerSidePx / DPI).toFixed(4)}in per side (need >= ${FOLD_VARIANCE_IN})`);
+console.log(
+  `spine length: title ${(plan.titleLengthPx / DPI).toFixed(2)}in + gap ${GAP_IN}in + author ` +
+    `${(plan.authorLengthPx / DPI).toFixed(2)}in = ${(plan.totalLengthPx / DPI).toFixed(2)}in of ${SPINE_SAFE_LEN_IN}in safe`,
+);
+if (plan.reducedToFit) console.log('spine fit  : size reduced so the type fits the spine length');
+if (plan.clearPerSidePx / DPI < FOLD_VARIANCE_IN) throw new Error('spine type too wide for the fold variance');
 
 const wrap = await sharp(placed)
-  .composite([{ input: Buffer.from(spineSvg), left: spineLeftPx, top: 0 }])
+  .composite([{ input: Buffer.from(plan.svg), left: spineLeftPx, top: 0 }])
   .jpeg({ quality: 92, chromaSubsampling: '4:4:4' })
   .toBuffer();
 
