@@ -225,16 +225,25 @@ function spineSvg(o: {
   // Title near the head of the spine, author near the foot — standard practice.
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${L}">
   <g transform="rotate(90) translate(0, -${W})">
+    <!-- dy, NOT dominant-baseline. librsvg (which sharp rasterises through)
+         does not implement dominant-baseline OR alignment-baseline: "middle",
+         "central" and the alignment- form all render byte-identical to no
+         attribute at all, leaving the text sitting ON its baseline. Inside this
+         rotate(90) the baseline axis IS the across-spine axis, so an ignored
+         attribute slides the whole line half a cap height toward one fold. That
+         shipped on another book's hardcover with the title touching the fold.
+         An explicit dy is honoured; measured, it centres to within half a
+         pixel. -->
     <text x="${Math.round(L * 0.06)}" y="${Math.round(W * 0.5)}"
           font-family="Archivo, DejaVu Sans, sans-serif" font-weight="800"
           font-size="${o.titlePx}" fill="${o.titleHex}"
           letter-spacing="${(o.titlePx * 0.02).toFixed(2)}"
-          dominant-baseline="central" text-anchor="start">${esc(o.title)}</text>
+          dy="0.35em" text-anchor="start">${esc(o.title)}</text>
     <text x="${Math.round(L * 0.94)}" y="${Math.round(W * 0.5)}"
           font-family="Archivo, DejaVu Sans, sans-serif" font-weight="600"
           font-size="${o.authorPx}" fill="${o.authorHex}"
           letter-spacing="${(o.authorPx * 0.04).toFixed(2)}"
-          dominant-baseline="central" text-anchor="end">${esc(o.author)}</text>
+          dy="0.35em" text-anchor="end">${esc(o.author)}</text>
   </g>
 </svg>`;
 }

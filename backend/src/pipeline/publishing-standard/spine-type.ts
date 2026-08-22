@@ -79,6 +79,54 @@ async function inkLengthAtRef(text: string, weight: number, letterSpacing: numbe
   return info.width;
 }
 
+/**
+ * Where the ink's CENTRE sits relative to the baseline, in pixels at `REF_PX`.
+ * Negative, because glyphs sit above their baseline.
+ *
+ * ─── WHY THIS EXISTS: `dominant-baseline` IS A NO-OP HERE ────────────────────
+ * sharp rasterises SVG through librsvg, and librsvg does not implement
+ * `dominant-baseline`. Not partially — at all. Rendering the same string with
+ * `dominant-baseline="middle"` and with no attribute produces BYTE-IDENTICAL
+ * output; the ink centre lands 0.355 x font-size above the anchor in both cases,
+ * exactly where a plain baseline puts it.
+ *
+ * On a spine that is not a cosmetic difference. The type is drawn inside a
+ * `rotate(90)` group, so the cross-spine axis IS the baseline axis, and an
+ * ignored `dominant-baseline` slides the whole line half a cap height toward the
+ * front fold. On the 0.450in hardcover spine that put the title's ink 0.000in
+ * from the fold against KDP's 0.0625in variance — it crossed it — while the plan
+ * reported a comfortable 0.1233in, because the number was computed from
+ * GEORGIA_CAP_RATIO and nothing ever looked at the ink.
+ *
+ * So the offset is measured, the same way the length already is, and applied as
+ * an explicit `y`. This is the same class of bug as the silent font fallback
+ * documented at the top of this file: the SVG asked for something and librsvg
+ * quietly did something else.
+ */
+async function inkCentreAtRef(text: string, weight: number, letterSpacing: number): Promise<number> {
+  const canvasW = REF_PX * Math.max(text.length, 1);
+  const canvasH = REF_PX * 3;
+  const baseline = REF_PX * 1.5;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}">
+    <text x="${canvasW / 2}" y="${baseline}" text-anchor="middle"
+          font-family="${SPINE_FONT}" font-size="${REF_PX}" font-weight="${weight}"
+          fill="#fff" letter-spacing="${letterSpacing}">${escapeXml(text)}</text>
+  </svg>`;
+  const { data, info } = await sharp(Buffer.from(svg)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  let top = info.height;
+  let bot = -1;
+  for (let y = 0; y < info.height; y += 1) {
+    for (let x = 0; x < info.width; x += 1) {
+      if (data[(y * info.width + x) * info.channels + 3]! > 24) {
+        if (y < top) top = y;
+        if (y > bot) bot = y;
+        break;
+      }
+    }
+  }
+  return bot < 0 ? 0 : (top + bot) / 2 - baseline;
+}
+
 export interface SpineTypeRequest {
   title: string;
   author: string;
@@ -95,6 +143,21 @@ export interface SpineTypeRequest {
   /** Fraction of the fold-safe width the title's cap height should fill. */
   capFill?: number;
   letterSpacing?: number;
+  /**
+   * INTERNAL production target for fold clearance, in pixels, measured with the
+   * halo included. The title is sized down until the drawn typography clears
+   * both folds by at least this much.
+   *
+   * This is a house safety margin, NOT a KDP requirement — KDP's fold variance
+   * is 0.0625in and that is the hard floor. Sizing to the floor leaves nothing
+   * for press wander: the first halo-aware measurement of these covers came out
+   * at 0.0633in, eight ten-thousandths of an inch clear, which is a pass on
+   * paper and no tolerance at all in a bindery.
+   *
+   * Omit it and no width-driven reduction happens — the caller's own gate is
+   * then the only thing standing between the type and the fold.
+   */
+  targetClearPx?: number;
 }
 
 export interface SpineTypePlan {
@@ -102,8 +165,30 @@ export interface SpineTypePlan {
   titlePx: number;
   authorPx: number;
   titleCapPx: number;
-  /** Clearance between the title's cap height and each spine fold, in pixels. */
+  /** Clearance between the title's cap height and each spine fold, in pixels. COMPUTED from the cap ratio. */
   clearPerSidePx: number;
+  /**
+   * The same clearance MEASURED off the drawn SVG — halo included — as the
+   * smaller of the two sides. This is the number to gate on.
+   *
+   * Both exist on purpose. `clearPerSidePx` said 0.1233in on the hardcover while
+   * the ink was touching the fold, because a formula cannot see what librsvg
+   * actually drew. Anything that reports or checks fold safety must use this.
+   */
+  measuredClearPerSidePx: number;
+  /** Across-spine imbalance in the drawn ink, in pixels. */
+  measuredImbalancePx: number;
+  /** Halo-aware clearance of the WHOLE strip, per side. */
+  measuredLeftClearPx: number;
+  measuredRightClearPx: number;
+  /** Halo-aware clearance of the title line alone, per side. */
+  titleClearLeftPx: number;
+  titleClearRightPx: number;
+  /** Halo-aware clearance of the author line alone, per side. */
+  authorClearLeftPx: number;
+  authorClearRightPx: number;
+  /** True when the size came down to meet `targetClearPx` rather than to fit the length. */
+  reducedForClearance: boolean;
   titleLengthPx: number;
   authorLengthPx: number;
   /** title + gap + author. */
@@ -125,11 +210,14 @@ export interface SpineTypePlan {
 export async function planSpineType(req: SpineTypeRequest): Promise<SpineTypePlan> {
   const capFill = req.capFill ?? 0.62;
   const letterSpacing = req.letterSpacing ?? 1;
+  const targetClearPx = req.targetClearPx ?? 0;
 
   const titleRef = await inkLengthAtRef(req.title, 600, letterSpacing);
   const authorRef = await inkLengthAtRef(req.author, 400, letterSpacing);
+  const titleCentreRef = await inkCentreAtRef(req.title, 600, letterSpacing);
+  const authorCentreRef = await inkCentreAtRef(req.author, 400, letterSpacing);
 
-  /** The size the fold-safe strip width allows, before any length constraint. */
+  /** The size the fold-safe strip width allows, before any other constraint. */
   const widthLimitedPx = Math.floor((req.foldSafeWidthPx / GEORGIA_CAP_RATIO) * capFill);
   const authorSizeRatio = 0.72;
 
@@ -138,47 +226,139 @@ export async function planSpineType(req: SpineTypeRequest): Promise<SpineTypePla
     req.gapPx +
     Math.round((authorRef * Math.floor(px * authorSizeRatio)) / REF_PX);
 
-  let titlePx = widthLimitedPx;
-  while (titlePx > 8 && lengthAt(titlePx) > req.safeLengthPx) titlePx -= 1;
-  if (lengthAt(titlePx) > req.safeLengthPx) {
-    throw new Error(
-      `spine type does not fit: "${req.title}" needs ${lengthAt(titlePx)}px of ` +
-        `${req.safeLengthPx}px safe length even at the minimum size`,
-    );
+  /* Everything below is a function of the title size, so that the size can be
+     chosen by MEASURING candidates rather than by trusting a ratio. */
+  const geometryFor = (px: number) => {
+    const authorPx = Math.floor(px * authorSizeRatio);
+    const titleLengthPx = Math.round((titleRef * px) / REF_PX);
+    const authorLengthPx = Math.round((authorRef * authorPx) / REF_PX);
+    const safeTopX = -req.safeLengthPx / 2;
+    const safeBotX = req.safeLengthPx / 2;
+    const authorCentreX = safeBotX - authorLengthPx / 2;
+    const titleCentreX = (safeTopX + (authorCentreX - authorLengthPx / 2 - req.gapPx)) / 2;
+    return {
+      authorPx,
+      titleLengthPx,
+      authorLengthPx,
+      titleCentreX,
+      authorCentreX,
+      haloTitle: Math.max(3, Math.round(px * 0.14)),
+      haloAuthor: Math.max(2, Math.round(authorPx * 0.14)),
+      /* The measured cross-axis correction, scaled from REF_PX to the real size.
+         Negating it moves the ink's centre onto the group's origin — which,
+         inside the rotate(90), is the middle of the spine. `dominant-baseline`
+         was supposed to do this and silently did nothing. */
+      titleDy: -Math.round((titleCentreRef * px) / REF_PX),
+      authorDy: -Math.round((authorCentreRef * authorPx) / REF_PX),
+    };
+  };
+
+  /** One line, or both, as an SVG the size of the spine strip. */
+  const buildSvg = (px: number, which: 'both' | 'title' | 'author'): string => {
+    const g = geometryFor(px);
+    const title =
+      `<text x="${g.titleCentreX}" y="${g.titleDy}" text-anchor="middle" ` +
+      `font-family="${SPINE_FONT}" font-size="${px}" font-weight="600" ` +
+      `fill="${SPINE_CREAM}" stroke="${SPINE_HALO}" stroke-width="${g.haloTitle}" stroke-opacity="0.85" ` +
+      `paint-order="stroke fill" stroke-linejoin="round" ` +
+      `letter-spacing="${letterSpacing}">${escapeXml(req.title)}</text>`;
+    const author =
+      `<text x="${g.authorCentreX}" y="${g.authorDy}" text-anchor="middle" ` +
+      `font-family="${SPINE_FONT}" font-size="${g.authorPx}" font-weight="400" ` +
+      `fill="${SPINE_CREAM}" stroke="${SPINE_HALO}" stroke-width="${g.haloAuthor}" stroke-opacity="0.85" ` +
+      `paint-order="stroke fill" stroke-linejoin="round" ` +
+      `letter-spacing="${letterSpacing}">${escapeXml(req.author)}</text>`;
+    const inner = which === 'title' ? title : which === 'author' ? author : `${title}${'\n'}    ${author}`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${req.spineWidthPx}" height="${req.wrapHeightPx}">
+  <g transform="translate(${req.spineWidthPx / 2}, ${req.wrapHeightPx / 2}) rotate(90)">
+    ${inner}
+  </g>
+</svg>`;
+  };
+
+  /**
+   * THE COMPLETE TYPOGRAPHY FOOTPRINT, measured on ALPHA over transparency.
+   *
+   * Not the cap box, not the glyph outline — everything that survives into the
+   * composited spine: fill, halo stroke, and the antialiased edge of both. Alpha
+   * over transparency is the strictest available reading and, crucially, cannot
+   * be contaminated by the artwork, because there is no artwork in the render.
+   *
+   * The previous version measured against a flat grey field with a colour-delta
+   * threshold of 18/255. That did include the halo, but a threshold can only
+   * ever flatter: the faint outer edge of a soft stroke falls under it and is
+   * scored as clear space. On a spine that difference is the whole margin.
+   */
+  const acrossBounds = async (svg: string): Promise<{ left: number; right: number } | null> => {
+    const { data, info } = await sharp(Buffer.from(svg))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let l = info.width;
+    let r = -1;
+    for (let y = 0; y < info.height; y += 1) {
+      for (let x = 0; x < info.width; x += 1) {
+        if (data[(y * info.width + x) * info.channels + 3]! > 0) {
+          if (x < l) l = x;
+          if (x > r) r = x;
+        }
+      }
+    }
+    return r < 0 ? null : { left: l, right: info.width - 1 - r };
+  };
+
+  /**
+   * Choose the size by measurement, not by ratio.
+   *
+   * Two constraints, either able to force a reduction: the type must fit the
+   * spine's LENGTH, and its complete footprint must clear both folds by
+   * `targetClearPx`. Clearance grows monotonically as the size falls, so a
+   * decrement converges; the seed below jumps most of the way first so it takes
+   * a handful of rasterisations rather than eighty.
+   */
+  const footprintRatio = GEORGIA_CAP_RATIO + 0.14; // cap height plus the halo either side
+  const seed = targetClearPx
+    ? Math.min(widthLimitedPx, Math.floor((req.spineWidthPx - 2 * targetClearPx) / footprintRatio))
+    : widthLimitedPx;
+
+  let titlePx = Math.max(seed, 8);
+  let reducedForClearance = false;
+  for (let guard = 0; ; guard += 1) {
+    if (guard > 400) throw new Error('spine type sizing failed to converge');
+    if (titlePx <= 8) {
+      throw new Error(
+        `spine type does not fit: "${req.title}" cannot clear ${targetClearPx}px of fold ` +
+          `and ${req.safeLengthPx}px of safe length at any readable size`,
+      );
+    }
+    if (lengthAt(titlePx) > req.safeLengthPx) {
+      titlePx -= 1;
+      continue;
+    }
+    if (targetClearPx > 0) {
+      const b = await acrossBounds(buildSvg(titlePx, 'both'));
+      if (b && Math.min(b.left, b.right) < targetClearPx) {
+        titlePx -= 1;
+        reducedForClearance = true;
+        continue;
+      }
+    }
+    break;
   }
 
-  const authorPx = Math.floor(titlePx * authorSizeRatio);
-  const titleLengthPx = Math.round((titleRef * titlePx) / REF_PX);
-  const authorLengthPx = Math.round((authorRef * authorPx) / REF_PX);
+  const g = geometryFor(titlePx);
+  const authorPx = g.authorPx;
+  const titleLengthPx = g.titleLengthPx;
+  const authorLengthPx = g.authorLengthPx;
   const titleCapPx = Math.round(titlePx * GEORGIA_CAP_RATIO);
   const clearPerSidePx = Math.round((req.spineWidthPx - titleCapPx) / 2);
 
-  /**
-   * Coordinates are in the rotated frame, where x runs down the spine from the
-   * top and 0 is the middle of the wrap.
-   */
-  const safeTopX = -req.safeLengthPx / 2;
-  const safeBotX = req.safeLengthPx / 2;
-  const authorCentreX = safeBotX - authorLengthPx / 2;
-  const titleCentreX = (safeTopX + (authorCentreX - authorLengthPx / 2 - req.gapPx)) / 2;
-
-  const haloTitle = Math.max(3, Math.round(titlePx * 0.14));
-  const haloAuthor = Math.max(2, Math.round(authorPx * 0.14));
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${req.spineWidthPx}" height="${req.wrapHeightPx}">
-  <g transform="translate(${req.spineWidthPx / 2}, ${req.wrapHeightPx / 2}) rotate(90)">
-    <text x="${titleCentreX}" y="0" text-anchor="middle" dominant-baseline="middle"
-          font-family="${SPINE_FONT}" font-size="${titlePx}" font-weight="600"
-          fill="${SPINE_CREAM}" stroke="${SPINE_HALO}" stroke-width="${haloTitle}" stroke-opacity="0.85"
-          paint-order="stroke fill" stroke-linejoin="round"
-          letter-spacing="${letterSpacing}">${escapeXml(req.title)}</text>
-    <text x="${authorCentreX}" y="0" text-anchor="middle" dominant-baseline="middle"
-          font-family="${SPINE_FONT}" font-size="${authorPx}" font-weight="400"
-          fill="${SPINE_CREAM}" stroke="${SPINE_HALO}" stroke-width="${haloAuthor}" stroke-opacity="0.85"
-          paint-order="stroke fill" stroke-linejoin="round"
-          letter-spacing="${letterSpacing}">${escapeXml(req.author)}</text>
-  </g>
-</svg>`;
+  const svg = buildSvg(titlePx, 'both');
+  const both = await acrossBounds(svg);
+  const titleOnly = await acrossBounds(buildSvg(titlePx, 'title'));
+  const authorOnly = await acrossBounds(buildSvg(titlePx, 'author'));
+  const leftClearPx = both?.left ?? 0;
+  const rightClearPx = both?.right ?? 0;
 
   return {
     svg,
@@ -186,10 +366,19 @@ export async function planSpineType(req: SpineTypeRequest): Promise<SpineTypePla
     authorPx,
     titleCapPx,
     clearPerSidePx,
+    measuredClearPerSidePx: Math.min(leftClearPx, rightClearPx),
+    measuredImbalancePx: Math.abs(leftClearPx - rightClearPx),
+    measuredLeftClearPx: leftClearPx,
+    measuredRightClearPx: rightClearPx,
+    titleClearLeftPx: titleOnly?.left ?? 0,
+    titleClearRightPx: titleOnly?.right ?? 0,
+    authorClearLeftPx: authorOnly?.left ?? 0,
+    authorClearRightPx: authorOnly?.right ?? 0,
     titleLengthPx,
     authorLengthPx,
     totalLengthPx: titleLengthPx + req.gapPx + authorLengthPx,
     reducedToFit: titlePx < widthLimitedPx,
+    reducedForClearance,
   };
 }
 
