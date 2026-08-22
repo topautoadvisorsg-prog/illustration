@@ -42,11 +42,17 @@ const ARTIFACTS = {
   kindleCover: 'kindle/7-national-parks-KINDLE-cover-1600x2560.jpg',
 } as const;
 
+/* Both cover hashes changed TWICE on 2026-08-22: once to re-centre the spine
+   type, and again to size it down until the complete drawn typography — halo
+   included — clears both folds by the 0.075in house target rather than the
+   0.0633in the centring alone bought. Every superseded file is kept at
+   `_np_build/_superseded-spine-fold-defect/`, named with its hash and its
+   defect, so the three generations can be compared rather than taken on trust. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
   pbInterior: '1e7cb467e630287d6994eb62cfadf4be716c2f262e45d18662e6b61ef5d9b3ac',
-  pbCover: 'f8f9316b9a1c3f28714b590b852b3b0429e4ae64fd388870a64ab1a04aa0fc02',
+  pbCover: 'e1cd19ae146a39290d26bed78d5fe962af94c94fb7704173d23c428fc566842d',
   hcInterior: '1e7cb467e630287d6994eb62cfadf4be716c2f262e45d18662e6b61ef5d9b3ac',
-  hcCover: 'e2f64fd3e40d7fd6c597e24c7c8989bf134af249bb09aab52ab330c640b51093',
+  hcCover: '75c142e346eab4825226fddf77f8a41f95a31adbf14d880a8b2ffaec5d2f7d3e',
   epub: '2c013d1da3cadf0418edeaf3dfff6b4705e8318beaab2ab951c57a209e41d95d',
   kindleCover: '661feafbc4d3df250b4fb2555d3d7857a1614cf0f2af1ca75a9727a7c340ea72',
 };

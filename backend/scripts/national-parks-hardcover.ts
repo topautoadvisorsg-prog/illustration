@@ -168,6 +168,17 @@ const placed = await extendSkyUpward(padded, W, scaledH, H, SKY_BAND_FRACTION);
 console.log(`sky band   : top ${(skyBandPx / DPI).toFixed(2)}in stretched to ${((skyBandPx + skyStretch) / DPI).toFixed(2)}in (${((skyStretch / skyBandPx) * 100).toFixed(0)}%)`);
 
 // ── Spine type, set by code, sized from the HARDCOVER spine safe area ──────
+/**
+ * INTERNAL production target for spine fold clearance.
+ *
+ * KDP's hard floor is 0.0625in. This is 0.075in, and the difference is
+ * deliberate: the first halo-aware measurement of this wrap came out at
+ * 0.0633in — a pass by eight ten-thousandths of an inch, which is not tolerance,
+ * it is luck. The title is sized down until the COMPLETE drawn typography clears
+ * both folds by this much.
+ */
+const TARGET_CLEAR_IN = 0.075;
+
 const spineLeftPx = Math.round(spineL * DPI);
 const spineWpx = Math.round(d.spineIn * DPI);
 const safeStripPx = Math.round(d.spineSafeWidthIn * DPI);
@@ -196,13 +207,38 @@ const plan = await planSpineType({
   foldSafeWidthPx: safeStripPx,
   safeLengthPx: Math.round(d.spineSafeHeightIn * DPI),
   gapPx: Math.round(GAP_IN * DPI),
+  targetClearPx: Math.round(TARGET_CLEAR_IN * DPI),
 });
 
 console.log(`
 spine strip: ${spineWpx}px, safe area ${safeStripPx}px (${d.spineSafeWidthIn} in)`);
 console.log(`spine type : title ${plan.titlePx}px (cap ${plan.titleCapPx}px), author ${plan.authorPx}px`);
-console.log(`clearance  : ${(plan.clearPerSidePx / DPI).toFixed(4)} in per side`);
+/* The hardcover printed a computed clearance and gated on nothing, which is how
+   spine type reached a finished wrap sitting ON the front fold while the line
+   above it read a comfortable 0.1233in. Every number below is now MEASURED off
+   an isolated transparent render of the typography — fill, halo and the
+   antialiased edge of both — so no artwork can flatter it and no ratio can
+   stand in for it. */
+const FOLD_VARIANCE_IN = 0.0625;
 console.log(
+  `clearance  : title ${(plan.titleClearLeftPx / DPI).toFixed(4)} / ${(plan.titleClearRightPx / DPI).toFixed(4)}in, ` +
+    `author ${(plan.authorClearLeftPx / DPI).toFixed(4)} / ${(plan.authorClearRightPx / DPI).toFixed(4)}in`,
+);
+console.log(
+  `           : WORST ${(plan.measuredClearPerSidePx / DPI).toFixed(4)}in (KDP floor ${FOLD_VARIANCE_IN}, house target ${TARGET_CLEAR_IN}), ` +
+    `imbalance ${(plan.measuredImbalancePx / DPI).toFixed(4)}in` +
+    `${plan.reducedForClearance ? ' — title sized down to reach the target' : ''}`,
+);
+console.log(`           : (the old cap-ratio figure would have said ${(plan.clearPerSidePx / DPI).toFixed(4)}in)`);
+if (plan.measuredClearPerSidePx / DPI < TARGET_CLEAR_IN) {
+  throw new Error(
+    `spine typography clears only ${(plan.measuredClearPerSidePx / DPI).toFixed(4)}in, ` +
+      `under the ${TARGET_CLEAR_IN}in house target`,
+  );
+}
+if (plan.measuredImbalancePx / DPI > 0.02) {
+  throw new Error(`spine type is ${(plan.measuredImbalancePx / DPI).toFixed(4)}in off centre across the spine`);
+}console.log(
   `spine length: title ${(plan.titleLengthPx / DPI).toFixed(2)} in + gap ${GAP_IN} in + author ` +
     `${(plan.authorLengthPx / DPI).toFixed(2)} in = ${(plan.totalLengthPx / DPI).toFixed(2)} in ` +
     `of ${d.spineSafeHeightIn} in safe`,

@@ -31,6 +31,17 @@ const BLEED = 0.125;
 const THICKNESS_WHITE_BW = 0.002252;
 /** KDP allows this much fold wander either side of each spine fold. */
 const FOLD_VARIANCE_IN = 0.0625;
+/**
+ * INTERNAL production target for spine fold clearance.
+ *
+ * KDP's hard floor is 0.0625in of fold variance. This is 0.075in, and the
+ * difference is deliberate: the first halo-aware measurement of this cover came
+ * out at 0.0633in — a pass by eight ten-thousandths of an inch, which is not
+ * tolerance, it is luck. The title is sized down until the COMPLETE drawn
+ * typography, halo and antialiasing included, clears both folds by this much.
+ */
+const TARGET_CLEAR_IN = 0.075;
+
 
 // ── Geometry, from the interior itself ─────────────────────────────────────
 const pageCount = (await PDFDocument.load(readFileSync(INTERIOR))).getPageCount();
@@ -145,18 +156,30 @@ const plan = await planSpineType({
   foldSafeWidthPx: safeStripPx,
   safeLengthPx: Math.round(SPINE_SAFE_LEN_IN * DPI),
   gapPx: Math.round(GAP_IN * DPI),
+  targetClearPx: Math.round(TARGET_CLEAR_IN * DPI),
 });
 
 console.log(`\nspine strip: ${spineWpx}px wide, fold-safe ${safeStripPx}px`);
 console.log(`spine type : title ${plan.titlePx}px (cap ${plan.titleCapPx}px), author ${plan.authorPx}px`);
-console.log(`clearance  : ${plan.clearPerSidePx}px = ${(plan.clearPerSidePx / DPI).toFixed(4)}in per side (need >= ${FOLD_VARIANCE_IN})`);
 console.log(
-  `spine length: title ${(plan.titleLengthPx / DPI).toFixed(2)}in + gap ${GAP_IN}in + author ` +
-    `${(plan.authorLengthPx / DPI).toFixed(2)}in = ${(plan.totalLengthPx / DPI).toFixed(2)}in of ${SPINE_SAFE_LEN_IN}in safe`,
+  `clearance  : title ${(plan.titleClearLeftPx / DPI).toFixed(4)} / ${(plan.titleClearRightPx / DPI).toFixed(4)}in, ` +
+    `author ${(plan.authorClearLeftPx / DPI).toFixed(4)} / ${(plan.authorClearRightPx / DPI).toFixed(4)}in`,
 );
-if (plan.reducedToFit) console.log('spine fit  : size reduced so the type fits the spine length');
-if (plan.clearPerSidePx / DPI < FOLD_VARIANCE_IN) throw new Error('spine type too wide for the fold variance');
-
+console.log(
+  `           : WORST ${(plan.measuredClearPerSidePx / DPI).toFixed(4)}in (KDP floor ${FOLD_VARIANCE_IN}, house target ${TARGET_CLEAR_IN}), ` +
+    `imbalance ${(plan.measuredImbalancePx / DPI).toFixed(4)}in` +
+    `${plan.reducedForClearance ? ' — title sized down to reach the target' : ''}`,
+);
+console.log(`           : (the old cap-ratio figure would have said ${(plan.clearPerSidePx / DPI).toFixed(4)}in)`);
+if (plan.measuredClearPerSidePx / DPI < TARGET_CLEAR_IN) {
+  throw new Error(
+    `spine typography clears only ${(plan.measuredClearPerSidePx / DPI).toFixed(4)}in, ` +
+      `under the ${TARGET_CLEAR_IN}in house target`,
+  );
+}
+if (plan.measuredImbalancePx / DPI > 0.02) {
+  throw new Error(`spine type is ${(plan.measuredImbalancePx / DPI).toFixed(4)}in off centre across the spine`);
+}
 const wrap = await sharp(placed)
   .composite([{ input: Buffer.from(plan.svg), left: spineLeftPx, top: 0 }])
   .jpeg({ quality: 92, chromaSubsampling: '4:4:4' })
