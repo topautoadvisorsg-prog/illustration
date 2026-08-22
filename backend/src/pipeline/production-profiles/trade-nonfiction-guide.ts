@@ -46,23 +46,51 @@ export const TRADE_NONFICTION_GUIDE_PROFILE: BookProductionProfile = {
    * inherit the interior DNA generates in monochrome and quietly converts the
    * art direction's colour into tone.
    */
-  coverStyleDnaId: 'graphic-trade-cover',
+  /**
+   * PHOTOGRAPHIC, not the flat graphic look.
+   *
+   * `graphic-trade-cover` states "NOT painted illustration, flat fills only, no
+   * gradients, no photographic shading, LIGHT: None" — it is a deliberate flat
+   * style and it directly contradicts the atmosphere this profile asks for. The
+   * two were fighting inside one prompt, and the DNA wins, because it is
+   * assembled after the art direction.
+   *
+   * `photographic-trade-cover` is the look the shipped DIRT RICH wrap was
+   * generated on: a real scene, real directional light, real depth, running
+   * continuously from back through spine to front.
+   */
+  coverStyleDnaId: 'photographic-trade-cover',
 
   /**
-   * A designed graphic cover, not a painting of a place.
+   * FULL COLOUR, cinematic, one cohesive scene.
    *
-   * A travel guide competes as a thumbnail in a category full of photographs of
-   * the same seven landscapes. Flat shapes and a tight palette survive that
-   * scale; an atmospheric painted vista becomes brown mush at 120 pixels and is
-   * indistinguishable from every other listing.
+   * The interior is black-and-white for print economy; the cover is not, and
+   * must not inherit that. KDP prints every paperback cover in full colour
+   * regardless, and a monochrome wrap on a travel shelf reads as a manual.
+   *
+   * An earlier version of this block asked for a flat graphic cover on the
+   * theory that atmosphere dies at thumbnail size. That was wrong for this
+   * category: the covers that sell adult travel nonfiction are photographic or
+   * painterly, and the discipline that makes them survive a thumbnail is
+   * COMPOSITION — one subject, deep tonal separation, a quiet zone for the
+   * title — not the absence of a picture.
+   *
+   * One scene, not a collage. Multiple parks are evoked through landscape
+   * language and depth, never through seven stamps in a grid.
    */
   coverArtLanguage: {
     atmosphere:
-      'a designed graphic cover rather than a photograph or a painted vista: flat bold shapes, strong ' +
-      'figure-ground contrast, generous empty space and a tightly limited palette. It must read at ' +
-      'Amazon-thumbnail size, so a few large elements rather than many small ones, and no fine texture ' +
-      'or atmospheric detail that disappears when scaled down',
-    mood: 'confident, plain-spoken and practical; a guide written by someone who has been there, never a brochure',
+      'one cohesive, cinematic full-colour landscape photograph or richly painted scene of dramatic ' +
+      'American wilderness — sweeping canyon walls, granite cliffs, layered mountain ridges, pine ' +
+      'forest, a trail or overlook — with real atmospheric depth from foreground to far distance and ' +
+      'warm natural light near sunrise or the golden hour. One strong scene that evokes several ' +
+      'iconic national parks through landform and depth, never a grid or collage of separate places. ' +
+      'Deep tonal separation between the sky and the land so a large title can sit in the upper front ' +
+      'panel on a quiet area and still read at Amazon-thumbnail size',
+    mood:
+      'premium, commercial adult travel nonfiction: adventurous but believable, sophisticated rather ' +
+      'than touristic. It should say "I want to go there, and this book will help me do it right" — ' +
+      'never a stock-photo brochure, never a coffee-table art book',
   },
 
   publishingStandardId: 'wildlands-v1.2',

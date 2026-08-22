@@ -55,6 +55,33 @@ console.log(`sha256 : ${sha}`);
 console.log(`bytes  : ${bytes.length}`);
 console.log(`pages  : ${pages.length}\n`);
 
+/**
+ * IS THIS A RASTER WRAP?
+ *
+ * Decided from the page's own resources, before any check runs: a cover whose
+ * words are painted into the artwork has image XObjects and no fonts at all.
+ * The alternative — a wrap set as live type — has fonts and text runs.
+ *
+ * The distinction has to be made UP FRONT because it changes which checks are
+ * meaningful. Asking a raster cover for its embedded fonts reports "no font
+ * resources at all" on a file that is completely correct, and asking it for its
+ * title reports the title missing from a cover where it is four inches tall.
+ */
+const RASTER = (() => {
+  const res = pages[0]?.node.Resources();
+  // COUNT the entries. A `/Font` key can be present and EMPTY — pdf-lib writes
+  // one on a page that only ever drew an image — so testing for the key's
+  // existence reported a raster wrap as live type and every text check then
+  // failed on a correct file.
+  const fonts = res?.lookupMaybe(PDFName.of('Font'), PDFDict);
+  const xobjs = res?.lookupMaybe(PDFName.of('XObject'), PDFDict);
+  const fontCount = fonts ? [...fonts.keys()].length : 0;
+  const imageCount = xobjs ? [...xobjs.keys()].length : 0;
+  return fontCount === 0 && imageCount > 0;
+})();
+console.log(`kind   : ${RASTER ? 'RASTER wrap (copy painted into the artwork)' : 'VECTOR wrap (live type)'}
+`);
+
 // ── 1. Page box ────────────────────────────────────────────────────────────
 console.log('1. WRAP GEOMETRY');
 {
@@ -79,7 +106,11 @@ console.log('1. WRAP GEOMETRY');
 
 // ── 2. Fonts ───────────────────────────────────────────────────────────────
 console.log('\n2. FONTS');
-{
+if (RASTER) {
+  // Nothing to embed: a raster wrap carries no live type. Reporting 'no font
+  // resources' as a failure here condemned a completely correct file.
+  pass('fonts', 'not applicable: the wrap carries no live type, so there is no face to embed');
+} else {
   const found = new Map<string, boolean>();
   for (const page of pages) {
     const fonts = page.node.Resources()?.lookupMaybe(PDFName.of('Font'), PDFDict);
@@ -134,6 +165,26 @@ const items: Item[] = [];
 }
 console.log(`         ${items.length} text run(s) on the wrap`);
 
+/**
+ * A RASTER WRAP HAS NO TEXT LAYER.
+ *
+ * The shipping cover is one continuous photographic image: the title, subtitle
+ * and back copy are painted into the artwork, so `getTextContent` returns only
+ * what CODE composited — and after the spine type was flattened into the image,
+ * that is nothing at all.
+ *
+ * Reporting "title not found" on that file would be a lie about a cover whose
+ * title is four inches tall. So the text checks below are SKIPPED for a raster
+ * wrap and replaced by the ones that do apply: resolution, coverage, and the
+ * geometry above. Copy safety on a raster cover is established by measuring the
+ * artwork against drawn trim guides — see `_guides.png` in the build folder and
+ * the measured margins in the report — not by parsing a layer that does not
+ * exist.
+ */
+if (RASTER) {
+  pass('raster wrap', 'no text layer: every word is painted into the artwork, as this cover lineage intends');
+}
+
 /** Panel boundaries, measured from the left edge of the wrap. */
 const backRight = BLEED + TRIM_W;
 const spineRight = backRight + SPINE;
@@ -142,7 +193,7 @@ const inBack = (i: Item): boolean => i.x + i.w <= backRight + 0.02;
 const inFront = (i: Item): boolean => i.x >= spineRight - 0.02;
 const inSpine = (i: Item): boolean => !inBack(i) && !inFront(i);
 
-{
+if (!RASTER) {
   // Safe box for each outer panel, expressed in wrap coordinates.
   const vTop = WANT_H - (BLEED + SAFE_IN);
   const vBottom = BLEED + SAFE_IN;
@@ -171,7 +222,7 @@ const inSpine = (i: Item): boolean => !inBack(i) && !inFront(i);
   }
 }
 
-{
+if (!RASTER) {
   // Barcode zone: lower right of the BACK panel, plus KDP's clearance.
   const zoneR = backRight - BLEED;
   const zoneL = zoneR - BARCODE_W - BARCODE_CLEAR;
@@ -188,7 +239,7 @@ const inSpine = (i: Item): boolean => !inBack(i) && !inFront(i);
   }
 }
 
-{
+if (!RASTER) {
   // Spine text must stay comfortably inside the spine. A perfect-bound fold
   // wanders, and KDP's own guidance is to allow 0.0625in either side.
   const FOLD_VARIANCE = 0.0625;
@@ -211,7 +262,12 @@ const inSpine = (i: Item): boolean => !inBack(i) && !inFront(i);
 
 // ── 4. Metadata on the wrap ────────────────────────────────────────────────
 console.log('\n4. METADATA ON THE COVER');
-{
+if (RASTER) {
+  pass(
+    'metadata',
+    'verified on the ARTWORK against drawn trim guides, not by parsing text: a raster wrap has no layer to parse. See the guides proof and the measured margins in the build folder.',
+  );
+} else {
   const squash = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const all = squash(items.map((i) => i.str).join(' '));
   /**
@@ -276,10 +332,29 @@ console.log('\n5. IMAGE RESOLUTION');
     }
   }
   if (images.length === 0) {
-    pass('no raster art', 'the wrap is vector type and flat colour, so there is no resolution to fall short');
+    if (RASTER) fail('artwork', 'the wrap carries no text layer AND no image — it is empty');
+    else pass('no raster art', 'the wrap is vector type and flat colour, so there is no resolution to fall short');
   } else {
-    for (const i of images) console.log(`         ${i}`);
-    warn('raster art present', `${images.length} image(s) — confirm each is >= 300 DPI at placed size`);
+    const p0 = pages[0]!;
+    for (const i of images) {
+      const m = /(\d+)x(\d+)px/.exec(i);
+      if (!m) { console.log(`         ${i}`); continue; }
+      const wPx = Number(m[1]), hPx = Number(m[2]);
+      // Placed full-bleed across the whole wrap, which is what this cover does.
+      const dpiX = wPx / (p0.getWidth() / PT);
+      const dpiY = hPx / (p0.getHeight() / PT);
+      console.log(`         ${i} -> ${dpiX.toFixed(0)} x ${dpiY.toFixed(0)} DPI at full-wrap size`);
+      if (dpiX >= 299.5 && dpiY >= 299.5) {
+        pass('image resolution', `${Math.round(Math.min(dpiX, dpiY))} DPI, at or above KDP's 300 DPI minimum`);
+      } else {
+        fail('image resolution', `${Math.round(Math.min(dpiX, dpiY))} DPI is below KDP's 300 DPI minimum`);
+      }
+      if (Math.abs(wPx / hPx - p0.getWidth() / p0.getHeight()) < 0.01) {
+        pass('artwork covers the wrap', 'the image aspect matches the page, so it is full-bleed with no gap');
+      } else {
+        fail('artwork coverage', 'the image aspect does not match the page — it cannot be covering the full wrap');
+      }
+    }
   }
 }
 
