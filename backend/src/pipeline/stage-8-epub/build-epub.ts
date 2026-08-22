@@ -20,7 +20,7 @@ import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 import { EPub, type Options } from 'epub-gen-memory';
 import { and, eq, inArray } from 'drizzle-orm';
-import { ProjectConfigSchema } from '@wildlands/shared';
+import { ProjectConfigSchema, type ProjectConfig, type PageIllustration } from '@wildlands/shared';
 import { getDb } from '../../db/client.js';
 import { manifests } from '../../db/schema/index.js';
 import { getProject } from '../../db/repositories/projects.repo.js';
@@ -32,6 +32,7 @@ import { listEntriesForProject } from '../../db/repositories/entries.repo.js';
 import { getProjectStorage } from '../../services/storage/project-storage.js';
 import { assembleEpubModel, type EpubMeta, type EpubModel, type EpubSourcePage, type HeroAssembleInput, type HeroRef } from './assemble-epub.js';
 import { loadHeroPlan } from './hero-plan.js';
+import { assembleTypesetEpubModel, type EpubFigure } from './assemble-typeset-epub.js';
 import { toRoman } from '../publishing-standard/index.js';
 
 /** Minimal reader-theme-friendly CSS — relative units only (no fixed px) so
@@ -63,6 +64,34 @@ const EPUB_CSS = [
   // Applied to every entry EXCEPT the first in a chapter (that flows under the
   // chapter title), so chapter-opener headings are never stranded.
   'img.hero--break { margin-top: 0; page-break-before: always; break-before: page; }',
+  // ── typeset (Track B) elements ────────────────────────────
+  // Everything below is sized in em/%, never px: a reflowable file is read at
+  // whatever size the reader has chosen, and a fixed measurement fights that.
+  'figure.fig { margin: 1em 0; text-align: center; page-break-inside: avoid; break-inside: avoid; }',
+  'img.figimg { max-width: 100%; height: auto; margin: 0 auto; }',
+  'p.caption { font-size: 0.9em; font-style: italic; margin: 0.4em 0 0; text-align: center; }',
+  // The scene break. The print edition centres an ornament between paragraphs
+  // and this is its reflowable equivalent: spaced, not ruled, so it cannot be
+  // mistaken for a chapter division on a small screen.
+  'p.ornament { text-align: center; margin: 1.4em 0; letter-spacing: 0.5em; }',
+  'p.disclaimer { font-size: 0.9em; }',
+  'p.series { font-size: 0.95em; margin-top: 1.5em; }',
+  // Tables reflow badly by nature; keep them readable rather than pretty. The
+  // 100% width lets a device shrink columns instead of clipping them.
+  'table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }',
+  'th, td { border: 1px solid #999; padding: 0.35em 0.5em; vertical-align: top; }',
+  'th { font-weight: bold; }',
+  // A table too wide to be a grid on a phone, set as labelled records instead.
+  // Sized in em so it follows the reader's chosen text size like everything else.
+  "div.stacked-table { margin: 1em 0; }",
+  "div.stk-unit { margin: 0 0 1em; padding: 0 0 0.6em; border-bottom: 1px solid #bbb; page-break-inside: avoid; break-inside: avoid; }",
+  "p.stk-lead { font-weight: bold; margin: 0 0 0.3em; }",
+  "p.stk-field { margin: 0 0 0.2em; text-indent: 0; }",
+  "span.stk-label { font-weight: bold; }",
+  'blockquote { margin: 1em 1.5em; font-style: italic; }',
+  'ul, ol { margin: 0 0 0.8em 1.2em; padding-left: 1em; }',
+  'li { margin: 0 0 0.35em; }',
+  'code { font-family: monospace; font-size: 0.95em; }',
 ].join('\n');
 
 export interface BuildEpubResult {
@@ -120,6 +149,124 @@ export interface ProjectEpubModel {
 }
 
 /**
+ * Resolve the manuscript's inline figures (`![alt](name)`) into temp files the
+ * packer can read.
+ *
+ * Encoded BOTH ways and the smaller kept. The book mixes 4.6 MB photographic
+ * plates with 96 KB vector-drawn charts, and one codec is wrong for one of them:
+ * JPEG smears the hairlines of a chart, PNG stores a photograph at ten times the
+ * size it needs. Trying both and measuring costs a few hundred milliseconds and
+ * removes the judgement call entirely.
+ *
+ * Capped at 1400px on the long edge — above that a Kindle downsamples on the
+ * device anyway, and the bytes are pure download weight.
+ */
+async function resolveFiguresForExport(
+  projectId: string,
+  markdown: string,
+): Promise<Map<string, EpubFigure>> {
+  const figures = new Map<string, EpubFigure>();
+  const storage = getProjectStorage();
+  const dir = join(tmpdir(), `wl-figs-${projectId}`);
+  mkdirSync(dir, { recursive: true });
+
+  for (const m of markdown.matchAll(/^!\[([^\]]*)\]\(([^)]+)\)(?:\{(\d{1,3})%\})?\s*$/gm)) {
+    const alt = (m[1] ?? '').trim();
+    const name = m[2]!.trim();
+    const widthPct = m[3] ? Number(m[3]) : undefined;
+    if (figures.has(name)) continue;
+    try {
+      const bytes = await storage.readProjectFile([projectId, 'illustrations', name].join('/'));
+      const base = sharp(bytes, { density: 300 }).resize({
+        width: 1400,
+        height: 1400,
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
+      const [asPng, asJpeg] = await Promise.all([
+        base.clone().png({ compressionLevel: 9 }).toBuffer(),
+        base.clone().jpeg({ quality: 82, chromaSubsampling: '4:4:4' }).toBuffer(),
+      ]);
+      const usePng = asPng.length <= asJpeg.length;
+      const file = join(dir, `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.${usePng ? 'png' : 'jpg'}`);
+      writeFileSync(file, usePng ? asPng : asJpeg);
+      figures.set(name, {
+        src: pathToFileURL(file).href,
+        // Alt text carries the caption's markdown; strip it so a screen reader
+        // does not read asterisks aloud.
+        alt: alt.replace(/[*`]/g, ''),
+        widthPct,
+      });
+    } catch {
+      // Left unresolved on purpose. The assembler reports it as a MISSING figure
+      // and the operator sees it in the build report, rather than the figure
+      // quietly not being in the shipped file.
+    }
+  }
+  return figures;
+}
+
+/**
+ * The stamped print plates, re-bound to SECTIONS for the reflowable edition.
+ *
+ * `config.illustrations` keys art by the stable block id it is stamped onto in
+ * the PDF. A block id resolves to a PAGE, and an ebook has no pages, so that
+ * mapping cannot be carried over — which is why an illustrated book exported
+ * with `heroesEmbedded: 0` and nobody noticed until the file was opened.
+ *
+ * The bridge is `PageIllustration.subject`, written at stamping time, which
+ * names what each plate is FOR. Matching on that gives the ebook the same five
+ * plates against the same five structural places, with no second copy of the
+ * art and no second decision about where it belongs.
+ *
+ * Sized for screens rather than for paper: a 2048px plate is pointless on a
+ * phone and costs download. Anything that fails to resolve is reported by the
+ * assembler rather than silently dropped.
+ */
+async function resolveSectionPlatesForExport(
+  projectId: string,
+  config: ProjectConfig,
+): Promise<Map<string, EpubFigure>> {
+  const out = new Map<string, EpubFigure>();
+  const illustrations = config.illustrations ?? {};
+  if (Object.keys(illustrations).length === 0) return out;
+
+  const storage = getProjectStorage();
+  const dir = join(tmpdir(), `wl-plates-${projectId}`);
+  mkdirSync(dir, { recursive: true });
+
+  /** Plate subject -> the section title it belongs under in the ebook. */
+  const SUBJECT_TO_SECTION: Array<[RegExp, string, string]> = [
+    [/part 1/i, 'PART 1 — BEFORE YOU GO', 'A trail leading into old-growth forest beneath a mountain wall'],
+    [/part 2/i, 'PART 2 — THE SEVEN PARKS', 'A range of peaks rising in receding planes above a conifer treeline'],
+    [/part 3/i, "PART 3 — AFTER YOU'RE HOOKED", 'A trail cresting a ridge toward distant mountain ranges'],
+    [/grand canyon/i, 'Grand Canyon', 'A desert canyon of layered rock seen from a high rim'],
+    [/rocky mountain/i, 'Rocky Mountain', 'A high alpine ridge of broken granite above the treeline'],
+  ];
+
+  for (const art of Object.values(illustrations) as PageIllustration[]) {
+    const subject = art.subject ?? '';
+    const match = SUBJECT_TO_SECTION.find(([re]) => re.test(subject));
+    if (!match) continue;
+    const [, sectionTitle, alt] = match;
+    try {
+      const bytes = await storage.readProjectFile(art.approvedAssetPath);
+      const web = await sharp(bytes, { density: 300 })
+        .resize({ width: 1200, height: 1600, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 82, chromaSubsampling: '4:4:4' })
+        .toBuffer();
+      const file = join(dir, `${sectionTitle.replace(/[^a-zA-Z0-9]+/g, '_')}.jpg`);
+      writeFileSync(file, web);
+      out.set(sectionTitle.trim().toLowerCase(), { src: pathToFileURL(file).href, alt });
+    } catch {
+      // Unresolved on purpose: the assembler reports it as MISSING rather than
+      // the plate quietly not being in the shipped file.
+    }
+  }
+  return out;
+}
+
+/**
  * Assemble the EPUB MODEL for a project WITHOUT packing the .epub — read-only,
  * cheap, no zip. Powers the in-console preview (structure + text + image plan +
  * report). `buildKindleEpub` reuses this then packs the bytes.
@@ -134,6 +281,40 @@ export async function assembleProjectModel(
 
   // Pages (real reading text) + chapter titles + entry titles.
   const pageRows = await listPaginatedPagesForProject(projectId);
+
+  /* ── TRACK B: a TYPESET book keeps its text in the manuscript, not in pages ──
+     `paginated_pages` is the Track A layout table. A book built by
+     `buildTypesetInterior` reflows its Markdown through Paged.js and never fills
+     that table, so an empty result here is not an error — it means this project
+     is the other kind of book, and its text has to be read from the manuscript.
+
+     Before this branch existed the export ran on happily with zero pages and
+     produced a 3.6 KB EPUB containing the generated title page and nothing else,
+     reporting success. Missing text now takes a DIFFERENT path rather than
+     silently producing an empty book. */
+  if (pageRows.length === 0 && project.manuscriptPath) {
+    const markdown = (await getProjectStorage().readProjectFile(project.manuscriptPath)).toString('utf8');
+    const figures = await resolveFiguresForExport(projectId, markdown);
+    const typesetConfig = ProjectConfigSchema.parse(project.config);
+    const sectionFigures = await resolveSectionPlatesForExport(projectId, typesetConfig);
+    const model = assembleTypesetEpubModel({
+      markdown,
+      meta,
+      config: typesetConfig,
+      figures,
+      sectionFigures,
+    });
+    const coverAssetPath = ProjectConfigSchema.parse(project.config).publishing.coverAssetPath;
+    if (opts.verifyCover === false) {
+      model.imagePlan.coverIncluded = Boolean(coverAssetPath);
+    } else if (!coverAssetPath) {
+      model.stats.warnings.push(
+        'No cover image is set — the EPUB will export WITHOUT a cover. Set publishing.coverAssetPath, ' +
+          'or pass a cover explicitly to buildKindleEpub.',
+      );
+    }
+    return { model, meta, coverAssetPath, fileName: fileNameFor(meta.title), entrySource: 'manifests' };
+  }
   const pages: EpubSourcePage[] = pageRows.map((p) => ({
     pageKey: p.pageKey,
     chapterNumber: p.chapterNumber,
@@ -235,8 +416,24 @@ async function resolveHeroesForExport(projectId: string): Promise<HeroAssembleIn
   return { entries, sections, frontispiece };
 }
 
+export interface BuildKindleEpubOptions {
+  /**
+   * A cover supplied by the caller, used INSTEAD of `publishing.coverAssetPath`.
+   *
+   * Exists because a print wrap built outside the platform — by a one-shot
+   * script, on an approved master the operator chose — never lands in
+   * `coverAssetPath`, and an ebook with no cover is not shippable. Accepts the
+   * full landscape wrap or an already-portrait front panel; the crop below
+   * handles both. Passing this does not write anything back to the project.
+   */
+  coverImage?: Buffer;
+}
+
 /** Build the Kindle EPUB for a project. Returns the bytes + a build report. */
-export async function buildKindleEpub(projectId: string): Promise<BuildEpubResult> {
+export async function buildKindleEpub(
+  projectId: string,
+  options: BuildKindleEpubOptions = {},
+): Promise<BuildEpubResult> {
   // verifyCover:false — this path reads + resizes the cover below and finalizes
   // coverIncluded from the actual embed, so no need to pre-read it here too.
   const heroes = await resolveHeroesForExport(projectId);
@@ -250,10 +447,10 @@ export async function buildKindleEpub(projectId: string): Promise<BuildEpubResul
   // file and hand epub-gen-memory a file:// URL (Node path read).
   let coverFileUrl: string | undefined;
   let coverEmbedded = false;
-  if (coverAssetPath) {
+  const coverSource = options.coverImage ? 'caller' : coverAssetPath ? 'project' : 'none';
+  if (coverSource !== 'none') {
     try {
-      const storage = getProjectStorage();
-      const raw = await storage.readProjectFile(coverAssetPath);
+      const raw = options.coverImage ?? (await getProjectStorage().readProjectFile(coverAssetPath!));
       const cm = await sharp(raw).metadata();
       const cw = cm.width ?? 0;
       const ch = cm.height ?? 0;
@@ -263,13 +460,25 @@ export async function buildKindleEpub(projectId: string): Promise<BuildEpubResul
       // subject (e.g. the title + animal) isn't clipped at its left edge.
       const rightInset = Math.round(cw * 0.04);
       const left = cw - cropW - rightInset;
-      const pipe =
-        cw > ch && cropW > 0 && left >= 0
-          ? // Landscape wrap → extract the front (right) panel, then scale to 1600x2560.
-            sharp(raw).extract({ left, top: 0, width: cropW, height: ch }).resize(1600, 2560)
-          : // Already portrait / not a wrap → fit the portrait box (front-biased right).
-            sharp(raw).resize(1600, 2560, { fit: 'cover', position: 'right' });
-      const resized = await pipe.jpeg({ quality: 88 }).toBuffer();
+      /* A caller that already supplied the exact target is not second-guessed.
+
+         The two branches below are HEURISTICS for a cover of unknown shape: the
+         first guesses where the front panel is in a landscape wrap, the second
+         crops a portrait image toward its right edge. Neither is right when the
+         caller has cut the front panel itself from known geometry — that path
+         handed in a 1707x2560 panel and the right-biased `fit:'cover'` quietly
+         took 107px off its LEFT edge, moving the composition 0.36in. */
+      const alreadyTarget = cw === 1600 && ch === 2560;
+      const resized = alreadyTarget
+        ? raw
+        : await (cw > ch && cropW > 0 && left >= 0
+            ? // Landscape wrap → extract the front (right) panel, then scale to 1600x2560.
+              sharp(raw).extract({ left, top: 0, width: cropW, height: ch }).resize(1600, 2560)
+            : // Already portrait / not a wrap → fit the portrait box (front-biased right).
+              sharp(raw).resize(1600, 2560, { fit: 'cover', position: 'right' })
+          )
+            .jpeg({ quality: 88 })
+            .toBuffer();
       const tmp = join(tmpdir(), `wl-cover-${projectId}.jpg`);
       writeFileSync(tmp, resized);
       coverFileUrl = pathToFileURL(tmp).href;
@@ -279,14 +488,23 @@ export async function buildKindleEpub(projectId: string): Promise<BuildEpubResul
       coverFileUrl = undefined;
       coverEmbedded = false;
       // eslint-disable-next-line no-console
-      console.warn(`[epub] cover not embedded (${coverAssetPath}): ${err instanceof Error ? err.message : String(err)}`);
+      console.warn(`[epub] cover not embedded (source: ${coverSource}): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  const options: Options = {
+  const epubOptions: Options = {
     title: meta.title,
     author: meta.authors,
-    publisher: meta.publisher,
+    /* EPUBCheck REJECTS an empty publisher, and this template emits the element
+       unconditionally: with nothing set, the package document carried
+       `<dc:publisher></dc:publisher>` and failed validation with RSC-005 twice.
+       The same value also fills `dc:rights`, which read "Copyright (c) 2026 by "
+       with the name simply missing off the end.
+
+       So fall back to the author. That is not an invented imprint — a KDP title
+       with no publisher of its own IS published by its author, and Amazon lists
+       it that way. Set `publishing.publisher.imprint` to override. */
+    publisher: meta.publisher || meta.authors.join(', '),
     description: meta.description,
     lang: meta.language,
     cover: coverFileUrl,
@@ -303,7 +521,7 @@ export async function buildKindleEpub(projectId: string): Promise<BuildEpubResul
 
   // Use the EPub class (named export) rather than the default function: under
   // some ESM loaders the CJS default export isn't unwrapped to a callable.
-  const epubDoc = await new EPub(options, model.chapters).render();
+  const epubDoc = await new EPub(epubOptions, model.chapters).render();
   const buffer = await epubDoc.genEpub();
   return { buffer, model, meta, coverEmbedded, fileName, entrySource };
 }

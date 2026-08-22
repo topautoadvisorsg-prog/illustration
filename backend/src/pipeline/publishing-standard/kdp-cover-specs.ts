@@ -70,6 +70,35 @@ interface VerifiedSpec extends Omit<KdpCoverDimensions, 'provenance' | 'note'> {
  */
 export const VERIFIED_SPECS: VerifiedSpec[] = [
   {
+    // WHAT THE SEED PACKET SKIPS — Abby Fenwick. Hardcover edition.
+    // Read from the KDP Cover Calculator on 2026-08-22 for this exact config.
+    //
+    // Note the spine: 0.504in at 126pp, against 0.315in for the SAME page count
+    // in paperback. The board accounts for most of that, which is why a
+    // paperback wrap can never be reused for a hardcover.
+    config: {
+      binding: 'HARDCOVER',
+      coverType: 'CASE_LAMINATE',
+      interiorType: 'BLACK_AND_WHITE',
+      paperType: 'CREAM',
+      trimSize: '6x9',
+      pageCount: 126,
+    },
+    verifiedOn: '2026-08-22',
+    fullWidthIn: 14.079,
+    fullHeightIn: 10.417,
+    spineIn: 0.504,
+    frontWidthIn: 6.197,
+    frontHeightIn: 9.236,
+    marginIn: 0.125,
+    wrapIn: 0.591,
+    hingeIn: 0.394,
+    spineSafeWidthIn: 0.379,
+    spineSafeHeightIn: 8.986,
+    barcodeMarginWidthIn: 0.25,
+    barcodeMarginHeightIn: 0.375,
+  },
+  {
     // THE WILDLANDS Vol. II — Canadian Rockies. Read 2026-08-06.
     config: {
       binding: 'HARDCOVER',
@@ -115,6 +144,35 @@ export const VERIFIED_SPECS: VerifiedSpec[] = [
     hingeIn: 0.394,
     spineSafeWidthIn: 0.695,
     spineSafeHeightIn: 9.986,
+    barcodeMarginWidthIn: 0.25,
+    barcodeMarginHeightIn: 0.375,
+  },
+  {
+    // 7 NATIONAL PARKS WITHOUT THE ROOKIE MISTAKES -- Tom Everett. Hardcover.
+    // Read from the KDP Cover Calculator on 2026-08-22 for this exact config.
+    //
+    // The spine is 0.450in at 116pp against 0.261in for the SAME page count in
+    // paperback. The case board is most of that difference, and it is why the
+    // approved paperback wrap could not simply be re-cut for this edition.
+    config: {
+      binding: 'HARDCOVER',
+      coverType: 'CASE_LAMINATE',
+      interiorType: 'BLACK_AND_WHITE',
+      paperType: 'WHITE',
+      trimSize: '6x9',
+      pageCount: 116,
+    },
+    verifiedOn: '2026-08-22',
+    fullWidthIn: 14.025,
+    fullHeightIn: 10.417,
+    spineIn: 0.45,
+    frontWidthIn: 6.197,
+    frontHeightIn: 9.236,
+    marginIn: 0.125,
+    wrapIn: 0.591,
+    hingeIn: 0.394,
+    spineSafeWidthIn: 0.325,
+    spineSafeHeightIn: 8.986,
     barcodeMarginWidthIn: 0.25,
     barcodeMarginHeightIn: 0.375,
   },

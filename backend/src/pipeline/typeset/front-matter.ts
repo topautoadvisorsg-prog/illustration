@@ -35,6 +35,18 @@ import type { TypesetSection } from './typeset-book.js';
  */
 export const TOC_NUMBER_WIDTH_CH = 3;
 
+/**
+ * The rights statement a book carries when it does not state its own.
+ *
+ * EXPORTED because the Kindle edition sets the same copyright page, and two
+ * editions of one book disagreeing about their own rights is not a formatting
+ * difference — it is two different legal statements in two products with the
+ * same title. `assemble-typeset-epub.ts` reads this.
+ */
+export const DEFAULT_RIGHTS_STATEMENT =
+  'All rights reserved. No part of this book may be reproduced in any form without written permission ' +
+  'from the publisher, except for brief quotations in a review.';
+
 export interface TocEntry {
   /** Stable section slug, so an entry survives a title being re-cased. */
   slug: string;
@@ -103,9 +115,7 @@ export function buildFrontMatterHtml(input: FrontMatterInput): string {
   const author = config.authorName;
 
   const year = publication?.year ?? new Date().getFullYear();
-  const rights =
-    publication?.rightsStatement ??
-    `All rights reserved. No part of this book may be reproduced in any form without written permission from the publisher, except for brief quotations in a review.`;
+  const rights = publication?.rightsStatement ?? DEFAULT_RIGHTS_STATEMENT;
 
   // Publication facts, each omitted when unknown. An ISBN in particular is
   // never fabricated: it is a registered identifier, and a plausible-looking
