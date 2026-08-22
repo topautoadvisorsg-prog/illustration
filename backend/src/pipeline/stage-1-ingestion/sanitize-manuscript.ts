@@ -67,10 +67,48 @@ const MOJIBAKE: ReadonlyArray<readonly [string, string]> = [
 // Stray U+00C2 left in front of a degree / (c) / (r) / +- / micro sign.
 const STRAY_C2 = /Â(?=[ ©®°±µ])/g;
 
+/**
+ * PICTOGRAPHS THAT ARE MEANING, NOT DECORATION — the allow-list the KNOWN LIMIT
+ * above called for.
+ *
+ * Each of these carries content no other character on the page carries, so
+ * removing it removes information rather than clutter:
+ *
+ *   U+26A0  WARNING SIGN     an author's safety marker. It opens the paragraph
+ *                            and is the only thing separating a line the reader
+ *                            must not skim from ordinary prose. The interior
+ *                            draws it as a vector glyph (`.gl-warn` in
+ *                            typeset-book.ts), exactly as it draws the flag.
+ *   U+00A9  COPYRIGHT SIGN   the one glyph on the copyright page that is not
+ *                            decorative. Stripping it turned "Copyright (c)
+ *                            2026 by X" into "Copyright 2026 by X" on a page
+ *                            whose whole job is to be legally exact.
+ *   U+00AE  REGISTERED SIGN  same class: a mark whose absence changes meaning.
+ *
+ * Note U+00A9 and U+00AE are already named in STRAY_C2 above — mojibake repair
+ * restored them and the strip below then deleted them on the very next line.
+ *
+ * Adding a character here is a decision that the interior can SET it. A
+ * pictograph the vendored faces cannot draw needs a drawn glyph in
+ * typeset-book.ts at the same time, or it prints as a tofu box.
+ */
+export const SEMANTIC_PICTOGRAPHS: ReadonlySet<string> = new Set([
+  '⚠', // WARNING SIGN
+  '©', // COPYRIGHT SIGN
+  '®', // REGISTERED SIGN
+]);
+
 // Emoji + pictographs + ZWJ + variation selector + regional indicators.
 // \p{Extended_Pictographic} covers emoji without touching the degree sign,
 // multiplication sign, micro sign, dashes, digits, letters, or measurements.
 const EMOJI = /(?:\p{Extended_Pictographic}|‍|️|[\u{1F1E6}-\u{1F1FF}])/gu;
+
+/**
+ * The VARIATION SELECTOR is stripped even from an allow-listed character: it
+ * only asks for emoji-colour presentation, which a black-and-white interior must
+ * not honour, and the drawn glyph replaces the character anyway.
+ */
+const VARIATION_SELECTOR = '️';
 
 // Decorative icon marker: literal "ICON: <name>" (one token), optionally wrapped
 // in [] or (). The icon name is a single word (pine, mountain, leaf, warning,
@@ -84,9 +122,45 @@ export function repairMojibake(input: string): string {
   return s.replace(STRAY_C2, '');
 }
 
-/** Remove emoji glyphs and literal ICON: markers. Exposed for tests. */
+/**
+ * Remove emoji glyphs and literal ICON: markers, KEEPING the pictographs on the
+ * semantic allow-list. Exposed for tests.
+ */
 export function stripDecorativeMarkers(input: string): string {
-  return input.replace(ICON_MARKER, '').replace(EMOJI, '');
+  return input
+    .replace(ICON_MARKER, '')
+    .replace(EMOJI, (m) => (SEMANTIC_PICTOGRAPHS.has(m) ? m : ''));
+}
+
+/**
+ * What the strip WOULD remove, as a report — the second half of the fix the
+ * KNOWN LIMIT asked for.
+ *
+ * The loss used to be silent by construction: it lands in the stored working
+ * copy, and text-fidelity QA compares the parsed sections against the PDF, so
+ * both sides are already missing the character and the check passes clean. The
+ * only way to see it is to look at the canonical upload BEFORE sanitization,
+ * which is what this does.
+ *
+ * Read by the manuscript-parse gate, which fails a book whose author marked
+ * meaning with a pictograph this file does not yet know about, instead of
+ * printing a page that quietly lost it.
+ */
+export function strippedPictographs(input: string): Array<{ char: string; codePoint: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const m of input.matchAll(EMOJI)) {
+    const ch = m[0]!;
+    if (ch === VARIATION_SELECTOR || ch === '‍') continue;
+    if (SEMANTIC_PICTOGRAPHS.has(ch)) continue;
+    counts.set(ch, (counts.get(ch) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([char, count]) => ({
+      char,
+      codePoint: `U+${char.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`,
+      count,
+    }))
+    .sort((a, b) => b.count - a.count || a.codePoint.localeCompare(b.codePoint));
 }
 
 /**

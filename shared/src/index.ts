@@ -619,6 +619,21 @@ export const PublishingMetadataSchema = z.object({
     .optional(),
   copyrightYear: z.number().int().optional(),
   copyrightHolder: z.string().optional(),
+  /**
+   * The rights sentence on the copyright page.
+   *
+   * Absent falls back to the long "no part of this book may be reproduced…"
+   * boilerplate in `front-matter.ts`. Present replaces it outright, because
+   * "All rights reserved." on its own is a deliberate choice on some books and
+   * there was previously no way to say it without editing the renderer.
+   */
+  rightsStatement: z.string().optional(),
+  /**
+   * The copyright line printed verbatim, replacing the generated
+   * "Copyright (c) <year> <author>". For a book whose rights holder is not
+   * its byline, or which words the line its own way.
+   */
+  copyrightLine: z.string().optional(),
   edition: z.string().default('First Edition'),
   isbn: z.object({ print: z.string().optional(), ebook: z.string().optional() }).optional(),
   printedIn: z.string().optional(),

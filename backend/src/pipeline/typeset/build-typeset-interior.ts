@@ -76,6 +76,46 @@ export function resolveStandardId(config: ProjectConfig): string {
   );
 }
 
+/**
+ * The copyright page's facts, taken from the project rather than invented.
+ *
+ * This used to be `{ year: new Date().getFullYear() }` and nothing else, so a
+ * book could not state its own copyright holder, rights sentence or required
+ * disclosures no matter what its config said — and the year moved on 1 January
+ * whether or not the book had been reprinted.
+ *
+ * ─── EVERYTHING HERE IS OMITTED WHEN UNSET ────────────────────────────────
+ * `front-matter.ts` prints only what it is given, and an invented publisher or
+ * a plausible-looking wrong ISBN on a real book is worse than a gap someone has
+ * to fill in. `edition` is the one field with a schema DEFAULT ('First
+ * Edition'), so a book that has not decided its edition would otherwise print
+ * one it never chose; an empty string turns it off.
+ *
+ * Disclosures are joined rather than picked from, because a disclosure that
+ * only partly survives is not a disclosure.
+ */
+function publicationFacts(config: ProjectConfig): {
+  isbn?: string;
+  publisher?: string;
+  year?: number;
+  edition?: string;
+  rightsStatement?: string;
+  disclaimer?: string;
+  copyrightLine?: string;
+} {
+  const p = config.publishing;
+  const disclaimers = (p.disclaimers ?? []).map((d) => d.trim()).filter(Boolean);
+  return {
+    year: p.copyrightYear ?? new Date().getFullYear(),
+    publisher: p.publisher?.imprint,
+    isbn: p.isbn?.print,
+    edition: p.edition,
+    rightsStatement: p.rightsStatement,
+    copyrightLine: p.copyrightLine,
+    disclaimer: disclaimers.length ? disclaimers.join('\n\n') : undefined,
+  };
+}
+
 export async function buildTypesetInterior(
   projectId: string,
   config: ProjectConfig,
@@ -137,7 +177,7 @@ export async function buildTypesetInterior(
     // Title page, copyright page and contents, set in the same standard as the
     // body. This makes the render two passes: a contents page states where
     // sections start, and that depends on how long the contents is.
-    frontMatter: { publication: { year: new Date().getFullYear() } },
+    frontMatter: { publication: publicationFacts(config) },
     // The probe resolves an illustration's anchor block to a page and says where
     // type actually ends on it. Only paid for when there is artwork.
     deepProbe: hasIllustrations,

@@ -33,6 +33,7 @@ const TABLES: TypesetTableStyles = {
   rowRulePt: 0.25,
   breakPolicy: 'keep-together',
   repeatHeader: false,
+  stackWhenColumnsExceed: null,
 };
 
 const CONFIG = ProjectConfigSchema.parse({

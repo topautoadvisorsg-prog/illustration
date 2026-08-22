@@ -29,6 +29,7 @@ import { computeCoverDimensions } from '../stage-6-layout/render-html.js';
 import { isKnownTypesetLayoutStandard, TYPESET_LAYOUT_STANDARDS } from '../typeset/layout-standards/registry.js';
 import { resolveStandardId } from '../typeset/build-typeset-interior.js';
 import { bundledFontCss } from '../typeset/font-assets.js';
+import { auditManuscriptParse } from '../typeset/manuscript-parse-gate.js';
 
 export type ReadinessStatus = 'PASS' | 'WARN' | 'FAIL' | 'NA';
 
@@ -255,6 +256,47 @@ export async function auditReadiness(projectId: string): Promise<ReadinessReport
       }
     } catch (err) {
       checks.push(warn('entry-parity', 'Entry count vs source', `Could not read the manuscript to compare: ${err instanceof Error ? err.message : String(err)}`, 'Check storage connectivity.'));
+    }
+  }
+
+  // ── 4b. Does the TYPESET parser see the whole manuscript? ─────────────────
+  /**
+   * The entry-parity check above answers the same question for the AI
+   * whole-page track, which counts catalog entries. A typeset book has no
+   * entries, so until now nothing asked whether the typesetter could see the
+   * book at all — and three books in a row lost structure silently because of
+   * it. See `manuscript-parse-gate.ts` for why this cannot be caught later.
+   */
+  if (profileForDna.bodyRenderTrack !== 'typeset') {
+    checks.push(
+      na(
+        'manuscript-parse',
+        'Manuscript parse',
+        'Not used by this book: the parse gate reads the typeset section parser, and this book renders whole pages.',
+      ),
+    );
+  } else if (!project.manuscriptPath) {
+    checks.push(na('manuscript-parse', 'Manuscript parse', 'No manuscript on file yet.'));
+  } else {
+    try {
+      const markdown = (await getProjectStorage().readProjectFile(project.manuscriptPath)).toString('utf8');
+      const audit = auditManuscriptParse(markdown);
+      for (const f of audit.findings) {
+        const detail = `${f.detail} (convention: ${audit.convention})`;
+        if (f.status === 'FAIL') checks.push(fail(`manuscript-parse.${f.id}`, `Parse — ${f.label}`, detail, f.fix ?? ''));
+        else if (f.status === 'WARN') checks.push(warn(`manuscript-parse.${f.id}`, `Parse — ${f.label}`, detail, f.fix ?? ''));
+        else if (f.status === 'NA') checks.push(na(`manuscript-parse.${f.id}`, `Parse — ${f.label}`, detail));
+        else checks.push(pass(`manuscript-parse.${f.id}`, `Parse — ${f.label}`, detail));
+      }
+    } catch (err) {
+      checks.push(
+        warn(
+          'manuscript-parse',
+          'Manuscript parse',
+          `Could not read the manuscript to audit the parse: ${err instanceof Error ? err.message : String(err)}`,
+          'Check storage connectivity.',
+        ),
+      );
     }
   }
 

@@ -10,6 +10,7 @@ import {
   sanitizeManuscript,
   repairMojibake,
   stripDecorativeMarkers,
+  strippedPictographs,
 } from '../pipeline/stage-1-ingestion/sanitize-manuscript.js';
 
 // Mojibake = UTF-8 punctuation bytes (E2 80 xx) decoded as Windows-1252.
@@ -48,7 +49,47 @@ describe('sanitizer — decorative marker removal', () => {
     expect(sanitizeManuscript(`Pine ${PINE} zone`)).toBe('Pine zone');
     // The real case: an emoji zone-marker inside a heading.
     expect(sanitizeManuscript(`## ${PINE} Northern Boreal Zone`)).toBe('## Northern Boreal Zone');
-    expect(sanitizeManuscript(`Hazard ${WARNING} ahead`)).toBe('Hazard ahead');
+  });
+});
+
+/**
+ * The allow-list, and why it exists.
+ *
+ * This block previously asserted the OPPOSITE of the first case below:
+ * `Hazard ${WARNING} ahead` was expected to become `Hazard ahead`. That
+ * assertion was the defect written down as a contract. The file's own KNOWN
+ * LIMIT header had described the problem all along — "decorative is an
+ * assumption, not a fact" — while a pictograph carrying meaning was deleted from
+ * the stored working copy, silently, before any later stage could see it.
+ *
+ * Measured on 7 NATIONAL PARKS WITHOUT THE ROOKIE MISTAKES: sixteen safety
+ * paragraphs (flash flood, altitude, road status, wildlife distance) lost the
+ * one mark separating them from ordinary prose, and the copyright page lost its
+ * copyright sign.
+ */
+describe('sanitizer — semantic pictographs survive', () => {
+  it('keeps the warning sign, dropping only its colour-presentation selector', () => {
+    // U+FE0F goes: a black-and-white interior must not request emoji colour.
+    expect(sanitizeManuscript(`Hazard ${WARNING} ahead`)).toBe('Hazard ⚠ ahead');
+    expect(sanitizeManuscript('⚠ Check the forecast.')).toBe('⚠ Check the forecast.');
+  });
+
+  it('keeps the copyright and registered signs', () => {
+    expect(sanitizeManuscript('Copyright © 2026 by Tom Everett')).toBe(
+      'Copyright © 2026 by Tom Everett',
+    );
+    expect(sanitizeManuscript('Acme® stove')).toBe('Acme® stove');
+  });
+
+  it('still strips a decorative pictograph sitting beside a semantic one', () => {
+    expect(sanitizeManuscript(`Hazard ${PINE} ⚠ zone`)).toBe('Hazard ⚠ zone');
+  });
+
+  it('reports what it would strip, and never reports the allow-listed marks', () => {
+    expect(strippedPictographs(`${PINE} ⚠ © ${PINE} zone`)).toEqual([
+      { char: PINE, codePoint: 'U+1F332', count: 2 },
+    ]);
+    expect(strippedPictographs('⚠ © ® only')).toEqual([]);
   });
 });
 

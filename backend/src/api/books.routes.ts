@@ -21,6 +21,10 @@ import { ProjectConfigSchema, type ProjectConfig } from '@wildlands/shared';
 import { createProject, getProject, listProjects } from '../db/repositories/projects.repo.js';
 import { auditReadiness } from '../pipeline/readiness/audit-readiness.js';
 import { getProductionProfile, isKnownProductionProfile, listProductionProfiles } from '../pipeline/production-profiles/registry.js';
+import {
+  isKnownTypesetLayoutStandard,
+  resolveTypesetLayoutStandard,
+} from '../pipeline/typeset/layout-standards/registry.js';
 import { UserFacingError } from '../lib/user-facing-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 
@@ -85,8 +89,39 @@ export function resolveTrim(brief: z.infer<typeof BriefSchema>): { widthIn: numb
   });
 }
 
-/** Build a full, valid ProjectConfig from the brief. Defaults come from the schema. */
+/**
+ * Build a full, valid ProjectConfig from the brief.
+ *
+ * ─── TYPOGRAPHY IS SEEDED FROM THE LAYOUT STANDARD ────────────────────────
+ * `ProjectConfig.typography` carries schema defaults from the field-guide era —
+ * Cormorant Garamond headings, 1.4 leading — and `resolveTypesetDesign` gives
+ * the CONFIG precedence over the standard, deliberately, because those values
+ * are the operator's to set in Book Setup.
+ *
+ * The consequence for a NEW book was that the standard's type never applied at
+ * all. A book pinned to a standard specifying Archivo at 1.35 rendered in
+ * Cormorant Garamond at 1.4, and nothing reported it, because a stored default
+ * is indistinguishable from a stored choice.
+ *
+ * It was not only cosmetic. Measured on 7 NATIONAL PARKS: the unintended face
+ * embedded as TYPE3 glyph procedures — the format `scripts/font-embed-probe.ts`
+ * exists to investigate, and which print RIPs commonly reject — on every page of
+ * the book. Seeding from the standard produced Type0 CID subsets for all seven
+ * faces and moved the page count from 120 to 116.
+ *
+ * Seeding at CREATION leaves the precedence rule intact: the operator can still
+ * change any of it afterwards and their change still wins. Existing projects are
+ * untouched, because they already have a stored typography block.
+ */
 export function configFromBrief(brief: z.infer<typeof BriefSchema>): ProjectConfig {
+  const standardId =
+    brief.typesetLayoutStandardId ??
+    getProductionProfile(brief.productionProfileId).typesetLayoutStandardId;
+  const standard =
+    standardId && isKnownTypesetLayoutStandard(standardId)
+      ? resolveTypesetLayoutStandard(standardId)
+      : null;
+
   return ProjectConfigSchema.parse({
     volume: brief.volume,
     title: brief.title,
@@ -96,6 +131,21 @@ export function configFromBrief(brief: z.infer<typeof BriefSchema>): ProjectConf
     paperStock: brief.paperStock,
     productionProfileId: brief.productionProfileId,
     ...(brief.typesetLayoutStandardId ? { typesetLayoutStandardId: brief.typesetLayoutStandardId } : {}),
+    ...(standard
+      ? {
+          typography: {
+            headingFont: standard.type.headingFont,
+            bodyFont: standard.type.bodyFont,
+            captionFont: standard.type.bodyFont,
+            bodyPt: standard.type.bodyPt,
+            lineHeight: standard.type.lineHeight,
+            labelPt: standard.type.labelPt,
+            captionPt: standard.type.captionPt,
+            sectionHeadingPt: standard.type.sectionHeadingPt,
+            subsectionHeadingPt: standard.type.subsectionHeadingPt,
+          },
+        }
+      : {}),
   });
 }
 

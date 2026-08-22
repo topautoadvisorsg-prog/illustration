@@ -41,6 +41,19 @@ export interface TocEntry {
   /** "Chapter One" and similar. Empty for unlabelled matter. */
   label: string;
   title: string;
+  /**
+   * The title with its inline emphasis RENDERED, when the caller supplied it.
+   *
+   * The contents page had the same defect as the chapter opener: it escaped the
+   * title and nothing else, so a heading carrying emphasis listed its markdown
+   * syntax in the table of contents. Rendering is done by the caller because the
+   * inline pass lives in `typeset-book.ts`, which already imports this file —
+   * doing it here would close an import cycle.
+   *
+   * Absent falls back to the escaped plain title, which is what every entry got
+   * before this field existed.
+   */
+  titleHtml?: string;
   kind: TypesetSection['kind'];
   /** Resolved on the second pass. `null` on the first. */
   page: number | null;
@@ -61,6 +74,16 @@ export interface FrontMatterInput {
     edition?: string;
     rightsStatement?: string;
     disclaimer?: string;
+    /**
+     * The copyright line, VERBATIM, replacing the generated
+     * "Copyright (c) <year> <author>".
+     *
+     * Present so a book can state its copyright exactly as its rights holder
+     * wrote it — the generated form has no "by" and cannot name a holder who is
+     * not the byline. Absent leaves the generated line untouched, which is what
+     * every book built before this field keeps getting.
+     */
+    copyrightLine?: string;
   };
 }
 
@@ -113,7 +136,7 @@ export function buildFrontMatterHtml(input: FrontMatterInput): string {
       const num = e.page === null ? '' : String(e.page);
       return (
         `<li class="toc-entry toc-${e.kind}">` +
-        `<span class="toc-text">${label}<span class="toc-title">${escapeHtml(e.title)}</span></span>` +
+        `<span class="toc-text">${label}<span class="toc-title">${e.titleHtml ?? escapeHtml(e.title)}</span></span>` +
         `<span class="toc-dots" aria-hidden="true"></span>` +
         `<span class="toc-page">${num}</span>` +
         `</li>`
@@ -133,7 +156,7 @@ export function buildFrontMatterHtml(input: FrontMatterInput): string {
 <section class="tmatter copyright-page">
   <div class="cp-block">
     <p class="cp-line">${escapeHtml(title)}</p>
-    <p class="cp-line">Copyright &copy; ${year} ${escapeHtml(author)}</p>
+    <p class="cp-line">${publication?.copyrightLine ? escapeHtml(publication.copyrightLine) : `Copyright &copy; ${year} ${escapeHtml(author)}`}</p>
     <p class="cp-rights">${escapeHtml(rights)}</p>
     ${publication?.disclaimer ? `<p class="cp-rights">${escapeHtml(publication.disclaimer)}</p>` : ''}
     ${accuracyNote ? `<p class="cp-rights cp-accuracy">${escapeHtml(accuracyNote)}</p>` : ''}

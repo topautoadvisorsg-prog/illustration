@@ -352,6 +352,38 @@ export interface TypesetTableStyles {
   breakPolicy: 'keep-together' | 'allow-break';
   /** Repeat the header on each page. Only meaningful with `allow-break`. */
   repeatHeader: boolean;
+  /**
+   * Above this many columns, a table is SET AS STACKED UNITS instead of a grid.
+   *
+   * ─── WHY A TABLE SOMETIMES CANNOT BE A TABLE ────────────────────────────
+   * A grid divides one fixed measure between its columns, so past a certain
+   * count each column is narrower than the words inside it. 7 NATIONAL PARKS
+   * carries a five-column permit table whose widest cell reads "Timed Entry +
+   * Bear Lake Road if your day touches the Bear Lake corridor; plain Timed Entry
+   * for everywhere else". At the 4.625in measure of a 6x9 that column is under
+   * an inch — roughly eleven characters — and the row sets as a vertical smear
+   * of one-word lines. There is no trim at which it works.
+   *
+   * The alternative was sending the table back to be reworded, which is the
+   * wrong direction of travel: the manuscript is verified text with a claim
+   * record behind every sentence, and layout does not get to reach into it. So
+   * the transformation happens HERE, in presentation, where it belongs.
+   *
+   * ─── WHAT STACKING DOES ─────────────────────────────────────────────────
+   * Each row becomes one unit: the FIRST column is the unit's name, and every
+   * other column becomes a labelled field beneath it, the label taken from that
+   * column's header. Every authored cell is emitted, including empty ones — the
+   * same rule the grid follows, for the same reason. No cell text is altered,
+   * merged, abbreviated or dropped. Presentation only.
+   *
+   * Deterministic: the same table at the same threshold always produces the same
+   * markup, so a book cannot stack on one build and grid on the next.
+   *
+   * `null` disables the fallback and every table stays a grid.
+   */
+  stackWhenColumnsExceed: number | null;
+  /** Type size for a stacked field's label. Absent falls back to `typePt`. */
+  stackedLabelPt?: number;
 }
 
 /**
@@ -423,6 +455,26 @@ export interface TypesetBlockStyles {
   /** Printed glyphs for a scene break, e.g. "* * *". */
   sceneBreakMark: string;
   sceneBreakLetterSpacingEm: number;
+  /**
+   * What to do with a horizontal rule that sits directly against a heading.
+   *
+   * A scene break's job is to separate two passages of PROSE. A rule with a
+   * heading immediately on either side separates nothing the heading does not
+   * already separate, so printing it puts a row of asterisks above the heading
+   * for no reader benefit.
+   *
+   * Some manuscripts use the rule as a STRUCTURAL divider rather than as a scene
+   * break, and then this matters a great deal. 7 NATIONAL PARKS carries 128 rule
+   * runs, of which 108 fall immediately before a heading and the remaining 20
+   * immediately after one — every single rule in the book is structural, and
+   * printing them would have set 128 asterisk rows through a 130-page interior.
+   *
+   * `print` is the original behaviour and the default for every standard that
+   * existed before this field: a rule always prints. `drop-at-heading` suppresses
+   * only the rules touching a heading and leaves genuine mid-prose scene breaks
+   * exactly as they are.
+   */
+  sceneBreakAtHeading?: 'print' | 'drop-at-heading';
   listIndentEm: number;
   listItemSpacingEm: number;
   /**

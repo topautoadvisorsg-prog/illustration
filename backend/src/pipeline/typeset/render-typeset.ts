@@ -11,6 +11,7 @@ import { loadPagedPolyfill, resolveChromiumPath } from '../stage-6-layout/render
 import {
   buildTypesetHtml,
   chapterLabel,
+  inlineHeadingHtml,
   parseTypesetSections,
   typesetMarginsForTrim,
   TYPESET_DONE_JS,
@@ -309,6 +310,9 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
       slug: slugifySection(s.title),
       label: chapterLabel(s, input.layoutStandard?.opener.labelFormat),
       title: s.title,
+      // Rendered here rather than in front-matter.ts, which this module's
+      // renderer already imports; doing it there would close an import cycle.
+      titleHtml: inlineHeadingHtml(s.title),
       kind: s.kind,
       page: pages ? (pages.get(s.title) ?? null) : null,
     }));

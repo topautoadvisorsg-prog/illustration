@@ -127,6 +127,26 @@ const ALERT_FLAG =
   '<path d="M6 2.2h16l-4.2 6.4 4.2 6.4H6z" fill="currentColor"/></svg>';
 
 /**
+ * The author's WARNING SIGN (U+26A0), drawn.
+ *
+ * Ingestion used to delete it as decoration, which flattened sixteen safety
+ * paragraphs — flash-flood checks, altitude, road status, wildlife distance —
+ * into ordinary prose. It is now on the semantic allow-list in
+ * `sanitize-manuscript.ts` and arrives here intact.
+ *
+ * A HOLLOW triangle with a solid bar-and-dot, not a filled one: at 11pt a solid
+ * triangle prints as a heavy black lozenge that pulls the eye off the sentence
+ * it is meant to introduce. The outline reads as a warning at text size and
+ * still survives a 300-dpi bitmap proof.
+ */
+const WARNING_MARK =
+  '<svg class="gl gl-warn" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+  '<path d="M12 2.6 22.4 21H1.6z" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+  'stroke-linejoin="round"/>' +
+  '<path d="M12 9.2v5.1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>' +
+  '<circle cx="12" cy="17.7" r="1.25" fill="currentColor"/></svg>';
+
+/**
  * A break opportunity, carried through escaping as a private-use character and
  * turned into `<wbr>` at the very end.
  *
@@ -177,9 +197,57 @@ function inlineMarkdown(s: string, longTokens?: LongTokenWrappingPolicy): string
     .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*]+?)\*/g, '$1<em>$2</em>')
-    .replace(/→/g, XREF_ARROW)
+    // U+2192 and U+27F6 both. The long form appears in this book's appendix
+    // banner and is no more likely to be in a vendored latin subset than the
+    // short one — an arrow the face cannot draw prints as a tofu box, which is
+    // the failure this substitution exists to prevent.
+    .replace(/[→⟶]/g, XREF_ARROW)
     .replace(/🚩/g, ALERT_FLAG)
+    // U+FE0F is already gone by here (ingestion drops it), but a manuscript that
+    // never went through ingestion — a test, a preview — can still carry it.
+    .replace(/⚠️?/g, WARNING_MARK)
     .replace(new RegExp(WBR, 'g'), '<wbr>');
+}
+
+/**
+ * A HEADING, rendered.
+ *
+ * Section titles used to go through `escapeHtml` alone, so a title carrying any
+ * emphasis printed its markdown syntax on the page: the appendix banner of
+ * 7 NATIONAL PARKS set as "…CURRENT AS OF: **August 2026**", asterisks and all,
+ * at chapter-opener size.
+ *
+ * This is GENERAL, not a fix for that one heading. Body text has always had an
+ * inline pass and headings never did, so any title with emphasis in any book was
+ * going to print raw — the appendix banner is simply the first one to have any.
+ *
+ * Long-token breaking is deliberately NOT applied: `<wbr>` in a heading invites
+ * a break in a display line, and a heading is short enough not to need one.
+ */
+export function inlineHeadingHtml(s: string): string {
+  return inlineMarkdown(s);
+}
+
+/**
+ * The same heading as PLAIN TEXT, for places that cannot hold markup.
+ *
+ * The running head is set through `string-set: sectitle attr(data-title)`, and a
+ * CSS string can only carry characters — markup in that attribute would print as
+ * literal tags in the margin, which is worse than the asterisks this replaces.
+ * So display gets `inlineHeading` and the attribute gets this.
+ *
+ * Drawn glyphs cannot travel here either: an SVG is not a character. They are
+ * replaced with a plain-text equivalent so the running head still reads.
+ */
+export function plainHeadingText(s: string): string {
+  return s
+    .replace(/\*\*\*(.+?)\*\*\*/g, '$1')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/(^|[^*])\*([^*]+?)\*/g, '$1$2')
+    .replace(/[→⟶]/g, '->')
+    .replace(/🚩|⚠️?/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 /**
@@ -193,6 +261,18 @@ function inlineMarkdown(s: string, longTokens?: LongTokenWrappingPolicy): string
  */
 const SELF_NUMBERED_CHAPTER = /^chapter\s+(\d+)\s*[:.–—-]\s*(.+)$/i;
 
+/**
+ * An H1 that numbers itself, e.g. `# 4 — Great Smoky Mountains`, `# 11 - Acadia`.
+ *
+ * As with SELF_NUMBERED_CHAPTER the separator is REQUIRED, and for the same
+ * reason: without one there is no non-guessing way to tell `# 7 National Parks
+ * Without the Rookie Mistakes` — a TITLE that opens with a numeral — from a
+ * numbered chapter. That distinction is not academic; it is this book's own
+ * title block, and reading it as chapter 7 would typeset the title page twice
+ * and renumber every chapter after it.
+ */
+const NUMBERED_H1_CHAPTER = /^(\d+)\s*[:.–—-]\s*(.+)$/;
+
 /** An H1 that is a STRUCTURAL MARKER rather than a section of the book. */
 const H1_STRUCTURE_MARKER = /^(chapter\s+\d+|front\s+matter|back\s+matter)/i;
 
@@ -203,10 +283,12 @@ const H1_STRUCTURE_MARKER = /^(chapter\s+\d+|front\s+matter|back\s+matter)/i;
  *                   H1 declares structure; H2 is a section or an entry inside one.
  *   `self-numbered` No structural H1 markers at all. `## Chapter N: Title` carries
  *                   its own number and H1 is a top-level division.
+ *   `numbered-h1`   `# N — Title` IS the chapter, and H2 is a SECTION INSIDE it
+ *                   rather than a sibling of it. Matter markers may still appear.
  *
  * ─── WHY THIS IS DECIDED UP FRONT ─────────────────────────────────────────
- * The two conventions assign OPPOSITE meanings to the same heading levels, so
- * role inference has to know which one it is reading before it starts. Deciding
+ * The conventions assign OPPOSITE meanings to the same heading levels, so role
+ * inference has to know which one it is reading before it starts. Deciding
  * per-heading instead was tried and regressed two shipped books: the Wildlands
  * manuscripts use `# CHAPTER N` markers AND happen to contain some
  * `## Chapter N: ...` H2s further down, so a per-heading rule promoted seven
@@ -214,11 +296,32 @@ const H1_STRUCTURE_MARKER = /^(chapter\s+\d+|front\s+matter|back\s+matter)/i;
  *
  * A single up-front decision makes the guarantee structural: a manuscript with
  * any marker H1 takes the original code path exactly, so it cannot move.
+ *
+ * ─── WHY numbered-h1 IS CHECKED LAST, AND ONLY UNDER 'marked' ─────────────
+ * `# FRONT MATTER` is a structure marker, so a book using self-numbered H1
+ * chapters alongside matter markers already returns 'marked' on the first
+ * marker it sees — and then loses every chapter, because none of its headings
+ * is `# Chapter N`. Measured on 7 NATIONAL PARKS WITHOUT THE ROOKIE MISTAKES:
+ * 126 sections, 0 chapters, 177 non-blank lines dropped.
+ *
+ * So the numbered-h1 test runs only on a manuscript that would otherwise be
+ * called 'marked' AND contains no `# Chapter N` marker at all. Any book with a
+ * real chapter marker, and any book with no numbered H1s, resolves exactly as
+ * it did before — which is every book that has shipped through this parser.
+ * Two numbered H1s are required, so a single stray `# 3 — Notes` cannot flip a
+ * whole manuscript into a different convention.
  */
-export type HeadingConvention = 'marked' | 'self-numbered';
+export type HeadingConvention = 'marked' | 'self-numbered' | 'numbered-h1';
+
+/** Chapter headings must agree on a convention; one lone match is not a book. */
+const MIN_NUMBERED_H1_CHAPTERS = 2;
 
 export function detectHeadingConvention(markdown: string): HeadingConvention {
   let sawSelfNumbered = false;
+  let sawChapterMarker = false;
+  let markerConvention = false;
+  let numberedH1 = 0;
+
   for (const raw of markdown.split('\n')) {
     const line = raw.replace(/\s+$/, '');
     const h2 = line.match(/^##\s+(.*)$/);
@@ -227,10 +330,24 @@ export function detectHeadingConvention(markdown: string): HeadingConvention {
       continue;
     }
     const h1 = line.match(/^#\s+(.*)$/);
+    if (!h1) continue;
+    const t = h1[1]!.trim();
     // Any structural marker at all settles it: this is the original convention.
-    if (h1 && H1_STRUCTURE_MARKER.test(h1[1]!.trim())) return 'marked';
+    if (H1_STRUCTURE_MARKER.test(t)) {
+      markerConvention = true;
+      if (/^chapter\s+\d+/i.test(t)) sawChapterMarker = true;
+      continue;
+    }
+    if (NUMBERED_H1_CHAPTER.test(t)) numberedH1 += 1;
   }
-  return sawSelfNumbered ? 'self-numbered' : 'marked';
+
+  // A real `# Chapter N` is decisive, exactly as it was before this branch existed.
+  if (sawChapterMarker) return 'marked';
+  if (markerConvention) {
+    return numberedH1 >= MIN_NUMBERED_H1_CHAPTERS ? 'numbered-h1' : 'marked';
+  }
+  if (sawSelfNumbered) return 'self-numbered';
+  return numberedH1 >= MIN_NUMBERED_H1_CHAPTERS ? 'numbered-h1' : 'marked';
 }
 
 /**
@@ -274,28 +391,65 @@ export function parseTypesetSections(markdown: string): TypesetSection[] {
   let matter: 'front' | 'back' | null = null;
   /** True once a chapter or matter marker has appeared — see the bare-H1 rule. */
   let seenStructure = false;
-  /** True once any chapter has been read. Only consulted in the new convention. */
+  /** True once any chapter has been read. Only consulted in the new conventions. */
   let seenChapter = false;
   /**
    * Decided once, before a single heading is read. In `marked` this function
    * behaves exactly as it did before C1, line for line — that is the regression
    * guarantee, and it is structural rather than a matter of testing carefully.
    */
-  const selfNumbered = detectHeadingConvention(markdown) === 'self-numbered';
-  /** Back-matter inference is a self-numbered-convention rule only. */
-  const unmarked = (): 'front' | 'back' => (selfNumbered && seenChapter ? 'back' : 'front');
+  const convention = detectHeadingConvention(markdown);
+  const selfNumbered = convention === 'self-numbered';
+  const numberedH1 = convention === 'numbered-h1';
+  /**
+   * Does the manuscript SAY where its back matter starts?
+   *
+   * The inference below exists for books that do not, and it must not overrule
+   * one that does. 7 NATIONAL PARKS declares `# BACK MATTER` near the end and
+   * ALSO carries bare H1 part dividers — `PART 2 — THE SEVEN PARKS` — in the
+   * middle of the book, four chapters before it. Inferring from "chapters have
+   * started" alone labelled those dividers back matter a third of the way in.
+   */
+  const declaresBackMatter = /^#[ \t]+back[ \t]+matter[ \t]*$/im.test(markdown);
+  /**
+   * Back-matter inference: a rule for the two newer conventions, and only for a
+   * manuscript that left the question open.
+   */
+  const unmarked = (): 'front' | 'back' =>
+    (selfNumbered || numberedH1) && seenChapter && !declaresBackMatter ? 'back' : 'front';
+  /**
+   * True when the section now open was started by an H3 under a matter marker.
+   * Consecutive H3s there are PEERS — two author notes, not one note carrying
+   * the other as a subhead — so each opens its own section. See the H3 branch.
+   */
+  let matterSectionFromH3 = false;
 
   for (const raw of markdown.split('\n')) {
     const line = raw.replace(/\s+$/, '');
     const h1 = line.match(/^#\s+(.*)$/);
     const h2 = line.match(/^##\s+(.*)$/);
+    const h3 = line.match(/^###\s+(.*)$/);
 
     if (h1) {
       const t = h1[1]!.trim();
       const ch = t.match(/^chapter\s+(\d+)/i);
-      if (ch) { pendingChapter = Number(ch[1]); matter = null; seenStructure = true; seenChapter = true; current = null; continue; }
-      if (/^front\s+matter$/i.test(t)) { matter = 'front'; seenStructure = true; current = null; continue; }
-      if (/^back\s+matter$/i.test(t)) { matter = 'back'; seenStructure = true; current = null; continue; }
+      if (ch) { pendingChapter = Number(ch[1]); matter = null; seenStructure = true; seenChapter = true; current = null; matterSectionFromH3 = false; continue; }
+      if (/^front\s+matter$/i.test(t)) { matter = 'front'; seenStructure = true; current = null; matterSectionFromH3 = false; continue; }
+      if (/^back\s+matter$/i.test(t)) { matter = 'back'; seenStructure = true; current = null; matterSectionFromH3 = false; continue; }
+      // `# N — Title` IS the chapter in this convention. Checked before the
+      // title-block rule, because the title block has no separator-number shape
+      // and so cannot reach here (see NUMBERED_H1_CHAPTER).
+      const num = numberedH1 ? t.match(NUMBERED_H1_CHAPTER) : null;
+      if (num) {
+        seenStructure = true;
+        seenChapter = true;
+        matter = null;
+        pendingChapter = null;
+        current = { kind: 'chapter', number: Number(num[1]), title: num[2]!.trim(), sourceTitle: t, bodyLines: [] };
+        out.push(current);
+        matterSectionFromH3 = false;
+        continue;
+      }
       // A bare H1 BEFORE any chapter or matter marker is the manuscript's own
       // title block. It must not become a typeset section: the title page is
       // generated matter, so typesetting the prose here would duplicate it and
@@ -309,11 +463,26 @@ export function parseTypesetSections(markdown: string): TypesetSection[] {
       current = { kind: matter ?? unmarked(), number: null, title: t, sourceTitle: t, bodyLines: [] };
       out.push(current);
       pendingChapter = null;
+      matterSectionFromH3 = false;
       continue;
     }
 
     if (h2) {
       const t = h2[1]!.trim();
+      /**
+       * In numbered-h1 an H2 is a SECTION INSIDE the chapter, not a sibling of
+       * it, so it stays in the body and is set as a subhead. Promoting it was
+       * the defect: 107 H2s became 107 top-level sections, each taking the
+       * standard's forced section break — 126 page breaks in a book with 23
+       * divisions, and no chapter opener anywhere.
+       *
+       * A stray H2 before any chapter (inside the title block) still has no
+       * section to belong to and is dropped with the rest of that block.
+       */
+      if (numberedH1) {
+        if (current) current.bodyLines.push(line);
+        continue;
+      }
       const self = selfNumbered && pendingChapter === null ? t.match(SELF_NUMBERED_CHAPTER) : null;
       if (self) {
         seenStructure = true;
@@ -335,6 +504,32 @@ export function parseTypesetSections(markdown: string): TypesetSection[] {
       };
       out.push(current);
       pendingChapter = null;
+      continue;
+    }
+
+    /**
+     * An H3 under a matter marker with NO section open starts one.
+     *
+     * `# FRONT MATTER` followed straight by `### A note on how this book was
+     * written` opened nothing, so every line beneath it fell to the `if
+     * (current)` guard at the bottom of the loop and was discarded — 177
+     * non-blank lines on 7 NATIONAL PARKS, including the composite-narrator
+     * disclosure, which is a legal disclosure rather than copy.
+     *
+     * It fired silently. Nothing downstream compares a section count against
+     * the manuscript's own headings, so the book simply had no front matter and
+     * reported success.
+     *
+     * STRICTLY ADDITIVE: it requires an explicit matter marker AND no open
+     * section, which is exactly and only the case that used to drop content. An
+     * H3 anywhere else — inside a chapter, inside a matter section already
+     * opened by an H2 — still falls through to the body, as it always did.
+     */
+    if (h3 && matter !== null && (current === null || matterSectionFromH3)) {
+      const t = h3[1]!.trim();
+      current = { kind: matter, number: null, title: t, sourceTitle: t, bodyLines: [] };
+      out.push(current);
+      matterSectionFromH3 = true;
       continue;
     }
 
@@ -428,6 +623,50 @@ function tableHtml(
   return `<table class="tset-table" data-columns="${columns}" data-rows="${rows.length}">${thead}${tbody}</table>`;
 }
 
+/**
+ * The same table, set as stacked units because it is too wide to be a grid.
+ * See `TypesetTableStyles.stackWhenColumnsExceed` for why this exists.
+ *
+ * One unit per row. The first cell names the unit; every remaining cell becomes
+ * a labelled field. `data-cells` carries the authored cell count so a QA pass
+ * can assert against the manuscript that nothing was lost on the way here —
+ * which is the whole reason a presentation fallback is safe to have at all.
+ */
+function stackedTableHtml(
+  header: string[],
+  rows: string[][],
+  inline: (s: string) => string,
+): string {
+  const columns = Math.max(header.length, ...rows.map((r) => r.length), 1);
+  const pad = (r: string[]): string[] =>
+    r.length >= columns ? r : [...r, ...Array(columns - r.length).fill('')];
+  const label = (i: number): string => header[i] ?? '';
+
+  const units = rows
+    .map((r) => {
+      const cells = pad(r);
+      const lead = `<p class="tst-lead">${inline(cells[0] ?? '')}</p>`;
+      const fields = cells
+        .slice(1)
+        .map(
+          (c, i) =>
+            `<p class="tst-field">` +
+            `<span class="tst-label">${inline(label(i + 1))}</span>` +
+            `<span class="tst-value">${inline(c)}</span>` +
+            `</p>`,
+        )
+        .join('');
+      return `<div class="tst-unit">${lead}${fields}</div>`;
+    })
+    .join('');
+
+  const cellCount = rows.reduce((n, r) => n + Math.max(r.length, columns), 0);
+  return (
+    `<div class="tset-table-stacked" data-columns="${columns}" data-rows="${rows.length}" ` +
+    `data-cells="${cellCount}">${units}</div>`
+  );
+}
+
 interface BodyHtmlOptions {
   micro?: TerminalMicroSectionPolicy;
   takeaway?: ChapterTakeawayPolicy;
@@ -455,6 +694,30 @@ interface BodyHtmlOptions {
   checklist?: TypesetChecklistStyles;
   /** asset name -> data URI. Absent means `![...]()` stays literal text. */
   images?: Record<string, string>;
+  /**
+   * How far to demote authored subheads. 0 leaves `###` as h3. 1 sets a
+   * manuscript's H2 as h3 and its H3 as h4 — see the heading branch below.
+   */
+  subheadOffset?: number;
+  /** Whether a rule touching a heading prints. Absent means it prints. */
+  sceneBreakAtHeading?: 'print' | 'drop-at-heading';
+}
+
+/**
+ * Does this manuscript set its H2s as body subheads rather than as sections?
+ *
+ * This is a FACT about the parse, not a guess. `parseTypesetSections` consumes
+ * every H2 into a section in both the `marked` and `self-numbered` conventions —
+ * the branch always `continue`s — so an H2 can only ever reach `bodyLines`
+ * through the `numbered-h1` branch, which is exactly the convention where H2 is
+ * a division inside the chapter.
+ *
+ * Deriving it here rather than threading a convention flag through every caller
+ * keeps the sections self-describing: anything holding a `TypesetSection[]` can
+ * set it correctly without also having to hold the markdown it came from.
+ */
+export function subheadOffsetFor(sections: readonly TypesetSection[]): 0 | 1 {
+  return sections.some((s) => s.bodyLines.some((l) => /^##\s+\S/.test(l))) ? 1 : 0;
 }
 
 function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
@@ -515,9 +778,13 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
     // rendered page runs "LABEL quote body..." together on one line.
     let label = '';
     const first = lines[0]?.trim() ?? '';
-    const m = /^\*\*(.+)\*\*$/.exec(first);
+    // A HEADING on the first line is a label too. 7 NATIONAL PARKS writes all 16
+    // of its skip boxes as `> ### SKIP IT / DO THIS INSTEAD`, and with only the
+    // bold rule that line went through `inline`, which has no heading branch —
+    // so the hashes printed literally at the top of every box.
+    const m = /^\*\*(.+)\*\*$/.exec(first) ?? /^#{1,4}\s+(.+)$/.exec(first);
     if (m) {
-      label = `<p class="callout-label">${inline(m[1]!)}</p>`;
+      label = `<p class="callout-label">${inline(m[1]!.trim())}</p>`;
       lines.shift();
     }
     const body = lines
@@ -542,7 +809,21 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
       flushNext = false;
       return;
     }
-    html.push(`<p${flushNext ? ' class="first"' : ''}>${inline(para.join(' '))}</p>`);
+    /**
+     * A paragraph the author OPENED with the warning sign is a safety warning,
+     * and is set as one: the drawn mark hangs at the head of the block and the
+     * paragraph is kept whole.
+     *
+     * Deliberately NOT a boxed panel. All sixteen of them sit inline in the
+     * middle of running advice, and boxing each one would change the rhythm of
+     * every safety passage in the book — the mark carries the signal on its own.
+     *
+     * `break-inside: avoid` matters more than it looks: a flash-flood
+     * instruction split across a page turn shows the reader half of it.
+     */
+    const text = para.join(' ');
+    const cls = [flushNext ? 'first' : '', /^\s*⚠/.test(text) ? 'warn' : ''].filter(Boolean).join(' ');
+    html.push(`<p${cls ? ` class="${cls}"` : ''}>${inline(text)}</p>`);
     para = [];
     flushNext = false;
   };
@@ -628,7 +909,16 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
         rows.push(splitTableRow(rt));
       }
       li = j - 1;
-      html.push(tableHtml(header, align, rows, inline));
+      // Too wide to divide the measure legibly? Set it as stacked units instead.
+      // The decision is taken on the authored column count, so it is the same on
+      // every build of the same manuscript.
+      const columns = Math.max(header.length, ...rows.map((r) => r.length), 1);
+      const limit = opts.tables.stackWhenColumnsExceed;
+      html.push(
+        limit !== null && limit !== undefined && columns > limit
+          ? stackedTableHtml(header, rows, inline)
+          : tableHtml(header, align, rows, inline),
+      );
       flushNext = true;
       continue;
     }
@@ -644,10 +934,57 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
       closeList(); closePara(); continue;
     }
     const bq = t.match(/^>\s?(.*)$/);
-    if (bq) { closeList(); closePara(); quote.push(bq[1] ?? ''); continue; }
+    if (bq) {
+      closeList(); closePara();
+      const inner = bq[1] ?? '';
+      /**
+       * A HEADING inside a quote opens a NEW callout.
+       *
+       * A blank line inside a blockquote is a paragraph break rather than the
+       * end of it, which is correct for a multi-paragraph aside and wrong for
+       * two boxes standing back to back. 7 NATIONAL PARKS writes its skip boxes
+       * as `> ### SKIP IT / DO THIS INSTEAD` and puts two of them in a row in
+       * two places; both merged into a single box, and because the label is
+       * only lifted from the FIRST line of a quote, the second one printed its
+       * hashes in the middle of the box.
+       *
+       * A heading is a label, and a label starts a box. Requiring existing
+       * content means the ordinary case — a heading on the quote's first line —
+       * is untouched.
+       */
+      if (/^#{1,6}\s+\S/.test(inner) && quote.some((q) => q.trim())) closeQuote();
+      quote.push(inner);
+      continue;
+    }
     closeQuote();
     if (/^-{3,}$/.test(t) || /^\*\s*\*\s*\*$/.test(t)) {
       closeList(); closePara();
+      /**
+       * A rule touching a heading is STRUCTURAL, not a scene break — dropped
+       * when the standard asks for it. See `blocks.sceneBreakAtHeading`.
+       *
+       * "Touching" is measured across blank lines and across a run of rules,
+       * because that is how these are authored: `---` on its own line, a blank,
+       * then the heading. Looking only at the adjacent line would find the blank
+       * and print the asterisks anyway.
+       */
+      if (opts.sceneBreakAtHeading === 'drop-at-heading') {
+        const isHeading = (s: string | undefined): boolean => /^#{1,6}\s+\S/.test((s ?? '').trim());
+        const isRuleOrBlank = (s: string | undefined): boolean => {
+          const v = (s ?? '').trim();
+          return v === '' || /^-{3,}$/.test(v) || /^\*\s*\*\s*\*$/.test(v);
+        };
+        let after = li + 1;
+        while (after < lines.length && isRuleOrBlank(lines[after])) after += 1;
+        let before = li - 1;
+        while (before >= 0 && isRuleOrBlank(lines[before])) before -= 1;
+        // No preceding prose at all means this rule opens the section body, and
+        // there is nothing above it to separate from either.
+        if (isHeading(lines[after]) || before < 0 || isHeading(lines[before])) {
+          flushNext = true;
+          continue;
+        }
+      }
       // A scene break separates two passages. Two in a row separate nothing
       // from nothing, so collapse them. This manuscript uses a DOUBLE rule as a
       // structural marker before every chapter heading and a single rule as a
@@ -657,15 +994,37 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
       flushNext = true;
       continue;
     }
-    const h4 = t.match(/^####\s+(.*)$/);
-    if (h4) { closeList(); closePara(); html.push(`<h4>${inline(h4[1]!)}</h4>`); flushNext = true; continue; }
-    const h3 = t.match(/^###\s+(.*)$/);
-    if (h3) {
-      closeList(); closePara();
-      const isUrgent = (opts.urgentHeadings ?? []).some((h) => h.toLowerCase() === h3[1]!.trim().toLowerCase());
-      html.push(`<h3${isUrgent ? ' class="urgent"' : ''}>${isUrgent ? ALERT_FLAG : ''}${inline(h3[1]!)}</h3>`);
-      flushNext = true;
-      continue;
+    /**
+     * Subheads, demoted by the convention's offset.
+     *
+     * With `subheadOffset: 1` the manuscript's H2 becomes the page's h3 and its
+     * H3 becomes h4 — which maps a numbered-h1 book's two levels of subhead onto
+     * the two the standard already styles (`sectionHeadingPt`,
+     * `subsectionHeadingPt`) rather than inventing a third. It also keeps the
+     * component matchers working: `alertPanel`, `takeaway` and `urgentHeadings`
+     * all key on `<h3`, and in that convention the recurring beats
+     * ("NOBODY WARNED ME") are authored as H2.
+     *
+     * Clamped at h4. Going deeper would emit a level with no styling.
+     */
+    const heading = t.match(/^(#{2,4})\s+(.*)$/);
+    if (heading) {
+      const authored = heading[1]!.length;
+      // A source H2 is a heading only where the convention says so; elsewhere it
+      // was consumed by the parser and can never reach here.
+      const level = Math.min(authored + (opts.subheadOffset ?? 0), 4);
+      if (level >= 3) {
+        closeList(); closePara();
+        const text = heading[2]!;
+        if (level === 3) {
+          const isUrgent = (opts.urgentHeadings ?? []).some((h) => h.toLowerCase() === text.trim().toLowerCase());
+          html.push(`<h3${isUrgent ? ' class="urgent"' : ''}>${isUrgent ? ALERT_FLAG : ''}${inline(text)}</h3>`);
+        } else {
+          html.push(`<h4>${inline(text)}</h4>`);
+        }
+        flushNext = true;
+        continue;
+      }
     }
     const bullet = t.match(/^[-*]\s+(.*)$/);
     // Ordered steps: "1. text" / "2) text". Without this branch the numerals
@@ -976,19 +1335,23 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
   // Every block gets a stable id as it is emitted, and the refs are collected so
   // callers (the review UI, Layer 1) can name a block without re-deriving it.
   const collect: TypesetBlockRef[] = [];
+  const subheadOffset = subheadOffsetFor(sections);
   const body = sections
     .map((s, i) => {
       const label = chapterLabel(s, op.labelFormat);
       const slug = slugifySection(s.title);
       const opener = stampBlockIds(
         [
-          `<header class="opener">${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}<h2>${escapeHtml(op.titleSource === 'source' ? s.sourceTitle : s.title)}</h2></header>`,
+          `<header class="opener">${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}<h2>${inlineHeadingHtml(op.titleSource === 'source' ? s.sourceTitle : s.title)}</h2></header>`,
         ],
         slug,
         s.title,
         collect,
       )[0]!;
-      return `<section class="tsec ${s.kind}${i === firstChapterIndex ? ' first-chapter' : ''}" id="tsec-${i}" data-title="${escapeHtml(s.title)}" data-label="${escapeHtml(label)}" data-kind="${s.kind}" data-section-slug="${slug}">
+      // `data-title` feeds the running head through `string-set`, and a CSS
+      // string can only carry characters — so the attribute gets the plain form
+      // while the opener above gets the rendered one.
+      return `<section class="tsec ${s.kind}${i === firstChapterIndex ? ' first-chapter' : ''}" id="tsec-${i}" data-title="${escapeHtml(plainHeadingText(s.title))}" data-label="${escapeHtml(label)}" data-kind="${s.kind}" data-section-slug="${slug}">
   ${opener}
   ${bodyToHtml(s.bodyLines, {
     micro: standard.terminalMicroSection,
@@ -1005,6 +1368,8 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
     preformatted: standard.preformatted,
     checklist: standard.checklist,
     images: input.images,
+    subheadOffset,
+    sceneBreakAtHeading: standard.blocks.sceneBreakAtHeading,
   })}
 </section>`;
     })
@@ -1244,7 +1609,28 @@ table.tset-table th { font-family: '${t.headingFont}', 'Oswald', sans-serif; fon
   text-align: left; border-bottom: ${standard.tables.headerRulePt}pt solid rgba(0,0,0,.85); }
 ${standard.tables.repeatHeader ? 'table.tset-table thead { display: table-header-group; }' : ''}
 table.tset-table tr { break-inside: avoid; }
-.ta-left { text-align: left; } .ta-right { text-align: right; } .ta-center { text-align: center; }`
+.ta-left { text-align: left; } .ta-right { text-align: right; } .ta-center { text-align: center; }
+/* Stacked wide table. Set as a run of small labelled records, because past a
+   certain column count a grid gives each column fewer characters than its words
+   need. Each unit is kept whole and hangs its labels on a common left edge, so
+   the reader still scans down one column even though the grid is gone. */
+.tset-table-stacked { margin: 1em 0; font-size: ${standard.tables.typePt}pt; line-height: 1.25; }
+.tst-unit { break-inside: avoid; margin: 0 0 .7em;
+  ${standard.tables.rowRulePt > 0 ? `padding-bottom: .55em; border-bottom: ${standard.tables.rowRulePt}pt solid rgba(0,0,0,.28);` : ''} }
+.tst-unit:last-child { margin-bottom: 0; border-bottom: none; }
+.tst-lead { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 600;
+  text-indent: 0; margin: 0 0 .25em; break-after: avoid;
+  border-bottom: ${standard.tables.headerRulePt}pt solid rgba(0,0,0,.85); padding-bottom: .18em; }
+/* Label and value on one line, the value indented to a common edge. The label
+   is a fixed-width inline-block rather than a float: a float drops out of flow
+   and stops break-inside:avoid holding the unit together. */
+.tst-field { text-indent: 0; margin: 0 0 .12em; padding-left: 5.4em;
+  hyphens: none; -webkit-hyphens: none; }
+.tst-label { display: inline-block; width: 5.4em; margin-left: -5.4em;
+  font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 600;
+  font-size: ${(standard.tables.stackedLabelPt ?? standard.tables.typePt).toFixed(2)}pt;
+  vertical-align: top; padding-right: .4em; }
+.tst-value { display: inline; }`
     : ''
 }
 ${
@@ -1301,6 +1687,16 @@ figure.tset-figure figcaption { font-family: '${t.bodyFont}', Georgia, serif;
    adds none of its own — with margins it read as a gap, not a pointer. */
 .gl-arrow { width: .95em; margin: 0; }
 .gl-flag { width: .82em; height: .92em; vertical-align: -.12em; margin-right: .3em; }
+.gl-warn { width: .92em; height: .92em; vertical-align: -.14em; margin-right: .34em; }
+/* A safety warning the author opened with the warning sign.
+   The mark HANGS in the left margin so the warning text keeps the same left
+   edge as the prose around it — indenting the whole block would read as a
+   quotation, and these are instructions, not asides. Kept whole on one page:
+   half of "check the flash flood forecast" is worse than none of it. */
+p.warn { text-indent: 0; padding-left: 1.26em; break-inside: avoid; }
+/* :first-child only — a warning sign used again mid-sentence is ordinary
+   inline punctuation and must not be pulled into the margin. */
+p.warn > .gl-warn:first-child { margin-left: -1.26em; }
 ${input.frontMatter ? frontMatterCss({ headingFont: t.headingFont, bodyFont: t.bodyFont, bodyPt: t.bodyPt, displayPt: t.bodyPt * t.chapterTitleScale, labelPt: t.labelPt, captionPt: t.captionPt }) : ''}
 ${overrides.css}</style></head>
 <body>

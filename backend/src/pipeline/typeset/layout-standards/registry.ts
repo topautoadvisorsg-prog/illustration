@@ -26,16 +26,26 @@
  */
 import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from './educational-nonfiction-v1.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V2 } from './educational-nonfiction-v2.js';
+import { EDUCATIONAL_NONFICTION_TYPESET_V3 } from './educational-nonfiction-v3.js';
+import { NATIONAL_PARKS_GUIDE_TYPESET_V1 } from './national-parks-guide-v1.js';
 import { TRADE_NONFICTION_GUIDE_TYPESET_V1 } from './trade-nonfiction-guide-v1.js';
+import { TRADE_NONFICTION_GUIDE_TYPESET_V2 } from './trade-nonfiction-guide-v2.js';
 import type { TypesetLayoutStandard } from './types.js';
 
 export const TYPESET_LAYOUT_STANDARDS: Record<string, TypesetLayoutStandard> = {
   [EDUCATIONAL_NONFICTION_TYPESET_V1.id]: EDUCATIONAL_NONFICTION_TYPESET_V1,
   [EDUCATIONAL_NONFICTION_TYPESET_V2.id]: EDUCATIONAL_NONFICTION_TYPESET_V2,
+  [EDUCATIONAL_NONFICTION_TYPESET_V3.id]: EDUCATIONAL_NONFICTION_TYPESET_V3,
   // A different FAMILY, not a version of the educational line: different trim,
   // different reader, different components. Registering it leaves both
   // educational versions exactly as they were approved.
   [TRADE_NONFICTION_GUIDE_TYPESET_V1.id]: TRADE_NONFICTION_GUIDE_TYPESET_V1,
+  // @2 raises both chapter-opener sizes 20%: kicker 11 -> 13.2pt, title 17.6 -> 21.1pt.
+  // @1 is left exactly as approved — every book pinned to it renders unchanged.
+  [TRADE_NONFICTION_GUIDE_TYPESET_V2.id]: TRADE_NONFICTION_GUIDE_TYPESET_V2,
+  // Another FAMILY again, derived from the trade line rather than versioning it:
+  // same trim and type scale, different components. DIRT RICH keeps its pin.
+  [NATIONAL_PARKS_GUIDE_TYPESET_V1.id]: NATIONAL_PARKS_GUIDE_TYPESET_V1,
 };
 
 export class UnknownTypesetLayoutStandardError extends Error {

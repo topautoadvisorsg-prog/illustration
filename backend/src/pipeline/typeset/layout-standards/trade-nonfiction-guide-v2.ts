@@ -35,8 +35,8 @@
  */
 import type { TypesetLayoutStandard } from './types.js';
 
-export const TRADE_NONFICTION_GUIDE_TYPESET_V1: TypesetLayoutStandard = {
-  id: 'trade-nonfiction-guide-typeset@1',
+export const TRADE_NONFICTION_GUIDE_TYPESET_V2: TypesetLayoutStandard = {
+  id: 'trade-nonfiction-guide-typeset@2',
   label: 'Trade Nonfiction Guide — 6x9 (v1)',
   description:
     'Adult trade nonfiction how-to at 6x9. Ragged-right EB Garamond under Archivo, chapters opening recto on a one-third sink, with real tables, preformatted diagrams and controlled URL breaking for dense reference matter.',
@@ -82,8 +82,8 @@ export const TRADE_NONFICTION_GUIDE_TYPESET_V1: TypesetLayoutStandard = {
     subsectionHeadingPt: 11.5,
     labelPt: 8.5,
     captionPt: 9,
-    chapterTitleScale: 1.6,
-    kickerPtDelta: 2.5,
+    chapterTitleScale: 2.0,
+    kickerPtDelta: 4.7,
     folioPtDelta: 1,
   },
 
