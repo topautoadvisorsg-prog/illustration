@@ -199,7 +199,7 @@ const parks = await planParkListOverlay({
   backPanelRightIn: spineL,
   lead: PARKS_LEAD,
   items: PARKS,
-  separator: '·',
+  joiner: ' · ',
   scanLeftIn: d.wrapIn + 0.1,
   scanRightInsetIn: 1.35,
 });
@@ -257,34 +257,31 @@ const byline = await findBylinePanel(
 );
 
 /**
- * BELOW THE PLAQUE IF THERE IS ROOM, ABOVE IT IF THERE IS NOT.
+ * ABOVE THE BYLINE PLAQUE — the same placement the paperback now uses.
  *
- * On the paperback the byline plaque leaves 0.285in between its foot and the
- * live edge, which is where this strip belongs. On the hardcover it does not:
- * the same plaque lands with its foot at 9.699in against a 9.701in live foot,
- * because a hardcover's outer edge is a 0.591in turn-in rather than a 0.125in
- * bleed and the artwork is fitted differently to suit it. Two thousandths of an
- * inch is not a gap.
+ * The hardcover has no choice: its plaque foot lands at 9.699in against a
+ * 9.701in live foot, because a hardcover's outer edge is a 0.591in turn-in
+ * folding around board rather than a 0.125in bleed. But it also reads better
+ * here, so the paperback was moved up to match rather than the two editions
+ * being laid out differently.
  *
- * So the band is chosen from what the wrap actually offers rather than from
- * where the paperback happens to put it.
+ * Size is bound by WIDTH, not by the band: seven names and six separators on one
+ * line across a six-inch cover. The fitter takes the largest size whose RENDER
+ * still fits the live width.
  */
-const belowIn = FRONT_LIVE_BOTTOM_IN - byline.footPx / DPI;
-const MIN_STRIP_BAND_IN = 0.22;
-const useBelow = belowIn >= MIN_STRIP_BAND_IN;
-const bandTopPx = useBelow ? byline.footPx : byline.topPx - Math.round(0.34 * DPI);
-const bandBottomPx = useBelow ? Math.round(FRONT_LIVE_BOTTOM_IN * DPI) : byline.topPx - Math.round(0.05 * DPI);
+const JOINER = process.env.NP_JOINER ?? ' · ';
+const bandBottomPx = byline.topPx - Math.round(0.055 * DPI);
+const bandTopPx = bandBottomPx - Math.round(0.34 * DPI);
 console.log(
   `
 front strip: plaque ${(byline.topPx / DPI).toFixed(3)}-${(byline.footPx / DPI).toFixed(3)}in, ` +
-    `live foot ${FRONT_LIVE_BOTTOM_IN.toFixed(3)}in, ${belowIn.toFixed(3)}in below it — ` +
-    `placing ${useBelow ? 'BELOW' : 'ABOVE'} the plaque`,
+    `band ${(bandTopPx / DPI).toFixed(3)}-${(bandBottomPx / DPI).toFixed(3)}in, joiner "${JOINER}"`,
 );
 
 const frontParks = await planBackCoverLine({
   lead: '',
   items: PARKS,
-  separator: '·',
+  joiner: JOINER,
   wrapWidthPx: W,
   wrapHeightPx: H,
   dpi: DPI,
@@ -293,16 +290,24 @@ const frontParks = await planBackCoverLine({
   columnLeftPx: Math.round(FRONT_LIVE_LEFT_IN * DPI),
   columnRightPx: Math.round(FRONT_LIVE_RIGHT_IN * DPI),
   align: 'centre',
-  minAirPx: Math.round(0.06 * DPI),
-  maxSizePx: Math.round(0.17 * DPI),
+  minAirPx: Math.round(0.05 * DPI),
+  maxSizePx: Math.round(0.26 * DPI),
 });
 
-console.log(`front parks: ${frontParks.sizePx}px (${(frontParks.sizePx / DPI * 72).toFixed(1)}pt), ${frontParks.lines.length} line(s), widest ${(frontParks.widestLinePx / DPI).toFixed(3)}in of ${(frontParks.measurePx / DPI).toFixed(3)}in`);
+console.log(
+  `front parks: ${frontParks.sizePx}px (${((frontParks.sizePx / DPI) * 72).toFixed(1)}pt), ` +
+    `${frontParks.lines.length} line(s), widest ${(frontParks.widestLinePx / DPI).toFixed(3)}in of ` +
+    `${(frontParks.measurePx / DPI).toFixed(3)}in`,
+);
 for (const l of frontParks.lines) console.log(`           : "${l}"`);
-console.log(`           : block ${(frontParks.blockTopPx / DPI).toFixed(3)}-${(frontParks.blockBottomPx / DPI).toFixed(3)}in, air ${(frontParks.airAbovePx / DPI).toFixed(3)}in above / ${(frontParks.airBelowPx / DPI).toFixed(3)}in below`);
-console.log(`           : x ${(frontParks.drawnLeftPx / DPI).toFixed(3)}-${(frontParks.drawnRightPx / DPI).toFixed(3)}in; live ${FRONT_LIVE_LEFT_IN.toFixed(3)}-${FRONT_LIVE_RIGHT_IN.toFixed(3)}in`);
+console.log(
+  `           : block ${(frontParks.blockTopPx / DPI).toFixed(3)}-${(frontParks.blockBottomPx / DPI).toFixed(3)}in, ` +
+    `x ${(frontParks.drawnLeftPx / DPI).toFixed(3)}-${(frontParks.drawnRightPx / DPI).toFixed(3)}in of live ` +
+    `${FRONT_LIVE_LEFT_IN.toFixed(3)}-${FRONT_LIVE_RIGHT_IN.toFixed(3)}in`,
+);
 
-if (frontParks.lines.length !== 1) throw new Error(`front strip wrapped to ${frontParks.lines.length} lines; the foot has room for one`);
+if (frontParks.blockBottomPx > byline.topPx) throw new Error('front strip overlaps the byline plaque');
+if (frontParks.lines.length !== 1) throw new Error(`front strip wrapped to ${frontParks.lines.length} lines; the brief is one line`);
 
 const withFrontParks = await sharp(withParks)
   .composite([{ input: Buffer.from(frontParks.svg), left: 0, top: 0 }])

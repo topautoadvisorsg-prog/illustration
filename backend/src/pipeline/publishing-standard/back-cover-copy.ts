@@ -217,8 +217,16 @@ export interface BackCoverLineRequest {
    * the separator be dropped at every line end, where it is not needed anyway.
    */
   items: string[];
-  /** Drawn between items on the same line. Never at a line end. */
-  separator: string;
+  /**
+   * The exact string drawn between two items on one line, spaces included:
+   * `' · '`, `', '`, whatever. Never drawn at a line end.
+   *
+   * It is the WHOLE joiner rather than a bare glyph because where the spaces sit
+   * is part of the choice — a middot is set with a space either side, a comma
+   * is not — and because a joiner measured as one string cannot disagree with
+   * the joiner that is drawn.
+   */
+  joiner: string;
   wrapWidthPx: number;
   wrapHeightPx: number;
   dpi: number;
@@ -293,8 +301,9 @@ export async function planBackCoverLine(req: BackCoverLineRequest): Promise<Back
    * So the space is measured by DIFFERENCE, from a string that has ink on both
    * sides of it, and the separator is built from its parts.
    */
-  const spaceRef = (await inkWidthAtRef('n n', 400, false)) - 2 * (await inkWidthAtRef('n', 400, false));
-  const sepRef = (await inkWidthAtRef(req.separator, 400, false)) + 2 * spaceRef;
+  const nRef = await inkWidthAtRef('n', 400, false);
+  const spaceRef = (await inkWidthAtRef('n n', 400, false)) - 2 * nRef;
+  const sepRef = (await inkWidthAtRef(`n${req.joiner}n`, 400, false)) - 2 * nRef;
 
   const at = (ref: number, size: number): number => (ref * size) / REF_PX;
   /** Width of a rendered line, measured from its parts rather than re-rasterised. */
@@ -348,7 +357,7 @@ export async function planBackCoverLine(req: BackCoverLineRequest): Promise<Back
     }
     if (cur.length) rows.push(cur);
 
-    const lines = rows.map((r) => r.map((i) => req.items[i]!).join(` ${req.separator} `));
+    const lines = rows.map((r) => r.map((i) => req.items[i]!).join(req.joiner));
 
     const blockH = (rows.length - 1) * LEADING * size + CAP * size;
     if (blockH + 2 * req.minAirPx > usableBand) continue;
@@ -511,7 +520,7 @@ export interface ParkListOverlayRequest {
   backPanelRightIn: number;
   lead: string;
   items: string[];
-  separator: string;
+  joiner: string;
   /**
    * Where to start looking for copy, in inches from the wrap's left edge.
    * Defaults to just inside a paperback's bleed; a hardcover's turn-in is much
@@ -587,7 +596,7 @@ export async function planParkListOverlay(req: ParkListOverlayRequest): Promise<
   const plan = await planBackCoverLine({
     lead: req.lead,
     items: req.items,
-    separator: req.separator,
+    joiner: req.joiner,
     wrapWidthPx: req.wrapWidthPx,
     wrapHeightPx: req.wrapHeightPx,
     dpi,

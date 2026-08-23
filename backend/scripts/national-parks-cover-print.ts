@@ -160,7 +160,7 @@ const parks = await planParkListOverlay({
   backPanelRightIn: BLEED + TRIM_W,
   lead: PARKS_LEAD,
   items: PARKS,
-  separator: '·',
+  joiner: ' · ',
 });
 console.log(`
 back copy  : column ${parks.columnLeftIn.toFixed(3)}-${parks.columnRightIn.toFixed(3)}in, band ${parks.bandTopIn.toFixed(3)}-${parks.bandBottomIn.toFixed(3)}in`);
@@ -227,38 +227,59 @@ const byline = await findBylinePanel(
   Math.round(FRONT_LIVE_BOTTOM_IN * DPI),
   Math.round(0.03 * DPI),
 );
-const bylineFootPx = byline.footPx;
+/**
+ * ABOVE THE BYLINE PLAQUE, ON BOTH EDITIONS.
+ *
+ * The strip first went below the plaque on the paperback, because that is where
+ * the paperback had room. It reads better above it — the parks introduce the
+ * author rather than trailing off the bottom of the cover — and the hardcover
+ * has to go there regardless, since its plaque sits two thousandths of an inch
+ * inside the live foot. So both editions place it the same way.
+ *
+ * SIZE IS BOUND BY WIDTH, not by the band. Seven park names and six separators
+ * on one line across a six-inch cover is simply a long line; the fitter takes
+ * the largest size whose RENDER still fits the live width, and on this cover
+ * that lands around nine point. Making it bigger means two lines, and one line
+ * is the brief.
+ */
+const JOINER = process.env.NP_JOINER ?? ' · ';
+const bandBottomPx = byline.topPx - Math.round(0.055 * DPI);
+const bandTopPx = bandBottomPx - Math.round(0.34 * DPI);
 
 const frontParks = await planBackCoverLine({
   lead: '',
   items: PARKS,
-  separator: '·',
+  joiner: JOINER,
   wrapWidthPx: W,
   wrapHeightPx: H,
   dpi: DPI,
-  bandTopPx: bylineFootPx,
-  bandBottomPx: Math.round(FRONT_LIVE_BOTTOM_IN * DPI),
+  bandTopPx,
+  bandBottomPx,
   columnLeftPx: Math.round(FRONT_LIVE_LEFT_IN * DPI),
   columnRightPx: Math.round(FRONT_LIVE_RIGHT_IN * DPI),
   align: 'centre',
-  minAirPx: Math.round(0.06 * DPI),
-  maxSizePx: Math.round(0.16 * DPI),
+  minAirPx: Math.round(0.05 * DPI),
+  maxSizePx: Math.round(0.26 * DPI),
 });
+if (frontParks.lines.length !== 1) {
+  throw new Error(`front strip wrapped to ${frontParks.lines.length} lines; the brief is one line`);
+}
 
 console.log(`
-front strip: byline plaque foot ${(bylineFootPx / DPI).toFixed(3)}in, live foot ${FRONT_LIVE_BOTTOM_IN}in, band ${((Math.round(FRONT_LIVE_BOTTOM_IN * DPI) - bylineFootPx) / DPI).toFixed(3)}in`);
+front strip: plaque ${(byline.topPx / DPI).toFixed(3)}-${(byline.footPx / DPI).toFixed(3)}in, band ${(bandTopPx / DPI).toFixed(3)}-${(bandBottomPx / DPI).toFixed(3)}in, joiner "${JOINER}"`);
 console.log(`front parks: ${frontParks.sizePx}px (${(frontParks.sizePx / DPI * 72).toFixed(1)}pt), ${frontParks.lines.length} line(s), widest ${(frontParks.widestLinePx / DPI).toFixed(3)}in of ${(frontParks.measurePx / DPI).toFixed(3)}in`);
 for (const l of frontParks.lines) console.log(`           : "${l}"`);
 console.log(`           : block ${(frontParks.blockTopPx / DPI).toFixed(3)}-${(frontParks.blockBottomPx / DPI).toFixed(3)}in, air ${(frontParks.airAbovePx / DPI).toFixed(3)}in above / ${(frontParks.airBelowPx / DPI).toFixed(3)}in below`);
 
 {
-  const botIn = frontParks.blockBottomPx / DPI;
-  if (botIn > FRONT_LIVE_BOTTOM_IN) throw new Error(`front strip reaches ${botIn.toFixed(3)}in, past the live foot`);
-  if (frontParks.blockTopPx < bylineFootPx) throw new Error('front strip overlaps the byline plaque');
-  if (frontParks.widestLinePx / DPI > FRONT_LIVE_RIGHT_IN - FRONT_LIVE_LEFT_IN) {
-    throw new Error('front strip is wider than the front cover live area');
+  if (frontParks.blockBottomPx > byline.topPx) throw new Error('front strip overlaps the byline plaque');
+  if (frontParks.blockTopPx / DPI < 0.375) throw new Error('front strip is above the live area');
+  const leftIn = frontParks.drawnLeftPx / DPI;
+  const rightIn = frontParks.drawnRightPx / DPI;
+  if (leftIn < FRONT_LIVE_LEFT_IN || rightIn > FRONT_LIVE_RIGHT_IN) {
+    throw new Error(`front strip spans ${leftIn.toFixed(3)}-${rightIn.toFixed(3)}in, outside the live area`);
   }
-  if (frontParks.lines.length !== 1) throw new Error(`front strip wrapped to ${frontParks.lines.length} lines; the foot only has room for one`);
+  console.log(`           : x ${leftIn.toFixed(3)}-${rightIn.toFixed(3)}in of live ${FRONT_LIVE_LEFT_IN.toFixed(3)}-${FRONT_LIVE_RIGHT_IN.toFixed(3)}in`);
 }
 
 const withFrontParks = await sharp(withParks)
