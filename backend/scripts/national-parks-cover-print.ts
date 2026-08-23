@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { extendSkyUpward, planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
+import { planParkListOverlay } from '../src/pipeline/publishing-standard/back-cover-copy.js';
 
 const ART = process.argv[2];
 const INTERIOR = process.argv[3];
@@ -31,6 +32,9 @@ const BLEED = 0.125;
 const THICKNESS_WHITE_BW = 0.002252;
 /** KDP allows this much fold wander either side of each spine fold. */
 const FOLD_VARIANCE_IN = 0.0625;
+/** KDP's barcode reserve, lower right of the back panel, plus its clearance. */
+const BARCODE_H = 1.2;
+const BARCODE_CLEAR = 0.25;
 /**
  * INTERNAL production target for spine fold clearance.
  *
@@ -119,6 +123,71 @@ const body = await sharp(ART)
  */
 const placed = await extendSkyUpward(body, W, scaledH, H);
 
+
+// -- The seven parks, set into the gap the painting leaves under the blurb ----
+/**
+ * The front cover promises seven national parks and the back cover never said
+ * which. This is the answer, composited rather than repainted: the artwork is
+ * approved and untouched, and there is no text layer on this wrap to edit.
+ *
+ * Verified against the canonical manuscript's own PART 2 chapter headings
+ * (sha256 9d3263d7...), chapters 4 through 10, not from memory.
+ */
+const PARKS_LEAD = 'Featured parks:';
+/** Book order is Great Smoky Mountains first; selling order leads with the names
+ *  a browser recognises fastest. Same seven either way. */
+const PARKS = [
+  'Yellowstone',
+  'Grand Canyon',
+  'Yosemite',
+  'Zion',
+  'Great Smoky Mountains',
+  'Rocky Mountain',
+  'Acadia',
+];
+
+const parks = await planParkListOverlay({
+  wrap: placed,
+  wrapWidthPx: W,
+  wrapHeightPx: H,
+  dpi: DPI,
+  backPanelRightIn: BLEED + TRIM_W,
+  lead: PARKS_LEAD,
+  items: PARKS,
+  separator: '·',
+});
+console.log(`
+back copy  : column ${parks.columnLeftIn.toFixed(3)}-${parks.columnRightIn.toFixed(3)}in, band ${parks.bandTopIn.toFixed(3)}-${parks.bandBottomIn.toFixed(3)}in`);
+console.log(`park list  : ${parks.sizePx}px (${(parks.sizePx / DPI * 72).toFixed(1)}pt), ${parks.lines.length} lines, widest ${(parks.widestLinePx / DPI).toFixed(3)}in of ${(parks.measurePx / DPI).toFixed(3)}in`);
+for (const l of parks.lines) console.log(`           : "${l}"`);
+console.log(`           : block ${(parks.blockTopPx / DPI).toFixed(3)}-${(parks.blockBottomPx / DPI).toFixed(3)}in, air ${(parks.airAbovePx / DPI).toFixed(3)}in above and below`);
+
+/**
+ * Gates, because this draws onto a finished cover. Horizontal first: the line
+ * must stay on the BACK panel and inside the live margin, nowhere near the
+ * spine or the front. Then vertical: inside the live area and well clear of the
+ * barcode reserve in the panel's lower right.
+ */
+{
+  const rightIn = parks.columnLeftIn + parks.widestLinePx / DPI;
+  const backPanelRightIn = BLEED + TRIM_W;
+  if (parks.columnLeftIn < 0.375) throw new Error(`park list starts at ${parks.columnLeftIn.toFixed(3)}in, inside the live margin`);
+  if (rightIn > backPanelRightIn - 0.25) {
+    throw new Error(`park list reaches ${rightIn.toFixed(3)}in, past the back panel's live edge`);
+  }
+  const topIn = parks.blockTopPx / DPI;
+  const botIn = parks.blockBottomPx / DPI;
+  const barcodeTopIn = fullHeightIn - (BLEED + BARCODE_H + BARCODE_CLEAR);
+  if (botIn > barcodeTopIn) throw new Error(`park list reaches ${botIn.toFixed(3)}in, into the barcode reserve`);
+  if (topIn < 0.375 || botIn > fullHeightIn - 0.375) throw new Error('park list falls outside the live area');
+  console.log(`           : x ${parks.columnLeftIn.toFixed(3)}-${rightIn.toFixed(3)}in of ${backPanelRightIn}in back panel; barcode reserve starts ${barcodeTopIn.toFixed(3)}in`);
+}
+
+const withParks = await sharp(placed)
+  .composite([{ input: Buffer.from(parks.svg), left: 0, top: 0 }])
+  .png()
+  .toBuffer();
+
 // ── Spine type, set by code ────────────────────────────────────────────────
 const spineLeftPx = Math.round((BLEED + TRIM_W) * DPI);
 const spineWpx = Math.round(spineIn * DPI);
@@ -180,7 +249,7 @@ if (plan.measuredClearPerSidePx / DPI < TARGET_CLEAR_IN) {
 if (plan.measuredImbalancePx / DPI > 0.02) {
   throw new Error(`spine type is ${(plan.measuredImbalancePx / DPI).toFixed(4)}in off centre across the spine`);
 }
-const wrap = await sharp(placed)
+const wrap = await sharp(withParks)
   .composite([{ input: Buffer.from(plan.svg), left: spineLeftPx, top: 0 }])
   .jpeg({ quality: 92, chromaSubsampling: '4:4:4' })
   .toBuffer();
