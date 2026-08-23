@@ -160,7 +160,7 @@ console.log(`
 back copy  : column ${parks.columnLeftIn.toFixed(3)}-${parks.columnRightIn.toFixed(3)}in, band ${parks.bandTopIn.toFixed(3)}-${parks.bandBottomIn.toFixed(3)}in`);
 console.log(`park list  : ${parks.sizePx}px (${(parks.sizePx / DPI * 72).toFixed(1)}pt), ${parks.lines.length} lines, widest ${(parks.widestLinePx / DPI).toFixed(3)}in of ${(parks.measurePx / DPI).toFixed(3)}in`);
 for (const l of parks.lines) console.log(`           : "${l}"`);
-console.log(`           : block ${(parks.blockTopPx / DPI).toFixed(3)}-${(parks.blockBottomPx / DPI).toFixed(3)}in, air ${(parks.airAbovePx / DPI).toFixed(3)}in above and below`);
+console.log(`           : block ${(parks.blockTopPx / DPI).toFixed(3)}-${(parks.blockBottomPx / DPI).toFixed(3)}in, air ${(parks.airAbovePx / DPI).toFixed(3)}in above / ${(parks.airBelowPx / DPI).toFixed(3)}in below`);
 
 /**
  * Gates, because this draws onto a finished cover. Horizontal first: the line

@@ -133,15 +133,25 @@ export async function scanBackPanel(
   /**
    * Lines closer together than a leading are one paragraph, not two blocks.
    *
-   * Scaled from the DPI, not from the panel width. Taken from the panel width it
-   * came out at 37px against a blurb whose lines sit 42px apart, so every line
-   * of every paragraph stayed its own "block" and the blurb was nineteen blocks
-   * instead of one.
+   * THE THRESHOLD IS MEASURED, NOT SET. A fixed figure cannot work across
+   * bindings: the same artwork sits 6.6% larger on the hardcover and then has
+   * its top half stretched another 28% to make the taller wrap, so the blurb's
+   * leading there is about a third wider than the paperback's. A 0.2in constant
+   * merged the paperback's paragraphs correctly and split the hardcover's,
+   * leaving a "gap under the blurb" of 0.223in that was really the gap between
+   * two lines of it.
+   *
+   * Most gaps on a back panel are inter-line gaps, so their median IS the
+   * leading. Paragraph breaks sit far above it.
    */
+  const gaps = raw.slice(1).map((b, i) => b.top - raw[i]!.bottom).sort((a, b) => a - b);
+  const median = gaps.length ? gaps[Math.floor(gaps.length / 2)]! : 0;
+  const merge = median > 0 ? Math.min(Math.max(median * 1.8, mergeGapPx * 0.5), mergeGapPx * 2.2) : mergeGapPx;
+
   const blocks: CopyBlock[] = [];
   for (const b of raw) {
     const last = blocks[blocks.length - 1];
-    if (last && b.top - last.bottom < mergeGapPx) last.bottom = b.bottom;
+    if (last && b.top - last.bottom < merge) last.bottom = b.bottom;
     else blocks.push({ ...b });
   }
 
@@ -331,6 +341,18 @@ export interface ParkListOverlayRequest {
   lead: string;
   items: string[];
   separator: string;
+  /**
+   * Where to start looking for copy, in inches from the wrap's left edge.
+   * Defaults to just inside a paperback's bleed; a hardcover's turn-in is much
+   * deeper, and scanning into it only adds artwork for the detector to reject.
+   */
+  scanLeftIn?: number;
+  /**
+   * How far short of the back panel's right edge to stop scanning, in inches.
+   * The painted column ends well before the panel does, and on this cover a
+   * sunlit cliff fills the rest of the width.
+   */
+  scanRightInsetIn?: number;
 }
 
 export interface ParkListOverlay extends BackCoverLinePlan {
@@ -357,31 +379,39 @@ export async function planParkListOverlay(req: ParkListOverlayRequest): Promise<
   const dpi = req.dpi;
   const panelW = Math.round(req.backPanelRightIn * dpi);
   /** Scan inside the live margin, and short of the sunlit cliff on the right. */
-  const scanL = Math.round(0.4 * dpi);
-  const scanR = Math.round((req.backPanelRightIn - 1.2) * dpi);
+  const scanL = Math.round((req.scanLeftIn ?? 0.4) * dpi);
+  const scanR = Math.round((req.backPanelRightIn - (req.scanRightInsetIn ?? 1.2)) * dpi);
 
   const scan = await scanBackPanel(req.wrap, panelW, scanL, scanR, Math.round(0.2 * dpi));
   const shape = (): string =>
     scan.blocks.map((b, i) => `${i}:${(b.top / dpi).toFixed(2)}-${(b.bottom / dpi).toFixed(2)}`).join(' ');
-  if (scan.blocks.length < 3) {
-    throw new Error(`back panel scan found only ${scan.blocks.length} copy blocks — layout not recognised: ${shape()}`);
+  /**
+   * The layout is confirmed by SHAPE, not by block count.
+   *
+   * Counting blocks is not stable: how many the panel resolves into depends on
+   * how aggressively paragraphs merge, and that is measured per wrap. The
+   * hardcover legitimately resolves to two — the blurb, then everything below it
+   * as one run — while the paperback resolves to more. What both must have is a
+   * substantial first paragraph high on the panel with a real gap beneath it.
+   */
+  if (scan.blocks.length < 2) {
+    throw new Error(`back panel scan found ${scan.blocks.length} copy block(s) — layout not recognised: ${shape()}`);
   }
-
-  const heights = scan.blocks.map((b) => b.bottom - b.top);
-  const tallest = heights.indexOf(Math.max(...heights));
   const blurb = scan.blocks[0]!;
-  if (tallest !== 0 && heights[0]! < heights[tallest]! * 0.6) {
-    throw new Error(
-      `expected the blurb to be the first and largest block; block ${tallest} is taller ` +
-        `(${heights[tallest]}px vs ${heights[0]}px) — layout not recognised: ${shape()}`,
-    );
+  const blurbHeightIn = (blurb.bottom - blurb.top) / dpi;
+  if (blurbHeightIn < 0.8) {
+    throw new Error(`first block is only ${blurbHeightIn.toFixed(2)}in tall — that is not the blurb: ${shape()}`);
+  }
+  if (blurb.top / dpi > (req.wrapHeightPx / dpi) * 0.4) {
+    throw new Error(`first block starts at ${(blurb.top / dpi).toFixed(2)}in, too low to be the blurb: ${shape()}`);
   }
 
   const next = scan.blocks[1]!;
   const bandTop = blurb.bottom;
   const bandBottom = next.top;
   const bandIn = (bandBottom - bandTop) / dpi;
-  if (bandIn < 0.3) throw new Error(`gap under the blurb is only ${bandIn.toFixed(3)}in — too tight to set a line in`);
+  if (bandIn < 0.3) throw new Error(`gap under the blurb is only ${bandIn.toFixed(3)}in — too tight to set a line in: ${shape()}`);
+  if (bandIn > 1.6) throw new Error(`gap under the blurb is ${bandIn.toFixed(3)}in — larger than any real paragraph break: ${shape()}`);
 
   const plan = await planBackCoverLine({
     lead: req.lead,
@@ -397,6 +427,7 @@ export async function planParkListOverlay(req: ParkListOverlayRequest): Promise<
     columnRightPx: scan.columnRight + Math.round(0.14 * dpi),
     minAirPx: Math.round(0.1 * dpi),
     maxSizePx: Math.round(0.19 * dpi),
+    airAboveFraction: 0.34,
   });
 
   return {

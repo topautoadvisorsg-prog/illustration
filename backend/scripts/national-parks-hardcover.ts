@@ -25,6 +25,7 @@ import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { getKdpCoverDimensions } from '../src/pipeline/publishing-standard/kdp-cover-specs.js';
 import { extendSkyUpward, planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
+import { planParkListOverlay } from '../src/pipeline/publishing-standard/back-cover-copy.js';
 
 const ART = process.argv[2];
 const INTERIOR = process.argv[3];
@@ -167,6 +168,67 @@ const skyBandPx = Math.round(scaledH * SKY_BAND_FRACTION);
 const placed = await extendSkyUpward(padded, W, scaledH, H, SKY_BAND_FRACTION);
 console.log(`sky band   : top ${(skyBandPx / DPI).toFixed(2)}in stretched to ${((skyBandPx + skyStretch) / DPI).toFixed(2)}in (${((skyStretch / skyBandPx) * 100).toFixed(0)}%)`);
 
+
+// -- The seven parks, set into the gap the painting leaves under the blurb ----
+/**
+ * Same addition as the paperback, from the same verified list, found the same
+ * way. The band is DETECTED rather than copied across: this wrap holds the same
+ * artwork at a different scale with a different sky stretch, so the paperback's
+ * coordinates mean nothing here.
+ */
+const PARKS_LEAD = 'Featured parks:';
+const PARKS = [
+  'Yellowstone',
+  'Grand Canyon',
+  'Yosemite',
+  'Zion',
+  'Great Smoky Mountains',
+  'Rocky Mountain',
+  'Acadia',
+];
+
+const parks = await planParkListOverlay({
+  wrap: placed,
+  wrapWidthPx: W,
+  wrapHeightPx: H,
+  dpi: DPI,
+  backPanelRightIn: spineL,
+  lead: PARKS_LEAD,
+  items: PARKS,
+  separator: '·',
+  scanLeftIn: d.wrapIn + 0.1,
+  scanRightInsetIn: 1.35,
+});
+console.log(`
+back copy  : column ${parks.columnLeftIn.toFixed(3)}-${parks.columnRightIn.toFixed(3)}in, band ${parks.bandTopIn.toFixed(3)}-${parks.bandBottomIn.toFixed(3)}in`);
+console.log(`park list  : ${parks.sizePx}px (${(parks.sizePx / DPI * 72).toFixed(1)}pt), ${parks.lines.length} lines, widest ${(parks.widestLinePx / DPI).toFixed(3)}in of ${(parks.measurePx / DPI).toFixed(3)}in`);
+for (const l of parks.lines) console.log(`           : "${l}"`);
+console.log(`           : block ${(parks.blockTopPx / DPI).toFixed(3)}-${(parks.blockBottomPx / DPI).toFixed(3)}in, air ${(parks.airAbovePx / DPI).toFixed(3)}in above / ${(parks.airBelowPx / DPI).toFixed(3)}in below`);
+
+/**
+ * Gates. A hardcover wrap folds around board, so the outside edges are the
+ * turn-in, not a bleed: copy must clear `wrapIn` plus the margin, not 0.125in.
+ */
+{
+  const rightIn = parks.columnLeftIn + parks.widestLinePx / DPI;
+  const liveLeft = d.wrapIn + d.marginIn;
+  const liveTop = d.wrapIn + d.marginIn;
+  const liveBottom = d.fullHeightIn - d.wrapIn - d.marginIn;
+  const topIn = parks.blockTopPx / DPI;
+  const botIn = parks.blockBottomPx / DPI;
+  if (parks.columnLeftIn < liveLeft) throw new Error(`park list starts at ${parks.columnLeftIn.toFixed(3)}in, inside the ${liveLeft.toFixed(3)}in turn-in and margin`);
+  if (rightIn > spineL - d.hingeIn) throw new Error(`park list reaches ${rightIn.toFixed(3)}in, into the ${d.hingeIn}in hinge`);
+  if (topIn < liveTop || botIn > liveBottom) throw new Error('park list falls outside the live area');
+  const barcodeTopIn = liveBottom - 1.2;
+  if (botIn > barcodeTopIn) throw new Error(`park list reaches ${botIn.toFixed(3)}in, into the barcode reserve`);
+  console.log(`           : x ${parks.columnLeftIn.toFixed(3)}-${rightIn.toFixed(3)}in; live ${liveLeft.toFixed(3)}-${(spineL - d.hingeIn).toFixed(3)}in, hinge starts ${(spineL - d.hingeIn).toFixed(3)}in`);
+}
+
+const withParks = await sharp(placed)
+  .composite([{ input: Buffer.from(parks.svg), left: 0, top: 0 }])
+  .png()
+  .toBuffer();
+
 // ── Spine type, set by code, sized from the HARDCOVER spine safe area ──────
 /**
  * INTERNAL production target for spine fold clearance.
@@ -245,7 +307,7 @@ if (plan.measuredImbalancePx / DPI > 0.02) {
 );
 if (plan.reducedToFit) console.log('spine fit  : size reduced so the type fits the spine length');
 
-const wrap = await sharp(placed)
+const wrap = await sharp(withParks)
   .composite([{ input: Buffer.from(plan.svg), left: spineLeftPx, top: 0 }])
   .jpeg({ quality: 92, chromaSubsampling: '4:4:4' })
   .toBuffer();
