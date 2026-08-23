@@ -55,6 +55,41 @@ async function inkWidthAtRef(text: string, weight: number, italic: boolean): Pro
   return info.width;
 }
 
+/**
+ * The real ink box of a rendered overlay, in pixels, or null if it drew nothing.
+ *
+ * Reads the alpha channel rather than a colour threshold: the overlay is drawn on
+ * transparency, so anything with alpha is ink — halo, antialiasing and all. A
+ * colour threshold would quietly drop the soft outer edge of the stroke, which is
+ * the half of the mark most likely to be the part that overruns.
+ */
+async function inkBox(
+  svg: string,
+  widthPx: number,
+  heightPx: number,
+): Promise<{ left: number; right: number; top: number; bottom: number } | null> {
+  const { data, info } = await sharp(Buffer.from(svg), { density: 72 })
+    .resize(widthPx, heightPx, { fit: 'fill' })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let left = info.width;
+  let right = -1;
+  let top = info.height;
+  let bottom = -1;
+  for (let y = 0; y < info.height; y += 1) {
+    for (let x = 0; x < info.width; x += 1) {
+      if (data[(y * info.width + x) * info.channels + 3]! > 8) {
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+      }
+    }
+  }
+  return bottom < 0 ? null : { left, right, top, bottom };
+}
+
 /** One block of painted copy found on the back panel, in pixels from the top. */
 export interface CopyBlock {
   top: number;
@@ -193,6 +228,8 @@ export interface BackCoverLineRequest {
   /** The painted text column the line must align to, in pixels. */
   columnLeftPx: number;
   columnRightPx: number;
+  /** Left, to sit in a text column; centred, to sit as a strip under a panel. */
+  align?: 'left' | 'centre';
   /** Minimum clear space to leave above and below the block, in pixels. */
   minAirPx: number;
   /**
@@ -219,7 +256,10 @@ export interface BackCoverLinePlan {
   airAbovePx: number;
   airBelowPx: number;
   measurePx: number;
+  /** Measured off the rendered overlay, not computed. */
   widestLinePx: number;
+  drawnLeftPx: number;
+  drawnRightPx: number;
 }
 
 /**
@@ -237,10 +277,24 @@ export async function planBackCoverLine(req: BackCoverLineRequest): Promise<Back
   const bandPx = req.bandBottomPx - req.bandTopPx;
 
   const leadRef = await inkWidthAtRef(req.lead, 400, true);
-  const sepRef = await inkWidthAtRef(` ${req.separator} `, 400, false);
   const itemRefs: number[] = [];
   for (const it of req.items) itemRefs.push(await inkWidthAtRef(it, 400, false));
+
+  /**
+   * A SPACE HAS NO INK, so it cannot be measured directly.
+   *
+   * `inkWidthAtRef` trims the transparent margin off the raster, which is what
+   * makes it exact for glyphs and useless for whitespace: measuring " · " gave
+   * back the width of the middot alone, both spaces trimmed away. Six separators
+   * on a seven-item list meant twelve missing spaces — the front-cover strip
+   * planned at 5.405in of a 5.500in measure and drew about 5.8in, straight past
+   * the live edge, while every gate reported it comfortably inside.
+   *
+   * So the space is measured by DIFFERENCE, from a string that has ink on both
+   * sides of it, and the separator is built from its parts.
+   */
   const spaceRef = (await inkWidthAtRef('n n', 400, false)) - 2 * (await inkWidthAtRef('n', 400, false));
+  const sepRef = (await inkWidthAtRef(req.separator, 400, false)) + 2 * spaceRef;
 
   const at = (ref: number, size: number): number => (ref * size) / REF_PX;
   /** Width of a rendered line, measured from its parts rather than re-rasterised. */
@@ -257,8 +311,24 @@ export async function planBackCoverLine(req: BackCoverLineRequest): Promise<Back
   const CAP = 0.7;
   const LEADING = 1.32;
 
+  /** Why the last candidate size was rejected, for the error if none fits. */
+  let lastReason = 'no size was tried';
+
   for (let size = req.maxSizePx; size >= 8; size -= 1) {
     const leadW = req.lead ? at(leadRef, size) + at(spaceRef, size) : 0;
+
+    /**
+     * THE HALO IS PART OF THE MARK.
+     *
+     * Each glyph is stroked before it is filled, so the drawn line is a stroke
+     * width wider and taller than its glyphs on every side. Laying out to the
+     * glyph box put the halo 4px past the column edge — caught by the
+     * render-back check, not by any of the arithmetic. So the column and the
+     * band are inset by the stroke before anything is fitted into them.
+     */
+    const halo = Math.max(2, Math.round(size * 0.11));
+    const usableMeasure = measurePx - 2 * halo;
+    const usableBand = bandPx - 2 * halo;
 
     /**
      * Greedy wrap on ITEMS. A line takes park names until the next one will not
@@ -269,7 +339,7 @@ export async function planBackCoverLine(req: BackCoverLineRequest): Promise<Back
     let cur: number[] = [];
     for (let i = 0; i < req.items.length; i += 1) {
       const trial = [...cur, i];
-      if (cur.length && lineWidth(trial, size, rows.length === 0) > measurePx) {
+      if (cur.length && lineWidth(trial, size, rows.length === 0) > usableMeasure) {
         rows.push(cur);
         cur = [i];
       } else {
@@ -281,53 +351,154 @@ export async function planBackCoverLine(req: BackCoverLineRequest): Promise<Back
     const lines = rows.map((r) => r.map((i) => req.items[i]!).join(` ${req.separator} `));
 
     const blockH = (rows.length - 1) * LEADING * size + CAP * size;
-    if (blockH + 2 * req.minAirPx > bandPx) continue;
+    if (blockH + 2 * req.minAirPx > usableBand) continue;
 
     const widest = Math.max(...rows.map((r, i) => lineWidth(r, size, i === 0)));
-    if (widest > measurePx) continue;
+    if (widest > usableMeasure) continue;
 
-    const slack = bandPx - blockH;
+    const slack = usableBand - blockH;
     const airAbove = slack * (req.airAboveFraction ?? 0.5);
     const airBelow = slack - airAbove;
     if (airAbove < req.minAirPx * 0.6 || airBelow < req.minAirPx) continue;
-    const blockTop = req.bandTopPx + airAbove;
+    const blockTop = req.bandTopPx + halo + airAbove;
     const firstBaseline = blockTop + CAP * size;
 
-    const halo = Math.max(2, Math.round(size * 0.11));
     const common =
       `font-family="${SPINE_FONT}" fill="${SPINE_CREAM}" stroke="${SPINE_HALO}" ` +
       `stroke-width="${halo}" stroke-opacity="0.85" paint-order="stroke fill" stroke-linejoin="round"`;
 
+    /**
+     * Left for a text column, centred for a strip under a panel.
+     *
+     * Centring has to be done from the MEASURED line width, not with
+     * `text-anchor="middle"`: the lead-in and the names are separate `<text>`
+     * elements, because librsvg gives no way to mix an italic run into one, and
+     * two independently centred elements would each centre themselves and
+     * overlap in the middle of the panel.
+     */
     const parts: string[] = [];
     for (const [i, line] of lines.entries()) {
       const y = firstBaseline + i * LEADING * size;
-      let x = req.columnLeftPx;
+      const lineW = lineWidth(rows[i]!, size, i === 0);
+      let x =
+        (req.align ?? 'left') === 'centre'
+          ? req.columnLeftPx + halo + (usableMeasure - lineW) / 2
+          : req.columnLeftPx + halo;
       if (i === 0 && req.lead) {
         parts.push(
-          `<text x="${x}" y="${y.toFixed(1)}" font-size="${size}" font-style="italic" ${common}>${escapeXml(req.lead)}</text>`,
+          `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${size}" font-style="italic" ${common}>${escapeXml(req.lead)}</text>`,
         );
         x += leadW;
       }
       parts.push(`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${size}" ${common}>${escapeXml(line)}</text>`);
     }
 
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${req.wrapWidthPx}" height="${req.wrapHeightPx}">\n${parts.join('\n')}\n</svg>`;
+
+    /**
+     * WHAT WAS DRAWN, not what was planned.
+     *
+     * Everything above this is arithmetic on reference measurements, and
+     * arithmetic is exactly what has gone wrong on this cover before — a spine
+     * whose plan reported 0.1233in of fold clearance while the ink sat on the
+     * fold, and a strip that planned 5.405in and drew 5.8in because a trimmed
+     * raster cannot measure a space. So the finished overlay is rasterised on
+     * its own and its real ink box read back. Halo included: the stroke is part
+     * of the mark and part of what has to fit.
+     */
+    const drawn = await inkBox(svg, req.wrapWidthPx, req.wrapHeightPx);
+    if (!drawn) throw new Error('the overlay rendered nothing — check the font is resolvable');
+
+    /**
+     * THE RENDER DECIDES, not the arithmetic.
+     *
+     * Reference measurements scale linearly and real type does not quite: at a
+     * small size the rasteriser rounds stems up, so a line built from parts
+     * measured at 200px comes out about 1.5% wider when it is actually drawn at
+     * 41px. That is 24px on a 5.5in strip — enough to put it past the live edge
+     * while every computed number says it fits.
+     *
+     * So a size that passes the arithmetic is then DRAWN and measured, and if the
+     * real ink does not fit, the loop simply tries the next size down. The
+     * arithmetic narrows the search; the render settles it.
+     */
+    if (drawn.left < req.columnLeftPx || drawn.right > req.columnRightPx) {
+      lastReason =
+        `at ${size}px the drawn line spans ${drawn.left}-${drawn.right}px against a ` +
+        `${req.columnLeftPx}-${req.columnRightPx}px column`;
+      continue;
+    }
+    if (drawn.top < req.bandTopPx || drawn.bottom > req.bandBottomPx) {
+      lastReason =
+        `at ${size}px the drawn block spans ${drawn.top}-${drawn.bottom}px against a ` +
+        `${req.bandTopPx}-${req.bandBottomPx}px band`;
+      continue;
+    }
+
     return {
-      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${req.wrapWidthPx}" height="${req.wrapHeightPx}">\n${parts.join('\n')}\n</svg>`,
+      svg,
       sizePx: size,
       lines,
-      blockTopPx: blockTop,
-      blockBottomPx: blockTop + blockH,
-      airAbovePx: airAbove,
-      airBelowPx: airBelow,
+      blockTopPx: drawn.top,
+      blockBottomPx: drawn.bottom,
+      airAbovePx: drawn.top - req.bandTopPx,
+      airBelowPx: req.bandBottomPx - drawn.bottom,
       measurePx,
-      widestLinePx: widest,
+      widestLinePx: drawn.right - drawn.left,
+      drawnLeftPx: drawn.left,
+      drawnRightPx: drawn.right,
     };
   }
 
   throw new Error(
-    `back-cover line does not fit: band ${(bandPx / req.dpi).toFixed(3)}in, ` +
-      `measure ${(measurePx / req.dpi).toFixed(3)}in, even at 8px`,
+    `line does not fit: band ${(bandPx / req.dpi).toFixed(3)}in, ` +
+      `measure ${(measurePx / req.dpi).toFixed(3)}in, down to 8px — ${lastReason}`,
   );
+}
+
+/**
+ * Find the foot of the painted byline panel on the FRONT cover.
+ *
+ * The author's name sits in a solid dark plaque with a gold rule around it. To
+ * put anything beneath it the build has to know where it ends, and it cannot be
+ * told: the plaque is painted into the artwork, and it lands at a different
+ * height on every binding because each one scales and stretches the picture
+ * differently.
+ *
+ * A plaque row is unmistakable — a long horizontal run of near-uniform dark
+ * green, which nothing else on this cover does. The last such row plus the gold
+ * rule beneath it is the foot.
+ *
+ * Returns the foot in PIXELS from the top of the wrap.
+ */
+export async function findBylinePanel(
+  wrap: Buffer,
+  frontLeftPx: number,
+  frontRightPx: number,
+  searchTopPx: number,
+  searchBottomPx: number,
+  rulePadPx: number,
+): Promise<{ topPx: number; footPx: number }> {
+  const { data, info } = await sharp(wrap).raw().toBuffer({ resolveWithObject: true });
+  const width = frontRightPx - frontLeftPx;
+  let first = -1;
+  let last = -1;
+  for (let y = searchTopPx; y < Math.min(searchBottomPx, info.height); y += 1) {
+    let dark = 0;
+    for (let x = frontLeftPx; x < frontRightPx; x += 1) {
+      const i = (y * info.width + x) * info.channels;
+      const r = data[i]!;
+      const g = data[i + 1]!;
+      const b = data[i + 2]!;
+      if (r < 60 && g < 75 && b < 60 && g >= r) dark += 1;
+    }
+    if (dark > width * 0.35) {
+      if (first < 0) first = y;
+      last = y;
+    }
+  }
+  if (last < 0) throw new Error('no byline plaque found on the front panel — layout not recognised');
+  return { topPx: first - rulePadPx, footPx: last + rulePadPx };
 }
 
 export interface ParkListOverlayRequest {

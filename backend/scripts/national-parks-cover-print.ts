@@ -16,7 +16,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { extendSkyUpward, planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
-import { planParkListOverlay } from '../src/pipeline/publishing-standard/back-cover-copy.js';
+import {
+  findBylinePanel,
+  planBackCoverLine,
+  planParkListOverlay,
+} from '../src/pipeline/publishing-standard/back-cover-copy.js';
 
 const ART = process.argv[2];
 const INTERIOR = process.argv[3];
@@ -35,6 +39,8 @@ const FOLD_VARIANCE_IN = 0.0625;
 /** KDP's barcode reserve, lower right of the back panel, plus its clearance. */
 const BARCODE_H = 1.2;
 const BARCODE_CLEAR = 0.25;
+/** Front panel and its live area, for the strip along the foot of the cover. */
+const LIVE_MARGIN_IN = 0.25;
 /**
  * INTERNAL production target for spine fold clearance.
  *
@@ -188,6 +194,78 @@ const withParks = await sharp(placed)
   .png()
   .toBuffer();
 
+
+// -- The same seven parks along the foot of the FRONT cover ------------------
+/**
+ * The front cover names the number and the back cover names the parks. This puts
+ * the parks on the front too, as a strip along the bottom, so the promise and its
+ * answer are on the same face.
+ *
+ * Set in code over the finished artwork, like everything else on this cover that
+ * an image model places badly. Nothing is repainted.
+ *
+ * The lead-in is dropped here. On the back it distinguishes the list from the
+ * paragraph above it; on the front the title three inches up already says
+ * 7 NATIONAL PARKS, so "Featured parks:" would only spend width — and width is
+ * what buys type size in a strip this shallow.
+ */
+const FRONT_LEFT_IN = BLEED + TRIM_W + spineIn;
+const FRONT_RIGHT_IN = FRONT_LEFT_IN + TRIM_W;
+const FRONT_LIVE_LEFT_IN = FRONT_LEFT_IN + LIVE_MARGIN_IN;
+const FRONT_LIVE_RIGHT_IN = FRONT_RIGHT_IN - LIVE_MARGIN_IN;
+const FRONT_LIVE_BOTTOM_IN = fullHeightIn - BLEED - LIVE_MARGIN_IN;
+/** Look for the plaque only in the bottom quarter, well below the title block. */
+const FRONT_BYLINE_SEARCH_TOP_IN = fullHeightIn * 0.75;
+
+const frontLeftPx = Math.round(FRONT_LEFT_IN * DPI);
+const frontRightPx = Math.round(FRONT_RIGHT_IN * DPI);
+const byline = await findBylinePanel(
+  withParks,
+  frontLeftPx,
+  frontRightPx,
+  Math.round(FRONT_BYLINE_SEARCH_TOP_IN * DPI),
+  Math.round(FRONT_LIVE_BOTTOM_IN * DPI),
+  Math.round(0.03 * DPI),
+);
+const bylineFootPx = byline.footPx;
+
+const frontParks = await planBackCoverLine({
+  lead: '',
+  items: PARKS,
+  separator: '·',
+  wrapWidthPx: W,
+  wrapHeightPx: H,
+  dpi: DPI,
+  bandTopPx: bylineFootPx,
+  bandBottomPx: Math.round(FRONT_LIVE_BOTTOM_IN * DPI),
+  columnLeftPx: Math.round(FRONT_LIVE_LEFT_IN * DPI),
+  columnRightPx: Math.round(FRONT_LIVE_RIGHT_IN * DPI),
+  align: 'centre',
+  minAirPx: Math.round(0.06 * DPI),
+  maxSizePx: Math.round(0.16 * DPI),
+});
+
+console.log(`
+front strip: byline plaque foot ${(bylineFootPx / DPI).toFixed(3)}in, live foot ${FRONT_LIVE_BOTTOM_IN}in, band ${((Math.round(FRONT_LIVE_BOTTOM_IN * DPI) - bylineFootPx) / DPI).toFixed(3)}in`);
+console.log(`front parks: ${frontParks.sizePx}px (${(frontParks.sizePx / DPI * 72).toFixed(1)}pt), ${frontParks.lines.length} line(s), widest ${(frontParks.widestLinePx / DPI).toFixed(3)}in of ${(frontParks.measurePx / DPI).toFixed(3)}in`);
+for (const l of frontParks.lines) console.log(`           : "${l}"`);
+console.log(`           : block ${(frontParks.blockTopPx / DPI).toFixed(3)}-${(frontParks.blockBottomPx / DPI).toFixed(3)}in, air ${(frontParks.airAbovePx / DPI).toFixed(3)}in above / ${(frontParks.airBelowPx / DPI).toFixed(3)}in below`);
+
+{
+  const botIn = frontParks.blockBottomPx / DPI;
+  if (botIn > FRONT_LIVE_BOTTOM_IN) throw new Error(`front strip reaches ${botIn.toFixed(3)}in, past the live foot`);
+  if (frontParks.blockTopPx < bylineFootPx) throw new Error('front strip overlaps the byline plaque');
+  if (frontParks.widestLinePx / DPI > FRONT_LIVE_RIGHT_IN - FRONT_LIVE_LEFT_IN) {
+    throw new Error('front strip is wider than the front cover live area');
+  }
+  if (frontParks.lines.length !== 1) throw new Error(`front strip wrapped to ${frontParks.lines.length} lines; the foot only has room for one`);
+}
+
+const withFrontParks = await sharp(withParks)
+  .composite([{ input: Buffer.from(frontParks.svg), left: 0, top: 0 }])
+  .png()
+  .toBuffer();
+
 // ── Spine type, set by code ────────────────────────────────────────────────
 const spineLeftPx = Math.round((BLEED + TRIM_W) * DPI);
 const spineWpx = Math.round(spineIn * DPI);
@@ -249,7 +327,7 @@ if (plan.measuredClearPerSidePx / DPI < TARGET_CLEAR_IN) {
 if (plan.measuredImbalancePx / DPI > 0.02) {
   throw new Error(`spine type is ${(plan.measuredImbalancePx / DPI).toFixed(4)}in off centre across the spine`);
 }
-const wrap = await sharp(withParks)
+const wrap = await sharp(withFrontParks)
   .composite([{ input: Buffer.from(plan.svg), left: spineLeftPx, top: 0 }])
   .jpeg({ quality: 92, chromaSubsampling: '4:4:4' })
   .toBuffer();
@@ -264,6 +342,23 @@ writeFileSync(OUT, bytes);
 
 const proof = OUT.replace(/\.pdf$/i, '-proof.png');
 await sharp(wrap).resize(1600).png().toFile(proof);
+
+/**
+ * The finished wrap, lossless, for the Kindle cover to be cut from.
+ *
+ * The ebook cover is this front panel and nothing else, so it has to come from
+ * THIS file rather than from a parallel rebuild of the same artwork. It used to
+ * come from a separate script that re-composed the wrap from the art, which was
+ * fine while the only thing on the front was painted — and stopped being fine
+ * the moment code started drawing on it, because that script knew nothing about
+ * the park strip and would have shipped an ebook cover missing it.
+ *
+ * PNG, not JPEG: the Kindle cover is compressed once, at the end, rather than
+ * inheriting this wrap's compression and then being compressed again.
+ */
+const wrapPng = OUT.replace(/\.pdf$/i, '-wrap.png');
+await sharp(wrap).png({ compressionLevel: 6 }).toFile(wrapPng);
+console.log(`wrap png   : ${wrapPng}`);
 
 console.log(`\nfile       : ${OUT}`);
 console.log(`bytes      : ${bytes.length}`);

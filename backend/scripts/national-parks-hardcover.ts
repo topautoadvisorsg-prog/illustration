@@ -25,7 +25,11 @@ import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { getKdpCoverDimensions } from '../src/pipeline/publishing-standard/kdp-cover-specs.js';
 import { extendSkyUpward, planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
-import { planParkListOverlay } from '../src/pipeline/publishing-standard/back-cover-copy.js';
+import {
+  findBylinePanel,
+  planBackCoverLine,
+  planParkListOverlay,
+} from '../src/pipeline/publishing-standard/back-cover-copy.js';
 
 const ART = process.argv[2];
 const INTERIOR = process.argv[3];
@@ -229,6 +233,82 @@ const withParks = await sharp(placed)
   .png()
   .toBuffer();
 
+
+// -- The same seven parks along the foot of the FRONT cover ------------------
+/**
+ * Matches the paperback: the parks named on the front as well as the back, as a
+ * strip under the byline plaque, set in code over the finished artwork.
+ *
+ * A hardcover's outer edges are the turn-in rather than a bleed, so "safe" here
+ * is `wrapIn + marginIn + 0.125` from the outside and the hinge from the spine
+ * side — the same envelope the back copy is held to.
+ */
+const FRONT_LIVE_LEFT_IN = spineR + d.hingeIn;
+const FRONT_LIVE_RIGHT_IN = d.fullWidthIn - SAFE_FROM_EDGE;
+const FRONT_LIVE_BOTTOM_IN = d.fullHeightIn - SAFE_FROM_EDGE;
+
+const byline = await findBylinePanel(
+  withParks,
+  Math.round(spineR * DPI),
+  Math.round(frontPanelR * DPI),
+  Math.round(d.fullHeightIn * 0.75 * DPI),
+  Math.round(FRONT_LIVE_BOTTOM_IN * DPI),
+  Math.round(0.03 * DPI),
+);
+
+/**
+ * BELOW THE PLAQUE IF THERE IS ROOM, ABOVE IT IF THERE IS NOT.
+ *
+ * On the paperback the byline plaque leaves 0.285in between its foot and the
+ * live edge, which is where this strip belongs. On the hardcover it does not:
+ * the same plaque lands with its foot at 9.699in against a 9.701in live foot,
+ * because a hardcover's outer edge is a 0.591in turn-in rather than a 0.125in
+ * bleed and the artwork is fitted differently to suit it. Two thousandths of an
+ * inch is not a gap.
+ *
+ * So the band is chosen from what the wrap actually offers rather than from
+ * where the paperback happens to put it.
+ */
+const belowIn = FRONT_LIVE_BOTTOM_IN - byline.footPx / DPI;
+const MIN_STRIP_BAND_IN = 0.22;
+const useBelow = belowIn >= MIN_STRIP_BAND_IN;
+const bandTopPx = useBelow ? byline.footPx : byline.topPx - Math.round(0.34 * DPI);
+const bandBottomPx = useBelow ? Math.round(FRONT_LIVE_BOTTOM_IN * DPI) : byline.topPx - Math.round(0.05 * DPI);
+console.log(
+  `
+front strip: plaque ${(byline.topPx / DPI).toFixed(3)}-${(byline.footPx / DPI).toFixed(3)}in, ` +
+    `live foot ${FRONT_LIVE_BOTTOM_IN.toFixed(3)}in, ${belowIn.toFixed(3)}in below it — ` +
+    `placing ${useBelow ? 'BELOW' : 'ABOVE'} the plaque`,
+);
+
+const frontParks = await planBackCoverLine({
+  lead: '',
+  items: PARKS,
+  separator: '·',
+  wrapWidthPx: W,
+  wrapHeightPx: H,
+  dpi: DPI,
+  bandTopPx,
+  bandBottomPx,
+  columnLeftPx: Math.round(FRONT_LIVE_LEFT_IN * DPI),
+  columnRightPx: Math.round(FRONT_LIVE_RIGHT_IN * DPI),
+  align: 'centre',
+  minAirPx: Math.round(0.06 * DPI),
+  maxSizePx: Math.round(0.17 * DPI),
+});
+
+console.log(`front parks: ${frontParks.sizePx}px (${(frontParks.sizePx / DPI * 72).toFixed(1)}pt), ${frontParks.lines.length} line(s), widest ${(frontParks.widestLinePx / DPI).toFixed(3)}in of ${(frontParks.measurePx / DPI).toFixed(3)}in`);
+for (const l of frontParks.lines) console.log(`           : "${l}"`);
+console.log(`           : block ${(frontParks.blockTopPx / DPI).toFixed(3)}-${(frontParks.blockBottomPx / DPI).toFixed(3)}in, air ${(frontParks.airAbovePx / DPI).toFixed(3)}in above / ${(frontParks.airBelowPx / DPI).toFixed(3)}in below`);
+console.log(`           : x ${(frontParks.drawnLeftPx / DPI).toFixed(3)}-${(frontParks.drawnRightPx / DPI).toFixed(3)}in; live ${FRONT_LIVE_LEFT_IN.toFixed(3)}-${FRONT_LIVE_RIGHT_IN.toFixed(3)}in`);
+
+if (frontParks.lines.length !== 1) throw new Error(`front strip wrapped to ${frontParks.lines.length} lines; the foot has room for one`);
+
+const withFrontParks = await sharp(withParks)
+  .composite([{ input: Buffer.from(frontParks.svg), left: 0, top: 0 }])
+  .png()
+  .toBuffer();
+
 // ── Spine type, set by code, sized from the HARDCOVER spine safe area ──────
 /**
  * INTERNAL production target for spine fold clearance.
@@ -307,7 +387,7 @@ if (plan.measuredImbalancePx / DPI > 0.02) {
 );
 if (plan.reducedToFit) console.log('spine fit  : size reduced so the type fits the spine length');
 
-const wrap = await sharp(withParks)
+const wrap = await sharp(withFrontParks)
   .composite([{ input: Buffer.from(plan.svg), left: spineLeftPx, top: 0 }])
   .jpeg({ quality: 92, chromaSubsampling: '4:4:4' })
   .toBuffer();
