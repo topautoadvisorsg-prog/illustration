@@ -238,6 +238,17 @@ export interface BackCoverLineRequest {
   columnRightPx: number;
   /** Left, to sit in a text column; centred, to sit as a strip under a panel. */
   align?: 'left' | 'centre';
+  /**
+   * Set exactly this many lines, balanced so the longest is as short as possible.
+   *
+   * Greedy wrapping fills each line before starting the next, which is right for
+   * running text and wrong for a display list: seven parks came out as five on
+   * one line and two on the other, and because the size is bound by the LONGEST
+   * line, that packed first line held the whole thing down to 9.4pt — barely
+   * larger than fitting all seven on a single line. Balanced, the same two lines
+   * carry roughly half each and the type grows by half again.
+   */
+  targetLines?: number;
   /** Minimum clear space to leave above and below the block, in pixels. */
   minAirPx: number;
   /**
@@ -251,6 +262,17 @@ export interface BackCoverLineRequest {
    * separation back.
    */
   airAboveFraction?: number;
+  /**
+   * A FIXED gap above the block instead of a share of the leftover.
+   *
+   * A fraction is right when the block floats in a gap between two painted
+   * things. It is wrong when the block is pinned under one of them: asking for
+   * 12% of the slack above meant the slack itself had to be large before that
+   * 12% cleared the minimum, and the type was held to 9.4pt purely to
+   * manufacture space it then did not use. With the gap fixed, every pixel the
+   * band has left goes into the type.
+   */
+  pinAirAbovePx?: number;
   /** Largest type size to consider, in pixels. */
   maxSizePx: number;
 }
@@ -340,22 +362,60 @@ export async function planBackCoverLine(req: BackCoverLineRequest): Promise<Back
     const usableBand = bandPx - 2 * halo;
 
     /**
-     * Greedy wrap on ITEMS. A line takes park names until the next one will not
-     * fit; the separator that would have followed the last name is simply not
-     * drawn, so no line ever ends on a middot.
+     * Wrap on ITEMS, never on words: the separator that would have followed the
+     * last name on a line is simply not drawn, so no line ends on a middot.
+     *
+     * Balanced when a line count is asked for, greedy otherwise.
      */
     const rows: number[][] = [];
-    let cur: number[] = [];
-    for (let i = 0; i < req.items.length; i += 1) {
-      const trial = [...cur, i];
-      if (cur.length && lineWidth(trial, size, rows.length === 0) > usableMeasure) {
-        rows.push(cur);
-        cur = [i];
-      } else {
-        cur = trial;
+    if (req.targetLines && req.targetLines > 1) {
+      const n = req.items.length;
+      const L = req.targetLines;
+      if (n < L) continue;
+      /**
+       * Minimise the LONGEST line over every way of cutting the list into L
+       * contiguous groups. dp[l][i] is the best achievable longest line using l
+       * lines for the first i items; n is seven here, so the exhaustive answer
+       * is free and there is no reason to approximate it.
+       */
+      const INF = Number.POSITIVE_INFINITY;
+      const dp: number[][] = Array.from({ length: L + 1 }, () => new Array<number>(n + 1).fill(INF));
+      const cut: number[][] = Array.from({ length: L + 1 }, () => new Array<number>(n + 1).fill(-1));
+      dp[0]![0] = 0;
+      for (let l = 1; l <= L; l += 1) {
+        for (let i = l; i <= n; i += 1) {
+          for (let k = l - 1; k < i; k += 1) {
+            if (dp[l - 1]![k] === INF) continue;
+            const idxs = Array.from({ length: i - k }, (_, t) => k + t);
+            const w = lineWidth(idxs, size, l === 1);
+            const worst = Math.max(dp[l - 1]![k]!, w);
+            if (worst < dp[l]![i]!) {
+              dp[l]![i] = worst;
+              cut[l]![i] = k;
+            }
+          }
+        }
       }
+      if (dp[L]![n] === INF) continue;
+      let end = n;
+      for (let l = L; l >= 1; l -= 1) {
+        const start = cut[l]![end]!;
+        rows.unshift(Array.from({ length: end - start }, (_, t) => start + t));
+        end = start;
+      }
+    } else {
+      let cur: number[] = [];
+      for (let i = 0; i < req.items.length; i += 1) {
+        const trial = [...cur, i];
+        if (cur.length && lineWidth(trial, size, rows.length === 0) > usableMeasure) {
+          rows.push(cur);
+          cur = [i];
+        } else {
+          cur = trial;
+        }
+      }
+      if (cur.length) rows.push(cur);
     }
-    if (cur.length) rows.push(cur);
 
     const lines = rows.map((r) => r.map((i) => req.items[i]!).join(req.joiner));
 
@@ -366,9 +426,10 @@ export async function planBackCoverLine(req: BackCoverLineRequest): Promise<Back
     if (widest > usableMeasure) continue;
 
     const slack = usableBand - blockH;
-    const airAbove = slack * (req.airAboveFraction ?? 0.5);
+    const airAbove = req.pinAirAbovePx ?? slack * (req.airAboveFraction ?? 0.5);
     const airBelow = slack - airAbove;
-    if (airAbove < req.minAirPx * 0.6 || airBelow < req.minAirPx) continue;
+    if (airAbove < 0 || airBelow < 0) continue;
+    if (req.pinAirAbovePx === undefined && (airAbove < req.minAirPx * 0.6 || airBelow < req.minAirPx)) continue;
     const blockTop = req.bandTopPx + halo + airAbove;
     const firstBaseline = blockTop + CAP * size;
 
@@ -466,48 +527,114 @@ export async function planBackCoverLine(req: BackCoverLineRequest): Promise<Back
 }
 
 /**
- * Find the foot of the painted byline panel on the FRONT cover.
+ * Find a painted panel on the FRONT cover — the title block or the byline plaque.
  *
- * The author's name sits in a solid dark plaque with a gold rule around it. To
- * put anything beneath it the build has to know where it ends, and it cannot be
- * told: the plaque is painted into the artwork, and it lands at a different
- * height on every binding because each one scales and stretches the picture
- * differently.
+ * Both are solid dark-green plaques with a gold rule, painted into the artwork,
+ * and to put anything against one the build has to know where it is. It cannot
+ * be told: they land at different heights on every binding, because each one
+ * scales and stretches the picture differently.
  *
  * A plaque row is unmistakable — a long horizontal run of near-uniform dark
- * green, which nothing else on this cover does. The last such row plus the gold
- * rule beneath it is the foot.
+ * green, which nothing else on this cover does. Which plaque you get is decided
+ * by the search range: the title block is in the top half, the byline plaque in
+ * the bottom quarter.
  *
- * Returns the foot in PIXELS from the top of the wrap.
+ * Returns pixels from the top and left of the wrap.
  */
-export async function findBylinePanel(
+export async function findPaintedPanel(
   wrap: Buffer,
   frontLeftPx: number,
   frontRightPx: number,
   searchTopPx: number,
   searchBottomPx: number,
   rulePadPx: number,
-): Promise<{ topPx: number; footPx: number }> {
+): Promise<{ topPx: number; footPx: number; leftPx: number; rightPx: number }> {
   const { data, info } = await sharp(wrap).raw().toBuffer({ resolveWithObject: true });
   const width = frontRightPx - frontLeftPx;
+  const isPanel = (x: number, y: number): boolean => {
+    const i = (y * info.width + x) * info.channels;
+    const r = data[i]!;
+    const g = data[i + 1]!;
+    const b = data[i + 2]!;
+    return r < 60 && g < 75 && b < 60 && g >= r;
+  };
+
   let first = -1;
   let last = -1;
   for (let y = searchTopPx; y < Math.min(searchBottomPx, info.height); y += 1) {
     let dark = 0;
-    for (let x = frontLeftPx; x < frontRightPx; x += 1) {
-      const i = (y * info.width + x) * info.channels;
-      const r = data[i]!;
-      const g = data[i + 1]!;
-      const b = data[i + 2]!;
-      if (r < 60 && g < 75 && b < 60 && g >= r) dark += 1;
-    }
+    for (let x = frontLeftPx; x < frontRightPx; x += 1) if (isPanel(x, y)) dark += 1;
     if (dark > width * 0.35) {
       if (first < 0) first = y;
       last = y;
     }
   }
-  if (last < 0) throw new Error('no byline plaque found on the front panel — layout not recognised');
-  return { topPx: first - rulePadPx, footPx: last + rulePadPx };
+  if (last < 0) throw new Error('no painted panel found on the front panel — layout not recognised');
+
+  /**
+   * Edges from rows in the plaque's TOP PADDING, where there is sky either side.
+   *
+   * Three earlier attempts all failed on this artwork, each for its own reason,
+   * and they are worth naming because they all looked correct:
+   *
+   *   - leftmost/rightmost dark pixel, and longest dark run, on the widest row:
+   *     canyon wall in deep shadow runs down the left of the front panel, is
+   *     dark enough to pass, and TOUCHES the plaque — so the plaque appeared to
+   *     start at the spine fold.
+   *   - the gold rule: sunlit sandstone on the right is the same hue, and the
+   *     plaque jumped to a strip of rock.
+   *   - columns dark for the plaque's whole height: the plaque is full of
+   *     CREAM TITLE TEXT, so its own columns fail that test and only the narrow
+   *     padding at one side survived.
+   *
+   * What works is choosing WHERE to look. Just below the plaque's top edge there
+   * is a band of solid fill above the first line of type, and at that height the
+   * artwork either side is sky — the brightest thing on the cover. The run is
+   * unambiguous there. Several rows are probed and the median taken, so one
+   * unlucky row cannot decide it.
+   */
+  const runOn = (y: number): [number, number] => {
+    const GAP = Math.round(width * 0.01);
+    let bl = 0;
+    let br = -1;
+    let start = -1;
+    let gap = 0;
+    for (let x = frontLeftPx; x <= frontRightPx; x += 1) {
+      const on = x < frontRightPx && isPanel(x, y);
+      if (on) {
+        if (start < 0) start = x;
+        gap = 0;
+      } else if (start >= 0) {
+        gap += 1;
+        if (gap > GAP || x === frontRightPx) {
+          const end = x - gap;
+          if (end - start > br - bl) {
+            bl = start;
+            br = end;
+          }
+          start = -1;
+          gap = 0;
+        }
+      }
+    }
+    return [bl, br];
+  };
+
+  const lefts: number[] = [];
+  const rights: number[] = [];
+  for (let y = first + 2; y < first + Math.round(0.11 * (frontRightPx - frontLeftPx) * 0.16); y += 1) {
+    const [l, r] = runOn(y);
+    if (r > l) {
+      lefts.push(l);
+      rights.push(r);
+    }
+  }
+  if (lefts.length === 0) throw new Error('painted panel has no solid row below its top edge — layout not recognised');
+  lefts.sort((x, y) => x - y);
+  rights.sort((x, y) => x - y);
+  const left = lefts[Math.floor(lefts.length / 2)]!;
+  const right = rights[Math.floor(rights.length / 2)]!;
+  return { topPx: first - rulePadPx, footPx: last + rulePadPx, leftPx: left, rightPx: right };
 }
 
 export interface ParkListOverlayRequest {

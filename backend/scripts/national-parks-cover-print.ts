@@ -17,7 +17,7 @@ import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { extendSkyUpward, planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
 import {
-  findBylinePanel,
+  findPaintedPanel,
   planBackCoverLine,
   planParkListOverlay,
 } from '../src/pipeline/publishing-standard/back-cover-copy.js';
@@ -214,40 +214,45 @@ const FRONT_RIGHT_IN = FRONT_LEFT_IN + TRIM_W;
 const FRONT_LIVE_LEFT_IN = FRONT_LEFT_IN + LIVE_MARGIN_IN;
 const FRONT_LIVE_RIGHT_IN = FRONT_RIGHT_IN - LIVE_MARGIN_IN;
 const FRONT_LIVE_BOTTOM_IN = fullHeightIn - BLEED - LIVE_MARGIN_IN;
-/** Look for the plaque only in the bottom quarter, well below the title block. */
-const FRONT_BYLINE_SEARCH_TOP_IN = fullHeightIn * 0.75;
+/** The title block sits in the top half; stop well above the hiker. */
+const TITLE_PANEL_SEARCH_BOTTOM_IN = fullHeightIn * 0.66;
 
-const frontLeftPx = Math.round(FRONT_LEFT_IN * DPI);
-const frontRightPx = Math.round(FRONT_RIGHT_IN * DPI);
-const byline = await findBylinePanel(
-  withParks,
-  frontLeftPx,
-  frontRightPx,
-  Math.round(FRONT_BYLINE_SEARCH_TOP_IN * DPI),
-  Math.round(FRONT_LIVE_BOTTOM_IN * DPI),
-  Math.round(0.03 * DPI),
-);
+const FRONT_LEFT_PX = Math.round(FRONT_LEFT_IN * DPI);
+const FRONT_RIGHT_PX = Math.round(FRONT_RIGHT_IN * DPI);
 /**
- * ABOVE THE BYLINE PLAQUE, ON BOTH EDITIONS.
+ * UNDER THE SUBTITLE, SET LIKE THE BACK COVER.
  *
- * The strip first went below the plaque on the paperback, because that is where
- * the paperback had room. It reads better above it — the parks introduce the
- * author rather than trailing off the bottom of the cover — and the hardcover
- * has to go there regardless, since its plaque sits two thousandths of an inch
- * inside the live foot. So both editions place it the same way.
+ * Two lines rather than one, and that is the whole point: seven park names on a
+ * single line across a six-inch cover can only ever be about nine point, which
+ * is too small to read from a shelf or a thumbnail. Breaking them over two lines
+ * halves the width each line has to carry and buys about half as much size again.
  *
- * SIZE IS BOUND BY WIDTH, not by the band. Seven park names and six separators
- * on one line across a six-inch cover is simply a long line; the fitter takes
- * the largest size whose RENDER still fits the live width, and on this cover
- * that lands around nine point. Making it bigger means two lines, and one line
- * is the brief.
+ * It sits directly beneath the title block, in the same "Featured parks:" style
+ * the back cover uses, aligned to the block's own width so it reads as the last
+ * line of the title lockup rather than as something dropped onto the picture.
  */
+const titlePanel = await findPaintedPanel(
+  withParks,
+  FRONT_LEFT_PX,
+  FRONT_RIGHT_PX,
+  Math.round(0.4 * DPI),
+  Math.round(TITLE_PANEL_SEARCH_BOTTOM_IN * DPI),
+  Math.round(0.02 * DPI),
+);
+
 const JOINER = process.env.NP_JOINER ?? ' · ';
-const bandBottomPx = byline.topPx - Math.round(0.055 * DPI);
-const bandTopPx = bandBottomPx - Math.round(0.34 * DPI);
+/** Cap in points, so the list stays clearly subordinate to the subtitle. */
+const FRONT_MAX_PT = Number(process.env.NP_FRONT_PT ?? 13.5);
+const bandTopPx = titlePanel.footPx;
+const bandBottomPx = bandTopPx + Math.round(0.62 * DPI);
+console.log(
+  `
+front strip: title block ${(titlePanel.topPx / DPI).toFixed(3)}-${(titlePanel.footPx / DPI).toFixed(3)}in, ` +
+    `x ${(titlePanel.leftPx / DPI).toFixed(3)}-${(titlePanel.rightPx / DPI).toFixed(3)}in`,
+);
 
 const frontParks = await planBackCoverLine({
-  lead: '',
+  lead: 'Featured parks:',
   items: PARKS,
   joiner: JOINER,
   wrapWidthPx: W,
@@ -255,32 +260,30 @@ const frontParks = await planBackCoverLine({
   dpi: DPI,
   bandTopPx,
   bandBottomPx,
-  columnLeftPx: Math.round(FRONT_LIVE_LEFT_IN * DPI),
-  columnRightPx: Math.round(FRONT_LIVE_RIGHT_IN * DPI),
+  columnLeftPx: titlePanel.leftPx,
+  columnRightPx: titlePanel.rightPx,
   align: 'centre',
-  minAirPx: Math.round(0.05 * DPI),
-  maxSizePx: Math.round(0.26 * DPI),
+  minAirPx: 0,
+  maxSizePx: Math.round((FRONT_MAX_PT / 72) * DPI),
+  pinAirAbovePx: Math.round(0.055 * DPI),
+  targetLines: 2,
 });
-if (frontParks.lines.length !== 1) {
-  throw new Error(`front strip wrapped to ${frontParks.lines.length} lines; the brief is one line`);
-}
 
-console.log(`
-front strip: plaque ${(byline.topPx / DPI).toFixed(3)}-${(byline.footPx / DPI).toFixed(3)}in, band ${(bandTopPx / DPI).toFixed(3)}-${(bandBottomPx / DPI).toFixed(3)}in, joiner "${JOINER}"`);
-console.log(`front parks: ${frontParks.sizePx}px (${(frontParks.sizePx / DPI * 72).toFixed(1)}pt), ${frontParks.lines.length} line(s), widest ${(frontParks.widestLinePx / DPI).toFixed(3)}in of ${(frontParks.measurePx / DPI).toFixed(3)}in`);
+console.log(
+  `front parks: ${frontParks.sizePx}px (${((frontParks.sizePx / DPI) * 72).toFixed(1)}pt), ` +
+    `${frontParks.lines.length} line(s), widest ${(frontParks.widestLinePx / DPI).toFixed(3)}in of ` +
+    `${(frontParks.measurePx / DPI).toFixed(3)}in`,
+);
 for (const l of frontParks.lines) console.log(`           : "${l}"`);
-console.log(`           : block ${(frontParks.blockTopPx / DPI).toFixed(3)}-${(frontParks.blockBottomPx / DPI).toFixed(3)}in, air ${(frontParks.airAbovePx / DPI).toFixed(3)}in above / ${(frontParks.airBelowPx / DPI).toFixed(3)}in below`);
+console.log(
+  `           : block ${(frontParks.blockTopPx / DPI).toFixed(3)}-${(frontParks.blockBottomPx / DPI).toFixed(3)}in, ` +
+    `x ${(frontParks.drawnLeftPx / DPI).toFixed(3)}-${(frontParks.drawnRightPx / DPI).toFixed(3)}in`,
+);
 
-{
-  if (frontParks.blockBottomPx > byline.topPx) throw new Error('front strip overlaps the byline plaque');
-  if (frontParks.blockTopPx / DPI < 0.375) throw new Error('front strip is above the live area');
-  const leftIn = frontParks.drawnLeftPx / DPI;
-  const rightIn = frontParks.drawnRightPx / DPI;
-  if (leftIn < FRONT_LIVE_LEFT_IN || rightIn > FRONT_LIVE_RIGHT_IN) {
-    throw new Error(`front strip spans ${leftIn.toFixed(3)}-${rightIn.toFixed(3)}in, outside the live area`);
-  }
-  console.log(`           : x ${leftIn.toFixed(3)}-${rightIn.toFixed(3)}in of live ${FRONT_LIVE_LEFT_IN.toFixed(3)}-${FRONT_LIVE_RIGHT_IN.toFixed(3)}in`);
+if (frontParks.lines.length !== 2) {
+  throw new Error(`front strip set ${frontParks.lines.length} lines; the brief is two`);
 }
+if (frontParks.blockTopPx < titlePanel.footPx) throw new Error('front strip overlaps the title block');
 
 const withFrontParks = await sharp(withParks)
   .composite([{ input: Buffer.from(frontParks.svg), left: 0, top: 0 }])

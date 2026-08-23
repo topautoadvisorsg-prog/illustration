@@ -42,20 +42,20 @@ const ARTIFACTS = {
   kindleCover: 'kindle/7-national-parks-KINDLE-cover-1600x2560.jpg',
 } as const;
 
-/* The three cover files have been re-cut several times across 2026-08-22/23:
-   spine type re-centred, then sized for real fold tolerance, then the seven
-   parks named on the back cover, then the same seven carried along the foot of
-   the front, and finally that front strip moved ABOVE the byline plaque on both
-   editions so the two bindings match. The Kindle JPG moves with the print front
-   panel, because it is a crop of it. Every superseded file is kept, named with
-   its hash, under `_np_build/_superseded-*`. */
+/* The three cover files have been re-cut repeatedly across 2026-08-22/23 as the
+   front-cover treatment settled: spine type re-centred and then sized for real
+   fold tolerance, the seven parks named on the back cover, then carried onto the
+   front, and finally moved from a one-line strip near the byline to two balanced
+   lines under the subtitle, where they can be half again as large. The Kindle JPG
+   moves with the print front panel, because it is a crop of it. Every superseded
+   file is kept, named with its hash, under `_np_build/_superseded-*`. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
   pbInterior: '1e7cb467e630287d6994eb62cfadf4be716c2f262e45d18662e6b61ef5d9b3ac',
-  pbCover: '9200ef4b330cf7e0b8f6528da050146fcf812ff24734669bf9fb230b8fab5fd3',
+  pbCover: '31b325530fb2782c60305502d18482e59b83506ff1cdc8de51d9ab0f7199c5da',
   hcInterior: '1e7cb467e630287d6994eb62cfadf4be716c2f262e45d18662e6b61ef5d9b3ac',
-  hcCover: 'b592ee8b7faa40f85d4c7fb23803fc4cb412260ad1d80c5982722413f601938c',
+  hcCover: '89bb590e2402e86e0e8a82a01763f9f15e80395df08e680ca2230f53aaa563aa',
   epub: '2c013d1da3cadf0418edeaf3dfff6b4705e8318beaab2ab951c57a209e41d95d',
-  kindleCover: '7c1ee50c65a4daa1edac7005e44da1aa48c5302912dae2b81a8d30a5cad86a54',
+  kindleCover: '23d8155366e180412f0ff3ab4ebdbc0466832e876f425366796e115b9c7f1e61',
 };
 
 const PAGES = 116;

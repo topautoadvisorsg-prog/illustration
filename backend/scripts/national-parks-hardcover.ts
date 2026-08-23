@@ -26,7 +26,7 @@ import sharp from 'sharp';
 import { getKdpCoverDimensions } from '../src/pipeline/publishing-standard/kdp-cover-specs.js';
 import { extendSkyUpward, planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
 import {
-  findBylinePanel,
+  findPaintedPanel,
   planBackCoverLine,
   planParkListOverlay,
 } from '../src/pipeline/publishing-standard/back-cover-copy.js';
@@ -234,52 +234,47 @@ const withParks = await sharp(placed)
   .toBuffer();
 
 
-// -- The same seven parks along the foot of the FRONT cover ------------------
+// -- The same seven parks on the FRONT cover, under the subtitle -------------
 /**
- * Matches the paperback: the parks named on the front as well as the back, as a
- * strip under the byline plaque, set in code over the finished artwork.
- *
  * A hardcover's outer edges are the turn-in rather than a bleed, so "safe" here
  * is `wrapIn + marginIn + 0.125` from the outside and the hinge from the spine
  * side — the same envelope the back copy is held to.
  */
+/**
+ * UNDER THE SUBTITLE, SET LIKE THE BACK COVER — the same as the paperback.
+ *
+ * Two lines rather than one, and that is the point: seven names on a single line
+ * across a six-inch cover can only ever be about nine point. Breaking them over
+ * two halves the width each line carries and buys about half as much size again.
+ *
+ * The title block is FOUND on this wrap rather than copied from the paperback's
+ * coordinates: the same artwork sits 6.6% larger here with its top half stretched
+ * another 28%, so nothing measured over there means anything here.
+ */
 const FRONT_LIVE_LEFT_IN = spineR + d.hingeIn;
 const FRONT_LIVE_RIGHT_IN = d.fullWidthIn - SAFE_FROM_EDGE;
-const FRONT_LIVE_BOTTOM_IN = d.fullHeightIn - SAFE_FROM_EDGE;
 
-const byline = await findBylinePanel(
+const titlePanel = await findPaintedPanel(
   withParks,
   Math.round(spineR * DPI),
   Math.round(frontPanelR * DPI),
-  Math.round(d.fullHeightIn * 0.75 * DPI),
-  Math.round(FRONT_LIVE_BOTTOM_IN * DPI),
-  Math.round(0.03 * DPI),
+  Math.round(0.4 * DPI),
+  Math.round(d.fullHeightIn * 0.66 * DPI),
+  Math.round(0.02 * DPI),
 );
 
-/**
- * ABOVE THE BYLINE PLAQUE — the same placement the paperback now uses.
- *
- * The hardcover has no choice: its plaque foot lands at 9.699in against a
- * 9.701in live foot, because a hardcover's outer edge is a 0.591in turn-in
- * folding around board rather than a 0.125in bleed. But it also reads better
- * here, so the paperback was moved up to match rather than the two editions
- * being laid out differently.
- *
- * Size is bound by WIDTH, not by the band: seven names and six separators on one
- * line across a six-inch cover. The fitter takes the largest size whose RENDER
- * still fits the live width.
- */
 const JOINER = process.env.NP_JOINER ?? ' · ';
-const bandBottomPx = byline.topPx - Math.round(0.055 * DPI);
-const bandTopPx = bandBottomPx - Math.round(0.34 * DPI);
+const FRONT_MAX_PT = Number(process.env.NP_FRONT_PT ?? 13.5);
+const bandTopPx = titlePanel.footPx;
+const bandBottomPx = bandTopPx + Math.round(0.62 * DPI);
 console.log(
   `
-front strip: plaque ${(byline.topPx / DPI).toFixed(3)}-${(byline.footPx / DPI).toFixed(3)}in, ` +
-    `band ${(bandTopPx / DPI).toFixed(3)}-${(bandBottomPx / DPI).toFixed(3)}in, joiner "${JOINER}"`,
+front strip: title block ${(titlePanel.topPx / DPI).toFixed(3)}-${(titlePanel.footPx / DPI).toFixed(3)}in, ` +
+    `x ${(titlePanel.leftPx / DPI).toFixed(3)}-${(titlePanel.rightPx / DPI).toFixed(3)}in`,
 );
 
 const frontParks = await planBackCoverLine({
-  lead: '',
+  lead: 'Featured parks:',
   items: PARKS,
   joiner: JOINER,
   wrapWidthPx: W,
@@ -287,11 +282,13 @@ const frontParks = await planBackCoverLine({
   dpi: DPI,
   bandTopPx,
   bandBottomPx,
-  columnLeftPx: Math.round(FRONT_LIVE_LEFT_IN * DPI),
-  columnRightPx: Math.round(FRONT_LIVE_RIGHT_IN * DPI),
+  columnLeftPx: titlePanel.leftPx,
+  columnRightPx: titlePanel.rightPx,
   align: 'centre',
-  minAirPx: Math.round(0.05 * DPI),
-  maxSizePx: Math.round(0.26 * DPI),
+  minAirPx: 0,
+  maxSizePx: Math.round((FRONT_MAX_PT / 72) * DPI),
+  pinAirAbovePx: Math.round(0.055 * DPI),
+  targetLines: 2,
 });
 
 console.log(
@@ -302,12 +299,18 @@ console.log(
 for (const l of frontParks.lines) console.log(`           : "${l}"`);
 console.log(
   `           : block ${(frontParks.blockTopPx / DPI).toFixed(3)}-${(frontParks.blockBottomPx / DPI).toFixed(3)}in, ` +
-    `x ${(frontParks.drawnLeftPx / DPI).toFixed(3)}-${(frontParks.drawnRightPx / DPI).toFixed(3)}in of live ` +
-    `${FRONT_LIVE_LEFT_IN.toFixed(3)}-${FRONT_LIVE_RIGHT_IN.toFixed(3)}in`,
+    `x ${(frontParks.drawnLeftPx / DPI).toFixed(3)}-${(frontParks.drawnRightPx / DPI).toFixed(3)}in`,
 );
 
-if (frontParks.blockBottomPx > byline.topPx) throw new Error('front strip overlaps the byline plaque');
-if (frontParks.lines.length !== 1) throw new Error(`front strip wrapped to ${frontParks.lines.length} lines; the brief is one line`);
+if (frontParks.lines.length !== 2) throw new Error(`front strip set ${frontParks.lines.length} lines; the brief is two`);
+if (frontParks.blockTopPx < titlePanel.footPx) throw new Error('front strip overlaps the title block');
+{
+  const l = frontParks.drawnLeftPx / DPI;
+  const r = frontParks.drawnRightPx / DPI;
+  if (l < FRONT_LIVE_LEFT_IN || r > FRONT_LIVE_RIGHT_IN) {
+    throw new Error(`front strip spans ${l.toFixed(3)}-${r.toFixed(3)}in, outside live ${FRONT_LIVE_LEFT_IN.toFixed(3)}-${FRONT_LIVE_RIGHT_IN.toFixed(3)}in`);
+  }
+}
 
 const withFrontParks = await sharp(withParks)
   .composite([{ input: Buffer.from(frontParks.svg), left: 0, top: 0 }])
