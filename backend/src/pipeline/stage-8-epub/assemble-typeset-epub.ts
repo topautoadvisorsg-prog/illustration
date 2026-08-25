@@ -480,13 +480,12 @@ function navTitleOf(section: TypesetSection): string {
  * The ebook simply never called it. Same helper here, so the two editions cannot
  * disagree about what a heading says.
  *
- * The one deliberate difference is the drawn warning mark. Print transliterates it
- * to `->` because the running head sits in the margin beside body copy; a contents
- * entry has no such context, and a leading arrow there just reads as a stray
- * character. It is dropped instead.
+ * Drawn warning marks are dropped by `plainHeadingText` itself, for both editions:
+ * a mark is emphasis on the heading where it is drawn, and in a contents entry or
+ * a running head it is decoration that has lost its meaning.
  */
 export function plainTitleOf(section: Pick<TypesetSection, 'title' | 'number'>): string {
-  const title = plainHeadingText(section.title).replace(/^->\s*/, '').trim();
+  const title = plainHeadingText(section.title);
   return section.number !== null ? `Chapter ${section.number}: ${title}` : title;
 }
 

@@ -43,16 +43,16 @@ const ARTIFACTS = {
 } as const;
 
 /* The three cover files have been re-cut repeatedly across 2026-08-22/23 as the
-   front-cover treatment settled: spine type re-centred and then sized for real
-   fold tolerance, the seven parks named on the back cover, then carried onto the
-   front, and finally moved from a one-line strip near the byline to two balanced
-   lines under the subtitle, where they can be half again as large. The Kindle JPG
-   moves with the print front panel, because it is a crop of it. Every superseded
-   file is kept, named with its hash, under `_np_build/_superseded-*`. */
+   front-cover treatment settled, and the INTERIOR changed once, on 2026-08-23,
+   to drop a stray "->" from the appendix running head. That rebuild was proved
+   inert: 116 pages before and after, every page identical character for
+   character except the two running heads, the five plates on the same pages,
+   the parity blanks unmoved. Every superseded file is kept, named with its hash,
+   under `_np_build/_superseded-*`. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
-  pbInterior: '1e7cb467e630287d6994eb62cfadf4be716c2f262e45d18662e6b61ef5d9b3ac',
+  pbInterior: '93700cc83bdb3db5042b5c25e1c94f104821a9be1ba12b2dc4401f13b7132de9',
   pbCover: '31b325530fb2782c60305502d18482e59b83506ff1cdc8de51d9ab0f7199c5da',
-  hcInterior: '1e7cb467e630287d6994eb62cfadf4be716c2f262e45d18662e6b61ef5d9b3ac',
+  hcInterior: '93700cc83bdb3db5042b5c25e1c94f104821a9be1ba12b2dc4401f13b7132de9',
   hcCover: '89bb590e2402e86e0e8a82a01763f9f15e80395df08e680ca2230f53aaa563aa',
   epub: '2c013d1da3cadf0418edeaf3dfff6b4705e8318beaab2ab951c57a209e41d95d',
   kindleCover: '23d8155366e180412f0ff3ab4ebdbc0466832e876f425366796e115b9c7f1e61',

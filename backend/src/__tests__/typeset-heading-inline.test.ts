@@ -144,8 +144,12 @@ describe('the running head gets plain text, never markup', () => {
     expect(plainHeadingText('*Italic*')).toBe('Italic');
     expect(plainHeadingText('***Both***')).toBe('Both');
     expect(plainHeadingText('⚠ Careful')).toBe('Careful');
-    expect(plainHeadingText('See → there')).toBe('See -> there');
-    expect(plainHeadingText('⟶ Onward')).toBe('-> Onward');
+    // A drawn mark is DROPPED, not spelled out. Transliterating `⟶` to `->`
+    // put "-> ALL FIGURES IN THIS APPENDIX..." along the top of two printed
+    // pages of 7 NATIONAL PARKS, which reads as a mistake rather than an arrow.
+    expect(plainHeadingText('See → there')).toBe('See there');
+    expect(plainHeadingText('⟶ Onward')).toBe('Onward');
+    expect(plainHeadingText('🚩 Flagged')).toBe('Flagged');
     expect(plainHeadingText('Plain title')).toBe('Plain title');
   });
 });

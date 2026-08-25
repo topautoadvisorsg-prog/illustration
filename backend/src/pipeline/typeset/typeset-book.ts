@@ -236,16 +236,27 @@ export function inlineHeadingHtml(s: string): string {
  * literal tags in the margin, which is worse than the asterisks this replaces.
  * So display gets `inlineHeading` and the attribute gets this.
  *
- * Drawn glyphs cannot travel here either: an SVG is not a character. They are
- * replaced with a plain-text equivalent so the running head still reads.
+ * ─── A DRAWN MARK IS DROPPED, NOT SPELLED OUT ────────────────────────────────
+ * Warning marks are drawn as SVG, and an SVG is not a character, so it cannot
+ * travel into a CSS string. An earlier version transliterated them — `⟶` became
+ * `->` — on the reasoning that something was better than nothing.
+ *
+ * It is not. 7 NATIONAL PARKS heads its appendix `⟶ ALL FIGURES IN THIS APPENDIX
+ * ARE CURRENT AS OF: August 2026`, and that ran along the top of pages 113 and
+ * 115 of the printed book as "-> ALL FIGURES...". A hyphen and a greater-than in
+ * a running head do not read as an arrow; they read as a mistake, and one that
+ * survived to a finished interior.
+ *
+ * A mark is emphasis on the heading where it is drawn. In the margin it is
+ * decoration that has lost its meaning, so it goes. The words are what a running
+ * head is for.
  */
 export function plainHeadingText(s: string): string {
   return s
     .replace(/\*\*\*(.+?)\*\*\*/g, '$1')
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/(^|[^*])\*([^*]+?)\*/g, '$1$2')
-    .replace(/[→⟶]/g, '->')
-    .replace(/🚩|⚠️?/g, '')
+    .replace(/[→⟶🚩]|⚠️?/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }

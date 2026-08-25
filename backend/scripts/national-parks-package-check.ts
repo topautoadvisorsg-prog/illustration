@@ -29,7 +29,7 @@ const INTERIOR = '7-national-parks-interior-6x9.pdf';
 const COVER = '7-national-parks-cover-6x9-116pp.pdf';
 const MANIFEST = 'KDP-UPLOAD-MANIFEST.md';
 
-const EXPECT_INTERIOR_SHA = '1e7cb467e630287d6994eb62cfadf4be716c2f262e45d18662e6b61ef5d9b3ac';
+const EXPECT_INTERIOR_SHA = '93700cc83bdb3db5042b5c25e1c94f104821a9be1ba12b2dc4401f13b7132de9';
 const EXPECT_COVER_SHA = 'ac77632ea1dcff7c9e7008b5f0f2b39988661130462e8eef1f2f31961399aefe';
 
 const PAGES = 116;
