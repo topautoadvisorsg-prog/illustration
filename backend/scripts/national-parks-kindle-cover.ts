@@ -24,12 +24,18 @@ if (!SRC || !OUT) throw new Error('usage: national-parks-kindle-cover.ts <wrapPr
 const TARGET_W = 1600;
 const TARGET_H = 2560;
 
-/** The approved paperback wrap, in inches. */
-const WRAP_W = 12.511232;
+/**
+ * The approved paperback wrap, in inches.
+ *
+ * These MUST track the interior's page count: the spine widens with it, and the
+ * front panel starts after the spine, so a stale figure crops the ebook cover
+ * off-centre. Defaults are the 118-page build; override for another.
+ */
+const WRAP_W = Number(process.env.NP_WRAP_W ?? 12.515736);
 const WRAP_H = 9.25;
 const BLEED = 0.125;
 const TRIM_W = 6;
-const SPINE = 0.261232;
+const SPINE = Number(process.env.NP_SPINE ?? 0.265736);
 
 const meta = await sharp(SRC).metadata();
 const pxPerIn = meta.width! / WRAP_W;

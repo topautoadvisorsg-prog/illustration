@@ -1572,6 +1572,17 @@ ul { list-style: disc; }
   font-size: ${ap.labelPt}pt; letter-spacing: ${ap.labelLetterSpacingEm}em;
   text-transform: uppercase; margin: 0 0 .45em; text-align: left; text-align-last: left;
   break-after: avoid; }
+/* A SPLIT PANEL IS ONE PANEL, NOT TWO.
+   When a panel is allowed to break, Paged.js rebuilds each fragment as its own
+   element, so both halves drew a complete four-sided box and the reader saw two
+   independent boxes across the spread rather than one continuing over the page.
+   Paged.js marks the fragments: data-split-to on the half that continues,
+   data-split-from on the half that resumes. Opening the facing edges turns them
+   back into one panel, and the label is suppressed on the continuation so the
+   heading is not announced twice. */
+.alert-panel[data-split-to] { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+.alert-panel[data-split-from] { border-top: none; padding-top: 0; margin-top: 0; }
+.alert-panel[data-split-from] > .alert-label { display: none; }
 .alert-panel p { text-indent: 0; }
 .alert-panel > p + p { margin-top: .3em; }
 .alert-panel ul, .alert-panel ol { margin: .3em 0; }

@@ -46,12 +46,29 @@ const MANIFEST = 'KDP-UPLOAD-MANIFEST.md';
  * and at upload time the only thing that matters is picking the right file.
  */
 const ARTIFACTS = {
-  interior: '7-national-parks-interior-6x9-116pp.pdf',
-  pbCover: '7-national-parks-cover-PAPERBACK-6x9-116pp.pdf',
-  hcCover: '7-national-parks-cover-HARDCOVER-6x9-116pp.pdf',
+  interior: '7-national-parks-interior-6x9-118pp.pdf',
+  pbCover: '7-national-parks-cover-PAPERBACK-6x9-118pp.pdf',
   epub: '7-national-parks-KINDLE.epub',
   kindleCover: '7-national-parks-KINDLE-cover-1600x2560.jpg',
 } as const;
+
+/**
+ * THE HARDCOVER COVER IS NOT IN THE PACKAGE, AND THAT IS THE POINT.
+ *
+ * The corrections took the interior from 116 pages to 118, and a hardcover spine
+ * cannot be derived from a formula the way a paperback's can — it comes from
+ * Amazon's Cover Calculator. `kdp-cover-specs` holds one verified reading for
+ * this configuration, at 116pp, and refuses to interpolate from a single point.
+ *
+ * So there is no hardcover wrap to ship, and the 116pp one would be wrong by
+ * design: a 0.450in spine on a 118-page block. It is quarantined under
+ * `_np_build/_superseded-116pp/` rather than left where it could be uploaded.
+ * This check reports the gap rather than passing a package that is missing a
+ * file someone is waiting to upload.
+ */
+const HARDCOVER_PENDING =
+  'hardcover wrap: BLOCKED until the KDP Cover Calculator is read for ' +
+  'HARDCOVER/CASE_LAMINATE, BLACK_AND_WHITE, WHITE paper, 6x9in, 118pp';
 
 /* The three cover files have been re-cut repeatedly across 2026-08-22/23 as the
    front-cover treatment settled, and the INTERIOR changed once, on 2026-08-23,
@@ -61,14 +78,13 @@ const ARTIFACTS = {
    the parity blanks unmoved. Every superseded file is kept, named with its hash,
    under `_np_build/_superseded-*`. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
-  interior: '93700cc83bdb3db5042b5c25e1c94f104821a9be1ba12b2dc4401f13b7132de9',
-  pbCover: '31b325530fb2782c60305502d18482e59b83506ff1cdc8de51d9ab0f7199c5da',
-  hcCover: '89bb590e2402e86e0e8a82a01763f9f15e80395df08e680ca2230f53aaa563aa',
-  epub: '2c013d1da3cadf0418edeaf3dfff6b4705e8318beaab2ab951c57a209e41d95d',
-  kindleCover: '23d8155366e180412f0ff3ab4ebdbc0466832e876f425366796e115b9c7f1e61',
+  interior: '261afc8aa89721f843a15dc466b0890b3624d1b84444289a93f9dcc856254dfd',
+  pbCover: '908fca62224e5443b4e37f8de0312b4dd1d9fa776210004d2b504d3ad0c94429',
+  epub: 'bf005b8ab244825d2d2f96bf9210fb5ba1cca6c7926c03ab144168253f51b024',
+  kindleCover: '0b83d753e04c3c3edabd02f753f4ef20280c0408f9e784f896963c170a6ebc30',
 };
 
-const PAGES = 116;
+const PAGES = 118;
 const PT = 72;
 
 /** Paperback: spine is derived from this interior's own page count. */
@@ -76,6 +92,7 @@ const PB_THICKNESS = 0.002252;
 const PB_SPINE = PAGES * PB_THICKNESS;
 const PB_WRAP_W = 0.125 * 2 + 6 * 2 + PB_SPINE;
 const PB_WRAP_H = 9 + 0.25;
+const PLATES_EXPECTED = 9;
 
 /** Hardcover: read from Amazon's Cover Calculator, 6x9 case laminate, 116pp. */
 const HC_WRAP_W = 14.025;
@@ -89,7 +106,7 @@ const sha = (b: Buffer): string => createHash('sha256').update(b).digest('hex');
 const abs = (rel: string): string => path.join(DIR, ...rel.split('/'));
 
 // ── 1. The exact bytes ─────────────────────────────────────────────────────
-console.log('1. FILE IDENTITY — five artifacts');
+console.log('1. FILE IDENTITY — four artifacts (the hardcover wrap is pending)');
 const bytes = {} as Record<keyof typeof ARTIFACTS, Buffer>;
 for (const key of Object.keys(ARTIFACTS) as Array<keyof typeof ARTIFACTS>) {
   const rel = ARTIFACTS[key];
@@ -194,8 +211,8 @@ else fail('trim', `${oddSize.length} page(s) are not 6 x 9`);
   else fail('fonts', `${unembedded.length} unembedded of ${fontsFound.size}: ${unembedded.map(([n]) => n).join(', ')}`);
 
   console.log(`   plates: ${plates.join(', ')}`);
-  if (plates.length === 5) pass('plate count', '5 stamped illustrations');
-  else fail('plate count', `${plates.length}, expected 5`);
+  if (plates.length === PLATES_EXPECTED) pass('plate count', `${PLATES_EXPECTED} stamped illustrations`);
+  else fail('plate count', `${plates.length}, expected ${PLATES_EXPECTED}`);
   if (plates.every((p) => p.includes('DeviceGray'))) pass('plate colour', 'every plate DeviceGray — a black-and-white interior');
   else fail('plate colour', 'a plate is not DeviceGray; KDP may price this as a colour interior');
 }
@@ -204,7 +221,6 @@ else fail('trim', `${oddSize.length} page(s) are not 6 x 9`);
 console.log('\n4. COVER WRAPS');
 for (const [label, buf, wantW, wantH, note] of [
   ['paperback', bytes.pbCover, PB_WRAP_W, PB_WRAP_H, `spine ${PB_SPINE.toFixed(6)} in from ${PAGES} pages`],
-  ['hardcover', bytes.hcCover, HC_WRAP_W, HC_WRAP_H, 'case laminate, spine 0.450 in per the KDP Cover Calculator'],
 ] as Array<[string, Buffer, number, number, string]>) {
   const doc = await PDFDocument.load(buf, { updateMetadata: false });
   const pages = doc.getPages();
@@ -216,19 +232,13 @@ for (const [label, buf, wantW, wantH, note] of [
   } else {
     fail(`${label} wrap`, `${w.toFixed(6)} x ${h.toFixed(6)} in, expected ${wantW.toFixed(6)} x ${wantH.toFixed(6)}`);
   }
-
   const annots = pages[0]!.node.lookupMaybe(PDFName.of('Annots'), PDFArray);
   const acro = doc.catalog.lookupMaybe(PDFName.of('AcroForm'), PDFDict);
   if ((!annots || annots.size() === 0) && !acro) pass(`${label} annotations`, 'none');
   else fail(`${label} annotations`, 'annotations or a form are present on a print cover');
 }
 
-/** The hardcover wrap is genuinely larger — if it were not, one of them is wrong. */
-if (HC_WRAP_W > PB_WRAP_W && HC_WRAP_H > PB_WRAP_H) {
-  pass('wrap separation', `hardcover is ${(HC_WRAP_W - PB_WRAP_W).toFixed(3)} in wider and ${(HC_WRAP_H - PB_WRAP_H).toFixed(3)} in taller — a distinct file, not a copy`);
-} else {
-  fail('wrap separation', 'the hardcover wrap is not larger than the paperback wrap');
-}
+fail(HARDCOVER_PENDING, `no wrap exists for a ${PAGES}-page block; the ${116}pp one is quarantined, not shipped`);
 
 // ── 5. Kindle ──────────────────────────────────────────────────────────────
 console.log('\n5. KINDLE');

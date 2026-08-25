@@ -12,6 +12,7 @@ import {
   buildTypesetHtml,
   chapterLabel,
   inlineHeadingHtml,
+  plainHeadingText,
   parseTypesetSections,
   typesetMarginsForTrim,
   TYPESET_DONE_JS,
@@ -314,7 +315,20 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
       // renderer already imports; doing it there would close an import cycle.
       titleHtml: inlineHeadingHtml(s.title),
       kind: s.kind,
-      page: pages ? (pages.get(s.title) ?? null) : null,
+      /**
+       * LOOKED UP BY THE SAME STRING THE PAGE MAP IS KEYED ON.
+       *
+       * The map comes from `data-title` in the rendered DOM, which is
+       * `plainHeadingText(title)` — markdown stripped, drawn marks dropped.
+       * This looked up the RAW title instead. For every ordinary heading the two
+       * are the same string and it worked; for a heading carrying emphasis or a
+       * mark it silently missed, and the contents printed a leader running to no
+       * page number at all.
+       *
+       * `⟶ ALL FIGURES IN THIS APPENDIX ARE CURRENT AS OF: **August 2026**` is
+       * such a heading, and its entry shipped that way on p3 of the printed book.
+       */
+      page: pages ? (pages.get(plainHeadingText(s.title)) ?? null) : null,
     }));
 
   const htmlFor = (pages: Map<string, number> | null): string =>
@@ -362,6 +376,28 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
       const pass1 = measured.sectionStarts.map((x) => ({ title: x.title, page: x.page }));
       const pages = new Map<string, number>();
       for (const x of measured.sectionStarts) if (x.page !== null) pages.set(x.title, x.page);
+
+      /**
+       * EVERY CONTENTS ENTRY MUST RESOLVE TO A PAGE.
+       *
+       * An entry renders a dotted leader and then whatever number it was given;
+       * given none, it renders the leader running into empty space. That is not
+       * a contents entry, it is a hole with a rule pointing at it, and it shipped
+       * on p3 because nothing checked.
+       *
+       * `assertTypesetComplete` did not catch it: it returns early whenever the
+       * counts match and only computes which titles are missing in order to
+       * write the error message. Counts matched. The lookup key did not.
+       */
+      const unresolved = tocEntries(pages).filter((e) => e.page === null);
+      if (unresolved.length > 0) {
+        throw new TypesetIncompleteError(
+          `${unresolved.length} contents entr${unresolved.length === 1 ? 'y has' : 'ies have'} no page number ` +
+            `and would print a leader running to nothing: ` +
+            `${unresolved.slice(0, 5).map((e) => JSON.stringify(e.title)).join(', ')}. ` +
+            `The page map is keyed on data-title; check that the lookup uses the same string.`,
+        );
+      }
 
       // A FRESH page, not setContent on this one. The completion flag lives on
       // `window`, which survives setContent, so the second pass would see pass
