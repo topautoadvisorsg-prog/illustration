@@ -32,14 +32,25 @@ if (!DIR) throw new Error('usage: national-parks-package-check-3.ts <deliveryDir
 
 const MANIFEST = 'KDP-UPLOAD-MANIFEST.md';
 
-/** The six artifacts, by the exact path they occupy in the delivery folder. */
+/**
+ * The five artifacts, by the exact name they carry in the delivery folder.
+ *
+ * ONE INTERIOR, not one per binding. The paperback and the hardcover are the
+ * same 6x9 block of pages; only the cover differs, because only the cover
+ * depends on how the book is bound. An earlier layout kept a copy of the
+ * interior in a `paperback/` folder and another in a `hardcover/` folder and
+ * proved them byte-identical, which was true and was the wrong shape: two files
+ * that must never differ are better stored as one file that cannot.
+ *
+ * Flat, too. Nesting hid the fact that four of the six files were really three,
+ * and at upload time the only thing that matters is picking the right file.
+ */
 const ARTIFACTS = {
-  pbInterior: 'paperback/7-national-parks-interior-6x9.pdf',
-  pbCover: 'paperback/7-national-parks-cover-6x9-116pp.pdf',
-  hcInterior: 'hardcover/7-national-parks-interior-6x9.pdf',
-  hcCover: 'hardcover/7-national-parks-HARDCOVER-6x9-116pp.pdf',
-  epub: 'kindle/7_NATIONAL_PARKS_WITHOUT_THE_ROOKIE_MISTAKES_KINDLE.epub',
-  kindleCover: 'kindle/7-national-parks-KINDLE-cover-1600x2560.jpg',
+  interior: '7-national-parks-interior-6x9-116pp.pdf',
+  pbCover: '7-national-parks-cover-PAPERBACK-6x9-116pp.pdf',
+  hcCover: '7-national-parks-cover-HARDCOVER-6x9-116pp.pdf',
+  epub: '7-national-parks-KINDLE.epub',
+  kindleCover: '7-national-parks-KINDLE-cover-1600x2560.jpg',
 } as const;
 
 /* The three cover files have been re-cut repeatedly across 2026-08-22/23 as the
@@ -50,9 +61,8 @@ const ARTIFACTS = {
    the parity blanks unmoved. Every superseded file is kept, named with its hash,
    under `_np_build/_superseded-*`. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
-  pbInterior: '93700cc83bdb3db5042b5c25e1c94f104821a9be1ba12b2dc4401f13b7132de9',
+  interior: '93700cc83bdb3db5042b5c25e1c94f104821a9be1ba12b2dc4401f13b7132de9',
   pbCover: '31b325530fb2782c60305502d18482e59b83506ff1cdc8de51d9ab0f7199c5da',
-  hcInterior: '93700cc83bdb3db5042b5c25e1c94f104821a9be1ba12b2dc4401f13b7132de9',
   hcCover: '89bb590e2402e86e0e8a82a01763f9f15e80395df08e680ca2230f53aaa563aa',
   epub: '2c013d1da3cadf0418edeaf3dfff6b4705e8318beaab2ab951c57a209e41d95d',
   kindleCover: '23d8155366e180412f0ff3ab4ebdbc0466832e876f425366796e115b9c7f1e61',
@@ -79,7 +89,7 @@ const sha = (b: Buffer): string => createHash('sha256').update(b).digest('hex');
 const abs = (rel: string): string => path.join(DIR, ...rel.split('/'));
 
 // ── 1. The exact bytes ─────────────────────────────────────────────────────
-console.log('1. FILE IDENTITY — six artifacts');
+console.log('1. FILE IDENTITY — five artifacts');
 const bytes = {} as Record<keyof typeof ARTIFACTS, Buffer>;
 for (const key of Object.keys(ARTIFACTS) as Array<keyof typeof ARTIFACTS>) {
   const rel = ARTIFACTS[key];
@@ -101,17 +111,18 @@ if (failures > 0) {
   process.exit(1);
 }
 
-// ── 2. The hardcover reuses the paperback interior, byte for byte ──────────
-console.log('\n2. SHARED INTERIOR');
-if (bytes.pbInterior.equals(bytes.hcInterior)) {
-  pass('interior reuse', 'hardcover interior is byte-identical to the paperback — one approved file, two bindings');
-} else {
-  fail('interior reuse', 'the two interiors differ; the approved interior was regenerated for the hardcover');
-}
+// ── 2. One interior, valid for both bindings ──────────────────────────────
+/**
+ * There is nothing left to compare — that is the point of storing it once. What
+ * still has to be proved is that this single file is acceptable to BOTH
+ * bindings, since it is uploaded to both.
+ */
+console.log('\n2. ONE INTERIOR, UPLOADED TO BOTH PRINT EDITIONS');
+pass('single source', 'one interior file, so the two print editions cannot drift apart');
 
-// ── 3. Interior geometry, checked once on the shared file ──────────────────
-console.log('\n3. INTERIOR (shared by both print editions)');
-const interior = await PDFDocument.load(bytes.pbInterior, { updateMetadata: false });
+// ── 3. Interior geometry ───────────────────────────────────────────────────
+console.log('\n3. INTERIOR');
+const interior = await PDFDocument.load(bytes.interior, { updateMetadata: false });
 const iPages = interior.getPages();
 
 if (iPages.length === PAGES) pass('page count', `${PAGES} pages`);
@@ -144,7 +155,7 @@ else fail('trim', `${oddSize.length} page(s) are not 6 x 9`);
 }
 
 {
-  const raw = bytes.pbInterior.toString('latin1');
+  const raw = bytes.interior.toString('latin1');
   const hasDash = /\[\s*\d+(\.\d+)?\s+\d+(\.\d+)?\s*\]\s*0\s+d/.test(raw);
   if (!hasDash) pass('review guides', 'no dashed stroke patterns — trim and text-area guides are off');
   else fail('review guides', 'dashed stroke pattern found; a guided build may have shipped');
@@ -329,7 +340,7 @@ console.log('\n6. DELIVERY FOLDER');
   const extra = found.filter((e) => !expected.includes(e));
   const missing = expected.filter((e) => !found.includes(e));
   if (extra.length === 0 && missing.length === 0) {
-    pass('folder contents', 'three edition folders, six artifacts and the manifest — nothing stale beside them');
+    pass('folder contents', 'five artifacts and the manifest, flat — nothing stale beside them');
   } else {
     if (extra.length) fail('unexpected files', extra.join(', '));
     if (missing.length) fail('missing files', missing.join(', '));
@@ -338,7 +349,7 @@ console.log('\n6. DELIVERY FOLDER');
   const manifest = readFileSync(abs(MANIFEST), 'utf8');
   const missingHashes = (Object.keys(ARTIFACTS) as Array<keyof typeof ARTIFACTS>)
     .filter((k) => !manifest.includes(EXPECT_SHA[k]));
-  if (missingHashes.length === 0) pass('manifest', 'lists the SHA-256 of every one of the six artifacts');
+  if (missingHashes.length === 0) pass('manifest', 'lists the SHA-256 of every one of the five artifacts');
   else fail('manifest', `no hash for ${missingHashes.map((k) => ARTIFACTS[k]).join(', ')}`);
 }
 
