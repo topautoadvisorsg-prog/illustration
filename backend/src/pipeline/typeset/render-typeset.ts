@@ -8,10 +8,10 @@
 
 import type { ProjectConfig } from '@wildlands/shared';
 import { loadPagedPolyfill, resolveChromiumPath } from '../stage-6-layout/render-pdf.js';
+import { escapeHtml } from '../stage-6-layout/render-html.js';
 import {
   buildTypesetHtml,
   chapterLabel,
-  inlineHeadingHtml,
   plainHeadingText,
   parseTypesetSections,
   typesetMarginsForTrim,
@@ -311,9 +311,25 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
       slug: slugifySection(s.title),
       label: chapterLabel(s, input.layoutStandard?.opener.labelFormat),
       title: s.title,
-      // Rendered here rather than in front-matter.ts, which this module's
-      // renderer already imports; doing it there would close an import cycle.
-      titleHtml: inlineHeadingHtml(s.title),
+      /**
+       * A CONTENTS ENTRY IS A LABEL, NOT THE HEADING.
+       *
+       * This used `inlineHeadingHtml`, which is right for the heading where it
+       * is set and wrong in a list of destinations: it carries the heading's
+       * emphasis and its drawn marks into the leader line. The appendix banner
+       * of 7 NATIONAL PARKS begins with an arrow and ends in bold, so its
+       * contents entry printed with an SVG arrow hanging off the left of the
+       * line and "August 2026" in bold on a second line — among twenty other
+       * entries set plain. The reader is choosing a page number, not reading
+       * the heading twice.
+       *
+       * Same text the running head uses, for the same reason: marks dropped
+       * rather than transliterated, emphasis flattened.
+       *
+       * Rendered here rather than in front-matter.ts, which this module's
+       * renderer already imports; doing it there would close an import cycle.
+       */
+      titleHtml: escapeHtml(plainHeadingText(s.title)),
       kind: s.kind,
       /**
        * LOOKED UP BY THE SAME STRING THE PAGE MAP IS KEYED ON.

@@ -225,8 +225,41 @@ function inlineMarkdown(s: string, longTokens?: LongTokenWrappingPolicy): string
  * Long-token breaking is deliberately NOT applied: `<wbr>` in a heading invites
  * a break in a display line, and a heading is short enough not to need one.
  */
+/**
+ * The marks a HEADING never carries: both arrows, the flag, and the warning
+ * triangle with or without its variation selector. One definition, used by every
+ * heading path, because three copies of this list is how they drift.
+ */
+const DRAWN_MARKS = /[\u2192\u27F6\u{1F6A9}]|\u26A0\uFE0F?/gu;
+
 export function inlineHeadingHtml(s: string): string {
-  return inlineMarkdown(s);
+  return inlineMarkdown(stripDrawnMarks(s));
+}
+
+/**
+ * Drawn marks come OFF a heading, everywhere a heading is set.
+ *
+ * A mark like an arrow or a warning triangle is emphasis inside a sentence,
+ * where it sits in the run of text and points at the words beside it. A heading
+ * is not a sentence. Set at display size and centred in the measure, a leading
+ * arrow hangs outside the left edge of the text column, throws the optical
+ * centring off, and is the only glyph of its kind at that size in the book.
+ *
+ * 7 NATIONAL PARKS heads its appendix with an arrow before "ALL FIGURES IN THIS
+ * APPENDIX ARE CURRENT AS OF: August 2026". That mark was already dropped from
+ * the running head and from the contents entry, for the same reason in each
+ * case; leaving it on the display heading alone made the three disagree about
+ * the same title.
+ *
+ * SAME LIST AS `plainHeadingText`, deliberately shared, so display, running head
+ * and contents cannot drift apart again. Body text is untouched: an arrow inside
+ * a paragraph is a real cross-reference and still draws.
+ */
+export function stripDrawnMarks(s: string): string {
+  return s
+    .replace(DRAWN_MARKS, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 /**
@@ -257,7 +290,7 @@ export function plainHeadingText(s: string): string {
     .replace(/\*\*\*(.+?)\*\*\*/g, '$1')
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/(^|[^*])\*([^*]+?)\*/g, '$1$2')
-    .replace(/[→⟶🚩]|⚠️?/g, '')
+    .replace(DRAWN_MARKS, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }

@@ -102,10 +102,21 @@ export async function stampIllustrations(input: StampInput): Promise<StampResult
       orphaned.push({ blockId, reason: 'anchor block is not in this render' });
       continue;
     }
-    const pageNumber = Math.max(...fragments.map((b) => b.page as number));
+    /**
+     * The anchor resolves to a page; `pageOffset` then steps one leaf off it, so
+     * a plate can land on a parity blank, which has no blocks of its own to
+     * anchor to. Offset 0 is the ordinary case and the default.
+     */
+    const anchorPage = Math.max(...fragments.map((b) => b.page as number));
+    const pageNumber = anchorPage + (illustration.pageOffset ?? 0);
     const page = pages[pageNumber - 1];
     if (!page) {
-      orphaned.push({ blockId, reason: `resolved to page ${pageNumber}, which the PDF does not have` });
+      orphaned.push({
+        blockId,
+        reason:
+          `anchor resolved to page ${anchorPage}, offset ${illustration.pageOffset ?? 0} ` +
+          `gives page ${pageNumber}, which the PDF does not have`,
+      });
       continue;
     }
 
@@ -124,8 +135,26 @@ export async function stampIllustrations(input: StampInput): Promise<StampResult
 
     const regionTopIn = typeBottomIn + artGapIn;
     const regionBottomIn = input.trim.heightIn - input.margins.bottomIn;
-    const regionLeftIn = input.margins.gutterIn;
-    const regionRightIn = input.trim.widthIn - input.margins.outsideIn;
+    /**
+     * WHICH SIDE THE GUTTER IS ON DEPENDS ON THE LEAF.
+     *
+     * This read `left = gutter` unconditionally. That is true on a recto and
+     * wrong on every verso, because the binding margin swaps sides at every page
+     * turn. With a 0.625in gutter against a 0.5in outside margin the two text
+     * centres are 0.125in apart, so every verso plate sat an eighth of an inch
+     * toward the spine while every recto plate was exact.
+     *
+     * Four of the ten plates in 7 NATIONAL PARKS were off this way. It is the
+     * shape of defect no data check can see: the plate is present, the right
+     * size, the right colour space and the right resolution, and visibly not
+     * centred on the page.
+     *
+     * Odd page numbers are rectos.
+     */
+    const isRecto = pageNumber % 2 === 1;
+    const regionLeftIn = isRecto ? input.margins.gutterIn : input.margins.outsideIn;
+    const regionRightIn =
+      input.trim.widthIn - (isRecto ? input.margins.outsideIn : input.margins.gutterIn);
     const regionHIn = regionBottomIn - regionTopIn;
     const regionWIn = regionRightIn - regionLeftIn;
 

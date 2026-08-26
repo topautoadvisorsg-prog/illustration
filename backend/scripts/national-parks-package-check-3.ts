@@ -46,8 +46,8 @@ const MANIFEST = 'KDP-UPLOAD-MANIFEST.md';
  * and at upload time the only thing that matters is picking the right file.
  */
 const ARTIFACTS = {
-  interior: '7-national-parks-interior-6x9-118pp.pdf',
-  pbCover: '7-national-parks-cover-PAPERBACK-6x9-118pp.pdf',
+  interior: '7-national-parks-interior-6x9-120pp.pdf',
+  pbCover: '7-national-parks-cover-PAPERBACK-6x9-120pp.pdf',
   epub: '7-national-parks-KINDLE.epub',
   kindleCover: '7-national-parks-KINDLE-cover-1600x2560.jpg',
 } as const;
@@ -55,20 +55,20 @@ const ARTIFACTS = {
 /**
  * THE HARDCOVER COVER IS NOT IN THE PACKAGE, AND THAT IS THE POINT.
  *
- * The corrections took the interior from 116 pages to 118, and a hardcover spine
+ * The corrections took the interior from 116 pages to 120, and a hardcover spine
  * cannot be derived from a formula the way a paperback's can — it comes from
  * Amazon's Cover Calculator. `kdp-cover-specs` holds one verified reading for
  * this configuration, at 116pp, and refuses to interpolate from a single point.
  *
  * So there is no hardcover wrap to ship, and the 116pp one would be wrong by
- * design: a 0.450in spine on a 118-page block. It is quarantined under
+ * design: a 0.450in spine on a 120-page block. It is quarantined under
  * `_np_build/_superseded-116pp/` rather than left where it could be uploaded.
  * This check reports the gap rather than passing a package that is missing a
  * file someone is waiting to upload.
  */
 const HARDCOVER_PENDING =
   'hardcover wrap: BLOCKED until the KDP Cover Calculator is read for ' +
-  'HARDCOVER/CASE_LAMINATE, BLACK_AND_WHITE, WHITE paper, 6x9in, 118pp';
+  'HARDCOVER/CASE_LAMINATE, BLACK_AND_WHITE, WHITE paper, 6x9in, 120pp';
 
 /* The three cover files have been re-cut repeatedly across 2026-08-22/23 as the
    front-cover treatment settled, and the INTERIOR changed once, on 2026-08-23,
@@ -78,13 +78,13 @@ const HARDCOVER_PENDING =
    the parity blanks unmoved. Every superseded file is kept, named with its hash,
    under `_np_build/_superseded-*`. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
-  interior: '261afc8aa89721f843a15dc466b0890b3624d1b84444289a93f9dcc856254dfd',
-  pbCover: '908fca62224e5443b4e37f8de0312b4dd1d9fa776210004d2b504d3ad0c94429',
-  epub: 'bf005b8ab244825d2d2f96bf9210fb5ba1cca6c7926c03ab144168253f51b024',
-  kindleCover: '0b83d753e04c3c3edabd02f753f4ef20280c0408f9e784f896963c170a6ebc30',
+  interior: '0ca8ac579653517a1304b20907219f9da8af3d1ae1fc0d288b8ce46c6ff6c72b',
+  pbCover: 'e302db9c5c2c48d9462fabd3c03e9973f4b4244199fd8314192c8824b1005c1e',
+  epub: '114bbeb619b394c12b1abf0148f4782e971e80c5886b9aa3b5b63befc036b63d',
+  kindleCover: 'd83f67a3ecab2ff3b0be36e9ee88d9fc70a7ae494a4278d50ffaaefcae6125b0',
 };
 
-const PAGES = 118;
+const PAGES = 120;
 const PT = 72;
 
 /** Paperback: spine is derived from this interior's own page count. */
@@ -92,7 +92,7 @@ const PB_THICKNESS = 0.002252;
 const PB_SPINE = PAGES * PB_THICKNESS;
 const PB_WRAP_W = 0.125 * 2 + 6 * 2 + PB_SPINE;
 const PB_WRAP_H = 9 + 0.25;
-const PLATES_EXPECTED = 9;
+const PLATES_EXPECTED = 15;
 
 /** Hardcover: read from Amazon's Cover Calculator, 6x9 case laminate, 116pp. */
 const HC_WRAP_W = 14.025;
@@ -345,7 +345,16 @@ console.log('\n6. DELIVERY FOLDER');
       return statSync(full).isDirectory() ? walk(full, rel) : [rel];
     });
   const found = walk(DIR).sort();
-  const expected = [...Object.values(ARTIFACTS), MANIFEST].sort();
+  /**
+   * The listing copy travels with the package.
+   *
+   * It is not an upload artifact -- nothing in it is a file KDP receives -- but
+   * the description, the seven keywords and the price all get typed into the KDP
+   * form during the same sitting as the uploads, and keeping them in the same
+   * folder is what stops that being done from memory.
+   */
+  const COMPANION_DOCS = ['AMAZON-BOOK-DESCRIPTION.md'];
+  const expected = [...Object.values(ARTIFACTS), MANIFEST, ...COMPANION_DOCS].sort();
   for (const f of found) console.log(`   ${f}`);
   const extra = found.filter((e) => !expected.includes(e));
   const missing = expected.filter((e) => !found.includes(e));
