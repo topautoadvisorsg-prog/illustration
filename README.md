@@ -1,508 +1,219 @@
 # The Wildlands Publishing Platform
 
-Turns a finished manuscript into a print-ready, fully illustrated KDP book through
-a single guided **Operator Console** — no terminal required.
+Turns a finished manuscript into print-ready KDP artifacts: a 6×9 interior PDF, a
+paperback cover wrap, a Kindle EPUB and a marketing cover. It runs as a Fastify
+API with a React operator console, Postgres for book state, Cloudflare R2 for
+artifacts, and Chromium doing the actual page rendering.
 
-```text
-Operator Console (8 steps):
-  Project → Manuscript → Book Setup → Breakdown → Paginate →
-  Front & Back Matter → Render & Review (pages + cover + Kindle) → Build Book
-```
-
-- Live frontend (Operator Console): `https://frontend-production-f65d.up.railway.app`
-- Live backend: `https://wildlandsbackend-production.up.railway.app`
-- Health check: `GET /` and `GET /health` → `{ "storage": "supabase", "storageDurable": true, "db": "connected" }`
+Four books have shipped through it.
 
 ---
 
-## Starting a new book — `docs/DROP_A_BOOK.md`
+## Read this before anything else: there are two tracks, and only one is live
 
-You do not have to walk the eight steps by hand to onboard a book.
-
-**Console:** Step 1 → **Drop a book in**. Pick the manuscript, name the book,
-choose the book type and trim. One button creates the project, ingests the
-manuscript, runs the stages that book's track actually uses, and finishes with a
-readiness report.
-
-**Agent:** an MCP server (`yarn workspace @wildlands/backend mcp`) exposes the
-same operations as tools. Free tools and spending tools are separated, and the
-spending ones refuse to run without explicit confirmation.
-
-**Before spending on anything**, run the free gate — `GET /api/projects/:id/readiness`
-or the "Check readiness (free)" button. It is deterministic and read-only, and
-it answers whether the book is set up correctly enough to be worth paying for:
-that the production profile, layout standard and Style DNA genuinely resolve
-rather than silently falling back, that the breakdown parser did not drop
-entries, that no other book's region has leaked into these prompts, that print
-faces are vendored rather than fetched mid-render, and that a cover is
-geometrically buildable.
-
-Its checks are chosen by the book's track — a typeset book is not asked for
-pagination it never uses. The rule it lives by is that **a check may only fail
-on evidence**; anything else is a warning or N/A, because a gate that fails a
-book you already shipped is a gate you learn to ignore.
-
----
-
-## TWO PRODUCTION TRACKS — read this before changing anything
-
-The platform builds books by **two different routes**, chosen per project by the
-production profile in Step 3 (Book Setup → "Book type"). They share the front of
-the pipeline, diverge in the middle, and are **supposed** to converge again at
-print-prep, cover and assembly.
-
-```text
-                     Project → Manuscript → Book Setup → Breakdown
-                                       │
-                 ┌─────────────────────┴─────────────────────┐
-                 │                                           │
-   TRACK A: AI WHOLE-PAGE                       TRACK B: DETERMINISTIC TYPESET
-   (Illustrated Field Guide)                    (Educational Nonfiction, B&W Digest)
-                 │                                           │
-   Paginate (character-grid estimate)           Paginate (Paged.js flows the book;
-                 │                              the renderer IS the authority)
-   Render every page as one AI image                        │
-   (text baked in by the model)                  Typeset interior PDF: live vector
-                 │                               text, embedded Type0 fonts,
-   Front/Back Matter (Step 6)                    front matter + TOC generated in
-                 │                               the same pass
-   Review & approve each page                                │
-                 │                               Illustrations STAMPED onto the
-   Print-Prep: 300 DPI compose per page          finished PDF, anchored to stable
-                 │                               block ids
-                 └─────────────────────┬─────────────────────┘
-                                       │
-                         Cover (full wrap: back | spine | front)
-                         Print-Prep composes cover art at 300 DPI
-                                       │
-                         Prebuild Audit → Final Assembly (local)
-                                       │
-                         Delivery Validation
-                                       │
-                        interior.pdf  +  cover.pdf  → KDP
-```
-
-### Which stages are shared, and which are track-specific
-
-| Stage | Track A (AI page) | Track B (typeset) |
+| | **Track B — ACTIVE** | **Track A — LEGACY / DORMANT** |
 |---|---|---|
-| Project / Manuscript / Book Setup / Breakdown | shared | shared |
-| Paginate | plans pages for image generation | **produces the finished interior** |
-| Front & Back Matter (Step 6) | required | **not used** — built inside the typeset pass |
-| Render & Review (Step 7) | per-page image render + approval | **only the cover applies** |
-| Cover | shared | shared |
-| Print-Prep / DPI | per page + cover | cover only |
-| Assembly | merges approved page PDFs | stores the finished typeset PDF unchanged |
-| Delivery validation | shared | shared |
+| What it does | Typesets real text with Paged.js, then stamps illustrations onto the finished PDF | Renders whole pages as AI artwork with text-safe zones |
+| Lives in | `backend/src/pipeline/typeset/` | `backend/src/pipeline/whole-page-render/` and most of `stage-6-layout/` |
+| Books | DIRT RICH, No One Told Me That, 7 National Parks, the MG chapter book | Earlier Wildlands illustrated volumes |
+| Status | **Every book shipped in the last three months** | Preserved, not extended. No new books. No new features. |
 
-### How Track B reaches the end of the factory
+**Track A still owns cover geometry.** `computeCoverDimensions` and the paper
+thickness table live in `stage-6-layout/render-html.ts`, and the whole platform
+imports them from there. Extracting them is Phase 1. Until that lands, "legacy"
+describes the render path, not the whole module. See
+[docs/LEGACY.md](docs/LEGACY.md).
 
-`assembleBook()` branches on the track, which comes from the production
-profile's `bodyRenderTrack` — never guessed from what data happens to exist, so
-a half-populated project cannot silently change tracks.
-
-- **Track A** merges the approved per-page print PDFs in spine order.
-- **Track B** stores the finished typeset PDF **unchanged**. Rasterising it back
-  into page images to satisfy the page-render assembler would destroy the vector
-  text, the embedded fonts and the stamped illustrations, which are the entire
-  point of the track. Its gate is the typesetter's own report — vertical
-  overflow, unplaced artwork — plus the shared cover-sync gate.
-
-One builder produces the typeset interior for everyone:
-`pipeline/typeset/build-typeset-interior.ts`. The preview, the cover's page
-count, assembly and the delivery check all call it, so a preview and an export
-cannot disagree about the book. It reads the chapter-start policy from the
-project (`typesetChaptersStartRecto`) rather than a request parameter, because
-that policy changes the page count and the page count sizes the spine.
-
-`renderCoverPdf()` is track-aware through `resolveCoverPageCount()`; it used to
-read the legacy pagination table unconditionally and threw `no_pages` for every
-typeset book.
-
-### Before you build a new subsystem, read this map
-
-This platform has already shipped a printed book. If you are about to write a
-cover renderer, a spine calculator, a delivery validator or an assembler, it
-exists — trace the map below to the code that does it and change that instead.
-Two answers to "how wide is the spine" sitting in one repository is how a wrong
-one gets printed.
-
-That has gone wrong twice, in both directions: a parallel cover system was built
-for capability that had already shipped, and real capability sat unreachable
-inside scripts (`validate-delivery.ts` with one book's paths compiled into it,
-`font-embed-probe.ts`'s font walk) where nothing on the delivery path could call
-it. A script is where a capability goes to be forgotten. If an operator needs
-it, it belongs in a module with an endpoint and a control.
-
-### Where the production code actually lives
-
-Names do not always say "cover" or "assembly". This map is the shortcut:
-
-| What | Where |
-|---|---|
-| Cover renderer + AI wrap artwork | `pipeline/stage-6-layout/render-chapter.ts` (`renderCoverPdf`, `generateCoverWrapArtwork`) |
-| Cover 300-DPI composition | `pipeline/print-prep/cover-print.ts` (`composeCoverPrint`) |
-| Cover dimensions / spine width / all KDP figures | `pipeline/stage-6-layout/render-html.ts` (`computeCoverDimensions`) — **single source, with the Amazon citations** |
-| Typeset interior | `pipeline/typeset/` (`render-typeset.ts`, `typeset-book.ts`, `front-matter.ts`) |
-| Typeset interior, as one call | `pipeline/typeset/build-typeset-interior.ts` (`buildTypesetInterior`) — **what every consumer should use** |
-| Illustration stamping | `pipeline/typeset/stamp-illustrations.ts` |
-| Assembly (both tracks) | `pipeline/book-assembly/assemble-book.ts` (`assembleBook`) |
-| Final assembly, Track A large books | `scripts/build-local2.ts` (**runs locally**, see below) |
-| Delivery check of the finished PDFs | `pipeline/book-assembly/delivery-check.ts`, `pdf-inspect.ts` — exposed at `GET /api/projects/:id/delivery-check` and in the Build Book step |
-| Readiness (Track A page state) | `scripts/prebuild-audit.ts` |
-
-### Why final assembly runs locally
-
-The deployed backend **OOMs and returns 502** on assembly: the merge loads every
-print PDF into memory at once. The build therefore runs on the operator's
-machine with an enlarged Node heap and writes straight to local disk, which is
-also where KDP uploads from. This is a real operational constraint, not a
-preference. See `PUBLISHING_TO_KDP.md`.
+> If you have read older documentation pointing at `RENDER_MODEL.md` as the
+> current system, it is describing Track A. That guidance is superseded.
 
 ---
 
-## The AI whole-page render model (Track A)
+## Repository map
 
-For Track A the generated image **IS the finished page** — illustration and all
-of its text baked in by the image model (`gpt-image-2`), rendered as one
-full-bleed image, with no separate typesetting pass and no boxed `<img>`.
+```
+backend/
+  src/
+    api/                     Fastify routes. projects.routes.ts is 3,092 loc and 43 routes.
+    pipeline/
+      stage-1-ingestion/     extract -> sanitize -> parse outline -> block ids
+      stage-1.75-pagination/ flow engine, capacity, rebalance. Best-tested subsystem.
+      typeset/               TRACK B. Paged.js, layout-standard registry, overrides, stamping.
+      whole-page-render/     TRACK A. Dormant.
+      stage-6-layout/        TRACK A renderer + the cover geometry everything depends on.
+      cover/                 Blueprint, geometry, preflight, prompt, spec, art validation.
+      publishing-standard/   Geometry, style DNA, badges, verified KDP specs, spine type.
+      print-prep/            Print-side cover composition and previews.
+      stage-8-epub/          EPUB assembly.
+      book-assembly/         delivery-check, pdf-inspect, pdf-merge. Runs against FINISHED files.
+      readiness/             Pre-flight audit of a project.
+    db/                      Drizzle schema, 16 migrations, repositories.
+    services/                Model providers, storage, redis, cost, page-quality, review routing.
+    mcp/                     The platform as agent-callable tools. No business logic.
+  scripts/                   310 operator tools. See docs/maintenance/.
+    _scratch/                UNTRACKED workbench. Never a production authority.
+frontend/src/                Operator console. 4,178 loc of plain JS; ProductionConsole.js is 3,699.
+shared/src/index.ts          1,467 loc of Zod schemas. The contract between all three workspaces.
+docs/                        See the documentation index below.
+```
 
-**This describes Track A only.** Track B typesets real text with Paged.js and
-keeps it vector; an earlier version of this README stated the platform had no
-typesetting pass at all, which sent at least one contributor off building a
-parallel system for capability that already existed.
+---
 
-- **Interior pages (Track A)** are rendered one finished image per page, then
-  prepared for print at **300 DPI** (sharp Lanczos upscale onto the trim + bleed
-  canvas, badge/folio stamp, lossless PNG → single-page PDF). Code:
-  `pipeline/whole-page-render/` and `pipeline/print-prep/`.
-- **The cover (both tracks)** is a full-wrap asset (back · spine · front), its
-  spine sized from the interior page count, composed at **300 DPI** and embedded
-  losslessly. Generated artwork does **not** need to originate at final print
-  size; `composeCoverPrint` upscales it onto the 300 DPI canvas. Code:
-  `pipeline/stage-6-layout/render-chapter.ts` + `pipeline/print-prep/cover-print.ts`.
-- **Assembly** merges the approved per-page print PDFs into one interior PDF in
-  spine order (lossless, `pdf-lib`). Code: `pipeline/book-assembly/`.
+## How a book moves through the platform
 
-The legacy layered / Paged.js "text-safe zone + scrim" renderer (Stage 2–6, the
-CLI `scripts/`, the `images` review table, Replicate Real-ESRGAN upscale) is
-**retired from the production path**. The old "Publishing Platform" UI (`App.js`)
-has been **deleted**; the **`?legacy=1`** URL param now opens a lean Advanced/dev
-panel (`AdvancedPanel.js`) with only genuinely-needed tools (the no-spend Pipeline
-Check). Do not use the legacy renderer for new books.
+```
+manuscript (DOCX or MD)
+  -> ingest            original bytes + sha256 retained; sanitized working copy derived
+  -> parse outline     chapters, blocks, STABLE BLOCK IDS
+  -> project config    trim, paper, layout-standard id, overrides  (Postgres)
+  -> typeset           Paged.js in Chromium
+  -> PAGE COUNT EMERGES HERE
+  -> pad to even       parity blanks
+  -> stamp plates      anchored to block ids, never page numbers
+  -> deterministic QA  fidelity, spacing, print check, image PPI
+  -> HUMAN LOOKS AT PAGES        <- the only gate that has ever caught a layout defect
+  -> cover             page count READ FROM THE INTERIOR PDF -> spine -> wrap
+  -> Kindle            EPUB + a 1600x2560 crop of the wrap
+  -> delivery folder + manifest, hashes taken from the shipped files
+```
 
-> Backend note: the unused "Publishing Intelligence" backend (intelligence routes,
-> service, `knowledge.repo`, and the `experiments`/`decisions`/`sops`/
-> `lessons_learned`/`print_reviews` tables) is dead weight pending a careful
-> teardown — not yet removed.
+Page count is **emergent, not declared**. Everything downstream of it — spine,
+both wraps, the Kindle cover crop — is invalidated by any change upstream of it.
 
-## The Operator Console workflow
+Full detail: [docs/BOOK-PRODUCTION.md](docs/BOOK-PRODUCTION.md).
 
-Top-to-bottom, one book at a time. A ✓ on a step means it's done. Previewing is
-free; only **Render & Review** (step 7) spends (page renders + cover artwork).
+---
 
-1. **Project** — create a book (title, subtitle, author, trim) or open/delete one.
-2. **Manuscript** — paste/drop the Markdown manuscript (keep Glossary, Index,
-   Sources as top-level sections).
-3. **Book Setup** — confirm title/subtitle/author/trim (form loads the saved
-   config; visual style is fixed by the Wildlands Standard).
-4. **Breakdown** — deterministic split into chapters + entries (no AI, no spend);
-   shows the chapter list.
-5. **Paginate** — flows text onto pages and shows a **fit blueprint** per page
-   (red = text, blue/light-blue = illustration, orange = ornament; "% full" + a
-   FITS/UNDERFILLED/OVERFLOW chip) so the operator confirms fit before any spend.
-6. **Front & Back Matter** — builds title, copyright, contents (from real page
-   numbers), glossary, index, sources, about-the-author.
-7. **Render & Review** — the review hub. Free to preview; rendering spends.
-   - **Cover** — generate the full-wrap artwork (paid); spine sized to the current
-     page count. Shows the **print front cover (7×10)** and the **Kindle front
-     cover (portrait 1600×2560)** side by side, with trim/safe + spine-fold QA overlays.
-   - **Interior pages** — one finished, text-baked image per page: **Preview** (free;
-     shows the exact text the AI will print), **Review prompt** (free pre-flight
-     sanity check — run it *before* Render, see below), **Render** (paid; re-click
-     to retry a FAILED page), **AI review text** (cheap automated text-fidelity
-     check — see below, run it before Approve), **Approve for book** / **Reject**,
-     **Upload image** (no-spend manual escape hatch — see below).
-   - **Kindle eBook — preview & export** — reflowable EPUB from the real text
-     (structure tree, actual reflowable text, per-entry hero-image slots [future],
-     build report, export). No spend.
-8. **Build Book** — merges the approved pages into the interior PDF and produces the
-   print-ready cover PDF (300 DPI). Blocks if any page isn't book-ready **or** if the
-   cover is out of sync with the interior (see below). On success: interior PDF +
-   cover PDF + an in-page preview. Paperback = same interior + paperback wrap.
+## Canonical sources of truth
 
-Operator SOP with screen-by-screen detail: `WILDLANDS_OPERATOR_MANUAL.md` (repo root).
+The full matrix, including secondary copies and conflict risk, is
+[docs/SOURCE-OF-TRUTH.md](docs/SOURCE-OF-TRUTH.md). The short version:
 
-## Prompt pre-flight review (before you spend anything)
+| Datum | Authority |
+|---|---|
+| Manuscript | `projects.canonical_manuscript_path` + `_sha256` — the operator's original bytes |
+| Book configuration | `ProjectConfig` (Zod, `shared/src/index.ts`) in Postgres |
+| Layout standard | `typeset/layout-standards/registry.ts` — versioned, pinned per book, never "latest" |
+| Per-block exceptions | `ProjectConfig.layoutOverrides`, via the API |
+| Page count | The final interior PDF. Read it; never type it. |
+| Cover geometry | **UNRESOLVED.** Five implementations, three numbers, zero verified paperback readings. Phase 1. |
+| Artifact hashes | Computed from the shipped file. The interior build is **not** byte-reproducible. |
 
-**"Review prompt"** (every page card, works even before the page has ever been
-rendered) checks the assembled spec BEFORE any paid image call — does the
-illustration subject actually match the entry title, is the body text intact
-(not truncated, duplicated, or placeholder), nothing internally contradictory.
-It's a text-only chat completion (no image involved), so it costs a fraction
-even of the post-render AI text review below. Code:
-`services/openai/prompt-review.ts`,
-`POST /api/whole-page-render/page/:pageId/review-prompt`.
+---
 
-**Result banners are advisory, not a gate — and dismissible.** Both this
-check and the post-render "AI review text" say explicitly when they find
-something that they do not block the next action (Render / Approve still
-work regardless), and both have a ✕ to clear a result once you've read it and
-decided. Nothing in this pipeline is designed to leave you at a dead end — if
-a review flags something, look at the actual page yourself, use your
-judgment, then dismiss and move on either way.
+## Production boundaries
 
-**Caught and fixed one real false-positive class:** the "internal
-contradiction" check originally flagged ANY mention of a different
-species/subject as a mismatch — but naming another animal for comparison
-("unlike black bears, grizzlies have...") or rhetorical contrast is normal,
-constant, and deliberate in this book's writing. `prompt-review.ts`'s system
-prompt now explicitly carves that out; only flag when the entry's own topic
-is genuinely absent or replaced, not merely referenced. Worth remembering if
-tuning this prompt further: false positives here cost real operator trust —
-a reviewer that cries wolf gets ignored, including on the pages where it's
-actually right.
+- **`backend/src` never imports `backend/scripts`.** Verified by resolved
+  specifiers. Keep it that way.
+- **`scripts/_scratch/` is untracked and is never a production authority.**
+- **Tests cannot reach production.** `backend/src/test-safety.ts` denies by
+  default and aborts the run if a production database, key or bucket is
+  reachable. Do not weaken it to make a test run.
+- **Spending is opt-in.** MCP tools that spend refuse without `confirm: true`;
+  the console enforces the same on its buttons.
+- Of the 310 operator scripts, **75 mutate state, 13 both mutate and spend, and
+  2 are destructive**. Check [docs/maintenance/](docs/maintenance/README.md)
+  before running one you do not recognise.
 
-Like every other AI-calling action in this pipeline it is **strictly one
-explicit call, triggered only by the operator clicking the button** — nothing
-in this codebase auto-retries or auto-loops a paid or even a free OpenAI call
-on its own; confirmed by reading `createAndRunRender` (one row per explicit
-call) and the OpenAI client config (`maxRetries: 0` — even the SDK's own
-transient-error retry is off). A failed render just sits at `FAILED` with its
-error message until an operator explicitly acts on it again.
+---
 
-## AI text review (cheap QA assist, not a substitute for a real check)
+## Where things are generated
 
-`gpt-image-2` occasionally bakes a typo into a page's text (it's a much higher-
-stakes failure mode than art quality, since a misspelled word in a printed book
-is just wrong). Instead of an operator eyeballing every word of every page,
-**"AI review text"** (per-page button in Render & Review, once a page is
-RENDERED) calls a vision-capable chat model — `OPENAI_REVIEW_MODEL` in
-`.env`, currently `gpt-5.5` — to compare the baked text against the literal
-source and flag mismatches. One call costs a small fraction of an image
-generation. Code: `services/openai/text-review.ts`,
-`POST /api/whole-page-render/:renderId/ai-review`.
+| Artifact | Built by |
+|---|---|
+| Interior PDF | `typeset/build-typeset-interior.ts` -> `typeset-book.ts` |
+| Illustration plates | `typeset/stamp-illustrations.ts`, onto the finished PDF |
+| Paperback cover | Currently per-book scripts in `backend/scripts/`; **18 scripts emit a cover PDF**. Being unified in Phase 1. |
+| Hardcover cover | No verified geometry exists for the current block. `kdp-cover-specs.ts` refuses to interpolate, by design. |
+| Kindle EPUB | `stage-8-epub/` |
+| Kindle cover | A 1600x2560 crop of the finished paperback wrap |
+| Delivery package | Per-book delivery folder plus a manifest of hashes |
 
-**Known limitation — read before trusting a "pass":** the reviewer reads the
-page semantically, not pixel-by-pixel, so it can silently "autocorrect" a
-subtle transposition in a common word — confirmed still true even on
-`gpt-5.5`: it transcribed the known-bad `cinmanon` render as `cinnamon`
-because that's what it expects a word spelled that closely to "cinnamon" to
-be, even though the actual pixels are wrong. This is a structural limit of
-using a language-vision model as an OCR proofreader (it reads intent, not
-letter-shapes), not something a model-version upgrade fixes — a literal OCR
-engine might catch this specific failure mode better, at the cost of
-introducing its own noise on the stylized serif type this book uses. It
-reliably catches grosser errors — garbled words, dropped/duplicated words,
-wrong words entirely — but a `pass: true` is not a guarantee of zero typos.
-Do not hard-gate Approve on it; treat it as a fast first pass, and still skim
-the page yourself before Approve on anything going to final print.
+---
 
-Model history, for whoever tunes this next: `gpt-4o-mini` → too inaccurate
-(missed a confirmed real typo, invented a false positive on a clean page).
-`gpt-4o` → better, but produced a false positive on `prompt-review.ts`
-specifically (see below). `gpt-5.5` → current, fixed that false-positive
-class; the semantic-autocorrect limitation above is unrelated and still
-open. Upgrading required two API-shape changes, not just a model-name swap:
-`max_tokens` → `max_completion_tokens`, and `temperature` is no longer
-settable (only the model's default is accepted) — expect similar shape
-changes on the next upgrade too.
-
-## Manual image upload (no-spend escape hatch)
-
-**"Upload image"** (every page card in Render & Review) registers an
-operator-supplied PNG as a real render version for that page — no OpenAI
-image-generation spend. Everything downstream (AI review, Approve, print-prep,
-select-for-book) works on it exactly like a normal render afterward. Use it
-when:
-- OpenAI billing/credits are exhausted and `Render` does nothing (check
-  Railway logs or the render's `errorMessage` for `Billing hard limit has
-  been reached` — that's the tell).
-- You hand-corrected an image outside the pipeline (any image editor, or by
-  asking Claude/an operator to use OpenAI's `images.edit` endpoint with a
-  precise transparent-mask over just the bad word — far more reliable than a
-  full-page regeneration, which tends to trade one typo for a different one
-  elsewhere on the page. There's no dedicated script for this in the repo
-  today; it was done ad hoc via `services/openai/openai.ts`'s pattern during
-  development — worth formalizing into a script if it comes up often).
-- Testing a prompt manually in a separate chat tool and want to bring the
-  result into the real book — just confirm the wording is the actual page
-  text first (a generic chat surface will often paraphrase instead of
-  reproducing the literal source, which makes the result unusable even if it
-  looks good).
-
-Code: `POST /api/whole-page-render/:pageId/upload-manual` (base64 PNG in the
-JSON body; `frontend`'s `uploadManualRender` reads the file via `FileReader`).
-
-## Cover / interior synchronization (production gate)
-
-The cover spine width is baked into the AI cover art for a specific interior page
-count. When the cover artwork is generated, the platform records
-`config.publishing.coverSync = { builtForPageCount, spineIn, generatedAt }`.
-
-**Final (full-book) export compares the recorded cover page count to the live
-interior page count and BLOCKS the export on a mismatch**, with:
-
-> "Cover is out of date. The interior page count changed and the spine width may
-> be incorrect. Regenerate the cover before exporting."
-
-Regenerating the cover (step 7 · Render & Review) refreshes `coverSync` and clears the block. Chapter
-proofs and pre-existing covers without a recorded count are exempt. Code:
-`coverSyncStatus()` in `pipeline/book-assembly/assemble-book.ts`. No cover
-versioning, no separate cover project.
-
-## Project lifecycle
-
-A project is a **temporary production workspace**. The intended lifecycle:
-
-1. Create the book project.
-2. Render and approve all pages.
-3. Generate and approve the cover.
-4. Export the KDP package (the cover sync gate must pass).
-5. **Archive approved images to the permanent Image Library.**  *(planned — not
-   yet implemented)*
-6. Download the external backup.
-7. **Delete the temporary project** (project data removed; library preserved).
-   *(safe deletion — planned; see warning below)*
-8. Start the next book.
-
-> ⚠ **Image Library and safe deletion are not implemented yet.** Today,
-> `DELETE /api/projects/:id` cascade-deletes the render records and leaves the
-> image files orphaned in storage — **deleting a project loses its AI artwork.**
-> This is safe for the disposable *test* projects, but **do not delete a real
-> book project** until the Image Library + project-scoped storage cleanup ship.
-
-## What's implemented (production path)
-
-- Operator Console driving the whole-page AI pipeline end to end (the default and
-  only operator path; legacy tools isolated behind a toggle).
-- Manuscript upload → deterministic breakdown → pagination (body flow engine +
-  unified reference model for glossary/index/sources) → front/back matter.
-- Whole-page render via OpenAI **`gpt-image-2`** (text baked into the image;
-  spend-gated; dependency-injected so tests never call the paid API), with
-  preview / render / approve / reject / print-prep per page.
-- No-spend prompt pre-flight review, cheap automated post-render AI
-  text-fidelity review (`gpt-5.5` chat-vision call), and a no-spend manual
-  image upload path for when generation is blocked or needs a hand
-  correction — see "Prompt pre-flight review", "AI text review", and "Manual
-  image upload" above. Confirmed zero auto-retry anywhere in the render
-  pipeline (one explicit call per attempt, `maxRetries: 0` at the OpenAI
-  client too).
-- **300 DPI** interior print-prep (sharp Lanczos) and **300 DPI** full-wrap cover
-  (direct lossless embed); KDP-shaped interior + cover PDFs.
-- Cover/interior synchronization export gate.
-- **Kindle EPUB export (Stage 8)** — text-first reflowable EPUB from the real
-  manuscript text (selectable, no baked page images) + a portrait front cover
-  (1600×2560, cropped from the wrap); previewed/exported in Render & Review;
-  EPUBCheck-clean. Code: `pipeline/stage-8-epub/`.
-- Cloudflare R2 storage adapter (zero-egress; dormant until R2 env vars are set —
-  prod currently on Supabase). Code: `services/storage/`.
-- Fastify backend; Supabase Postgres + Drizzle migrations (auto-applied on
-  deploy); durable Supabase Storage.
-
-## Not implemented yet
-
-- **Permanent Image Library** (project-independent archive of approved AI masters).
-- **Safe project deletion** (purge project storage files; preserve library).
-- **Per-entry hero illustrations for Kindle** (one cinematic image per entry;
-  needs the `entry_assets` foundation — spec'd, not built).
-- BullMQ background workers (rendering runs synchronously per request).
-- Single-user auth enforcement.
-
-## Durable storage (production requirement)
-
-Generated images and PDFs **must** use Supabase Storage. In production the backend
-**fails loud** rather than falling back to ephemeral local disk (Railway wipes it
-on redeploy). Confirm any deploy: `GET /health` → `storageDurable: true`.
-
-## Tech stack
-
-Node + TypeScript + Fastify · React (CRA/craco) · Zod · Supabase Postgres +
-Drizzle · sharp + pdf-lib (print-prep & assembly) · OpenAI `gpt-image-2` ·
-Anthropic Claude (operator chat / stage review only) · Puppeteer + Paged.js
-(legacy renderer only) · Pino.
-
-## Commands
+## Local development
 
 ```bash
 yarn install
-yarn workspace @wildlands/shared build
-yarn workspace @wildlands/backend run typecheck
-yarn workspace @wildlands/backend run test     # vitest
-yarn workspace frontend build
+yarn workspace @wildlands/shared build     # backend typechecks against shared/dist
+yarn dev:backend                            # Fastify on :8001
+yarn workspace @wildlands/frontend start    # console on :3000
 ```
 
-## Run it yourself, no Claude required
+Health check: `GET /` and `GET /health`.
 
-Two processes, two terminals, from the repo root:
+**Storage is Cloudflare R2-primary with Supabase as read fallback.** Writes always
+go to R2. Reads try R2 first and fall back to Supabase for objects predating the
+migration. Older documentation describing Supabase as *the* storage backend is
+out of date.
 
-```bash
-# Terminal 1 — backend (Fastify API on :8001, reads backend/../.env)
-cd backend
-yarn install        # first time only
-yarn dev             # tsx watch src/index.ts
+### Working in a git worktree — read this
 
-# Terminal 2 — frontend (Operator Console on :3000)
-cd frontend
-yarn install        # first time only
-yarn dev             # craco start
-```
+`node_modules/@wildlands/shared` and `@wildlands/backend` are **junctions into the
+main checkout**. A worktree that borrows `node_modules` will typecheck and test
+against *main's* `shared`, not its own, and a change to `shared/src` will appear
+to have no effect. Alias `@wildlands/shared` to the worktree's own copy in a
+local tsconfig and vitest config when validating there.
 
-Open `http://localhost:3000`, log in with the `CONSOLE_PASSWORD` value from
-`.env`.
+---
 
-**Important:** the frontend defaults to the **deployed Railway backend**
-(`DEFAULT_BACKEND_URL` in `ProductionConsole.js`), not your local one — so
-running the frontend alone points at production data. To actually exercise a
-local backend change before it's deployed, set the override when starting the
-frontend:
+## Making a change safely
 
-```bash
-REACT_APP_BACKEND_URL=http://localhost:8001 yarn dev
-```
+Four levels. Pick the smallest one that fits — this is the rule the platform is
+built around, and mixing the levels is what has cost the most time.
 
-(PowerShell: `$env:REACT_APP_BACKEND_URL="http://localhost:8001"; yarn dev`)
+| Level | Fix path | Affects |
+|---|---|---|
+| **Systemic** | Shared renderer, or a **new version** of a layout standard | Every book. Never edit a standard in place. |
+| **Book-class** | A new version of that class's layout standard | Books that re-pin to it |
+| **Book-specific** | `layoutOverrides` on the project | That book only |
+| **Artifact** | Post-render stamping | One rendered file |
 
-### Key `.env` values (see `.env.example` for the full list)
+A single-book need does not belong in shared renderer code. There is currently no
+sanctioned home for a *text* correction at book scope — that gap is Phase 2.
 
-| Variable | What it's for |
+---
+
+## Documentation
+
+| Document | What it is for |
 |---|---|
-| `PROJECT_ID` | Which book the `backend/scripts/` operator scripts run against — scripts fail loudly if unset, never silently default. |
-| `DATABASE_URL`, `SUPABASE_*` | Postgres + Supabase Storage. |
-| `OPENAI_API_KEY`, `OPENAI_IMAGE_MODEL` | Page-image generation (`gpt-image-2`) — the expensive calls. |
-| `OPENAI_REVIEW_MODEL` | The cheap text-QA reviewer (see "AI text review" above) — safe to swap for cost/accuracy tradeoffs. |
-| `CONSOLE_PASSWORD` | Single shared password gating the whole API (no user accounts). Unset = open API, dev only. |
-| `WHOLE_PAGE_RENDER_ENABLED` | Master flag for the whole-page pipeline; routes 503 when false. |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Subsystems, diagrams, and the Track A/B boundary |
+| [docs/BOOK-PRODUCTION.md](docs/BOOK-PRODUCTION.md) | The operator path, end to end |
+| [docs/COVERS-AND-SPINES.md](docs/COVERS-AND-SPINES.md) | Geometry, KDP readings, safe zones, the current conflict |
+| [docs/QA-SYSTEM.md](docs/QA-SYSTEM.md) | What is checked today and what is not |
+| [docs/SOURCE-OF-TRUTH.md](docs/SOURCE-OF-TRUTH.md) | One authority per production datum |
+| [docs/LEGACY.md](docs/LEGACY.md) | Track A: what it is, what still depends on it, how it retires |
+| [docs/maintenance/](docs/maintenance/README.md) | Script census, safety classification, dispositions |
+| [docs/archive/](docs/archive/) | Historical. Superseded by the above. |
 
-### Operator scripts (`backend/scripts/`)
+---
 
-One-off/reusable tools for direct DB + storage access, bypassing the UI —
-useful when doing bulk QA or debugging a specific page. Run with
-`node ../node_modules/tsx/dist/cli.mjs scripts/<name>.ts <args>` from
-`backend/`. Worth knowing:
+## Known technical debt
 
-- `_review_chapter.ts CH02` — pulls every rendered page image + the DB's
-  ground-truth text for a chapter into a scratch folder, for a manual
-  typo sweep.
-- `_qa_rerender.ts <pageKey>` — triggers one real render for a page (same
-  paid call the UI's Render button makes) — always one at a time, this repo
-  has already had one billing-limit incident from a batch job firing several
-  generations concurrently.
-- `_qa_listversions.ts <pageKey>` / `_qa_pull.ts` / `_qa_pullversion.ts` —
-  inspect and download a page's render history.
-- `_qa_billingcheck.ts` / `_qa_failcheck.ts CH02` — find FAILED renders and
-  their error messages project-wide or per chapter (the July 2026 billing
-  incident silently orphaned 15 pages this way — worth an occasional sweep).
+The ranked list lives in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The three
+that shape current work:
 
-## Deploy / Railway notes
+1. **Cover geometry has no single authority.** Five implementations, three
+   different per-page thicknesses, and every verified KDP reading in the
+   repository is hardcover. Phase 1.
+2. **A comma costs a rebuild.** No book-scoped text correction layer exists, so
+   trivial edits reach either the frozen manuscript or shared renderer code.
+   Phase 2.
+3. **No visual QA gate.** Deterministic checks exist and are good; every defect
+   found so far passed them and was caught by a human looking at pages. Phase 3.
 
-- Two services: **frontend** (Nixpacks/`Dockerfile.frontend`, serves the static
-  console) and **@wildlands/backend** (`Dockerfile.backend`, node:20 + chromium;
-  runs `drizzle-kit migrate` on boot, so schema changes ship via a committed
-  migration). ~5–6 min builds.
-- **Watch-path quirk:** a service only auto-builds when a pushed commit touches its
-  watched paths; an empty/unrelated commit shows up as `SKIPPED`. Force a build by
-  editing a file under that service's tree. Verify a deploy by diffing the live
-  bundle hash (`curl <frontend>/ | grep main.<hash>.js`).
-- API POSTs need a JSON body — send `{}` for bodyless actions.
-- `whole-page-render/:pageId` takes the page **UUID**, not the page key.
+## Common failure modes
+
+- **A hash does not match.** The interior build is not byte-reproducible; two
+  runs differ at the PDF creation-date field. Hash the shipped file.
+- **A plate vanished.** Its anchor went stale when pagination moved. The stamper
+  refuses to draw rather than clip. Re-anchor it.
+- **Re-pagination lost renders.** It CASCADE-deletes body render rows. Check
+  before re-paginating; recover from R2.
+- **An override stopped applying.** Block ids come from manuscript text. If the
+  text moved, the override no longer matches — it is reported, not dropped.
+- **A change to `shared/` had no effect.** You are in a worktree. See above.
+- **Four tests fail on a clean checkout.** Known and pre-existing. They read real
+  book manuscripts from absolute paths outside the repository, including one
+  under `C:/Users/jovan/Downloads/`. The CI fixture book is the fix.
