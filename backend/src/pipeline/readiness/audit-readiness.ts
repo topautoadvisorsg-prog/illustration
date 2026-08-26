@@ -25,7 +25,7 @@ import { getProject, listProjects } from '../../db/repositories/projects.repo.js
 import { getProjectStorage } from '../../services/storage/project-storage.js';
 import { isKnownProductionProfile, getProductionProfile, listProductionProfiles } from '../production-profiles/registry.js';
 import { STYLE_DNA, listStyleDna } from '../publishing-standard/style-dna.js';
-import { computeCoverDimensions } from '../stage-6-layout/render-html.js';
+import { computeCoverDimensions } from '../publishing-standard/cover-dimensions.js';
 import { isKnownTypesetLayoutStandard, TYPESET_LAYOUT_STANDARDS } from '../typeset/layout-standards/registry.js';
 import { resolveStandardId } from '../typeset/build-typeset-interior.js';
 import { bundledFontCss } from '../typeset/font-assets.js';

@@ -41,7 +41,7 @@ import { ProjectConfigSchema } from '@wildlands/shared';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { getProject } from '../src/db/repositories/projects.repo.js';
-import { computeCoverDimensions } from '../src/pipeline/stage-6-layout/render-html.js';
+import { computeCoverDimensions } from '../src/pipeline/publishing-standard/cover-dimensions.js';
 
 // PRODUCTION CONTEXT. The dev database is not where the title lives, and the
 // dev project still carries the OLD title — reading it would stamp the wrong

@@ -29,7 +29,7 @@
  * converts an inch into a fraction of a canvas.
  */
 import type { ProjectConfig } from '@wildlands/shared';
-import { computeCoverDimensions, COVER_BLEED_IN, type CoverDimensions } from '../stage-6-layout/render-html.js';
+import { computeCoverDimensions, COVER_BLEED_IN, type CoverDimensions } from '../publishing-standard/cover-dimensions.js';
 
 /**
  * KDP wants readable copy at least this far INSIDE the trim line. KDP's stated

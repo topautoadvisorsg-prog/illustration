@@ -38,7 +38,7 @@ import { ProjectConfigSchema } from '@wildlands/shared';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { getProject } from '../src/db/repositories/projects.repo.js';
-import { computeCoverDimensions } from '../src/pipeline/stage-6-layout/render-html.js';
+import { computeCoverDimensions } from '../src/pipeline/publishing-standard/cover-dimensions.js';
 
 const PROJECT_ID = '55d7bce0-2f71-4f02-8131-e6c750c8506e';
 // Downloads was reorganised on 2026-08-17 and the loose book files were moved

@@ -15,7 +15,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema } from '@wildlands/shared';
-import { computeCoverDimensions } from '../pipeline/stage-6-layout/render-html.js';
+import { computeCoverDimensions } from '../pipeline/publishing-standard/cover-dimensions.js';
 import { buildCoverWrapPrompt, coverTypeSafeArea } from '../pipeline/stage-6-layout/render-chapter.js';
 import { getProductionProfile } from '../pipeline/production-profiles/registry.js';
 

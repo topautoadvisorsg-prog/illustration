@@ -16,7 +16,7 @@
  * is only actionable once you can see which size the pages actually are.
  */
 import type { ProjectConfig } from '@wildlands/shared';
-import { computeCoverDimensions } from '../stage-6-layout/render-html.js';
+import { computeCoverDimensions } from '../publishing-standard/cover-dimensions.js';
 import { inspectPdf, type PdfFacts } from './pdf-inspect.js';
 
 export type CheckStatus = 'PASS' | 'WARNING' | 'FAIL';

@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema } from '@wildlands/shared';
-import { computeCoverDimensions } from '../pipeline/stage-6-layout/render-html.js';
+import { computeCoverDimensions } from '../pipeline/publishing-standard/cover-dimensions.js';
 import { coverArtSafeBand, COVER_ART_CANVAS_PX } from '../pipeline/stage-6-layout/render-chapter.js';
 
 const config = (over = {}) =>

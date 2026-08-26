@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { composeCoverPrint } from '../pipeline/print-prep/cover-print.js';
 import type { ProjectConfig } from '@wildlands/shared';
-import type { CoverDimensions } from '../pipeline/stage-6-layout/render-html.js';
+import type { CoverDimensions } from '../pipeline/publishing-standard/cover-dimensions.js';
 
 // gpt-image-2 landscape native size for the wrap art.
 const NATIVE_W = 1536;

@@ -25,7 +25,7 @@
  */
 import sharp from 'sharp';
 import type { ProjectConfig } from '@wildlands/shared';
-import { computeCoverDimensions, COVER_BLEED_IN } from './render-html.js';
+import { computeCoverDimensions, COVER_BLEED_IN } from '../publishing-standard/cover-dimensions.js';
 
 export interface SpineStripGeometry {
   /** Spine rectangle in the GENERATED ART's pixel space. */

@@ -19,7 +19,7 @@ import sharp from 'sharp';
 import { PDFDocument } from 'pdf-lib';
 import type { ProjectConfig } from '@wildlands/shared';
 import { SPACING } from '../publishing-standard/index.js';
-import type { CoverDimensions } from '../stage-6-layout/render-html.js';
+import type { CoverDimensions } from '../publishing-standard/cover-dimensions.js';
 
 export interface CoverComposeResult {
   pngBuffer: Buffer;

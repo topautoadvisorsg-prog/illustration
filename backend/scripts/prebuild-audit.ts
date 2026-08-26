@@ -4,7 +4,7 @@ import { pages, wholePageRenders } from '../src/db/schema/index.js';
 import { eq, and, ne } from 'drizzle-orm';
 import { getProject } from '../src/db/repositories/projects.repo.js';
 import { ProjectConfigSchema, buildSeriesLine } from '@wildlands/shared';
-import { computeCoverDimensions } from '../src/pipeline/stage-6-layout/render-html.js';
+import { computeCoverDimensions } from '../src/pipeline/publishing-standard/cover-dimensions.js';
 
 const PROJECT = process.argv[2]!;
 const db = getDb();

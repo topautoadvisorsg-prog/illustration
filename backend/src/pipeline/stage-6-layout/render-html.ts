@@ -716,81 +716,28 @@ ${fontLinkTags(t)}
 }
 
 /**
- * KDP FULL-WRAP COVER FIGURES — this file is the single source.
+ * COVER GEOMETRY MOVED OUT OF THIS FILE — Phase 1A.
  *
- * Quoted from Amazon's published specifications, with the sources below, so
- * nobody has to work them out from memory or build a second calculator
- * somewhere else. A spine wrong by a few hundredths of an inch prints with the
- * front artwork creeping around the fold and the file gives no sign of it.
+ * These figures now live in `publishing-standard/cover-dimensions.ts`. This
+ * file is Track A (LEGACY / DORMANT) and must not be the authority for anything
+ * the rest of the platform depends on. It was — only because it is where the
+ * cover was first drawn, and every later subsystem imported from where it found
+ * them.
  *
- *   Spine width, black ink   white 0.002252in/page, cream 0.0025in/page
- *   Bleed                    0.125in on top, bottom and outside edges
- *   Cover width              bleed + back + spine + front + bleed
- *   Cover height             bleed + trim height + bleed
- *   Text safe area           at least 0.125in inside the trim lines
- *   Spine text safe area     at least 0.0625in either side of the spine
- *   Spine fold variance      allow 0.0625in either side of each fold line
- *   Spine text eligibility   at least 79 pages (KDP_MIN_SPINE_TEXT_PAGES)
- *   Minimum type size        7pt
- *   Resolution               at least 300 DPI (see print-prep/cover-print.ts)
- *   Barcode                  KDP adds its own to the back cover when none is
- *                            supplied. It is NOT part of the artwork: nothing
- *                            is reserved, nothing is drawn, and the design runs
- *                            straight through that area. Keep readable COPY out
- *                            of it; background is fine.
- *
- * Sources:
- *   https://kdp.amazon.com/en_US/help/topic/G201953020   (cover, spine, safety)
- *   https://kdp.amazon.com/en_US/help/topic/G201857950   (submission, 300 DPI)
- *   https://kdp.amazon.com/help?topicId=G5HDYGP4BXLX4RUW (barcode)
- *
- * Paper thickness was a single constant fixed at the white value: right for the
- * one book that had shipped, silently wrong for anything on cream. On 154 pages
- * the two differ by 0.038in.
+ * Re-exported here so existing Track A callers keep working unchanged. New code
+ * imports from `publishing-standard/cover-dimensions.js` directly. When the last
+ * Track A consumer goes, these lines go with it.
  */
-const PAGE_THICKNESS_IN = { white: 0.002252, cream: 0.0025 } as const;
+import {
+  COVER_BLEED_IN,
+  KDP_MIN_SPINE_TEXT_PAGES,
+  coverAllowsSpineText,
+  computeCoverDimensions,
+  type CoverDimensions,
+} from '../publishing-standard/cover-dimensions.js';
 
-/**
- * COVER BLEED — 0.125in on every outside edge, always.
- *
- * A cover is not a page and does not inherit the interior's bleed. KDP requires
- * bleed on every paperback cover regardless of what the interior does, because
- * the wrap is trimmed after printing.
- *
- * This used to read `config.trimSize.bleedIn`, which is the INTERIOR's setting.
- * A text interior legitimately prints with no bleed, so this book — 5.5x8.5,
- * bleedIn 0 — produced an 11.385 x 8.500in wrap: correct arithmetic, and 0.25in
- * short in both directions of what KDP will accept. It was invisible because the
- * only book that had shipped is an illustrated guide whose interior bleeds
- * 0.125in anyway, so the two numbers happened to agree.
- *
- * Source: https://kdp.amazon.com/en_US/help/topic/G201953020
- */
-export const COVER_BLEED_IN = 0.125;
-
-export interface CoverDimensions {
-  fullWidthIn: number;
-  fullHeightIn: number;
-  spineIn: number;
-}
-
-/** KDP only permits spine text once the interior reaches 79 pages. */
-export const KDP_MIN_SPINE_TEXT_PAGES = 79;
-
-export function coverAllowsSpineText(pageCount: number): boolean {
-  return pageCount >= KDP_MIN_SPINE_TEXT_PAGES;
-}
-
-/** KDP full-wrap cover dimensions for a given interior page count. */
-export function computeCoverDimensions(config: ProjectConfig, pageCount: number): CoverDimensions {
-  const trim = config.trimSize;
-  const spineIn = Math.max(0.06, pageCount * PAGE_THICKNESS_IN[config.paperStock ?? 'white']);
-  return {
-    fullWidthIn: trim.widthIn * 2 + spineIn + COVER_BLEED_IN * 2,
-    fullHeightIn: trim.heightIn + COVER_BLEED_IN * 2,
-    spineIn,
-  };
-}
+export { COVER_BLEED_IN, KDP_MIN_SPINE_TEXT_PAGES, coverAllowsSpineText, computeCoverDimensions };
+export type { CoverDimensions };
 
 /**
  * Build a print-ready full-wrap cover (back panel | spine | front panel) at KDP

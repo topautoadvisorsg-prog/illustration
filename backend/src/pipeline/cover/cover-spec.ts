@@ -27,7 +27,7 @@ import type { ProjectConfig } from '@wildlands/shared';
 import { buildBackCoverCopy, buildSeriesLine } from '@wildlands/shared';
 import { getProductionProfile } from '../production-profiles/registry.js';
 import { assembleIllustrationDna, getStyleDna } from '../publishing-standard/style-dna.js';
-import { coverAllowsSpineText } from '../stage-6-layout/render-html.js';
+import { coverAllowsSpineText } from '../publishing-standard/cover-dimensions.js';
 import { resolveCoverGeometry, MODEL_CANVAS, type CoverGeometry } from './cover-geometry.js';
 
 /** Words that will be printed on the cover. Nothing here describes the artwork. */

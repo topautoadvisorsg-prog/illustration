@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectConfigSchema, buildSeriesLine, toRoman, stripLeadingOrdinal } from '@wildlands/shared';
 import { buildCoverWrapPrompt } from '../pipeline/stage-6-layout/render-chapter.js';
-import { computeCoverDimensions } from '../pipeline/stage-6-layout/render-html.js';
+import { computeCoverDimensions } from '../pipeline/publishing-standard/cover-dimensions.js';
 import { buildPageRolePolicy, type PageRolePolicy } from '../pipeline/whole-page-render/page-role-policy.js';
 import { buildPageSpec } from '../pipeline/whole-page-render/build-page-spec.js';
 import { computePageGeometry } from '../pipeline/stage-6-layout/page-geometry.js';
