@@ -348,3 +348,88 @@ interface CoverBuildResult {
 | **1A** | ✅ Extract the geometry core out of Track A. Zero behaviour change, proven byte-identical on 12 shipped configurations. |
 | **1B** | Reconcile the thicknesses against the current official KDP specification, calculator and templates. Paperback B&W white, paperback B&W cream, premium colour, hardcover case laminate, and the trim/bleed/hinge rules. Existing formulas are regression evidence, not truth. |
 | **1C** | The one-command workflow above, replacing the 18 cover scripts. |
+
+---
+
+## Building a cover: `build-cover`
+
+Cover production used to mean writing a new script. There are nineteen of them
+in `backend/scripts`, each with its own geometry, its own spine maths and its
+own idea of where the barcode goes. Phase 1C replaced that with one engine.
+
+```bash
+tsx scripts/qa/build-cover.ts \
+  --interior final-interior.pdf \
+  --art approved-wrap.png \
+  --binding paperback --ink bw --paper white --trim 6x9 \
+  --title "..." --author "..." \
+  --out cover.pdf --proof proof.png --manifest cover.json
+```
+
+Same command for a hardcover. Change `--binding` and the geometry authority
+changes underneath: published formula for a paperback, verified Cover
+Calculator readings for a hardcover. The operator does not choose between two
+production systems.
+
+### What it will not do
+
+| | |
+|---|---|
+| **No `--pages`** | The count is read from the interior PDF. If that PDF cannot be opened, the build stops. There is no fallback to a supplied number, because that is exactly how a cover ends up sized for the wrong book. |
+| **No `--spine`** | Geometry comes from the authority. An unsupported configuration exits 3. |
+| **No generation** | It places artwork a human has approved. It never regenerates, redesigns, or upscales. Enhancement is a separate operation asked for by name. |
+| **No silent stretch** | `--fit exact` distorts the art and is therefore a hard FAIL, not a convenience. |
+
+### Effective resolution, measured
+
+A JPEG's embedded DPI tag is a claim. What matters is how many real source
+pixels land on one printed inch at the final placed size:
+
+```
+effective PPI = renderDpi / scaleFactor
+```
+
+Art scaled up to fill the wrap drops below the render DPI, and that is the
+number judged against the 300 minimum. PASS at or above it, WARN down to 80% of
+it, FAIL below. The tool will not invent pixels to make a check go green.
+
+### The proof
+
+Two files come out of every build: a clean production PDF with no guides, and a
+proof PNG carrying full-cover bounds, panels, trim or board, safe zones, folds,
+hinges, the spine-text strip and the barcode reserve. A blocked build stamps
+the reason across the foot of the proof.
+
+The barcode rectangle is why the proof exists. Back-cover copy invading the
+region KDP prints over is invisible in a PDF viewer and obvious on a printed
+book, which is the wrong order to find out. Declare back-cover content boxes
+and the check becomes a measurement rather than a drawing.
+
+### Manifest pairing
+
+Every build records the SHA-256 of the interior it was built from beside the
+SHA-256 of the cover, with the detected page count and the geometry provenance.
+That makes one specific accident mechanically detectable:
+
+> a 118-page interior shipped with a forgotten 116-page cover.
+
+Different interior, different hash, different spine, different cover hash.
+
+### Real-book proof
+
+Verified against 7 NATIONAL PARKS, using the shipped interior and the approved
+full-wrap artwork, with no artwork regenerated:
+
+| | Shipped | Compositor |
+|---|---|---|
+| Page box | 12.52024 × 9.25000in | 12.52024 × 9.25000in |
+| Spine | 0.27024in | 0.27024in |
+| Effective PPI | — | 300.0, no crop, aspect identical |
+
+The same inputs against the hardcover binding produce 14.034 × 10.417in on a
+6.197 × 9.236in board, from the calculator fixture rather than trim arithmetic.
+
+One finding worth recording: run against the PRE-wrap art (3864 × 2576, a 3:2
+frame) rather than the finished wrap, the compositor reported a 0.677in crop per
+side and 278.5 effective PPI. That is correct behaviour and it is how you find
+out you supplied the wrong source file.
