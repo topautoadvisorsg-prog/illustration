@@ -49,6 +49,17 @@ import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { getProject } from '../src/db/repositories/projects.repo.js';
 import { computeCoverDimensions } from '../src/pipeline/publishing-standard/cover-dimensions.js';
+import { getKdpCoverDimensions } from '../src/pipeline/publishing-standard/kdp-cover-specs.js';
+
+/** The verified reading for this book. Replaces wrap/margin literals. */
+const HC_KDP = getKdpCoverDimensions({
+  binding: 'HARDCOVER',
+  coverType: 'CASE_LAMINATE',
+  interiorType: 'BLACK_AND_WHITE',
+  paperType: 'CREAM',
+  trimSize: '6x9',
+  pageCount: 126,
+});
 
 // PRODUCTION CONTEXT. The dev database is not where the title lives, and the
 // dev project still carries the OLD title — reading it would stamp the wrong
@@ -84,7 +95,7 @@ const OUT_PROOF = `C:/Users/jovan/Downloads/dirt rich book/COVER HARDCOVER/COVER
 
 const DPI = 300;
 /** KDP: keep every piece of type this far inside the physical edge. */
-const SAFE_IN = 0.591 + 0.125; // wrap + margin: distance from the CANVAS edge
+const SAFE_IN = HC_KDP.wrapIn + HC_KDP.marginIn; // wrap + margin: distance from the CANVAS edge
 /** Chosen so the back copy lands ~0.49in in - clear of safe, minimal side loss. */
 const SCALE = 4464 / 6144; // 0.40in side crop, ~0.50in sky extend on the hardcover canvas
 /** The clear band of path: the sign ends at 5.16in, the hen's comb starts 5.77in. */
@@ -93,7 +104,7 @@ const SCALE = 4464 / 6144; // 0.40in side crop, ~0.50in sky extend on the hardco
  * Placed at 5.6in it sat directly under the subtitle and read as part of the
  * sign. One inch off the foot puts it where a reader expects an author name.
  */
-const AUTHOR_BASE_ABOVE_FOOT_IN = 0.591 + 1.0; // 1in above the TRIM foot
+const AUTHOR_BASE_ABOVE_FOOT_IN = HC_KDP.wrapIn + 1.0; // 1in above the TRIM foot
 /** Sampled from the title lettering itself, not an invented white. */
 const AUTHOR_CREAM = '#e7d4b4';
 const AUTHOR_FONT_PX = 120;

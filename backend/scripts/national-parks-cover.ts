@@ -41,6 +41,7 @@
  */
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
+import { PAGE_THICKNESS_IN } from '../src/pipeline/publishing-standard/cover-dimensions.js';
 
 await import('../src/env.js');
 process.env.CHROMIUM_PATH ??= 'C:/Program Files/Google/Chrome/Application/chrome.exe';
@@ -60,7 +61,7 @@ const { resolveChromiumPath, loadPagedPolyfill } = await import('../src/pipeline
 const TRIM_W = 6;
 const TRIM_H = 9;
 const BLEED = 0.125;
-const PAGE_THICKNESS_WHITE_BW = 0.002252;
+const PAGE_THICKNESS_WHITE_BW = PAGE_THICKNESS_IN.white;
 
 const spineIn = INTERIOR_PAGES * PAGE_THICKNESS_WHITE_BW;
 const fullWidthIn = BLEED + TRIM_W + spineIn + TRIM_W + BLEED;

@@ -26,6 +26,7 @@ import { getProjectStorage } from '../src/services/storage/project-storage.js';
 import { renderTypesetBook } from '../src/pipeline/typeset/render-typeset.js';
 import { TRADE_NONFICTION_GUIDE_TYPESET_V1 as STD } from '../src/pipeline/typeset/layout-standards/trade-nonfiction-guide-v1.js';
 import { padInteriorToEven } from '../src/pipeline/typeset/pad-to-even.js';
+import { resolvePaperbackSpine } from '../src/pipeline/publishing-standard/kdp-spec.js';
 
 const PROJECT_ID = '55d7bce0-2f71-4f02-8131-e6c750c8506e';
 const DIR = 'C:/Users/jovan/Downloads/dirt rich book';
@@ -105,7 +106,10 @@ if (base.pages !== 126) {
 }
 console.log(`  Rev 4 candidate: ${cand.pages} pages (${cand.pages === base.pages ? 'UNCHANGED' : `MOVED by ${cand.pages - base.pages}`})`);
 
-const spineIn = (n: number): number => Math.max(0.06, n * 0.0025);
+// The 0.06in floor this used to apply is gone: it was never KDP, and it only
+// engaged below 24 pages on cream. This book is 126.
+const spineIn = (n: number): number =>
+  resolvePaperbackSpine({ ink: 'BLACK_AND_WHITE', paper: 'CREAM', trim: '6x9', pageCount: n }).spineIn;
 if (cand.pages !== base.pages) {
   console.log(`\n  SPINE IMPACT: ${spineIn(base.pages).toFixed(3)}in -> ${spineIn(cand.pages).toFixed(3)}in`);
   console.log('  The approved cover must be recomposed. Artwork is unchanged; geometry only.');

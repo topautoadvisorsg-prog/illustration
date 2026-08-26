@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { extendSkyUpward, planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
+import { PAGE_THICKNESS_IN } from '../src/pipeline/publishing-standard/cover-dimensions.js';
 import {
   findPaintedPanel,
   planBackCoverLine,
@@ -33,7 +34,7 @@ const DPI = 300;
 const TRIM_W = 6;
 const TRIM_H = 9;
 const BLEED = 0.125;
-const THICKNESS_WHITE_BW = 0.002252;
+const THICKNESS_WHITE_BW = PAGE_THICKNESS_IN.white;
 /** KDP allows this much fold wander either side of each spine fold. */
 const FOLD_VARIANCE_IN = 0.0625;
 /** KDP's barcode reserve, lower right of the back panel, plus its clearance. */

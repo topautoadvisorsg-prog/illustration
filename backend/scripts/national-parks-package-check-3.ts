@@ -26,6 +26,9 @@ import path from 'node:path';
 import JSZip from 'jszip';
 import sharp from 'sharp';
 import { PDFDocument, PDFName, PDFDict, PDFArray } from 'pdf-lib';
+import { PAGE_THICKNESS_IN } from '../src/pipeline/publishing-standard/cover-dimensions.js';
+
+import { getKdpCoverDimensions } from '../src/pipeline/publishing-standard/kdp-cover-specs.js';
 
 const DIR = process.argv[2];
 if (!DIR) throw new Error('usage: national-parks-package-check-3.ts <deliveryDir>');
@@ -88,15 +91,23 @@ const PAGES = 120;
 const PT = 72;
 
 /** Paperback: spine is derived from this interior's own page count. */
-const PB_THICKNESS = 0.002252;
+const PB_THICKNESS = PAGE_THICKNESS_IN.white;
 const PB_SPINE = PAGES * PB_THICKNESS;
 const PB_WRAP_W = 0.125 * 2 + 6 * 2 + PB_SPINE;
 const PB_WRAP_H = 9 + 0.25;
 const PLATES_EXPECTED = 15;
 
-/** Hardcover: read from Amazon's Cover Calculator, 6x9 case laminate, 116pp. */
-const HC_WRAP_W = 14.025;
-const HC_WRAP_H = 10.417;
+/** Hardcover: the verified Cover Calculator reading, 6x9 case laminate, 116pp. */
+const HC = getKdpCoverDimensions({
+  binding: 'HARDCOVER',
+  coverType: 'CASE_LAMINATE',
+  interiorType: 'BLACK_AND_WHITE',
+  paperType: 'WHITE',
+  trimSize: '6x9',
+  pageCount: 116,
+});
+const HC_WRAP_W = HC.fullWidthIn;
+const HC_WRAP_H = HC.fullHeightIn;
 
 let failures = 0;
 const fail = (l: string, d: string): void => { failures += 1; console.log(`  [FAIL] ${l}: ${d}`); };

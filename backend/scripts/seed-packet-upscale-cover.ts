@@ -19,6 +19,9 @@ import { fileURLToPath } from 'node:url';
 import { parse as parseDotenv } from 'dotenv';
 import sharp from 'sharp';
 
+import { getKdpCoverDimensions } from '../src/pipeline/publishing-standard/kdp-cover-specs.js';
+import { computeCoverDimensions } from '../src/pipeline/publishing-standard/cover-dimensions.js';
+
 const REPO_ROOT = nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.url)), '../../');
 
 await import('../src/env.js');
@@ -54,10 +57,25 @@ console.log(`  elapsed    : ${((Date.now() - started) / 1000).toFixed(1)}s`);
 console.log(`  out sha    : ${sha(result.pngBuffer)}`);
 console.log(`  -> ${OUT}`);
 
+// Printed sizes come from the authority, not from numbers typed here. The
+// literals these replaced (12.565 x 9.25 and 14.079 x 10.417) matched, so the
+// reported PPI is unchanged.
+const HC = getKdpCoverDimensions({
+  binding: 'HARDCOVER',
+  coverType: 'CASE_LAMINATE',
+  interiorType: 'BLACK_AND_WHITE',
+  paperType: 'CREAM',
+  trimSize: '6x9',
+  pageCount: 126,
+});
+const PB = computeCoverDimensions(
+  { trimSize: { widthIn: 6, heightIn: 9 }, paperStock: 'cream' } as never,
+  126,
+);
 console.log('\nEFFECTIVE PPI OF THE UPSCALED RASTER AT PRINTED SIZE');
 for (const [name, w, h] of [
-  ['paperback wrap', 12.565, 9.25],
-  ['hardcover wrap', 14.079, 10.417],
+  ['paperback wrap', PB.fullWidthIn, PB.fullHeightIn],
+  ['hardcover wrap', HC.fullWidthIn, HC.fullHeightIn],
 ] as const) {
   const ppiW = after.width! / w;
   const ppiH = after.height! / h;

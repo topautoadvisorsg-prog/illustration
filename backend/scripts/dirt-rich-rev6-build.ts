@@ -15,6 +15,7 @@ import { writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parse as parseDotenv } from 'dotenv';
 import { fileURLToPath } from 'node:url';
+import { resolvePaperbackSpine } from '../src/pipeline/publishing-standard/kdp-spec.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '../../');
@@ -83,6 +84,12 @@ console.log(`  pdf sha256     : ${sha(interior.pdf)}`);
 console.log(`  -> ${OUT}`);
 
 console.log('\nSPINE');
-const spine = interior.pageCount * 0.0025; // cream paper
-console.log(`  ${interior.pageCount} pages x 0.0025in (cream) = ${spine.toFixed(4)}in`);
+const spineRes = resolvePaperbackSpine({
+  ink: 'BLACK_AND_WHITE',
+  paper: 'CREAM',
+  trim: '6x9',
+  pageCount: interior.pageCount,
+});
+const spine = spineRes.spineIn;
+console.log(`  ${spineRes.explanation}`);
 console.log(`  full wrap = ${(6 * 2 + spine + 0.25).toFixed(3)} x 9.250in`);

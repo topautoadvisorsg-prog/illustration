@@ -15,6 +15,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { PDFDocument, PDFName, PDFDict, PDFArray } from 'pdf-lib';
+import { PAGE_THICKNESS_IN } from '../src/pipeline/publishing-standard/cover-dimensions.js';
 
 const COVER = process.argv[2];
 if (!COVER) throw new Error('usage: national-parks-cover-check.ts <coverPdf> [interiorPdf]');
@@ -26,7 +27,7 @@ const INTERIOR_PAGES = 116;
 const TRIM_W = 6;
 const TRIM_H = 9;
 const BLEED = 0.125;
-const THICKNESS = 0.002252;
+const THICKNESS = PAGE_THICKNESS_IN.white;
 const SPINE = INTERIOR_PAGES * THICKNESS;
 const WANT_W = BLEED + TRIM_W + SPINE + TRIM_W + BLEED;
 const WANT_H = BLEED + TRIM_H + BLEED;

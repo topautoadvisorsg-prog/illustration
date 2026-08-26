@@ -23,6 +23,7 @@ import sharp from 'sharp';
 import { PDFDocument } from 'pdf-lib';
 import { planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
 import { getKdpCoverDimensions } from '../src/pipeline/publishing-standard/kdp-cover-specs.js';
+import { PAGE_THICKNESS_IN } from '../src/pipeline/publishing-standard/cover-dimensions.js';
 
 const DEL = 'C:/Users/jovan/Downloads/7-NATIONAL-PARKS-KDP-UPLOAD';
 const DPI = 300;
@@ -36,7 +37,7 @@ const TARGET_IN = 0.075;
 const MIN_LINE_GAP_IN = 0.2;
 
 const PAGES = 116;
-const PB_SPINE = PAGES * 0.002252;
+const PB_SPINE = PAGES * PAGE_THICKNESS_IN.white;
 const hc = getKdpCoverDimensions({
   binding: 'HARDCOVER',
   coverType: 'CASE_LAMINATE',

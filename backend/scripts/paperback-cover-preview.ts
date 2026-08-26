@@ -10,11 +10,12 @@ import { ProjectConfigSchema } from '@wildlands/shared';
 import { getProject } from '../src/db/repositories/projects.repo.js';
 import { getProjectStorage } from '../src/services/storage/project-storage.js';
 import { P } from './_project.js';
+import { PAPERBACK_SPINE_FACTOR_IN } from '../src/pipeline/publishing-standard/kdp-spec.js';
 
 // ── KDP paperback wrap math (7x10, Premium Color) ──
 const TRIM_W = 7, TRIM_H = 10, BLEED = 0.125;
 const PAGES = 276;                  // 275 interior, rounded up to even (KDP)
-const PREMIUM_COLOR_PER_PAGE = 0.002347;
+const PREMIUM_COLOR_PER_PAGE = PAPERBACK_SPINE_FACTOR_IN.PREMIUM_COLOR!.WHITE!.value;
 const SPINE = +(PAGES * PREMIUM_COLOR_PER_PAGE).toFixed(3); // ~0.648"
 const SAFE = 0.25;                  // text-safe inset from trim
 const FULL_W = TRIM_W * 2 + SPINE + BLEED * 2;   // ~14.898"

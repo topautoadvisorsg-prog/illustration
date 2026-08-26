@@ -22,6 +22,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
+import { PAGE_THICKNESS_IN } from '../src/pipeline/publishing-standard/cover-dimensions.js';
 import {
   COPY_CREAM,
   COPY_FONT,
@@ -41,7 +42,7 @@ const DPI = 300;
 const TRIM_W = 6;
 const TRIM_H = 9;
 const BLEED = 0.125;
-const THICKNESS_WHITE_BW = 0.002252;
+const THICKNESS_WHITE_BW = PAGE_THICKNESS_IN.white;
 const BARCODE_H = 1.2;
 const BARCODE_CLEAR = 0.25;
 /** Type never comes closer than this to a trim edge. */

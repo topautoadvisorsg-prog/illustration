@@ -13,6 +13,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { PDFDocument, PDFName, PDFDict, PDFArray, PDFNumber } from 'pdf-lib';
+import { PAGE_THICKNESS_IN } from '../src/pipeline/publishing-standard/cover-dimensions.js';
 
 const PDF_PATH = process.argv[2];
 if (!PDF_PATH) throw new Error('usage: national-parks-print-check.ts <pdf>');
@@ -205,7 +206,7 @@ console.log('\n4. COVER AND SPINE BASIS');
    * besides the page count — which is why the cover cannot be finished until
    * this file is final.
    */
-  const PPI = 0.002252;
+  const PPI = PAGE_THICKNESS_IN.white;
   const spine = n * PPI;
   console.log(`         paper stock          : white`);
   console.log(`         multiplier           : ${PPI} in/page (KDP, B&W on white)`);

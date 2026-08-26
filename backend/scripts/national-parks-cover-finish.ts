@@ -28,6 +28,7 @@ import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { extendSkyUpward, planSpineType } from '../src/pipeline/publishing-standard/spine-type.js';
 import { COPY_CREAM, COPY_FONT, COPY_HALO } from '../src/pipeline/publishing-standard/cover-copy-column.js';
+import { PAGE_THICKNESS_IN } from '../src/pipeline/publishing-standard/cover-dimensions.js';
 
 const ART = process.argv[2];
 const INTERIOR = process.argv[3];
@@ -38,7 +39,7 @@ const DPI = 300;
 const TRIM_W = 6;
 const TRIM_H = 9;
 const BLEED = 0.125;
-const THICKNESS_WHITE_BW = 0.002252;
+const THICKNESS_WHITE_BW = PAGE_THICKNESS_IN.white;
 const BARCODE_H = 1.2;
 const BARCODE_CLEAR = 0.25;
 const FOLD_VARIANCE_IN = 0.0625;

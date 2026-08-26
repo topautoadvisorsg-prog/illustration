@@ -176,6 +176,194 @@ export const VERIFIED_SPECS: VerifiedSpec[] = [
     barcodeMarginWidthIn: 0.25,
     barcodeMarginHeightIn: 0.375,
   },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 6x9 HARDCOVER SERIES, read 2026-08-26.
+  //
+  // Collected in one sitting from the public Cover Calculator, which needs no
+  // sign-in. The 126pp cream row above was re-read first as a control and came
+  // back identical to what was already stored, which is what makes the rest of
+  // this batch trustworthy.
+  //
+  // The board, wrap, hinge, margin and barcode margin do NOT vary with page
+  // count at 6x9 — only the spine and the spine-safe area move. That is an
+  // observation about these readings, not a licence to compute new ones.
+  //
+  // The readings are internally consistent with a constant offset from the
+  // paperback spine (about 0.189in of board). DO NOT turn that into a
+  // multiplier. Amazon publishes no hardcover spine formula, and a pattern
+  // across six points is not a specification.
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    // The hardcover page-count floor. The calculator REFUSES 75 and returns this for 76, which is how the 75-vs-76 conflict was settled.
+    //
+    // Read from the KDP Cover Calculator on 2026-08-26. Inputs exactly:
+    //   Binding type      Hardcover
+    //   Cover Type        Hardcover (case laminate)
+    //   Interior type     Black & white
+    //   Paper type        White paper
+    //   Reading Direction Left to Right
+    //   Measurement units Inches
+    //   Interior trim     6 x 9 in
+    //   Page count        76
+    config: {
+      binding: 'HARDCOVER',
+      coverType: 'CASE_LAMINATE',
+      interiorType: 'BLACK_AND_WHITE',
+      paperType: 'WHITE',
+      trimSize: '6x9',
+      pageCount: 76,
+    },
+    verifiedOn: '2026-08-26',
+    fullWidthIn: 13.935,
+    fullHeightIn: 10.417,
+    spineIn: 0.36,
+    frontWidthIn: 6.197,
+    frontHeightIn: 9.236,
+    marginIn: 0.125,
+    wrapIn: 0.591,
+    hingeIn: 0.394,
+    spineSafeWidthIn: 0.235,
+    spineSafeHeightIn: 8.986,
+    barcodeMarginWidthIn: 0.25,
+    barcodeMarginHeightIn: 0.375,
+  },
+  {
+    // 7 NATIONAL PARKS, hardcover edition of the shipped 120pp paperback.
+    //
+    // Read from the KDP Cover Calculator on 2026-08-26. Inputs exactly:
+    //   Binding type      Hardcover
+    //   Cover Type        Hardcover (case laminate)
+    //   Interior type     Black & white
+    //   Paper type        White paper
+    //   Reading Direction Left to Right
+    //   Measurement units Inches
+    //   Interior trim     6 x 9 in
+    //   Page count        120
+    config: {
+      binding: 'HARDCOVER',
+      coverType: 'CASE_LAMINATE',
+      interiorType: 'BLACK_AND_WHITE',
+      paperType: 'WHITE',
+      trimSize: '6x9',
+      pageCount: 120,
+    },
+    verifiedOn: '2026-08-26',
+    fullWidthIn: 14.034,
+    fullHeightIn: 10.417,
+    spineIn: 0.459,
+    frontWidthIn: 6.197,
+    frontHeightIn: 9.236,
+    marginIn: 0.125,
+    wrapIn: 0.591,
+    hingeIn: 0.394,
+    spineSafeWidthIn: 0.334,
+    spineSafeHeightIn: 8.986,
+    barcodeMarginWidthIn: 0.25,
+    barcodeMarginHeightIn: 0.375,
+  },
+  {
+    // NO ONE TOLD ME THAT, hardcover edition of the shipped 170pp interior.
+    //
+    // Read from the KDP Cover Calculator on 2026-08-26. Inputs exactly:
+    //   Binding type      Hardcover
+    //   Cover Type        Hardcover (case laminate)
+    //   Interior type     Black & white
+    //   Paper type        White paper
+    //   Reading Direction Left to Right
+    //   Measurement units Inches
+    //   Interior trim     6 x 9 in
+    //   Page count        170
+    config: {
+      binding: 'HARDCOVER',
+      coverType: 'CASE_LAMINATE',
+      interiorType: 'BLACK_AND_WHITE',
+      paperType: 'WHITE',
+      trimSize: '6x9',
+      pageCount: 170,
+    },
+    verifiedOn: '2026-08-26',
+    fullWidthIn: 14.147,
+    fullHeightIn: 10.417,
+    spineIn: 0.572,
+    frontWidthIn: 6.197,
+    frontHeightIn: 9.236,
+    marginIn: 0.125,
+    wrapIn: 0.591,
+    hingeIn: 0.394,
+    spineSafeWidthIn: 0.447,
+    spineSafeHeightIn: 8.986,
+    barcodeMarginWidthIn: 0.25,
+    barcodeMarginHeightIn: 0.375,
+  },
+  {
+    // A mid-range cream anchor between the 126pp and 250pp readings.
+    //
+    // Read from the KDP Cover Calculator on 2026-08-26. Inputs exactly:
+    //   Binding type      Hardcover
+    //   Cover Type        Hardcover (case laminate)
+    //   Interior type     Black & white
+    //   Paper type        Cream paper
+    //   Reading Direction Left to Right
+    //   Measurement units Inches
+    //   Interior trim     6 x 9 in
+    //   Page count        200
+    config: {
+      binding: 'HARDCOVER',
+      coverType: 'CASE_LAMINATE',
+      interiorType: 'BLACK_AND_WHITE',
+      paperType: 'CREAM',
+      trimSize: '6x9',
+      pageCount: 200,
+    },
+    verifiedOn: '2026-08-26',
+    fullWidthIn: 14.264,
+    fullHeightIn: 10.417,
+    spineIn: 0.689,
+    frontWidthIn: 6.197,
+    frontHeightIn: 9.236,
+    marginIn: 0.125,
+    wrapIn: 0.591,
+    hingeIn: 0.394,
+    spineSafeWidthIn: 0.564,
+    spineSafeHeightIn: 8.986,
+    barcodeMarginWidthIn: 0.25,
+    barcodeMarginHeightIn: 0.375,
+  },
+  {
+    // An upper-range anchor, so interpolation is never extrapolation for a normal trade book.
+    //
+    // Read from the KDP Cover Calculator on 2026-08-26. Inputs exactly:
+    //   Binding type      Hardcover
+    //   Cover Type        Hardcover (case laminate)
+    //   Interior type     Black & white
+    //   Paper type        White paper
+    //   Reading Direction Left to Right
+    //   Measurement units Inches
+    //   Interior trim     6 x 9 in
+    //   Page count        250
+    config: {
+      binding: 'HARDCOVER',
+      coverType: 'CASE_LAMINATE',
+      interiorType: 'BLACK_AND_WHITE',
+      paperType: 'WHITE',
+      trimSize: '6x9',
+      pageCount: 250,
+    },
+    verifiedOn: '2026-08-26',
+    fullWidthIn: 14.327,
+    fullHeightIn: 10.417,
+    spineIn: 0.752,
+    frontWidthIn: 6.197,
+    frontHeightIn: 9.236,
+    marginIn: 0.125,
+    wrapIn: 0.591,
+    hingeIn: 0.394,
+    spineSafeWidthIn: 0.627,
+    spineSafeHeightIn: 8.986,
+    barcodeMarginWidthIn: 0.25,
+    barcodeMarginHeightIn: 0.375,
+  },
 ];
 
 /** Configuration identity, ignoring page count — the "family" a spine varies within. */

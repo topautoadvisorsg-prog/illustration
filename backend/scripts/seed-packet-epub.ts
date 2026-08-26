@@ -24,6 +24,7 @@ import nodePath from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse as parseDotenv } from 'dotenv';
 import sharp from 'sharp';
+import { resolvePaperbackSpine } from '../src/pipeline/publishing-standard/kdp-spec.js';
 
 const REPO_ROOT = nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.url)), '../../');
 
@@ -45,7 +46,15 @@ const WRAP = 'C:/Users/jovan/Downloads/dirt rich book/COVER REV5 - new title/COV
    portrait region" is the difference between a front cover and a front cover
    with a slice of spine down one side. */
 const DPI = 300;
-const FRONT_LEFT_IN = 0.125 + 6.0 + 0.315;
+// bleed + back panel + spine. The spine comes from the published formula for
+// this book (126pp, cream), not from a number typed into this script.
+const SPINE_IN = resolvePaperbackSpine({
+  ink: 'BLACK_AND_WHITE',
+  paper: 'CREAM',
+  trim: '6x9',
+  pageCount: 126,
+}).spineIn;
+const FRONT_LEFT_IN = 0.125 + 6.0 + SPINE_IN;
 const TRIM_W_IN = 6.0;
 const TRIM_H_IN = 9.0;
 const BLEED_IN = 0.125;

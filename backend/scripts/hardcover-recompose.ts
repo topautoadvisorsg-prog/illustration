@@ -7,11 +7,29 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { PDFDocument } from 'pdf-lib';
 import { getProjectStorage } from '../src/services/storage/project-storage.js';
+import { getKdpCoverDimensions } from '../src/pipeline/publishing-standard/kdp-cover-specs.js';
+import { HARDCOVER_RULES } from '../src/pipeline/publishing-standard/kdp-spec.js';
 
 const P = process.argv[2]!;
 const OUT = process.argv[3] ?? 'C:/Users/jovan/Downloads';
-const dims = { fullWidthIn: 16.409, fullHeightIn: 11.417, spineIn: 0.834 };
-const WRAP = 0.591, BC_LEFT_MARGIN = 0.25, BC_BOTTOM_MARGIN = 0.375, BC_W = 2.0, BC_H = 1.2;
+// Geometry comes from the verified Cover Calculator reading for this exact
+// configuration, not from numbers typed here. The literals this replaced
+// (16.409 x 11.417, spine 0.834, wrap 0.591) matched the fixture exactly, so
+// no cover moves.
+const KDP = getKdpCoverDimensions({
+  binding: 'HARDCOVER',
+  coverType: 'CASE_LAMINATE',
+  interiorType: 'PREMIUM_COLOR',
+  paperType: 'WHITE',
+  trimSize: '7x10',
+  pageCount: 275,
+});
+const dims = { fullWidthIn: KDP.fullWidthIn, fullHeightIn: KDP.fullHeightIn, spineIn: KDP.spineIn };
+const WRAP = KDP.wrapIn;
+const BC_LEFT_MARGIN = KDP.barcodeMarginWidthIn;
+const BC_BOTTOM_MARGIN = KDP.barcodeMarginHeightIn;
+const BC_W = HARDCOVER_RULES.barcode.value.widthIn;
+const BC_H = HARDCOVER_RULES.barcode.value.heightIn;
 
 const storage = getProjectStorage();
 const artPng = await storage.readProjectFile(`${P}/cover/cover-wrap-hardcover-art.png`);

@@ -4,16 +4,38 @@
  * Geometry is the KDP hardcover wrap (16.409 x 11.417, spine 0.834); zones are
  * expressed as fractions so the same builder works at any render size. */
 
-// ---- KDP wrap geometry as fractions of full width / height ----
-const Wf = 16.409, Hf = 11.417;
+import { getKdpCoverDimensions } from '../../src/pipeline/publishing-standard/kdp-cover-specs.js';
+
+// ---- KDP wrap geometry, DERIVED from the verified calculator reading ----
+// Every fraction below used to be a hand-typed inch value. They are now
+// computed from the fixture for this exact configuration, so the blueprint
+// cannot drift from the wrap the cover builder actually uses.
+//
+// One real correction: the spine-safe width was typed as 0.709in against the
+// calculator's 0.695in, which let spine type sit 0.007in per side closer to
+// the fold than KDP allows. It now uses the stated figure.
+const KDP = getKdpCoverDimensions({
+  binding: 'HARDCOVER',
+  coverType: 'CASE_LAMINATE',
+  interiorType: 'PREMIUM_COLOR',
+  paperType: 'WHITE',
+  trimSize: '7x10',
+  pageCount: 275,
+});
+const Wf = KDP.fullWidthIn, Hf = KDP.fullHeightIn;
+const spineStart = KDP.wrapIn + KDP.frontWidthIn;
+const spineEnd = spineStart + KDP.spineIn;
 const f = {
-  marginX: 0.716 / Wf, marginY: 0.716 / Hf,        // safe inset (wrap 0.591 + margin 0.125)
-  backTrim0: 0.591 / Wf,                            // back panel left trim
-  backHinge0: 7.394 / Wf, spine0: 7.788 / Wf,       // back hinge | spine start
-  spine1: 8.622 / Wf, frontHinge1: 9.016 / Wf,      // spine end | front hinge end
-  frontTrim1: 15.819 / Wf,                          // front panel right trim
+  marginX: (KDP.wrapIn + KDP.marginIn) / Wf,
+  marginY: (KDP.wrapIn + KDP.marginIn) / Hf,
+  backTrim0: KDP.wrapIn / Wf,
+  backHinge0: (spineStart - KDP.hingeIn) / Wf,
+  spine0: spineStart / Wf,
+  spine1: spineEnd / Wf,
+  frontHinge1: (spineEnd + KDP.hingeIn) / Wf,
+  frontTrim1: (spineEnd + KDP.frontWidthIn) / Wf,
 };
-const spineSafeHalf = (0.709 / 2) / Wf;             // spine text-safe half width
+const spineSafeHalf = KDP.spineSafeWidthIn / 2 / Wf;
 const spineCx = 0.5;
 
 export function buildBlueprintSvg(W: number, H: number): string {
