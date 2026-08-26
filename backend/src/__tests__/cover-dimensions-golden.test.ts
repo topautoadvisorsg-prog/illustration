@@ -46,7 +46,8 @@ import {
   computeCoverDimensions,
   coverAllowsSpineText,
   COVER_BLEED_IN,
-  MIN_SPINE_IN,
+  LEGACY_MIN_SPINE_IN,
+  computeCoverDimensionsLegacyFloor,
   PAGE_THICKNESS_IN,
 } from '../pipeline/publishing-standard/cover-dimensions.js';
 
@@ -70,7 +71,7 @@ const GOLDEN: Golden[] = [
   {"label":"7 NATIONAL PARKS — earlier 116pp build","pageCount":116,"trim":"6x9","paperStock":"white","spineIn":0.261232,"fullWidthIn":12.511232,"fullHeightIn":9.25,"spineTextAllowed":true},
   {"label":"boundary — 79pp, NOT eligible for spine text","pageCount":79,"trim":"6x9","paperStock":"white","spineIn":0.177908,"fullWidthIn":12.427908,"fullHeightIn":9.25,"spineTextAllowed":false},
   {"label":"boundary — 80pp, first eligible for spine text","pageCount":80,"trim":"6x9","paperStock":"white","spineIn":0.18016,"fullWidthIn":12.43016,"fullHeightIn":9.25,"spineTextAllowed":true},
-  {"label":"boundary — 24pp, printable minimum","pageCount":24,"trim":"6x9","paperStock":"white","spineIn":0.06,"fullWidthIn":12.31,"fullHeightIn":9.25,"spineTextAllowed":false},
+  {"label":"boundary — 24pp, printable minimum (published formula, NOT the old 0.06 floor)","pageCount":24,"trim":"6x9","paperStock":"white","spineIn":0.054048,"fullWidthIn":12.304048,"fullHeightIn":9.25,"spineTextAllowed":false},
   {"label":"boundary — 828pp, printable maximum","pageCount":828,"trim":"6x9","paperStock":"white","spineIn":1.864656,"fullWidthIn":14.114656,"fullHeightIn":9.25,"spineTextAllowed":true},
 ];
 
@@ -111,9 +112,80 @@ describe('the constants the whole platform now shares', () => {
     expect(Math.abs(154 * PAGE_THICKNESS_IN.cream - 154 * PAGE_THICKNESS_IN.white)).toBeCloseTo(0.038, 3);
   });
 
-  it('a very thin block is floored rather than allowed to go unfoldable', () => {
-    const dims = computeCoverDimensions(configFor(GOLDEN[0]!), 4);
-    expect(dims.spineIn).toBe(MIN_SPINE_IN);
+  /**
+   * REGRESSION — canonical geometry must not clamp.
+   *
+   * The 0.06in floor used to live inside computeCoverDimensions, where it
+   * overrode the published formula between 24 and 26 pages on white paper.
+   * Amazon prints from 24 and publishes no minimum spine. If any of these fail,
+   * a clamp has been reintroduced into the canonical path.
+   */
+  describe('the canonical path applies the published formula and nothing else', () => {
+    it('does not clamp at the thinnest page count KDP will print', () => {
+      const dims = computeCoverDimensions(configFor(GOLDEN[0]!), 24);
+      expect(dims.spineIn).toBeCloseTo(24 * PAGE_THICKNESS_IN.white, 10);
+      expect(dims.spineIn).toBeLessThan(LEGACY_MIN_SPINE_IN.value);
+    });
+
+    it('does not clamp anywhere the old floor used to engage', () => {
+      for (const pages of [24, 25, 26]) {
+        const dims = computeCoverDimensions(configFor(GOLDEN[0]!), pages);
+        expect(dims.spineIn).toBeCloseTo(pages * PAGE_THICKNESS_IN.white, 10);
+      }
+    });
+
+    it('does not clamp even far below the printable range', () => {
+      const dims = computeCoverDimensions(configFor(GOLDEN[0]!), 4);
+      expect(dims.spineIn).toBeCloseTo(4 * PAGE_THICKNESS_IN.white, 10);
+      expect(dims.spineIn).not.toBe(LEGACY_MIN_SPINE_IN.value);
+    });
+
+    it('the wrap width reflects the unclamped spine', () => {
+      const cfg = configFor(GOLDEN[0]!);
+      const dims = computeCoverDimensions(cfg, 24);
+      const expected = cfg.trimSize.widthIn * 2 + 24 * PAGE_THICKNESS_IN.white + COVER_BLEED_IN * 2;
+      expect(dims.fullWidthIn).toBeCloseTo(expected, 10);
+    });
+  });
+
+  /**
+   * The historical behaviour still exists, but only when asked for by name, and
+   * it is labelled LEGACY_COMPATIBILITY rather than presented as KDP authority.
+   */
+  describe('the legacy floor is preserved but quarantined', () => {
+    it('is not KDP authority', () => {
+      expect(LEGACY_MIN_SPINE_IN.authority).toBe('LEGACY_COMPATIBILITY');
+      expect(LEGACY_MIN_SPINE_IN.value).toBe(0.06);
+    });
+
+    it('still clamps when a caller opts in explicitly', () => {
+      const dims = computeCoverDimensionsLegacyFloor(configFor(GOLDEN[0]!), 24);
+      expect(dims.spineIn).toBe(LEGACY_MIN_SPINE_IN.value);
+    });
+
+    it('agrees with canonical geometry at every shipped page count', () => {
+      // Only where the floor never engaged. Below 27 pages on white paper the
+      // two are SUPPOSED to differ — that difference is the whole point of
+      // separating them.
+      const shipped = GOLDEN.filter((g) => g.pageCount >= 27);
+      expect(shipped.length).toBeGreaterThan(0);
+      for (const g of shipped) {
+        const cfg = configFor(g);
+        expect(computeCoverDimensionsLegacyFloor(cfg, g.pageCount)).toEqual(
+          computeCoverDimensions(cfg, g.pageCount),
+        );
+      }
+    });
+
+    it('differs from canonical geometry exactly where the floor used to bite', () => {
+      const cfg = configFor(GOLDEN[0]!);
+      for (const pages of [24, 25, 26]) {
+        expect(computeCoverDimensionsLegacyFloor(cfg, pages).spineIn).toBe(0.06);
+        expect(computeCoverDimensions(cfg, pages).spineIn).toBeLessThan(0.06);
+      }
+      // and at 27 they converge again
+      expect(computeCoverDimensionsLegacyFloor(cfg, 27)).toEqual(computeCoverDimensions(cfg, 27));
+    });
   });
 
   it('an unset paper stock falls back to white, as it always has', () => {

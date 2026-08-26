@@ -33,7 +33,9 @@
  * refuses rather than approximating.
  */
 import type { ProjectConfig } from '@wildlands/shared';
-import { PAPERBACK_SPINE_FACTOR_IN, PAPERBACK_RULES } from './kdp-spec.js';
+import { PAPERBACK_SPINE_FACTOR_IN, PAPERBACK_RULES,
+} from './kdp-spec.js';
+import type { SpecValue } from './kdp-spec.js';
 
 /**
  * Per-page paper thickness, in inches.
@@ -50,21 +52,57 @@ export const PAGE_THICKNESS_IN = {
 } as const;
 
 /**
- * PLATFORM DECISION, not a KDP rule — and it OVERRIDES the published formula
- * inside KDPs printable range.
+ * LEGACY COMPATIBILITY — NOT KDP, AND NOT CANONICAL.
  *
- * Amazon publishes no minimum spine. This floor stops a very short block
- * producing a spine narrower than the printer can fold to.
+ * Canonical geometry no longer applies this. Amazon publishes no minimum spine
+ * width; it publishes a formula, and the formula is what `computeCoverDimensions`
+ * now returns for every page count in the printable range.
  *
- * BUT: on white paper it engages at 24, 25 and 26 pages, and KDP prints from 24.
- * A 24-page book computes 0.054048in by the published formula and is returned as
- * 0.06in here. That is a deliberate deviation from the specification in a range
- * KDP will actually print, and it is the one place the platform knowingly
- * disagrees with Amazon. It has never applied to a real book — the thinnest
- * shipped is 116 pages — but it is a decision, not a detail, and it should be
- * confirmed or dropped rather than left implicit.
+ * The floor used to be applied silently inside the canonical path, where it
+ * OVERRODE the published formula between 24 and 26 pages on white paper. KDP
+ * prints from 24. A 24-page book computes 0.054048in by the published formula
+ * and was being handed back as 0.06in: a deviation from the specification, in a
+ * range Amazon will actually print, presented as though it were KDP geometry.
+ *
+ * WHICH ARTIFACTS ACTUALLY NEED IT: none. The floor engages only below 27 pages
+ * on white and below 24 on cream. Every book the platform has produced is 116
+ * pages or more, so no shipped cover, spine or wrap moves by removing it. This
+ * was verified by recomputing all reference configurations, not assumed.
+ *
+ * It is kept, unused by the canonical path, only so that a caller which must
+ * reproduce a pre-Phase-1B artifact can opt in explicitly and be seen doing it.
+ * If nothing consumes it by the time the fixture book lands, delete it.
  */
-export const MIN_SPINE_IN = 0.06;
+export const LEGACY_MIN_SPINE_IN: SpecValue = {
+  value: 0.06,
+  units: 'in',
+  authority: 'LEGACY_COMPATIBILITY',
+  source: {
+    topic: 'Wildlands platform history — pre-Phase-1B cover geometry',
+    url: 'internal',
+    retrieved: '2026-08-26',
+  },
+  note:
+    'Historical clamp removed from canonical geometry on 2026-08-26. No shipped artifact depends on it: it engages only below 27 pages on white paper and the thinnest book produced is 116 pages. Never present this as a KDP requirement.',
+};
+
+/**
+ * The historical behaviour, available only by asking for it by name.
+ *
+ * Use this ONLY to reproduce a cover built before 2026-08-26. Anything new must
+ * call `computeCoverDimensions`, which follows the published formula.
+ */
+export function computeCoverDimensionsLegacyFloor(config: ProjectConfig, pageCount: number): CoverDimensions {
+  const exact = computeCoverDimensions(config, pageCount);
+  if (exact.spineIn >= LEGACY_MIN_SPINE_IN.value) return exact;
+  const trim = config.trimSize;
+  const spineIn = LEGACY_MIN_SPINE_IN.value;
+  return {
+    fullWidthIn: trim.widthIn * 2 + spineIn + COVER_BLEED_IN * 2,
+    fullHeightIn: trim.heightIn + COVER_BLEED_IN * 2,
+    spineIn,
+  };
+}
 
 /**
  * COVER BLEED — 0.125in on every outside edge, always.
@@ -113,7 +151,11 @@ export function coverAllowsSpineText(pageCount: number): boolean {
  */
 export function computeCoverDimensions(config: ProjectConfig, pageCount: number): CoverDimensions {
   const trim = config.trimSize;
-  const spineIn = Math.max(MIN_SPINE_IN, pageCount * PAGE_THICKNESS_IN[config.paperStock ?? 'white']);
+  // The published formula, and nothing else. No floor, no rounding, no nearest
+  // fixture. If a page count is outside KDP's printable range the caller is
+  // asking for a book Amazon will not print, and that is the caller's error to
+  // surface, not something to paper over with a minimum.
+  const spineIn = pageCount * PAGE_THICKNESS_IN[config.paperStock ?? 'white'];
   return {
     fullWidthIn: trim.widthIn * 2 + spineIn + COVER_BLEED_IN * 2,
     fullHeightIn: trim.heightIn + COVER_BLEED_IN * 2,

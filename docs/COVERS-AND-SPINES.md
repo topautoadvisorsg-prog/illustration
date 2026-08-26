@@ -11,7 +11,7 @@ downstream holds a literal factor.
 Read from Amazon's live documentation on that date. Each value carries its topic
 and retrieval date in the module.
 
-### Paperback spine factors — `published-formula`
+### Paperback spine factors — `OFFICIAL_FORMULA`
 
 | Ink | Paper | Factor | Note |
 |---|---|---|---|
@@ -23,7 +23,7 @@ and retrieval date in the module.
 
 Source: G201953020 — Create a Paperback Cover.
 
-### Paperback static rules — `published-constraint`
+### Paperback static rules — `OFFICIAL_STATIC_RULE`
 
 | Rule | Value | Source |
 |---|---|---|
@@ -39,7 +39,7 @@ Cover Width  = Bleed + Back Cover Width + Spine Width + Front Cover Width + Blee
 Cover Height = Bleed + Trim Height + Bleed
 ```
 
-### Hardcover static rules — `published-constraint`
+### Hardcover static rules — `OFFICIAL_STATIC_RULE`
 
 | Rule | Value |
 |---|---|
@@ -51,7 +51,7 @@ Cover Height = Bleed + Trim Height + Bleed
 
 Source: GDTKFJPNQCBTMRV6 — Create a Hardcover Cover.
 
-### Hardcover spine — `calculator-fixture`, and no multiplier exists
+### Hardcover spine — `OFFICIAL_CALCULATOR_FIXTURE`, and no multiplier exists
 
 **Amazon publishes no hardcover spine factor.** The help page directs you to the
 Cover Calculator with ink, paper, trim and page count. The stored readings happen
@@ -111,7 +111,7 @@ Hardcover trims: 5.5×8.5, 6×9, 6.14×9.21, 7×10, 8.25×11. Paperback offers s
 | **Groundwood** | assumed ≈0.00235 | **unsupported**, fails closed |
 | **Standard vs premium colour** | assumed one "colour" factor | **two separate factors**; collapsing them costs 0.057in on a 600-page book |
 | **Premium Color default** | `paperback-preview.ts` defaulted to 0.002347 for every book | **removed**; refuses without an explicit spine or thickness |
-| **Paperback barcode size** | applied as though published | labelled `platform-decision`; KDP publishes it for hardcover only |
+| **Paperback barcode size** | applied as though published | labelled `HOUSE_POLICY`; KDP publishes it for hardcover only |
 | **Hardcover wrap** | `scripts/qa/cover-spec.ts` computed it from the trim, as though it were a paperback | **reads the calculator fixture**; the board is larger than the trim, and the old maths was short by 0.556in on the Seed Packet hardcover |
 | **Hardcover spine text** | reported ELIGIBLE unconditionally | **NOT PUBLISHED** — KDP states a page minimum for paperback only; asserting one invented a rule |
 | **Hardcover spine-safe** | inset by the 0.4in hinge, which clamps a 0.504in spine to zero width | the calculator's stated spine-safe box |
@@ -138,7 +138,7 @@ Every dimension prints with its arithmetic:
 ```
   spine                 0.27024in
                         120 pages x 0.002252 in/page = 0.270240in
-  authority             published-formula
+  authority             OFFICIAL_FORMULA
   source                G201953020 — Create a Paperback Cover (read 2026-08-26)
   wrap                  width  = 0.125 + 6 + 0.27024 + 6 + 0.125 = 12.52024in
 ```

@@ -9,16 +9,19 @@
  * The platform's worst habit was defaults that looked authoritative. So every
  * value declares what KIND of thing it is:
  *
- *   'published-formula'    Amazon publishes the arithmetic. We can compute any
+ *   OFFICIAL_FORMULA       Amazon publishes the arithmetic. We can compute any
  *                          page count. Paperback spines are all of this kind.
- *   'published-constraint' Amazon publishes a fixed number — a bleed, a safe
+ *   OFFICIAL_STATIC_RULE   Amazon publishes a fixed number — a bleed, a safe
  *                          margin, a minimum page count for spine text.
- *   'calculator-fixture'   Amazon publishes NO formula and the value must be
+ *   OFFICIAL_CALCULATOR_FIXTURE
  *                          read from the Cover Calculator for one exact
  *                          configuration. Hardcover spines are all of this kind;
  *                          they live in `kdp-cover-specs.ts` as VERIFIED_SPECS.
- *   'platform-decision'    Ours, not Amazon's. Labelled so nobody mistakes a
+ *   HOUSE_POLICY           Ours, not Amazon's. Labelled so nobody mistakes a
  *                          house rule for a print requirement.
+ *   LEGACY_COMPATIBILITY   Historical behaviour kept only to reproduce an old
+ *                          artifact. Never canonical, never presented as KDP.
+ *   UNVERIFIED             Nothing authoritative found. Fails closed.
  *
  * A configuration we cannot serve from one of the first three FAILS CLOSED. It
  * does not fall back to the nearest factor. `UnverifiedKdpConfigurationError`
@@ -28,10 +31,11 @@
  * Two things believed true going in were wrong, and both were caught by reading
  * the live page rather than trusting the brief:
  *
- *   GROUNDWOOD has NO published spine multiplier. A value of 0.00235 was
- *   expected; the cover page does not list groundwood at all, and the groundwood
- *   help page defers to the Cover Calculator. So groundwood is UNSUPPORTED here
- *   until a fixture is read. It is not approximated from cream.
+ *   GROUNDWOOD has NO published spine multiplier. Neither the cover page nor
+ *   the groundwood help page states one; both defer to the Cover Calculator.
+ *   It is therefore OFFICIAL_CALCULATOR_FIXTURE, not OFFICIAL_FORMULA. Two
+ *   readings taken on 2026-08-26 both give exactly 0.00235 in/page, so the
+ *   value is usable, but it must never be relabelled as published.
  *
  *   STANDARD COLOR AND PREMIUM COLOR DO NOT SHARE A SPINE FACTOR. They are
  *   listed separately with different multipliers — 0.002252 and 0.002347. A
@@ -43,7 +47,20 @@ export type KdpBinding = 'PAPERBACK' | 'HARDCOVER';
 export type KdpInk = 'BLACK_AND_WHITE' | 'STANDARD_COLOR' | 'PREMIUM_COLOR';
 export type KdpPaper = 'WHITE' | 'CREAM' | 'GROUNDWOOD';
 
-export type SpecAuthority = 'published-formula' | 'published-constraint' | 'calculator-fixture' | 'platform-decision';
+export type SpecAuthority =
+  | 'OFFICIAL_FORMULA'
+  | 'OFFICIAL_STATIC_RULE'
+  | 'OFFICIAL_CALCULATOR_FIXTURE'
+  | 'HOUSE_POLICY'
+  | 'LEGACY_COMPATIBILITY'
+  | 'UNVERIFIED';
+
+/**
+ * A value KDP has not published and we refuse to invent. Distinct from a
+ * missing entry: this says we LOOKED and Amazon states nothing.
+ */
+export const NOT_PUBLISHED = 'NOT_PUBLISHED' as const;
+export type NotPublished = typeof NOT_PUBLISHED;
 
 export interface SpecSource {
   /** Amazon help topic id, or the tool. */
@@ -106,31 +123,52 @@ type PaperbackSpineTable = {
  *   Premium Color paper          page count x 0.002347in  (0.0596 mm)
  *   Standard Color paper         page count x 0.002252in  (0.0572 mm)
  *
- * Groundwood is deliberately absent — see the header.
+ * Groundwood is present but is a CALCULATOR reading, not a published formula.
  */
 export const PAPERBACK_SPINE_FACTOR_IN: PaperbackSpineTable = {
   BLACK_AND_WHITE: {
     WHITE: {
       value: 0.002252,
       units: 'in/page',
-      authority: 'published-formula',
+      authority: 'OFFICIAL_FORMULA',
       source: CREATE_PAPERBACK_COVER,
       note: 'Quoted: "White paper: page count x 0.002252" (0.0572 mm)".',
     },
     CREAM: {
       value: 0.0025,
       units: 'in/page',
-      authority: 'published-formula',
+      authority: 'OFFICIAL_FORMULA',
       source: CREATE_PAPERBACK_COVER,
       note: 'Quoted: "Cream paper: page count x 0.0025" (0.0635 mm)".',
     },
-    // GROUNDWOOD: intentionally absent. No published multiplier.
+    /**
+     * NOT a published formula. Amazon publishes no groundwood multiplier at
+     * all; both help pages send you to the Cover Calculator. These readings
+     * were taken from the calculator itself on 2026-08-26, 6x9in paperback,
+     * black & white, groundwood:
+     *
+     *     120 pages  ->  spine 0.282in   0.282 / 120 = 0.00235
+     *     240 pages  ->  spine 0.564in   0.564 / 240 = 0.00235
+     *
+     * Two independent readings, exact agreement, so the calculator is linear
+     * here and the quotient is safe to apply. The authority stays
+     * OFFICIAL_CALCULATOR_FIXTURE: if Amazon changes the stock, a published
+     * formula would tell us and this will not.
+     */
+    GROUNDWOOD: {
+      value: 0.00235,
+      units: 'in/page',
+      authority: 'OFFICIAL_CALCULATOR_FIXTURE',
+      source: COVER_CALCULATOR,
+      note:
+        'Derived from two Cover Calculator readings on 2026-08-26 (6x9 paperback, B&W, groundwood): 120pp -> 0.282in and 240pp -> 0.564in, both exactly 0.00235 in/page. Amazon publishes NO groundwood multiplier; do not relabel this as OFFICIAL_FORMULA.',
+    },
   },
   PREMIUM_COLOR: {
     WHITE: {
       value: 0.002347,
       units: 'in/page',
-      authority: 'published-formula',
+      authority: 'OFFICIAL_FORMULA',
       source: CREATE_PAPERBACK_COVER,
       note: 'Quoted: "Premium Color paper: page count x 0.002347" (0.0596 mm)".',
     },
@@ -139,7 +177,7 @@ export const PAPERBACK_SPINE_FACTOR_IN: PaperbackSpineTable = {
     WHITE: {
       value: 0.002252,
       units: 'in/page',
-      authority: 'published-formula',
+      authority: 'OFFICIAL_FORMULA',
       source: CREATE_PAPERBACK_COVER,
       note:
         'Quoted: "Standard Color paper: page count x 0.002252" (0.0572 mm)". ' +
@@ -154,21 +192,21 @@ export const PAPERBACK_RULES = {
   bleedIn: {
     value: 0.125,
     units: 'in',
-    authority: 'published-constraint',
+    authority: 'OFFICIAL_STATIC_RULE',
     source: CREATE_PAPERBACK_COVER,
     note: 'Added to the top, bottom and outside edges. Quoted: "add 0.125" (3.2 mm) to the top, bottom, and outside edges".',
   } as SpecValue,
   safeFromOutsideEdgeIn: {
     value: 0.25,
     units: 'in',
-    authority: 'published-constraint',
+    authority: 'OFFICIAL_STATIC_RULE',
     source: PAPERBACK_SUBMISSION,
     note: 'Quoted: "Any content you don\'t intend to be trimmed off should be a minimum of 0.25" (6.4 mm) from the outside cover edge."',
   } as SpecValue,
   spineTextMinPages: {
     value: 80,
     units: 'pages',
-    authority: 'published-constraint',
+    authority: 'OFFICIAL_STATIC_RULE',
     source: CREATE_PAPERBACK_COVER,
     note:
       'Quoted: "We only print spine text on books with more than 79 pages". ' +
@@ -178,21 +216,21 @@ export const PAPERBACK_RULES = {
   spineTextSafeIn: {
     value: 0.0625,
     units: 'in',
-    authority: 'published-constraint',
+    authority: 'OFFICIAL_STATIC_RULE',
     source: CREATE_PAPERBACK_COVER,
     note: 'Quoted: "at least 0.0625" (1.6 mm) of space between the text and the edge".',
   } as SpecValue,
   foldVarianceIn: {
     value: 0.0625,
     units: 'in',
-    authority: 'published-constraint',
+    authority: 'OFFICIAL_STATIC_RULE',
     source: CREATE_PAPERBACK_COVER,
     note: 'Quoted: "Allow for 0.0625" (1.6 mm) variance on either side of the fold lines".',
   } as SpecValue,
   minDpi: {
     value: 300,
     units: 'dpi',
-    authority: 'published-constraint',
+    authority: 'OFFICIAL_STATIC_RULE',
     source: PAPERBACK_SUBMISSION,
     note: 'Quoted: "All images (both cover and manuscript) should be at least 300 DPI."',
   } as SpecValue,
@@ -205,7 +243,7 @@ export const PAPERBACK_RULES = {
   barcodeReserve: {
     value: { widthIn: 2.0, heightIn: 1.2 },
     units: 'in',
-    authority: 'platform-decision',
+    authority: 'HOUSE_POLICY',
     source: CREATE_HARDCOVER_COVER,
     note:
       'NOT published for paperback. KDP states only that it places a barcode on the ' +
@@ -217,31 +255,45 @@ export const PAPERBACK_RULES = {
 
 /** Hardcover rules, published explicitly and separately from paperback. */
 export const HARDCOVER_RULES = {
+  /**
+   * KDP publishes a spine-text page minimum for PAPERBACK only. The hardcover
+   * page states none, so this is NOT_PUBLISHED rather than a number. If we
+   * later want a readability floor of our own, add it as a separate
+   * HOUSE_POLICY value and call it that. Do not fill this in.
+   */
+  spineTextMinPages: {
+    value: NOT_PUBLISHED,
+    units: 'pages',
+    authority: 'UNVERIFIED',
+    source: CREATE_HARDCOVER_COVER,
+    note:
+      'Read 2026-08-26: the hardcover cover page publishes no spine-text page minimum. Absence of a rule is not permission to invent one.',
+  } as SpecValue<NotPublished>,
   caseWrapIn: {
     value: 0.51,
     units: 'in',
-    authority: 'published-constraint',
+    authority: 'OFFICIAL_STATIC_RULE',
     source: CREATE_HARDCOVER_COVER,
     note: 'Quoted: "Cover file images should extend 0.51" (15 mm) past the edge of the front cover." Wraps the case board and is glued inside.',
   } as SpecValue,
   hingeIn: {
     value: 0.4,
     units: 'in',
-    authority: 'published-constraint',
+    authority: 'OFFICIAL_STATIC_RULE',
     source: CREATE_HARDCOVER_COVER,
     note: 'Quoted: "There\'s a 0.4" (10 mm) space between the spine and safe area on the front and back covers."',
   } as SpecValue,
   safeFromEdgeIn: {
     value: 0.635,
     units: 'in',
-    authority: 'published-constraint',
+    authority: 'OFFICIAL_STATIC_RULE',
     source: CREATE_HARDCOVER_COVER,
     note: 'Quoted: "All text and images should be 0.635" (16 mm) from the edge of the book. This is 0.125" (3 mm) inside the margin line."',
   } as SpecValue,
   barcode: {
     value: { widthIn: 2.0, heightIn: 1.2, fromBottomIn: 0.76, fromSpineHingeIn: 0.25 },
     units: 'in',
-    authority: 'published-constraint',
+    authority: 'OFFICIAL_STATIC_RULE',
     source: CREATE_HARDCOVER_COVER,
     note:
       'Quoted: 300 DPI, "2" (50.8 mm) wide and 1.2" (30.5 mm) high", placed ' +
@@ -250,14 +302,14 @@ export const HARDCOVER_RULES = {
   minDpi: {
     value: 300,
     units: 'dpi',
-    authority: 'published-constraint',
+    authority: 'OFFICIAL_STATIC_RULE',
     source: CREATE_HARDCOVER_COVER,
     note: 'Quoted: "Ensure your cover image meets the minimum resolution of 300 DPI (dots per inch)."',
   } as SpecValue,
   spineFactor: {
     value: null,
     units: 'in/page',
-    authority: 'calculator-fixture',
+    authority: 'OFFICIAL_CALCULATOR_FIXTURE',
     source: COVER_CALCULATOR,
     note:
       'THERE IS NO PUBLISHED HARDCOVER SPINE MULTIPLIER. The help page directs you ' +
@@ -281,13 +333,22 @@ export const PAGE_COUNT_LIMITS: Array<{
   source: SpecSource;
 }> = [
   { binding: 'PAPERBACK', ink: 'BLACK_AND_WHITE', paper: 'WHITE', min: 24, max: 828, source: TRIM_BLEED_MARGINS },
-  { binding: 'PAPERBACK', ink: 'BLACK_AND_WHITE', paper: 'CREAM', min: 24, max: 828, source: TRIM_BLEED_MARGINS },
+  // Cream tops out LOWER than white. Read 2026-08-26: "Black Ink & Cream Paper: 24 - 776".
+  { binding: 'PAPERBACK', ink: 'BLACK_AND_WHITE', paper: 'CREAM', min: 24, max: 776, source: TRIM_BLEED_MARGINS },
   { binding: 'PAPERBACK', ink: 'BLACK_AND_WHITE', paper: 'GROUNDWOOD', min: 24, max: 812, source: TRIM_BLEED_MARGINS },
   { binding: 'PAPERBACK', ink: 'STANDARD_COLOR', paper: 'WHITE', min: 72, max: 600, source: TRIM_BLEED_MARGINS },
   { binding: 'PAPERBACK', ink: 'PREMIUM_COLOR', paper: 'WHITE', min: 24, max: 828, source: TRIM_BLEED_MARGINS },
-  { binding: 'HARDCOVER', ink: 'BLACK_AND_WHITE', paper: 'WHITE', min: 75, max: 550, source: TRIM_BLEED_MARGINS },
-  { binding: 'HARDCOVER', ink: 'BLACK_AND_WHITE', paper: 'CREAM', min: 75, max: 550, source: TRIM_BLEED_MARGINS },
-  { binding: 'HARDCOVER', ink: 'PREMIUM_COLOR', paper: 'WHITE', min: 75, max: 550, source: TRIM_BLEED_MARGINS },
+  // TWO OFFICIAL AMAZON SOURCES DISAGREE on the hardcover minimum.
+  //   GVBQ3CMEQW3W2VL6 publishes "75 - 550".
+  //   The Cover Calculator REFUSES 75 and its own validation message reads
+  //   "Page count must be between 76 - 550". Verified 2026-08-26: 75 produces
+  //   no result, 76 returns a full set of dimensions.
+  // We take the stricter number. A 75-page hardcover cannot be given a wrap by
+  // the calculator, so treating it as valid would produce a cover nobody can
+  // check. Recorded here rather than silently picked.
+  { binding: 'HARDCOVER', ink: 'BLACK_AND_WHITE', paper: 'WHITE', min: 76, max: 550, source: COVER_CALCULATOR },
+  { binding: 'HARDCOVER', ink: 'BLACK_AND_WHITE', paper: 'CREAM', min: 76, max: 550, source: COVER_CALCULATOR },
+  { binding: 'HARDCOVER', ink: 'PREMIUM_COLOR', paper: 'WHITE', min: 76, max: 550, source: COVER_CALCULATOR },
 ];
 
 /** Trim sizes KDP lists for each binding, in inches. */
@@ -392,7 +453,7 @@ export function resolvePaperbackSpine(args: {
       request,
       `KDP publishes no spine multiplier for ${ink} on ${paper} paper`,
       paper === 'GROUNDWOOD'
-        ? `Groundwood is not listed on ${CREATE_PAPERBACK_COVER.topic}, and ${GROUNDWOOD_PAPER.topic} defers to the Cover Calculator. Read the calculator for this exact configuration and record it as a fixture. Do NOT approximate it from cream.`
+        ? `Groundwood resolves from Cover Calculator readings, not from ${CREATE_PAPERBACK_COVER.topic}. If it is failing here, the ink is not BLACK_AND_WHITE — Amazon offers groundwood for black & white only.`
         : 'Read the KDP Cover Calculator for this exact configuration and record it as a fixture.',
     );
   }

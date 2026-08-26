@@ -57,18 +57,23 @@ describe('paperback spine factors — published by KDP, topic G201953020', () =>
 
   it('every factor explains its own arithmetic', () => {
     expect(spine('BLACK_AND_WHITE', 'WHITE', 120).explanation).toBe('120 pages x 0.002252 in/page = 0.270240in');
-    expect(spine('BLACK_AND_WHITE', 'WHITE', 120).authority).toBe('published-formula');
+    expect(spine('BLACK_AND_WHITE', 'WHITE', 120).authority).toBe('OFFICIAL_FORMULA');
     expect(spine('BLACK_AND_WHITE', 'WHITE', 120).source.topic).toContain('G201953020');
   });
 });
 
 describe('refusals — an unsupported configuration never resolves to the nearest factor', () => {
-  it('GROUNDWOOD has no published multiplier and is refused', () => {
-    // A value of 0.00235 was believed correct going in. The cover page does not
-    // list groundwood at all, and the groundwood help page defers to the Cover
-    // Calculator. So it is unsupported until a fixture is read.
-    expect(PAPERBACK_SPINE_FACTOR_IN.BLACK_AND_WHITE!.GROUNDWOOD).toBeUndefined();
-    expect(() => spine('BLACK_AND_WHITE', 'GROUNDWOOD', 120)).toThrow(UnverifiedKdpConfigurationError);
+  it('GROUNDWOOD resolves from the calculator, and is never labelled published', () => {
+    // Amazon publishes NO groundwood multiplier: the cover page omits it and the
+    // groundwood help page defers to the Cover Calculator. Two calculator
+    // readings on 2026-08-26 (120pp -> 0.282in, 240pp -> 0.564in) both give
+    // exactly 0.00235 in/page, so it resolves — but as a FIXTURE, not a formula.
+    const gw = PAPERBACK_SPINE_FACTOR_IN.BLACK_AND_WHITE!.GROUNDWOOD!;
+    expect(gw.value).toBe(0.00235);
+    expect(gw.authority).toBe('OFFICIAL_CALCULATOR_FIXTURE');
+    expect(gw.authority).not.toBe('OFFICIAL_FORMULA');
+    expect(spine('BLACK_AND_WHITE', 'GROUNDWOOD', 120).spineIn).toBeCloseTo(0.282, 6);
+    expect(spine('BLACK_AND_WHITE', 'GROUNDWOOD', 240).spineIn).toBeCloseTo(0.564, 6);
     try {
       spine('BLACK_AND_WHITE', 'GROUNDWOOD', 120);
     } catch (e) {
@@ -105,7 +110,7 @@ describe('refusals — an unsupported configuration never resolves to the neares
 describe('paperback static rules — published constants', () => {
   it('bleed is 0.125in on top, bottom and outside edges', () => {
     expect(PAPERBACK_RULES.bleedIn.value).toBe(0.125);
-    expect(PAPERBACK_RULES.bleedIn.authority).toBe('published-constraint');
+    expect(PAPERBACK_RULES.bleedIn.authority).toBe('OFFICIAL_STATIC_RULE');
   });
 
   it('content stays at least 0.25in inside the outside cover edge', () => {
@@ -128,7 +133,7 @@ describe('paperback static rules — published constants', () => {
     // KDP states only that it places a barcode on the back cover if none is
     // supplied. The 2.0 x 1.2in figure comes from the HARDCOVER page. Calling it
     // published would be the exact habit this layer exists to break.
-    expect(PAPERBACK_RULES.barcodeReserve.authority).toBe('platform-decision');
+    expect(PAPERBACK_RULES.barcodeReserve.authority).toBe('HOUSE_POLICY');
     expect(PAPERBACK_RULES.barcodeReserve.value).toEqual({ widthIn: 2.0, heightIn: 1.2 });
   });
 });
@@ -136,7 +141,7 @@ describe('paperback static rules — published constants', () => {
 describe('hardcover — published rules, and NO invented multiplier', () => {
   it('there is no hardcover spine factor, and the reason is recorded', () => {
     expect(HARDCOVER_RULES.spineFactor.value).toBeNull();
-    expect(HARDCOVER_RULES.spineFactor.authority).toBe('calculator-fixture');
+    expect(HARDCOVER_RULES.spineFactor.authority).toBe('OFFICIAL_CALCULATOR_FIXTURE');
     expect(HARDCOVER_RULES.spineFactor.note).toContain('NO PUBLISHED HARDCOVER SPINE MULTIPLIER');
   });
 
@@ -159,12 +164,16 @@ describe('hardcover — published rules, and NO invented multiplier', () => {
       fromBottomIn: 0.76,
       fromSpineHingeIn: 0.25,
     });
-    expect(HARDCOVER_RULES.barcode.authority).toBe('published-constraint');
+    expect(HARDCOVER_RULES.barcode.authority).toBe('OFFICIAL_STATIC_RULE');
   });
 
-  it('hardcover prints 75-550 pages, a narrower range than paperback', () => {
+  it('hardcover takes the STRICTER of two disagreeing official sources', () => {
+    // GVBQ3CMEQW3W2VL6 publishes "75 - 550". The Cover Calculator refuses 75
+    // and its validation message reads "76 - 550". Verified 2026-08-26: 75
+    // returns nothing, 76 returns a full set of dimensions. We take 76,
+    // because a wrap the calculator will not produce cannot be checked.
     const hc = pageCountLimit('HARDCOVER', 'BLACK_AND_WHITE', 'WHITE')!;
-    expect([hc.min, hc.max]).toEqual([75, 550]);
+    expect([hc.min, hc.max]).toEqual([76, 550]);
     const pb = pageCountLimit('PAPERBACK', 'BLACK_AND_WHITE', 'WHITE')!;
     expect([pb.min, pb.max]).toEqual([24, 828]);
   });
@@ -219,7 +228,9 @@ describe('supported trims and limits', () => {
   it('every published factor carries a source and a retrieval date', () => {
     for (const byPaper of Object.values(PAPERBACK_SPINE_FACTOR_IN)) {
       for (const factor of Object.values(byPaper!)) {
-        expect(factor!.authority).toBe('published-formula');
+        // Groundwood is the one paperback factor Amazon does not publish, so it
+        // is a calculator fixture. Everything else must be a published formula.
+        expect(['OFFICIAL_FORMULA', 'OFFICIAL_CALCULATOR_FIXTURE']).toContain(factor!.authority);
         expect(factor!.source.url).toMatch(/^https:\/\/kdp\.amazon\.com\//);
         expect(factor!.source.retrieved).toBe('2026-08-26');
         expect(factor!.units).toBe('in/page');

@@ -145,7 +145,7 @@ try {
       dims.provenance === 'verified'
         ? `${spineIn}in — read from the KDP Cover Calculator for this exact configuration`
         : `${spineIn}in — interpolated between verified calculator readings`;
-    spineAuthority = 'calculator-fixture';
+    spineAuthority = 'OFFICIAL_CALCULATOR_FIXTURE';
     spineSource = dims.note;
     hc = dims;
     // The calculator reports the wrap and hinge for this exact configuration.
