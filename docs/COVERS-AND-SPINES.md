@@ -60,6 +60,35 @@ turned into one. `HARDCOVER_RULES.spineFactor` is explicitly `null` with the
 reason recorded, and hardcover resolves through `kdp-cover-specs.ts`, which fails
 closed outside its verified anchors.
 
+### A hardcover cover is NOT the size of its trim
+
+A paperback cover is the same size as its page, so the wrap is trim arithmetic:
+bleed, back, spine, front, bleed. **A hardcover is not.** The case board is
+larger than the trim on every edge, and the calculator reports the board size
+separately from the trim.
+
+For the Seed Packet hardcover — 6×9in, 126pp, cream:
+
+| Figure | Value |
+|---|---|
+| Trim | 6 × 9in |
+| **Board** | **6.197 × 9.236in** |
+| Spine | 0.504in (against 0.315in for the same page count in paperback) |
+| Wrap | 0.591in each edge |
+| Full cover | 14.079 × 10.417in |
+
+Computing that wrap from the trim instead of the board gives 13.523 × 10.02in:
+short by 0.556in across and 0.397in down, and rejected at upload. Take every
+hardcover figure from `kdp-cover-specs.ts`. Do not derive one from the trim,
+and do not reuse a paperback wrap.
+
+Note also that the published `caseWrapIn` (0.51in, "past the front cover edge")
+does **not** reconcile with the calculator's 0.591in wrap. They measure
+different things. Geometry follows the calculator reading; the published figure
+is kept as a labelled constraint, not used for layout.
+
+---
+
 ### Page-count ranges and trims
 
 | Binding | Ink / paper | Pages |
@@ -83,6 +112,9 @@ Hardcover trims: 5.5×8.5, 6×9, 6.14×9.21, 7×10, 8.25×11. Paperback offers s
 | **Standard vs premium colour** | assumed one "colour" factor | **two separate factors**; collapsing them costs 0.057in on a 600-page book |
 | **Premium Color default** | `paperback-preview.ts` defaulted to 0.002347 for every book | **removed**; refuses without an explicit spine or thickness |
 | **Paperback barcode size** | applied as though published | labelled `platform-decision`; KDP publishes it for hardcover only |
+| **Hardcover wrap** | `scripts/qa/cover-spec.ts` computed it from the trim, as though it were a paperback | **reads the calculator fixture**; the board is larger than the trim, and the old maths was short by 0.556in on the Seed Packet hardcover |
+| **Hardcover spine text** | reported ELIGIBLE unconditionally | **NOT PUBLISHED** — KDP states a page minimum for paperback only; asserting one invented a rule |
+| **Hardcover spine-safe** | inset by the 0.4in hinge, which clamps a 0.504in spine to zero width | the calculator's stated spine-safe box |
 
 Every paperback factor the platform had been using was **confirmed correct**. The
 shipped spines and wraps did not move: 11 of 12 reference configurations are
