@@ -134,6 +134,12 @@ export interface Sample {
   /** Which severity a correct system should reach. */
   expect: 'CLEAN_OR_EXPECTED' | 'REVIEW_OR_WORSE' | 'HARD_FAIL';
   split: 'TUNING' | 'HOLDOUT';
+  /**
+   * Which book this page belongs to, for BOOK-RELATIVE comparison.
+   * A page is only ever compared with pages of the same book and role: that is
+   * what separates "a design this book uses" from "an obstruction on one page".
+   */
+  book: string;
   sourcePage: number;
 }
 
@@ -144,7 +150,7 @@ const H = raster.heightPx;
 const write = async (id: string, png: Buffer, s: Omit<Sample, 'id' | 'file'>) => {
   const file = path.join('samples', `${id}.png`);
   writeFileSync(path.join(OUT, file), png);
-  samples.push({ id, file, ...s });
+  samples.push({ id, file, book: 'calibration', ...s });
 };
 
 /** Paint white over a band of the page, erasing whatever was there. */
@@ -270,6 +276,47 @@ const bads: Array<[string, Promise<Buffer>, PageRole, string, Sample['expect']]>
 ];
 for (const [id, work, role, defect, expect] of bads) {
   await write(id, await work, { label: 'BAD', role, defect, expect, split: alternate(bi++), sourcePage: 0 });
+}
+
+// ── INTENTIONAL DESIGN CONTROL ──────────────────────────────────────────────
+/**
+ * A second "book" whose every body page carries the same dark header band.
+ *
+ * This is the control that proves the rule is not "dark is bad". These pages are
+ * pixel-for-pixel as dark in the furniture region as the obstructed one, and they
+ * must all come back clean, because in THIS book the band is the design.
+ */
+const bandHeader = async (png: Buffer): Promise<Buffer> =>
+  sharp(png)
+    .composite([
+      {
+        input: Buffer.from(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${Math.round(H * 0.06)}">` +
+            `<rect x="0" y="0" width="${W}" height="${Math.round(H * 0.055)}" fill="#1a1a1a"/></svg>`,
+        ),
+        top: Math.round(H * 0.01),
+        left: 0,
+      },
+    ])
+    .png()
+    .toBuffer();
+
+for (let i = 0; i < 4; i += 1) {
+  const src = bodyPages[i % bodyPages.length]!;
+  const id = `good-banded-design-${i + 1}`;
+  const file = path.join("samples", `${id}.png`);
+  writeFileSync(path.join(OUT, file), await bandHeader(png(src)));
+  samples.push({
+    id,
+    file,
+    book: 'banded-design',
+    label: 'GOOD',
+    role: 'BODY',
+    defect: 'a deliberate dark header band, on every comparable page of this book',
+    expect: 'CLEAN_OR_EXPECTED',
+    split: i % 2 === 0 ? 'TUNING' : 'HOLDOUT',
+    sourcePage: src,
+  });
 }
 
 // ── labels, kept OUT of the prompt ──────────────────────────────────────────
