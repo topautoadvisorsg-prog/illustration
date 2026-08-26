@@ -60,19 +60,39 @@ const OVERRIDES: Record<string, LayoutOverride> = {
    * reported rather than hidden.
    */
   '7f4b3917': { keepTogether: true, note: 'p75: whole one-line paragraph alone at a page top. Left as-is; break-before:avoid costs 2 pages and a 6th blank.' },
-  bf8a8ea6: { keepTogether: true, note: 'p77 widow: tail "Grove plus Glacier Point Road properly." was alone at the page top.' },
+  /**
+   * bf8a8ea6 is NOT here. That p77 widow was fixed by the re-pagination the
+   * heading rule caused, and its block id no longer exists in the document, so
+   * carrying the override forward only produced an "orphaned override" warning
+   * on every build. An override that points at nothing is a lie about what the
+   * book needs; the audit confirms the widow is gone.
+   */
   '4f665a70': { keepTogether: true, note: 'p87 widow: paragraph tail alone at the page top.' },
   '8f99ddd3': { keepTogether: true, note: 'p92 widow: "hour out and served by the national carriers." was alone at the page top.' },
   '7f9b5d43': { keepTogether: true, note: 'p94 widow: paragraph tail alone at the page top.' },
-  // ── Two headings left above a single line ────────────────────────────────
-  '19d231ec': {
-    breakBefore: 'page',
-    note: 'p58: "Below the rim: who should, who shouldn\'t, and which trail" sat above one line.',
-  },
-  f5a79310: {
-    breakBefore: 'page',
-    note: 'p64: "Wildlife and what to look for" sat above one line.',
-  },
+  /**
+   * APPENDIX: the Acadia permit entry was splitting across the leaf.
+   *
+   * The restructured appendix sets each park as a bold name followed by a
+   * What/When/Cost/Where list. Those are separate blocks, so nothing binds the
+   * name to its own bullets, and Acadia landed as the last line of p115 with its
+   * four bullets overleaf. A reader turning that page meets four unlabelled
+   * facts.
+   *
+   * Only one park of the seven broke, so this is an exception rather than a rule
+   * change. `breakBefore: page` costs about one line of white at the foot of
+   * p115, which is the cheapest correct fix available.
+   */
+  '40abccae': { breakBefore: 'page', note: 'Appendix: keep the Acadia permit entry whole; its name was stranded at the foot of p115.' },
+  /**
+   * The two heading orphans are NOT here any more.
+   *
+   * They were fixed with `breakBefore: page`, which moved each heading to the
+   * next page and left the page behind it two-thirds empty — a worse mark on the
+   * spread than the defect. They are handled in the renderer instead, by binding
+   * a heading to two LINES of body rather than to one block, which is the actual
+   * rule and leaves no hole.
+   */
 };
 
 const project = await getProject(P);

@@ -16,6 +16,7 @@
  *
  *   pages  comma-separated, 1-based, in the order you want them laid out
  *   scale  1.0 is 72dpi; 1.15 fits four 6x9 pages side by side legibly
+ *   cols   wrap into a grid this many pages wide, for a whole-book sweep
  */
 import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,9 +24,9 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import puppeteer from 'puppeteer-core';
 
-const [PDF, PAGES, OUT, SCALE] = process.argv.slice(2);
+const [PDF, PAGES, OUT, SCALE, COLS] = process.argv.slice(2);
 if (!PDF || !PAGES || !OUT) {
-  throw new Error('usage: pdf-page-proof.ts <pdf> <pages> <out.png> [scale]');
+  throw new Error('usage: pdf-page-proof.ts <pdf> <pages> <out.png> [scale] [cols]');
 }
 
 const require = createRequire(import.meta.url);
@@ -45,7 +46,7 @@ try {
     path.join(dir, 'index.html'),
     `<!doctype html><meta charset="utf-8"><style>
       body{margin:0;background:#444;font:13px/1.4 system-ui,sans-serif}
-      .row{display:flex;gap:10px;padding:10px;align-items:flex-start}
+      .row{display:flex;flex-wrap:wrap;gap:10px;padding:10px;align-items:flex-start}
       figure{margin:0}figcaption{color:#fff;padding:4px 2px}
       canvas{background:#fff;box-shadow:0 0 0 1px #000;display:block}
     </style><div class="row" id="out"></div>
@@ -54,6 +55,15 @@ try {
       const q=new URLSearchParams(location.search);
       const pages=(q.get('pages')||'1').split(',').map(Number);
       const scale=Number(q.get('scale')||1.5);
+      // A whole-book sweep needs a GRID, not one long row: a hundred pages in a
+      // single row is unreadable at any scale that fits a screenshot. The cols
+      // parameter caps the row width so the sheet wraps.
+      // No backticks in here: this whole block lives inside a template literal.
+      const cols=Number(q.get('cols')||0);
+      if(cols>0){
+        const px=Math.ceil(6*72*scale);
+        document.getElementById('out').style.maxWidth=(cols*(px+10)+10)+'px';
+      }
       window.ready=false;
       (async()=>{
         const doc=await pdfjsLib.getDocument('doc.pdf').promise;

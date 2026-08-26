@@ -23,7 +23,7 @@ if (!PDF_PATH) throw new Error('usage: national-parks-fidelity.ts <pdf>');
 
 const MANUSCRIPT =
   'C:/Users/jovan/Downloads/national parks book/LAYOUT-7-national-parks-without-the-rookie-mistakes.md';
-const SHIPPING_SHA = '7d12bb3099a4e1b7a43875011785a2818641ed3506e8c59386dbc2d6b3c878eb';
+const SHIPPING_SHA = '26615fa372fc96c093875af27b5302b576d611ad247288d4bdacec554d265d08';
 
 const sha = (b: Buffer | string): string => createHash('sha256').update(b as never).digest('hex');
 

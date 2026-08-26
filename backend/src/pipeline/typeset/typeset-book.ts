@@ -224,8 +224,41 @@ function inlineMarkdown(s: string, longTokens?: LongTokenWrappingPolicy): string
  * Long-token breaking is deliberately NOT applied: `<wbr>` in a heading invites
  * a break in a display line, and a heading is short enough not to need one.
  */
+/**
+ * The marks a HEADING never carries: both arrows, the flag, and the warning
+ * triangle with or without its variation selector. One definition, used by every
+ * heading path, because three copies of this list is how they drift.
+ */
+const DRAWN_MARKS = /[\u2192\u27F6\u{1F6A9}]|\u26A0\uFE0F?/gu;
+
 export function inlineHeadingHtml(s: string): string {
-  return inlineMarkdown(s);
+  return inlineMarkdown(stripDrawnMarks(s));
+}
+
+/**
+ * Drawn marks come OFF a heading, everywhere a heading is set.
+ *
+ * A mark like an arrow or a warning triangle is emphasis inside a sentence,
+ * where it sits in the run of text and points at the words beside it. A heading
+ * is not a sentence. Set at display size and centred in the measure, a leading
+ * arrow hangs outside the left edge of the text column, throws the optical
+ * centring off, and is the only glyph of its kind at that size in the book.
+ *
+ * 7 NATIONAL PARKS heads its appendix with an arrow before "ALL FIGURES IN THIS
+ * APPENDIX ARE CURRENT AS OF: August 2026". That mark was already dropped from
+ * the running head and from the contents entry, for the same reason in each
+ * case; leaving it on the display heading alone made the three disagree about
+ * the same title.
+ *
+ * SAME LIST AS `plainHeadingText`, deliberately shared, so display, running head
+ * and contents cannot drift apart again. Body text is untouched: an arrow inside
+ * a paragraph is a real cross-reference and still draws.
+ */
+export function stripDrawnMarks(s: string): string {
+  return s
+    .replace(DRAWN_MARKS, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 /**
@@ -256,7 +289,7 @@ export function plainHeadingText(s: string): string {
     .replace(/\*\*\*(.+?)\*\*\*/g, '$1')
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/(^|[^*])\*([^*]+?)\*/g, '$1$2')
-    .replace(/[→⟶🚩]|⚠️?/g, '')
+    .replace(DRAWN_MARKS, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -1100,10 +1133,36 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
       const cur = blocks[i]!;
       const next = blocks[i + 1];
       const isHeading = /^<h[34][ >]/.test(cur);
-      const nextIsPara = Boolean(next && /^<p[ >]/.test(next) && !next.includes('scene-break'));
-      if (isHeading && nextIsPara) {
-        out.push(`<div class="keep-with-next">${cur}${next}</div>`);
-        i++;
+      const isPara = (b: string | undefined): boolean =>
+        Boolean(b && /^<p[ >]/.test(b) && !b.includes('scene-break'));
+      if (isHeading && isPara(next)) {
+        /**
+         * AT LEAST TWO LINES OF TEXT, not merely one block.
+         *
+         * Binding the heading to the next paragraph is enough only when that
+         * paragraph runs to two lines. When it is a single line the whole unit
+         * still fits at the foot of a page, so the reader gets a heading, one
+         * line, and a page turn — the defect this exists to prevent, one line
+         * further on. It shipped that way twice.
+         *
+         * The alternative, forcing the heading to the next page with
+         * break-before, was tried and is worse: it fixed the heading and left a
+         * two-thirds-empty page behind it. Pulling one more paragraph into the
+         * unit fixes the heading with no hole anywhere.
+         *
+         * ONE_LINE_CHARS is measured off this book, not assumed: the line
+         * "Descending even a little changes the park from a view into a place.
+         * If you can, do it." is 85 characters and sets as ONE justified line,
+         * so an em-width estimate of 68 missed both cases. Erring HIGH is the
+         * safe direction — binding one paragraph too many costs a slightly
+         * larger keep-together unit; binding one too few costs the defect.
+         */
+        const ONE_LINE_CHARS = 95;
+        const textLen = (b: string): number => b.replace(/<[^>]+>/g, '').trim().length;
+        const after = blocks[i + 2];
+        const bindTwo = textLen(next!) <= ONE_LINE_CHARS && isPara(after);
+        out.push(`<div class="keep-with-next">${cur}${next}${bindTwo ? after : ''}</div>`);
+        i += bindTwo ? 2 : 1;
         continue;
       }
       out.push(cur);

@@ -53,6 +53,24 @@ export const PageIllustrationSchema = z
     placementWidthIn: z.number().positive(),
     placementHeightIn: z.number().positive(),
     status: z.enum(['draft', 'approved']).default('draft'),
+    /**
+     * Draw this many pages AFTER the page the anchor block resolves to.
+     *
+     * Illustrations are anchored to a stable block id, which is what keeps a
+     * placement pointing at the same passage when pagination moves. A PARITY
+     * BLANK has no blocks at all, so it can never be an anchor, and until this
+     * existed there was no way to put art on one.
+     *
+     * The blank facing a chapter opening is the frontispiece position, and a
+     * book that leaves five of them empty is leaving its best pages unused. Such
+     * a plate anchors to the FIRST block of the chapter opening and is drawn at
+     * offset -1, so it stays welded to the leaf in front of that chapter however
+     * the pagination moves.
+     *
+     * Bounded to one leaf either way on purpose. This exists to reach a facing
+     * page, not to become a second, weaker way of specifying a page number.
+     */
+    pageOffset: z.number().int().min(-1).max(1).default(0),
     /** What produced it, so a replacement can start from the same brief. */
     prompt: z.string().optional(),
     model: z.string().optional(),

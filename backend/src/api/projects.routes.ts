@@ -1645,6 +1645,8 @@ const IllustrationUploadSchema = z.object({
   placementWidthIn: z.number().positive(),
   placementHeightIn: z.number().positive(),
   status: z.enum(['draft', 'approved']).optional(),
+  /** -1 draws on the leaf before the anchor's page, which is how a parity blank is reached. */
+  pageOffset: z.number().int().min(-1).max(1).optional(),
   prompt: z.string().optional(),
   model: z.string().optional(),
   styleDnaId: z.string().optional(),
@@ -1741,6 +1743,8 @@ const OverrideParamsSchema = z.object({
       placementWidthIn: body.placementWidthIn,
       placementHeightIn: body.placementHeightIn,
       status: body.status ?? 'approved',
+      /** Ordinary art sits on its anchor's own page; only a facing-page plate steps off it. */
+      pageOffset: body.pageOffset ?? 0,
       prompt: body.prompt,
       model: body.model,
       styleDnaId: body.styleDnaId,
