@@ -149,11 +149,51 @@ out of date.
 
 ### Working in a git worktree — read this
 
-`node_modules/@wildlands/shared` and `@wildlands/backend` are **junctions into the
-main checkout**. A worktree that borrows `node_modules` will typecheck and test
-against *main's* `shared`, not its own, and a change to `shared/src` will appear
-to have no effect. Alias `@wildlands/shared` to the worktree's own copy in a
-local tsconfig and vitest config when validating there.
+`node_modules/@wildlands/shared` and `@wildlands/backend` are **junctions into
+whichever checkout ran the yarn install**. A worktree that borrows that
+`node_modules` therefore typechecks and tests against the *other* checkout: a
+change to `shared/src` appears to do nothing, and a merge that adds a field to it
+appears to fail.
+
+**Set the worktree up once:**
+
+```bash
+# from the worktree root, with <MAIN> = the checkout that ran yarn install
+#
+# 1. borrow third-party dependencies from <MAIN> (read-only)
+mklink /J node_modules "<MAIN>
+ode_modules"
+#
+# 2. give the worktree its OWN backend/node_modules, so @wildlands wins locally.
+#    Move the borrowed junction aside first — never delete it, that risks the target.
+move backend
+ode_modules backend_node_modules_mainlink
+mkdir backend
+ode_modules@wildlands
+#    re-link the few non-hoisted packages from <MAIN>, then override @wildlands:
+mklink /J backend
+ode_modules@wildlandsshared  "<WORKTREE>shared"
+mklink /J backend
+ode_modules@wildlandsackend "<WORKTREE>ackend"
+```
+
+Node resolves `@wildlands/shared` from `backend/` by finding
+`backend/node_modules` first, so the worktree's own copy wins; everything else
+falls through to the borrowed `node_modules` one level up.
+
+**Then validate with the script that proves it:**
+
+```bash
+node scripts/validate-worktree.mjs              # everything
+node scripts/validate-worktree.mjs --no-tests   # static checks only
+```
+
+It builds this checkout's `shared` itself, prints the resolved package path, and
+**refuses to continue if that path lands outside this checkout**. It checks the
+`realpath`, not the apparent path: a junction makes another checkout's package
+look local, and a path-only check passes while validating the wrong tree. It then
+loads the module and compares it against this checkout's source, which is the
+check that actually catches it.
 
 ---
 
