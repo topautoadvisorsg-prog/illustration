@@ -1,0 +1,311 @@
+path	class	owner	loc	safety	mutates	spends	destructive	emits_artifact	importers	in_package_json	in_ci	books	proposed_home	disposition	notes
+backend/scripts/c1-regression.ts	BOOK-CLASS	multi-book	151	SAFE-READONLY	no	no	no	no	0	no	no	national-parks|dirt-rich|wildlands|puberty/nottm	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-cover-copy.ts	BOOK-CLASS	multi-book	141	SAFE-READONLY	no	no	no	no	0	no	no	dirt-rich|puberty/nottm	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-cover-rev5-pdf.ts	BOOK-CLASS	multi-book	496	WRITES-FILES	no	no	no	yes	0	no	no	dirt-rich|seed-packet	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-cover.ts	BOOK-CLASS	multi-book	102	SPENDS	no	yes	no	yes	0	no	no	dirt-rich|puberty/nottm	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-build.ts	BOOK-CLASS	multi-book	89	MUTATES-STATE	yes	no	no	yes	0	no	no	national-parks|dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-cover-copy.ts	BOOK-CLASS	multi-book	54	SAFE-READONLY	no	no	no	no	0	no	no	national-parks|dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-cover-print.ts	BOOK-CLASS	multi-book	393	MUTATES-STATE	yes	no	no	yes	0	no	no	national-parks|dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/seed-packet-cover-hardcover.ts	BOOK-CLASS	multi-book	663	WRITES-FILES	no	no	no	yes	0	no	no	dirt-rich|seed-packet	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/seed-packet-cover-paperback.ts	BOOK-CLASS	multi-book	599	WRITES-FILES	no	no	no	yes	0	no	no	dirt-rich|seed-packet	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/seed-packet-epub.ts	BOOK-CLASS	multi-book	119	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich|seed-packet	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/typeset-prototype.ts	BOOK-CLASS	multi-book	357	SAFE-READONLY	no	no	no	no	0	no	no	puberty/nottm|mg-chapter-book	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/derive-ttf.ts	BOOK-SPECIFIC	puberty/nottm	193	MUTATES-STATE	yes	no	no	no	0	yes	no	puberty/nottm	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/dirt-rich-cover-pdf.ts	BOOK-SPECIFIC	dirt-rich	363	WRITES-FILES	no	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-cover-rev4-edit.ts	BOOK-SPECIFIC	dirt-rich	58	MUTATES+SPENDS	yes	yes	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-cover-rev4-pdf.ts	BOOK-SPECIFIC	dirt-rich	363	WRITES-FILES	no	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-figure-pipeline.ts	BOOK-SPECIFIC	dirt-rich	316	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-final-pagination.ts	BOOK-SPECIFIC	dirt-rich	127	WRITES-FILES	no	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-final-verify.ts	BOOK-SPECIFIC	dirt-rich	54	MUTATES-STATE	yes	no	no	no	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-fix-figure-anchors.ts	BOOK-SPECIFIC	dirt-rich	128	SAFE-READONLY	no	no	no	no	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-gate.ts	BOOK-SPECIFIC	dirt-rich	197	WRITES-FILES	no	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-inline-figures.ts	BOOK-SPECIFIC	dirt-rich	104	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-intake-local.ts	BOOK-SPECIFIC	dirt-rich	213	MUTATES-STATE	yes	no	no	no	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-page-review.ts	BOOK-SPECIFIC	dirt-rich	156	SAFE-READONLY	no	no	no	no	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-place-figures.ts	BOOK-SPECIFIC	dirt-rich	121	MUTATES-STATE	yes	no	no	no	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-place-interiors.ts	BOOK-SPECIFIC	dirt-rich	94	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-render-interiors.ts	BOOK-SPECIFIC	dirt-rich	149	SPENDS	no	yes	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-rev4-apply.ts	BOOK-SPECIFIC	dirt-rich	208	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-rev4-final-build.ts	BOOK-SPECIFIC	dirt-rich	74	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-rev4-paginate.ts	BOOK-SPECIFIC	dirt-rich	118	WRITES-FILES	no	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-rev4-prod-read.ts	BOOK-SPECIFIC	dirt-rich	84	MUTATES-STATE	yes	no	no	no	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-rev4-prod-write.ts	BOOK-SPECIFIC	dirt-rich	110	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-rev5-apply.ts	BOOK-SPECIFIC	dirt-rich	118	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-rev5-final-build.ts	BOOK-SPECIFIC	dirt-rich	74	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-rev5-prod-write.ts	BOOK-SPECIFIC	dirt-rich	110	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-rev6-build.ts	BOOK-SPECIFIC	dirt-rich	89	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-strip-markers.ts	BOOK-SPECIFIC	dirt-rich	154	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-style-test.ts	BOOK-SPECIFIC	dirt-rich	71	SPENDS	no	yes	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/dirt-rich-upload-assets-prod.ts	BOOK-SPECIFIC	dirt-rich	175	MUTATES-STATE	yes	no	no	no	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/illustration-candidates.ts	BOOK-SPECIFIC	puberty/nottm	236	SAFE-READONLY	no	no	no	no	0	yes	no	puberty/nottm	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/national-parks-apply-corrections.ts	BOOK-SPECIFIC	national-parks	104	MUTATES-STATE	yes	no	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-cover-art.ts	BOOK-SPECIFIC	national-parks	34	SPENDS	no	yes	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-cover-check.ts	BOOK-SPECIFIC	national-parks	377	MUTATES-STATE	yes	no	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-cover-request.ts	BOOK-SPECIFIC	national-parks	52	WRITES-FILES	no	no	no	yes	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-cover-spine-fix.ts	BOOK-SPECIFIC	national-parks	115	SPENDS	no	yes	no	yes	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-cover.ts	BOOK-SPECIFIC	national-parks	391	MUTATES-STATE	yes	no	no	yes	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-divider-art.ts	BOOK-SPECIFIC	national-parks	110	SPENDS	no	yes	no	yes	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-endpieces.ts	BOOK-SPECIFIC	national-parks	178	SPENDS	no	yes	no	yes	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-epub-check.ts	BOOK-SPECIFIC	national-parks	305	MUTATES-STATE	yes	no	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-fidelity.ts	BOOK-SPECIFIC	national-parks	560	MUTATES-STATE	yes	no	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-hardcover.ts	BOOK-SPECIFIC	national-parks	418	MUTATES-STATE	yes	no	no	yes	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-intake-local.ts	BOOK-SPECIFIC	national-parks	155	MUTATES-STATE	yes	no	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-interior-inventory.ts	BOOK-SPECIFIC	national-parks	167	SAFE-READONLY	no	no	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-interior-plates.ts	BOOK-SPECIFIC	national-parks	191	SPENDS	no	yes	no	yes	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-kindle-cover-source.ts	BOOK-SPECIFIC	national-parks	110	WRITES-FILES	no	no	no	yes	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-kindle-cover.ts	BOOK-SPECIFIC	national-parks	87	MUTATES-STATE	yes	no	no	yes	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-layout-overrides.ts	BOOK-SPECIFIC	national-parks	99	SAFE-READONLY	no	no	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-package-check-3.ts	BOOK-SPECIFIC	national-parks	369	MUTATES-STATE	yes	no	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-plate-style.ts	BOOK-SPECIFIC	national-parks	60	SAFE-READONLY	no	no	no	no	1	no	no	national-parks	backend/scripts/lib/ (shared toolchain)	RELOCATE (path move only)	
+backend/scripts/national-parks-print-check.ts	BOOK-SPECIFIC	national-parks	223	MUTATES-STATE	yes	no	no	no	0	no	no	national-parks	backend/src/pipeline/qa/ (promote in Phase 3)	PROMOTE (Phase 3)	generic tool behind a book-specific filename
+backend/scripts/national-parks-publication-facts.ts	BOOK-SPECIFIC	national-parks	92	SAFE-READONLY	no	no	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-spacing-audit.ts	BOOK-SPECIFIC	national-parks	380	MUTATES-STATE	yes	no	no	no	0	no	no	national-parks	backend/src/pipeline/qa/ (promote in Phase 3)	PROMOTE (Phase 3)	generic tool behind a book-specific filename
+backend/scripts/national-parks-spine-verify.ts	BOOK-SPECIFIC	national-parks	179	MUTATES-STATE	yes	no	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-stamp-endpieces.ts	BOOK-SPECIFIC	national-parks	140	MUTATES+SPENDS	yes	yes	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/national-parks-stamp-plates.ts	BOOK-SPECIFIC	national-parks	154	MUTATES+SPENDS	yes	yes	no	no	0	no	no	national-parks	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/render-illustration.ts	BOOK-SPECIFIC	puberty/nottm	657	SPENDS	no	yes	no	no	0	yes	no	puberty/nottm	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/rerender-about-series-bio.ts	BOOK-SPECIFIC	wildlands	81	MUTATES-STATE	yes	no	no	yes	0	no	no	wildlands	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/review-grid.ts	BOOK-SPECIFIC	puberty/nottm	227	WRITES-FILES	no	no	no	yes	0	yes	no	puberty/nottm	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/seed-packet-upscale-cover.ts	BOOK-SPECIFIC	seed-packet	70	MUTATES+SPENDS	yes	yes	no	yes	0	no	no	seed-packet	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/shipped-render-regression.ts	BOOK-SPECIFIC	puberty/nottm	117	SAFE-READONLY	no	no	no	no	0	no	no	puberty/nottm	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/shoot-page.ts	BOOK-SPECIFIC	puberty/nottm	117	SAFE-READONLY	no	no	no	no	0	yes	no	puberty/nottm	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/typeset-deep-fingerprint.ts	BOOK-SPECIFIC	puberty/nottm	179	MUTATES-STATE	yes	no	no	no	0	yes	no	puberty/nottm	backend/scripts/ (keep — has a package target)	KEEP	generic tool behind a book-specific filename
+backend/scripts/typeset-diagnose.ts	BOOK-SPECIFIC	puberty/nottm	147	SAFE-READONLY	no	no	no	no	0	no	no	puberty/nottm	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/typeset-fingerprint.ts	BOOK-SPECIFIC	puberty/nottm	101	MUTATES-STATE	yes	no	no	no	0	yes	no	puberty/nottm	backend/scripts/ (keep — has a package target)	KEEP	generic tool behind a book-specific filename
+backend/scripts/typeset-qa-layer1.ts	BOOK-SPECIFIC	puberty/nottm	418	MUTATES-STATE	yes	no	no	no	0	yes	no	puberty/nottm	backend/scripts/ (keep — has a package target)	KEEP	generic tool behind a book-specific filename
+backend/scripts/typeset-qa.ts	BOOK-SPECIFIC	puberty/nottm	95	SAFE-READONLY	no	no	no	no	0	no	no	puberty/nottm	backend/src/pipeline/qa/ (promote in Phase 3)	PROMOTE (Phase 3)	generic tool behind a book-specific filename
+backend/scripts/vendor-mono-font.ts	BOOK-SPECIFIC	dirt-rich	73	MUTATES-STATE	yes	no	no	yes	0	no	no	dirt-rich	backend/scripts/books/<book>/	RELOCATE (path move only)	
+backend/scripts/activate-newest.ts	MIGRATION	unassigned	14	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/migrations/	ARCHIVE (one-time, already run)	
+backend/scripts/backfill-editions.ts	MIGRATION	unassigned	12	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/migrations/	ARCHIVE (one-time, already run)	
+backend/scripts/backfill-entries.ts	MIGRATION	unassigned	21	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/migrations/	ARCHIVE (one-time, already run)	
+backend/scripts/derive-static-faces.ts	MIGRATION	platform	286	MUTATES-STATE	yes	no	no	no	0	yes	no	-	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/repair-storage-keys.ts	MIGRATION	unassigned	85	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/migrations/	ARCHIVE (one-time, already run)	
+backend/scripts/vendor-fonts.ts	MIGRATION	platform	89	SAFE-READONLY	no	no	no	no	0	yes	no	-	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/db-guard.ts	PLATFORM	platform	44	SAFE-READONLY	no	no	no	no	0	yes	no	-	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/extract-manuscript.ts	PLATFORM	unassigned	45	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	RELOCATE (path move only)	
+backend/scripts/heroes-data.ts	PLATFORM	platform	165	SPENDS	no	yes	no	no	3	no	no	-	backend/scripts/lib/ (shared toolchain)	RELOCATE (path move only)	
+backend/scripts/lib/cover-blueprint.ts	PLATFORM	platform	468	SAFE-READONLY	no	no	no	no	2	no	no	-	backend/scripts/lib/ (shared toolchain)	RELOCATE (path move only)	
+backend/scripts/publish-illustration.ts	PLATFORM	platform	116	MUTATES+SPENDS	yes	yes	no	no	0	yes	no	-	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/storage-prune.ts	PLATFORM	platform	119	SAFE-READONLY	yes	no	no	no	0	yes	no	-	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/batch-ai-review.ts	QA/DIAGNOSTIC	unassigned	219	SPENDS	yes	yes	no	yes	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/book-ready-audit.ts	QA/DIAGNOSTIC	unassigned	41	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/check-active.ts	QA/DIAGNOSTIC	unassigned	15	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/check-page-fit.ts	QA/DIAGNOSTIC	unassigned	54	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/check-series.ts	QA/DIAGNOSTIC	unassigned	12	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/cover-spine-proof.ts	QA/DIAGNOSTIC	unassigned	67	WRITES-FILES	no	no	no	yes	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/diag-print-sizes.ts	QA/DIAGNOSTIC	unassigned	43	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/diag-typeset-hang.ts	QA/DIAGNOSTIC	unassigned	187	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/dump-entry.ts	QA/DIAGNOSTIC	unassigned	28	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/dump-keys.ts	QA/DIAGNOSTIC	unassigned	23	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/dump-renders.ts	QA/DIAGNOSTIC	unassigned	21	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/dump-source.ts	QA/DIAGNOSTIC	unassigned	21	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/font-embed-probe.ts	QA/DIAGNOSTIC	platform	134	SAFE-READONLY	no	no	no	no	0	yes	no	-	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/font-system-probe.mjs	QA/DIAGNOSTIC	unassigned	183	SAFE-READONLY	no	no	no	no	0	no	yes	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/inspect-audit-sources.ts	QA/DIAGNOSTIC	unassigned	27	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/inspect-front-matter.ts	QA/DIAGNOSTIC	unassigned	58	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/inspect-page.ts	QA/DIAGNOSTIC	unassigned	17	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/list-binomial-openers.ts	QA/DIAGNOSTIC	unassigned	30	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/list-notstarted.ts	QA/DIAGNOSTIC	unassigned	25	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/list-pages.ts	QA/DIAGNOSTIC	unassigned	14	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/list-projects.ts	QA/DIAGNOSTIC	unassigned	8	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/local-ai-review.ts	QA/DIAGNOSTIC	unassigned	326	SPENDS	yes	yes	no	yes	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/measure-review-routing.ts	QA/DIAGNOSTIC	unassigned	119	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/paperback-cover-preview.ts	QA/DIAGNOSTIC	unassigned	75	WRITES-FILES	no	no	no	yes	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/pdf-page-proof.ts	QA/DIAGNOSTIC	unassigned	97	WRITES-FILES	no	no	no	yes	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/prebuild-audit.ts	QA/DIAGNOSTIC	unassigned	83	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/probe-renders.ts	QA/DIAGNOSTIC	unassigned	18	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/punctuation-audit.ts	QA/DIAGNOSTIC	unassigned	132	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/show-blueprint.ts	QA/DIAGNOSTIC	unassigned	27	WRITES-FILES	no	no	no	yes	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/show-override.ts	QA/DIAGNOSTIC	unassigned	16	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/subject-audit.ts	QA/DIAGNOSTIC	unassigned	24	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/test-preview.ts	QA/DIAGNOSTIC	unassigned	21	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/typeset-check.ts	QA/DIAGNOSTIC	unassigned	33	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/typeset-fingerprint-diff.ts	QA/DIAGNOSTIC	platform	214	SAFE-READONLY	no	no	no	no	0	yes	no	-	backend/scripts/ (keep — has a package target)	KEEP	
+backend/scripts/typeset-route-check.ts	QA/DIAGNOSTIC	unassigned	51	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/verify-deploy.ts	QA/DIAGNOSTIC	unassigned	12	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/verify-dpi.ts	QA/DIAGNOSTIC	unassigned	38	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/verify-interior-geometry.ts	QA/DIAGNOSTIC	unassigned	119	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/verify-spot.ts	QA/DIAGNOSTIC	unassigned	191	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/verify-text-fidelity.ts	QA/DIAGNOSTIC	unassigned	123	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/qa/	RELOCATE (path move only)	
+backend/scripts/_activate.ts	SCRATCH	unassigned	20	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_approve1.ts	SCRATCH	unassigned	14	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_approveall.ts	SCRATCH	unassigned	23	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_approverr.ts	SCRATCH	unassigned	28	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_audit_all.ts	SCRATCH	unassigned	63	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_audit.ts	SCRATCH	unassigned	40	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_backmatter.ts	SCRATCH	unassigned	19	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_badgecount.ts	SCRATCH	unassigned	34	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_batch.ts	SCRATCH	unassigned	137	MUTATES+SPENDS	yes	yes	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES+SPENDS	
+backend/scripts/_beforeafter.ts	SCRATCH	unassigned	47	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_bookcfg.ts	SCRATCH	mg-chapter-book	38	MUTATES-STATE	yes	no	no	no	0	no	no	mg-chapter-book	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_bpmany.ts	SCRATCH	unassigned	46	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_buildbook.ts	SCRATCH	mg-chapter-book	241	DESTRUCTIVE	yes	no	YES	yes	0	no	no	mg-chapter-book	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — DESTRUCTIVE	contains a delete/drop/repaginate path
+backend/scripts/_cachetest.ts	SCRATCH	unassigned	50	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_capacity.ts	SCRATCH	unassigned	60	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_chlist.ts	SCRATCH	unassigned	25	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_compare5.ts	SCRATCH	unassigned	54	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_contactsheet.ts	SCRATCH	unassigned	53	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_dbgprev.ts	SCRATCH	unassigned	11	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_delines.ts	SCRATCH	unassigned	86	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_drypaginate.ts	SCRATCH	unassigned	87	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_err.ts	SCRATCH	unassigned	19	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_exp_doc_src.md	SCRATCH	unassigned	0	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_exp_fetch_spec.ts	SCRATCH	unassigned	38	SPENDS	yes	yes	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — SPENDS	
+backend/scripts/_exp_generate.ts	SCRATCH	unassigned	139	SPENDS	yes	yes	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — SPENDS	
+backend/scripts/_exp_lib.ts	SCRATCH	platform	378	SPENDS	no	yes	no	no	2	no	no	-	backend/scripts/lib/ (shared toolchain)	ARCHIVE WITH GUARD — SPENDS	
+backend/scripts/_exp_smoke.ts	SCRATCH	unassigned	18	SPENDS	no	yes	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — SPENDS	
+backend/scripts/_exp_validate.ts	SCRATCH	unassigned	82	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_exp_write_doc.mjs	SCRATCH	unassigned	7	WRITES-FILES	no	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_export.ts	SCRATCH	unassigned	109	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_findpage.ts	SCRATCH	unassigned	11	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_findrenders.ts	SCRATCH	unassigned	41	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_fixline.ts	SCRATCH	unassigned	46	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_fixmove.ts	SCRATCH	unassigned	82	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_flipbook.ts	SCRATCH	unassigned	111	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_fmkeys.ts	SCRATCH	unassigned	21	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_folioview.ts	SCRATCH	unassigned	49	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_folioz.ts	SCRATCH	unassigned	40	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_full.ts	SCRATCH	unassigned	32	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_geocheck.ts	SCRATCH	unassigned	13	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_grid.ts	SCRATCH	unassigned	37	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_inspect.ts	SCRATCH	unassigned	43	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_keys.ts	SCRATCH	unassigned	14	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_layoutfix.ts	SCRATCH	unassigned	123	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_layoutpreview.ts	SCRATCH	unassigned	56	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_movehead.ts	SCRATCH	unassigned	32	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_moveline.ts	SCRATCH	unassigned	53	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_msrange.ts	SCRATCH	unassigned	10	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_msread.ts	SCRATCH	unassigned	18	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_notillus.ts	SCRATCH	unassigned	21	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_openeraudit.ts	SCRATCH	unassigned	44	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_openerbreak.ts	SCRATCH	unassigned	19	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_orphanaudit.ts	SCRATCH	unassigned	78	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_orphanscan.ts	SCRATCH	unassigned	51	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_overflowscan.ts	SCRATCH	unassigned	49	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_pdfdims.ts	SCRATCH	unassigned	17	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_pdfimg.ts	SCRATCH	unassigned	47	WRITES-FILES	no	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_pdfpage.ts	SCRATCH	unassigned	16	WRITES-FILES	no	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_planstate.ts	SCRATCH	unassigned	32	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_ppdiag.ts	SCRATCH	unassigned	22	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_preflight.ts	SCRATCH	platform	74	SPENDS	no	yes	no	no	2	no	no	-	backend/scripts/lib/ (shared toolchain)	ARCHIVE WITH GUARD — SPENDS	
+backend/scripts/_prepcheck.ts	SCRATCH	unassigned	17	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_prog.ts	SCRATCH	unassigned	28	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_project.ts	SCRATCH	platform	42	SAFE-READONLY	no	no	no	no	117	no	no	-	scripts/lib/project.ts (SHARED — 117 importers, never archive)	KEEP — promote to scripts/lib, shim the 117 importers	single source of PROJECT_ID; refuses to default to a book
+backend/scripts/_projects.ts	SCRATCH	unassigned	13	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_prompt.ts	SCRATCH	unassigned	32	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_proofchapter.ts	SCRATCH	mg-chapter-book	134	WRITES-FILES	yes	no	no	yes	0	no	no	mg-chapter-book	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_proofsheet.ts	SCRATCH	unassigned	86	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_prunesize.ts	SCRATCH	unassigned	65	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_purge.ts	SCRATCH	unassigned	91	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_qa_billingcheck.ts	SCRATCH	unassigned	39	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_qa_failcheck.ts	SCRATCH	unassigned	19	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_qa_listversions.ts	SCRATCH	unassigned	15	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_qa_pull.ts	SCRATCH	unassigned	19	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_qa_pullversion.ts	SCRATCH	unassigned	20	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_qa_rerender.ts	SCRATCH	unassigned	26	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_r2count.ts	SCRATCH	unassigned	15	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_r2migrate.ts	SCRATCH	unassigned	175	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_r2prune.ts	SCRATCH	unassigned	127	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_railcheck.ts	SCRATCH	unassigned	53	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_recoverscan.ts	SCRATCH	unassigned	26	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_rendercount.ts	SCRATCH	unassigned	51	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_renderinv.ts	SCRATCH	unassigned	28	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_rendertextcheck.ts	SCRATCH	unassigned	55	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_restorerenders.ts	SCRATCH	unassigned	92	MUTATES+SPENDS	yes	yes	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES+SPENDS	
+backend/scripts/_resubject.ts	SCRATCH	unassigned	42	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_revert.ts	SCRATCH	unassigned	19	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_review_chapter.ts	SCRATCH	unassigned	43	SPENDS	yes	yes	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — SPENDS	
+backend/scripts/_review.ts	SCRATCH	unassigned	44	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_rft.ts	SCRATCH	unassigned	15	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_sample.ts	SCRATCH	unassigned	51	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_seq.ts	SCRATCH	unassigned	16	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_setfullwidthtext.ts	SCRATCH	unassigned	32	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_setlayout.ts	SCRATCH	unassigned	20	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_setopenerscene.ts	SCRATCH	unassigned	36	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_setpagescene.ts	SCRATCH	unassigned	62	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_specdiff.ts	SCRATCH	unassigned	42	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_specpeek.ts	SCRATCH	unassigned	21	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_specpeek2.ts	SCRATCH	unassigned	17	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_storagecheck.ts	SCRATCH	unassigned	33	MUTATES-STATE	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — MUTATES-STATE	
+backend/scripts/_storedprompt.ts	SCRATCH	unassigned	21	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_subj.ts	SCRATCH	unassigned	18	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_subjch.ts	SCRATCH	unassigned	21	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_syncimg.ts	SCRATCH	unassigned	18	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_testb.ts	SCRATCH	unassigned	32	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_textcheck.ts	SCRATCH	unassigned	33	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_verifyload.ts	SCRATCH	unassigned	17	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_view.ts	SCRATCH	unassigned	22	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_viewver.ts	SCRATCH	unassigned	22	WRITES-FILES	yes	no	no	yes	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE WITH GUARD — WRITES-FILES	
+backend/scripts/_watch.ts	SCRATCH	unassigned	46	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_zz_mon.ts	SCRATCH	unassigned	27	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_zz_run.ts	SCRATCH	unassigned	26	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/_zz_verify.ts	SCRATCH	unassigned	30	SAFE-READONLY	yes	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/test-strip.ts	SCRATCH	unassigned	14	SAFE-READONLY	no	no	no	no	0	no	no	-	backend/scripts/archive/scratch/	ARCHIVE (proven no caller, read-only)	
+backend/scripts/add-frontispiece.ts	UNKNOWN	unassigned	49	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/approve-prep-keys.ts	UNKNOWN	unassigned	26	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/badge-inventory.ts	UNKNOWN	unassigned	55	SAFE-READONLY	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/bodymax.ts	UNKNOWN	unassigned	17	SAFE-READONLY	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/build-epub-local.ts	UNKNOWN	unassigned	25	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/build-local2.ts	UNKNOWN	unassigned	81	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/context-classify.ts	UNKNOWN	unassigned	170	WRITES-FILES	yes	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/count-printready.ts	UNKNOWN	unassigned	11	SAFE-READONLY	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/cover-add-bleed-band.mjs	UNKNOWN	unassigned	47	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/crop-img.ts	UNKNOWN	unassigned	10	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/detect-orphan-headings.ts	UNKNOWN	unassigned	21	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/dl-one.ts	UNKNOWN	unassigned	7	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/download-page-image.ts	UNKNOWN	unassigned	53	WRITES-FILES	yes	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/embed-heroes-prep.ts	UNKNOWN	unassigned	118	MUTATES-STATE	yes	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/exception-table.ts	UNKNOWN	unassigned	110	SPENDS	no	yes	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries SPENDS	
+backend/scripts/fail-stuck.ts	UNKNOWN	unassigned	22	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/fix-bushcraft-subjects.ts	UNKNOWN	unassigned	61	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/fix-mushroom-subjects.ts	UNKNOWN	unassigned	71	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/fix-survival-subjects.ts	UNKNOWN	unassigned	56	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/fix-terrain-subjects.ts	UNKNOWN	unassigned	47	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/fix-tree-subjects.ts	UNKNOWN	unassigned	61	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/generate-error-registry-doc.ts	UNKNOWN	unassigned	54	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/get-printpaths.ts	UNKNOWN	unassigned	15	SAFE-READONLY	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/hardcover-blueprint.ts	UNKNOWN	unassigned	50	MUTATES+SPENDS	yes	yes	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES+SPENDS	
+backend/scripts/hardcover-compose-only.ts	UNKNOWN	unassigned	30	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/hardcover-cover.ts	UNKNOWN	unassigned	57	MUTATES+SPENDS	yes	yes	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES+SPENDS	
+backend/scripts/hardcover-deterministic.ts	UNKNOWN	unassigned	141	MUTATES+SPENDS	yes	yes	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES+SPENDS	
+backend/scripts/hardcover-edit-back.ts	UNKNOWN	unassigned	46	MUTATES+SPENDS	yes	yes	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES+SPENDS	
+backend/scripts/hardcover-fix-barcode.ts	UNKNOWN	unassigned	43	MUTATES+SPENDS	yes	yes	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES+SPENDS	
+backend/scripts/hardcover-fix-margins.ts	UNKNOWN	unassigned	43	MUTATES+SPENDS	yes	yes	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES+SPENDS	
+backend/scripts/hardcover-recompose.ts	UNKNOWN	unassigned	50	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/hardcover-shave.ts	UNKNOWN	unassigned	44	MUTATES-STATE	yes	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/imgpath.ts	UNKNOWN	unassigned	8	SAFE-READONLY	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/kindle-cover.ts	UNKNOWN	unassigned	18	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/make-newest-active.ts	UNKNOWN	unassigned	32	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/ocr-screen-summary.ts	UNKNOWN	unassigned	112	SAFE-READONLY	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/ocr-text-fidelity.ts	UNKNOWN	unassigned	398	SPENDS	yes	yes	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries SPENDS	
+backend/scripts/paperback-cover-pdf.ts	UNKNOWN	unassigned	32	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/print-ids.ts	UNKNOWN	unassigned	4	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/printprep-http.ts	UNKNOWN	unassigned	52	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/printprep-local.ts	UNKNOWN	unassigned	51	SAFE-READONLY	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/promote-prep-image.ts	UNKNOWN	unassigned	21	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/prove-db-isolation.ts	UNKNOWN	unassigned	81	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/r2-cleanup-stray-project.ts	UNKNOWN	unassigned	128	DESTRUCTIVE	no	no	YES	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries DESTRUCTIVE	contains a delete/drop/repaginate path
+backend/scripts/reconcile-canonical-renders.ts	UNKNOWN	unassigned	324	WRITES-FILES	yes	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/record-visual-verdict.ts	UNKNOWN	unassigned	105	WRITES-FILES	yes	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/render-all.sh	UNKNOWN	unassigned	0	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/render-batch.ts	UNKNOWN	unassigned	67	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/render-driver.ts	UNKNOWN	unassigned	65	SPENDS	no	yes	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries SPENDS	
+backend/scripts/render-health.ts	UNKNOWN	unassigned	70	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/render-heroes.ts	UNKNOWN	unassigned	230	SPENDS	no	yes	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries SPENDS	
+backend/scripts/render-one-page.ts	UNKNOWN	unassigned	31	SAFE-READONLY	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/render-one.ts	UNKNOWN	unassigned	34	SPENDS	no	yes	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries SPENDS	
+backend/scripts/render-watchdog.mjs	UNKNOWN	unassigned	65	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/rerender-copyright-isbn.ts	UNKNOWN	unassigned	79	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/save-newest.ts	UNKNOWN	unassigned	37	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/save-versions.ts	UNKNOWN	unassigned	23	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/scan-terms.ts	UNKNOWN	unassigned	88	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/select-newest.ts	UNKNOWN	unassigned	32	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/set-page-subject.ts	UNKNOWN	unassigned	36	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/three-covers.ts	UNKNOWN	unassigned	18	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/thumb.ts	UNKNOWN	unassigned	5	WRITES-FILES	no	no	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries WRITES-FILES	
+backend/scripts/unapprove-all.ts	UNKNOWN	unassigned	30	MUTATES-STATE	yes	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries MUTATES-STATE	
+backend/scripts/validate-delivery.ts	UNKNOWN	unassigned	63	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/validate-file.ts	UNKNOWN	unassigned	20	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/vision-calibration.ts	UNKNOWN	unassigned	192	SPENDS	yes	yes	no	yes	0	no	no	-	UNRESOLVED — needs review	REVIEW — carries SPENDS	
+backend/scripts/wait-deploy.ts	UNKNOWN	unassigned	18	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
+backend/scripts/wait-jpeg.ts	UNKNOWN	unassigned	27	SAFE-READONLY	no	no	no	no	0	no	no	-	UNRESOLVED — needs review	REVIEW — likely keep as operator tool	
