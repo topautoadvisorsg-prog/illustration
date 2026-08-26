@@ -155,27 +155,8 @@ describe('wide-table fallback — the shipped standards cannot restack', () => {
   });
 });
 
-describe('the real manuscript', () => {
-  const PATH =
-    'C:/Users/jovan/Downloads/national parks book/LAYOUT-7-national-parks-without-the-rookie-mistakes.md';
-  let md = '';
-  try {
-    md = readFileSync(PATH, 'utf8');
-  } catch {
-    /* not on this machine — the cases below skip themselves */
-  }
-  const maybe = md ? it : it.skip;
-
-  maybe('accounts for all 46 authored table rows across grids and stacked units', () => {
-    const html = render(md, NATIONAL_PARKS_GUIDE_TYPESET_V1);
-    // 46 authored pipe rows = 5 header + 5 delimiter + 36 body rows.
-    const gridBodyRows =
-      count(html, /<tr>/g) - count(html, /<thead><tr>/g);
-    const stackedRows = [...html.matchAll(/class="tset-table-stacked" data-columns="\d+" data-rows="(\d+)"/g)]
-      .reduce((n, m) => n + Number(m[1]), 0);
-    expect(gridBodyRows + stackedRows).toBe(36);
-    // Four grids and one stacked unit-list — the five-column permits table.
-    expect(count(html, GRID)).toBe(4);
-    expect(count(html, STACKED)).toBe(1);
-  });
-});
+// The real-manuscript cases that used to live here now sit in
+// `real-manuscript.operator.test.ts`. They read a commercial book from
+// outside this repository, so they cannot be part of a portable gate: on any
+// other machine the file is absent, and on this one it drifts as the book is
+// edited. The portable equivalents are in `fixture-book.test.ts`.

@@ -1,3 +1,15 @@
+/*
+ * RETIRED — SUPERSEDED. DO NOT USE, DO NOT EXTEND.
+ *
+ * Reason: an early hardcover build, superseded by the per-book scripts and then by the compositor.
+ *
+ * Kept rather than deleted because removal is not trivially provable safe in
+ * this phase, and a deleted script cannot be consulted when someone asks how
+ * a shipped artifact was made. It has no place in any current workflow.
+ *
+ * New cover production: tsx scripts/qa/build-cover.ts. See
+ * docs/COVERS-AND-SPINES.md.
+ */
 /* Generate the HARDCOVER full-wrap cover at KDP's exact case-laminate dimensions
  * (7x10, 275pp, premium color → 16.409 x 11.417in, spine 0.834in) using the same
  * saved cover art direction (moose front, bear back, panorama, branding). Writes

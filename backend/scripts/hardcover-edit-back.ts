@@ -1,3 +1,15 @@
+/*
+ * RETIRED — SUPERSEDED. DO NOT USE, DO NOT EXTEND.
+ *
+ * Reason: a one-off back-panel patch applied to a wrap that has since shipped.
+ *
+ * Kept rather than deleted because removal is not trivially provable safe in
+ * this phase, and a deleted script cannot be consulted when someone asks how
+ * a shipped artifact was made. It has no place in any current workflow.
+ *
+ * New cover production: tsx scripts/qa/build-cover.ts. See
+ * docs/COVERS-AND-SPINES.md.
+ */
 /* Targeted edit: take the APPROVED finished wrap art and move ONLY the back-cover
  * text block down ~1 inch into the empty bottom space, freezing the front, spine,
  * wildlife, landscape, and all wording. Preserves the approved front (no re-roll).

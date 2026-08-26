@@ -351,6 +351,18 @@ interface CoverBuildResult {
 
 ---
 
+## There is one cover command
+
+For any new cover, paperback or hardcover, the answer is `build-cover`. The
+nineteen per-book scripts in `backend/scripts/` are not alternatives to it and
+must not be used as templates. Every one of them now says so in its own header:
+
+| State | Meaning | Count |
+|---|---|---|
+| **ACTIVE WRAPPER** | A thin shim over the compositor, kept so an existing habit keeps working. Holds no geometry. | 2 |
+| **HISTORICAL — DO NOT USE FOR NEW BOOKS** | Reproduces an artifact that already shipped. Frozen on purpose: rewriting it risks changing a printed book for no benefit. | 8 |
+| **RETIRED — SUPERSEDED** | No longer needed for production or reproduction. Kept, not deleted, because a deleted script cannot answer how a shipped artifact was made. | 9 |
+
 ## Building a cover: `build-cover`
 
 Cover production used to mean writing a new script. There are nineteen of them

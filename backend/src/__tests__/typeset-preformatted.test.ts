@@ -15,6 +15,7 @@ import { ProjectConfigSchema } from '@wildlands/shared';
 import { buildTypesetHtml, parseTypesetSections } from '../pipeline/typeset/typeset-book.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from '../pipeline/typeset/layout-standards/educational-nonfiction-v1.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V2 } from '../pipeline/typeset/layout-standards/educational-nonfiction-v2.js';
+import { normalizeManuscriptNewlines } from '../pipeline/stage-1-ingestion/normalize-newlines.js';
 import type {
   TypesetLayoutStandard,
   TypesetPreformattedStyles,
@@ -147,7 +148,7 @@ describe('C3 — fenced content is preserved verbatim', () => {
 });
 
 describe('C3 — the real Appendix E', () => {
-  const md = readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/dirt-rich-manuscript.md'), 'utf8');
+  const md = normalizeManuscriptNewlines(readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/dirt-rich-manuscript.md'), 'utf8'));
   const html = render(md, PRE);
 
   /** The fence as the canonical file holds it, read independently of the render. */

@@ -1,3 +1,25 @@
+/*
+ * HISTORICAL — DO NOT USE FOR NEW BOOKS.
+ *
+ * This built the shipped 7 NATIONAL PARKS cover, final pass. It is kept so that artifact can be reproduced, and
+ * for no other reason. It is NOT the platform entry point and it is not a
+ * template for anything new.
+ *
+ * NEW COVER PRODUCTION USES THE CANONICAL COMPOSITOR:
+ *
+ *   tsx scripts/qa/build-cover.ts --interior final.pdf --art approved.png \
+ *       --binding paperback --ink bw --paper white --trim 6x9 \
+ *       --title "..." --author "..." --out cover.pdf --proof proof.png
+ *
+ * That command reads the page count from the interior, takes its geometry
+ * from the published KDP specification or a verified calculator reading,
+ * validates effective resolution and the barcode reserve, and writes a
+ * manifest pairing the cover to the interior it was built from. This file
+ * does none of that. See docs/COVERS-AND-SPINES.md.
+ *
+ * Frozen deliberately: rewriting a script whose only job is to reproduce a
+ * shipped book risks changing that book for no benefit.
+ */
 /**
  * FINISH THE PAPERBACK WRAP: the model's artwork plus the two strings it must
  * not paint.

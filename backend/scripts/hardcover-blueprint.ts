@@ -1,3 +1,15 @@
+/*
+ * RETIRED — SUPERSEDED. DO NOT USE, DO NOT EXTEND.
+ *
+ * Reason: a one-off blueprint preview for a case wrap that has since shipped.
+ *
+ * Kept rather than deleted because removal is not trivially provable safe in
+ * this phase, and a deleted script cannot be consulted when someone asks how
+ * a shipped artifact was made. It has no place in any current workflow.
+ *
+ * New cover production: tsx scripts/qa/build-cover.ts. See
+ * docs/COVERS-AND-SPINES.md.
+ */
 /* Generate the hardcover wrap: hand the model the CONTENT-PLACEMENT blueprint
  * (shared lib) + the cover prompt with v1.3 PRODUCTION LAYOUT RULES injected, so
  * it paints one continuous scene AND bakes the engraved text inside the marked

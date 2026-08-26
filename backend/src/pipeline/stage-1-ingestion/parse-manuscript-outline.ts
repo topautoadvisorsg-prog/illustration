@@ -10,6 +10,7 @@
 
 import { UserFacingError } from '../../lib/user-facing-error.js';
 import { ERROR_CODES } from '../../lib/error-codes.js';
+import { normalizeManuscriptNewlines } from './normalize-newlines.js';
 
 export interface ManuscriptSectionOutline {
   title: string;
@@ -159,7 +160,10 @@ function collectHeadings(markdown: string): Heading[] {
   return headings;
 }
 
-export function parseManuscriptOutline(markdown: string): ManuscriptOutline {
+export function parseManuscriptOutline(input: string): ManuscriptOutline {
+  // Line endings are a transport detail, not content. Normalised once, here,
+  // so nothing downstream ever has to reason about a carriage return. See normalize-newlines.ts.
+  const markdown = normalizeManuscriptNewlines(input);
   const headings = collectHeadings(markdown);
   const warnings: string[] = [];
   const explicitChapterHeadings = headings.filter((heading) => heading.level === 1 && isChapterHeading(heading.title));

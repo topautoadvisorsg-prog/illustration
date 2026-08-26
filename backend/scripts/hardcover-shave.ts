@@ -1,3 +1,15 @@
+/*
+ * RETIRED — SUPERSEDED. DO NOT USE, DO NOT EXTEND.
+ *
+ * Reason: a one-off trim adjustment applied to a wrap that has since shipped.
+ *
+ * Kept rather than deleted because removal is not trivially provable safe in
+ * this phase, and a deleted script cannot be consulted when someone asks how
+ * a shipped artifact was made. It has no place in any current workflow.
+ *
+ * New cover production: tsx scripts/qa/build-cover.ts. See
+ * docs/COVERS-AND-SPINES.md.
+ */
 /* Deterministic "shave": take the already-generated cover art and scale it INWARD
  * by a fixed inset (default 0.3in) so every baked text line pulls away from the
  * trim edges at once. The freed outer strip is filled by clamping/stretching the

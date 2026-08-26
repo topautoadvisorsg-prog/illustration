@@ -1,3 +1,15 @@
+/*
+ * RETIRED — SUPERSEDED. DO NOT USE, DO NOT EXTEND.
+ *
+ * Reason: a one-off barcode-area patch; the compositor now reserves that region by construction.
+ *
+ * Kept rather than deleted because removal is not trivially provable safe in
+ * this phase, and a deleted script cannot be consulted when someone asks how
+ * a shipped artifact was made. It has no place in any current workflow.
+ *
+ * New cover production: tsx scripts/qa/build-cover.ts. See
+ * docs/COVERS-AND-SPINES.md.
+ */
 /* Remove the AI-painted fake barcode from the hardcover back cover and re-compose
  * with NO white box (KDP adds its own barcode). Edits the stored art, recomposes
  * the PDF at the exact KDP wrap, writes cover PDF + review PNG. */

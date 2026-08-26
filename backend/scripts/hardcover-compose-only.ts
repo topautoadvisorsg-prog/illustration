@@ -1,3 +1,15 @@
+/*
+ * RETIRED — SUPERSEDED. DO NOT USE, DO NOT EXTEND.
+ *
+ * Reason: a one-off recomposition step for a case wrap that has since shipped.
+ *
+ * Kept rather than deleted because removal is not trivially provable safe in
+ * this phase, and a deleted script cannot be consulted when someone asks how
+ * a shipped artifact was made. It has no place in any current workflow.
+ *
+ * New cover production: tsx scripts/qa/build-cover.ts. See
+ * docs/COVERS-AND-SPINES.md.
+ */
 /* Re-compose the hardcover cover PDF from the already-fixed stored art (barcode
  * removed). No render, no edit, no white box. → Downloads. */
 import { writeFileSync } from 'node:fs';

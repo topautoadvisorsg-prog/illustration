@@ -30,7 +30,9 @@
     "qa:illustrations": "tsx scripts/illustration-candidates.ts",
     "art:page": "tsx scripts/render-illustration.ts",
     "art:publish": "tsx scripts/publish-illustration.ts",
-    "qa:grid": "tsx scripts/review-grid.ts"
+    "qa:grid": "tsx scripts/review-grid.ts",
+    "qa:fixture-smoke": "tsx scripts/qa/fixture-smoke.ts",
+    "test:operator": "vitest run src/__tests__/real-manuscript.operator.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",

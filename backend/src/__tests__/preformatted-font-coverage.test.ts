@@ -24,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as fontkit from 'fontkit';
 import { describe, expect, it } from 'vitest';
+import { normalizeManuscriptNewlines } from '../pipeline/stage-1-ingestion/normalize-newlines.js';
 
 const FONT_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -94,7 +95,7 @@ describe('preformatted face — the vendored binary', () => {
 
 describe('preformatted face — covers every character DIRT RICH actually sets', () => {
   const font = fontkit.openSync(TTF);
-  const chars = fencedCharacters(readFileSync(MANUSCRIPT, 'utf8'));
+  const chars = fencedCharacters(normalizeManuscriptNewlines(readFileSync(MANUSCRIPT, 'utf8')));
 
   it('found the fenced content to check', () => {
     expect(chars.length).toBeGreaterThan(20);

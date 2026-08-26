@@ -1,3 +1,15 @@
+/*
+ * RETIRED — SUPERSEDED. DO NOT USE, DO NOT EXTEND.
+ *
+ * Reason: a one-off margin patch applied to a wrap that has since shipped.
+ *
+ * Kept rather than deleted because removal is not trivially provable safe in
+ * this phase, and a deleted script cannot be consulted when someone asks how
+ * a shipped artifact was made. It has no place in any current workflow.
+ *
+ * New cover production: tsx scripts/qa/build-cover.ts. See
+ * docs/COVERS-AND-SPINES.md.
+ */
 /* Fix back-cover text margins on the hardcover wrap (KDP previewer flagged text
  * at the trim). Pull the back-cover text block inward (down from top, in from
  * left, up from bottom) and raise the front 'SERIES I' line — preserving the

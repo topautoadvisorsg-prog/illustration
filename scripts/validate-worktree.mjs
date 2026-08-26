@@ -217,20 +217,27 @@ if (!SKIP_TESTS) {
   const failed = [...clean.matchAll(/^ FAIL\s+(.+)$/gm)].map((m) => m[1].trim());
   console.log(`  ${line.trim()}`);
   /**
-   * The baseline. These four read real book manuscripts from absolute paths
-   * OUTSIDE the repository — one of them under C:/Users/jovan/Downloads/ — so
-   * they cannot pass on any other machine. They are not fixed by pointing them
-   * at a different Downloads folder; they are replaced by the fixture book.
+   * THE BASELINE IS EMPTY, AND IT MUST STAY THAT WAY.
+   *
+   * Four tests used to live here. Two read a commercial manuscript from an
+   * absolute path outside the repository; two read a tracked fixture whose
+   * checked-out line endings differed between working trees at the SAME commit,
+   * so the same code passed in one and failed in the other.
+   *
+   * Both causes are fixed rather than tolerated. Newlines are normalised once,
+   * at the boundary where text becomes a manuscript. The commercial-manuscript
+   * cases moved to `*.operator.test.ts`, excluded from the default run, and
+   * their portable equivalents assert against the repository-owned fixture book.
+   *
+   * An allow-list is a debt that hides regressions: it permits the named tests to
+   * fail for ANY reason, including a real one. Do not add a name here to make a
+   * run green. Fix the test, or move it out of the portable gate and say why.
    */
-  const KNOWN = [
-    'manuscript-parse-gate.test.ts',
-    'preformatted-font-coverage.test.ts',
-    'typeset-preformatted.test.ts',
-    'typeset-wide-tables.test.ts',
-  ];
+  const KNOWN = [];
   const unexpected = failed.filter((f) => !KNOWN.some((k) => f.includes(k)));
   for (const f of failed) console.log(`    ${KNOWN.some((k) => f.includes(k)) ? 'known ' : 'NEW   '} ${f.slice(0, 110)}`);
-  if (unexpected.length === 0) pass(`no failures beyond the ${KNOWN.length} known non-portable baseline tests`);
+  if (unexpected.length === 0)
+    pass(KNOWN.length === 0 ? 'test suite is green with no allow-listed failures' : `no failures beyond the ${KNOWN.length} allow-listed tests`);
   else fail(`${unexpected.length} failure(s) beyond baseline`);
 } else {
   head('6. Test suite');

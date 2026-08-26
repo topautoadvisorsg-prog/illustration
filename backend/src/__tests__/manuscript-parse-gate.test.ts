@@ -147,25 +147,8 @@ Body.
   });
 });
 
-describe('the real manuscript', () => {
-  const PATH =
-    'C:/Users/jovan/Downloads/national parks book/LAYOUT-7-national-parks-without-the-rookie-mistakes.md';
-  let md = '';
-  try {
-    md = readFileSync(PATH, 'utf8');
-  } catch {
-    /* not on this machine */
-  }
-  const maybe = md ? it : it.skip;
-
-  maybe('7 NATIONAL PARKS parses whole', () => {
-    const a = auditManuscriptParse(md);
-    expect(a.convention).toBe('numbered-h1');
-    expect(a.parsed.chapters).toBe(12);
-    expect(a.parsed.tableRows).toBe(46);
-    expect(a.droppedAfterStructure).toBe(0);
-    expect(a.ok).toBe(true);
-    // Before the fix this book produced 126 sections and zero chapters.
-    expect(a.parsed.sections).toBe(21);
-  });
-});
+// The real-manuscript cases that used to live here now sit in
+// `real-manuscript.operator.test.ts`. They read a commercial book from
+// outside this repository, so they cannot be part of a portable gate: on any
+// other machine the file is absent, and on this one it drifts as the book is
+// edited. The portable equivalents are in `fixture-book.test.ts`.

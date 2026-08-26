@@ -18,11 +18,24 @@ Four books have shipped through it.
 | Books | DIRT RICH, No One Told Me That, 7 National Parks, the MG chapter book | Earlier Wildlands illustrated volumes |
 | Status | **Every book shipped in the last three months** | Preserved, not extended. No new books. No new features. |
 
-**Track A still owns cover geometry.** `computeCoverDimensions` and the paper
-thickness table live in `stage-6-layout/render-html.ts`, and the whole platform
-imports them from there. Extracting them is Phase 1. Until that lands, "legacy"
-describes the render path, not the whole module. See
-[docs/LEGACY.md](docs/LEGACY.md).
+**One command builds a cover.** New production covers, paperback or hardcover,
+are made with a single tool:
+
+```bash
+tsx scripts/qa/build-cover.ts --interior final.pdf --art approved-wrap.png \
+    --binding paperback --ink bw --paper white --trim 6x9 \
+    --title "..." --author "..." --out cover.pdf --proof proof.png --manifest cover.json
+```
+
+It reads the page count from the interior PDF, takes its geometry from the
+published KDP specification (paperback) or a verified Cover Calculator reading
+(hardcover), validates effective resolution and the barcode reserve, emits a
+proof for human approval, and writes a manifest pairing the cover to the
+interior it was built from. See [docs/COVERS-AND-SPINES.md](docs/COVERS-AND-SPINES.md).
+
+The per-book cover scripts in `backend/scripts/` are **not** alternatives. Each is
+marked in its own header as `HISTORICAL — DO NOT USE FOR NEW BOOKS` or
+`RETIRED — SUPERSEDED`. They exist to reproduce artifacts that already shipped.
 
 > If you have read older documentation pointing at `RENDER_MODEL.md` as the
 > current system, it is describing Track A. That guidance is superseded.
@@ -106,6 +119,26 @@ The full matrix, including secondary copies and conflict risk, is
 - **`backend/src` never imports `backend/scripts`.** Verified by resolved
   specifiers. Keep it that way.
 - **`scripts/_scratch/` is untracked and is never a production authority.**
+- **The portable suite owns its own book.**
+  `backend/src/__tests__/fixtures/fixture-book/` is a small synthetic manuscript
+  carrying every structure the engine can break on: part dividers, a chapter
+  opener, both list kinds, a labelled callout, a narrow table, a wide table that
+  must trigger the stacked fallback, a plate, a preformatted block, an appendix,
+  a sources section and a heading with a drawn mark. Nothing in the default test
+  run reads a file outside this repository.
+
+- **End to end, on that book:**
+
+  ```bash
+  npm run qa:fixture-smoke   # manuscript -> PDF -> covers -> manifest
+  ```
+
+  Needs Chromium (set `CHROMIUM_PATH`). Exits 4 if none is found, so CI can tell
+  "environment not ready" from "the book is broken".
+
+- **Operator tests are separate.** `*.operator.test.ts` assert against real
+  commercial manuscripts outside the repo and are excluded from the default run.
+  `OPERATOR_TESTS=1 npm run test:operator` on a machine that holds the books.
 - **Tests cannot reach production.** `backend/src/test-safety.ts` denies by
   default and aborts the run if a production database, key or bucket is
   reachable. Do not weaken it to make a test run.
@@ -123,8 +156,8 @@ The full matrix, including secondary copies and conflict risk, is
 |---|---|
 | Interior PDF | `typeset/build-typeset-interior.ts` -> `typeset-book.ts` |
 | Illustration plates | `typeset/stamp-illustrations.ts`, onto the finished PDF |
-| Paperback cover | Currently per-book scripts in `backend/scripts/`; **18 scripts emit a cover PDF**. Being unified in Phase 1. |
-| Hardcover cover | No verified geometry exists for the current block. `kdp-cover-specs.ts` refuses to interpolate, by design. |
+| Paperback cover | **Resolved.** One compositor, `scripts/qa/build-cover.ts`. The per-book scripts are marked HISTORICAL or RETIRED and are not entry points. |
+| Hardcover cover | **Resolved for 6x9 and 7x10.** Nine verified Cover Calculator readings in `kdp-cover-specs.ts`; anything outside them still refuses to interpolate, by design. |
 | Kindle EPUB | `stage-8-epub/` |
 | Kindle cover | A 1600x2560 crop of the finished paperback wrap |
 | Delivery package | Per-book delivery folder plus a manifest of hashes |

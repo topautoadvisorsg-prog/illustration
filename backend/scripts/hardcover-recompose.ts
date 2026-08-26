@@ -1,67 +1,87 @@
-/* Re-compose the hardcover cover from the already-generated art (no new render):
- * resize to the exact KDP wrap, then reserve a clean white 2x1.2in barcode area
- * at the lower-left of the back cover (KDP places its own barcode there; artwork
- * must be clear). Writes the cover PDF + review PNG. */
-import { writeFileSync } from 'node:fs';
+/**
+ * ACTIVE WRAPPER over the canonical compositor.
+ *
+ * Re-compose a hardcover case from artwork that has already been generated and
+ * approved. No new render, no model call, no spend.
+ *
+ *   tsx scripts/hardcover-recompose.ts <projectId> --interior final.pdf \
+ *       --title "..." --author "..." [--out DIR]
+ *
+ * WHAT CHANGED, AND WHY IT MATTERS
+ *
+ * This script used to carry a hardcover wrap of its own: 16.409 x 11.417in,
+ * spine 0.834in, wrap 0.591in, plus a hand-placed 2 x 1.2in barcode box. Phase
+ * 1B replaced those literals with the verified calculator reading, and this
+ * phase removes the geometry from the script entirely.
+ *
+ * It also hardcoded a 275-page book. That is the defect the compositor exists to
+ * remove: a page count typed into a script cannot be wrong loudly, and a
+ * hardcover spine that is wrong by one signature is a reprint. The count now
+ * comes from the interior PDF that is shipping.
+ *
+ * The barcode reserve is no longer drawn as a white box by default. The
+ * compositor reserves that region by construction and marks it on the proof, so
+ * a human can see the region KDP may cover without a white rectangle being
+ * baked into approved artwork.
+ *
+ * For anything new, call `scripts/qa/build-cover.ts` directly.
+ */
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import sharp from 'sharp';
-import { PDFDocument } from 'pdf-lib';
 import { getProjectStorage } from '../src/services/storage/project-storage.js';
-import { getKdpCoverDimensions } from '../src/pipeline/publishing-standard/kdp-cover-specs.js';
-import { HARDCOVER_RULES } from '../src/pipeline/publishing-standard/kdp-spec.js';
+import { buildCover } from '../src/pipeline/cover/compositor/build-cover.js';
 
-const P = process.argv[2]!;
-const OUT = process.argv[3] ?? 'C:/Users/jovan/Downloads';
-// Geometry comes from the verified Cover Calculator reading for this exact
-// configuration, not from numbers typed here. The literals this replaced
-// (16.409 x 11.417, spine 0.834, wrap 0.591) matched the fixture exactly, so
-// no cover moves.
-const KDP = getKdpCoverDimensions({
-  binding: 'HARDCOVER',
-  coverType: 'CASE_LAMINATE',
-  interiorType: 'PREMIUM_COLOR',
-  paperType: 'WHITE',
-  trimSize: '7x10',
-  pageCount: 275,
-});
-const dims = { fullWidthIn: KDP.fullWidthIn, fullHeightIn: KDP.fullHeightIn, spineIn: KDP.spineIn };
-const WRAP = KDP.wrapIn;
-const BC_LEFT_MARGIN = KDP.barcodeMarginWidthIn;
-const BC_BOTTOM_MARGIN = KDP.barcodeMarginHeightIn;
-const BC_W = HARDCOVER_RULES.barcode.value.widthIn;
-const BC_H = HARDCOVER_RULES.barcode.value.heightIn;
+const argv = process.argv.slice(2);
+const positional = argv.filter((a) => !a.startsWith('--'));
+const flag = (n: string): string | undefined => {
+  const hit = argv.find((a) => a === `--${n}` || a.startsWith(`--${n}=`));
+  if (!hit) return undefined;
+  if (hit.includes('=')) return hit.slice(hit.indexOf('=') + 1);
+  const next = argv[argv.indexOf(hit) + 1];
+  return next && !next.startsWith('--') ? next : '';
+};
+
+const projectId = positional[0];
+const INTERIOR = flag('interior');
+if (!projectId) {
+  console.error('hardcover-recompose: a project id is required as the first argument.');
+  process.exit(1);
+}
+if (!INTERIOR) {
+  console.error(
+    'hardcover-recompose: --interior <final interior PDF> is required.\n' +
+      'The page count is read from it. This script no longer carries a hardcoded 275.',
+  );
+  process.exit(1);
+}
+
+const OUT = flag('out') ?? 'C:/Users/jovan/Downloads';
+mkdirSync(OUT, { recursive: true });
 
 const storage = getProjectStorage();
-const artPng = await storage.readProjectFile(`${P}/cover/cover-wrap-hardcover-art.png`);
+const artwork = await storage.readProjectFile(`${projectId}/cover/cover-wrap-hardcover-art.png`);
 
-const dpi = 300;
-const canvasW = Math.round(dims.fullWidthIn * dpi);
-const canvasH = Math.round(dims.fullHeightIn * dpi);
-const art = await sharp(artPng).resize({ width: canvasW, height: canvasH, fit: 'cover', position: 'centre', kernel: 'lanczos3' }).toBuffer();
+const result = await buildCover({
+  interiorPdf: readFileSync(INTERIOR),
+  interiorName: INTERIOR,
+  artwork,
+  artworkName: 'cover-wrap-hardcover-art.png',
+  binding: 'HARDCOVER',
+  ink: 'PREMIUM_COLOR',
+  paper: 'WHITE',
+  trim: flag('trim') ?? '7x10',
+  title: flag('title') ?? 'Untitled',
+  author: flag('author') ?? 'Unknown',
+  // The generated art already carries its own spine treatment on this lineage.
+  spineText: false,
+});
 
-// Clean white barcode-reserve box, lower-left of the back cover (inside wrap + margins).
-const leftIn = WRAP + BC_LEFT_MARGIN;            // 0.841"
-const bottomIn = WRAP + BC_BOTTOM_MARGIN;        // 0.966"
-const L = Math.round(leftIn * dpi);
-const T = Math.round((dims.fullHeightIn - bottomIn - BC_H) * dpi);
-const W = Math.round(BC_W * dpi);
-const H = Math.round(BC_H * dpi);
-const box = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}"><rect x="${L}" y="${T}" width="${W}" height="${H}" fill="#ffffff"/></svg>`;
-const overlay = await sharp(Buffer.from(box)).png().toBuffer();
+writeFileSync(join(OUT, 'HARDCOVER-COVER.pdf'), result.productionPdf);
+writeFileSync(join(OUT, 'HARDCOVER-COVER-proof.png'), result.proofPng);
+writeFileSync(join(OUT, 'HARDCOVER-COVER-manifest.json'), JSON.stringify(result.manifest, null, 2));
 
-const composed = await sharp(art).composite([{ input: overlay, left: 0, top: 0 }]).jpeg({ quality: 92, chromaSubsampling: '4:4:4' }).toBuffer();
-
-const pdf = await PDFDocument.create();
-const page = pdf.addPage([dims.fullWidthIn * 72, dims.fullHeightIn * 72]);
-const img = await pdf.embedJpg(composed);
-page.drawImage(img, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() });
-const pdfBuffer = Buffer.from(await pdf.save());
-
-const pdfPath = join(OUT, 'THE_WILDLANDS_NEW_ENGLAND_HARDCOVER_cover.pdf');
-const pngPath = join(OUT, 'hardcover_cover_review.png');
-writeFileSync(pdfPath, pdfBuffer);
-writeFileSync(pngPath, await sharp(composed).png().toBuffer());
-console.log(`barcode reserve box: ${BC_W}x${BC_H}in at left ${leftIn.toFixed(3)}in, bottom ${bottomIn.toFixed(3)}in`);
-console.log(`cover PDF → ${pdfPath} (${(pdfBuffer.length / 1048576).toFixed(1)} MB)`);
-console.log(`review PNG → ${pngPath}`);
-process.exit(0);
+console.log(result.report);
+console.log(`  production            ${join(OUT, 'HARDCOVER-COVER.pdf')}`);
+console.log(`  proof                 ${join(OUT, 'HARDCOVER-COVER-proof.png')}`);
+console.log(`  manifest              ${join(OUT, 'HARDCOVER-COVER-manifest.json')}`);
+if (result.status === 'BLOCKED') process.exit(2);
