@@ -138,6 +138,13 @@ callouts, fonts, colour space, covers or EPUB while the unit suite stays green.
 
 ---
 
+## A vision engine already exists
+
+Before designing any of the above, read [VISION-QA.md](VISION-QA.md). There is a
+working vision-model QA path in this repository, built for illustration-text
+fidelity. Roughly 60% of it is reusable unchanged, and a second Vision stack must
+not be built beside it.
+
 ## Phasing
 
 | Phase | Work |

@@ -222,6 +222,7 @@ sanctioned home for a *text* correction at book scope — that gap is Phase 2.
 | [docs/BOOK-PRODUCTION.md](docs/BOOK-PRODUCTION.md) | The operator path, end to end |
 | [docs/COVERS-AND-SPINES.md](docs/COVERS-AND-SPINES.md) | Geometry, KDP readings, safe zones, the current conflict |
 | [docs/QA-SYSTEM.md](docs/QA-SYSTEM.md) | What is checked today and what is not |
+| [docs/VISION-QA.md](docs/VISION-QA.md) | The vision-model QA engine that already exists — read before building a second one |
 | [docs/SOURCE-OF-TRUTH.md](docs/SOURCE-OF-TRUTH.md) | One authority per production datum |
 | [docs/LEGACY.md](docs/LEGACY.md) | Track A: what it is, what still depends on it, how it retires |
 | [docs/maintenance/](docs/maintenance/README.md) | Script census, safety classification, dispositions |
