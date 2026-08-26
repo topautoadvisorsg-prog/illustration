@@ -213,7 +213,20 @@ if (!SKIP_TESTS) {
   try { out = run(bin('vitest'), ['run', '--reporter=basic'], BACKEND); }
   catch (e) { out = String(e.stdout || '') + String(e.stderr || ''); }
   const clean = out.replace(/\x1b\[[0-9;]*m/g, '');
-  const line = clean.split('\n').find((l) => /^\s*Tests\s+/.test(l)) || '(no summary line)';
+  const summary = clean.split('\n').find((l) => /^\s*Tests\s+/.test(l));
+  /**
+   * NO SUMMARY LINE IS A FAILURE, NOT A PASS.
+   *
+   * This reported a green suite once when vitest could not start at all: with no
+   * output there were no FAIL lines to find, so the allow-list check passed on an
+   * empty set. A validator that calls a suite green when it never ran is worse
+   * than no validator.
+   */
+  if (!summary) {
+    console.log(String(clean).slice(0, 600));
+    fail('test suite produced no summary line — it did not run');
+  }
+  const line = summary || '(no summary line — the suite did not run)';
   const failed = [...clean.matchAll(/^ FAIL\s+(.+)$/gm)].map((m) => m[1].trim());
   console.log(`  ${line.trim()}`);
   /**
