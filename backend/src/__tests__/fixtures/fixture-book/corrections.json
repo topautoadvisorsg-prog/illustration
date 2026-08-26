@@ -1,0 +1,81 @@
+[
+  {
+    "id": "fix-doubled-period",
+    "type": "text",
+    "anchor": "e43f3d0a",
+    "expect": "5 p.m.. and",
+    "replace": "5 p.m. and",
+    "reason": "Typo in the source: a sentence-ending period after an abbreviation that already ends in one.",
+    "status": "active",
+    "createdAt": "2026-08-26T00:00:00.000Z"
+  },
+  {
+    "id": "author-legal-name",
+    "type": "metadata",
+    "field": "authorName",
+    "value": "The Fixture Standards Board (Synthetic Press)",
+    "reason": "The imprint must appear with the author on every output rather than being typed into the cover alone.",
+    "status": "active"
+  },
+  {
+    "id": "appendix-heading-plain",
+    "type": "headingDisplay",
+    "anchor": "8243bdad",
+    "stripDrawnMarks": true,
+    "reason": "The drawn arrow reads as a cross-reference in the body but as noise in a printed heading.",
+    "status": "active"
+  },
+  {
+    "id": "appendix-short-running-head",
+    "type": "runningHead",
+    "section": "appendix-a-reference-values",
+    "display": "Appendix A",
+    "reason": "The full title does not fit the folio line at this trim.",
+    "status": "active"
+  },
+  {
+    "id": "sources-toc-entry",
+    "type": "tocDisplay",
+    "section": "sources",
+    "display": "Sources and Further Reading",
+    "reason": "The contents entry is intentionally fuller than the section heading.",
+    "status": "active"
+  },
+  {
+    "id": "keep-lead-in-with-list",
+    "type": "layout",
+    "anchor": "6b1915c5",
+    "override": {
+      "keepWithNext": true,
+      "note": "A lead-in colon must not end a page above its own list."
+    },
+    "reason": "The lead-in sentence was orphaned above a page break from the list it introduces.",
+    "status": "active"
+  },
+  {
+    "id": "plate-after-lead-in",
+    "type": "illustration",
+    "anchor": "878d4faf",
+    "asset": "fixture-plate",
+    "placement": "after-block",
+    "widthPercent": 70,
+    "reason": "Anchored to the paragraph that introduces it, so it survives repagination.",
+    "status": "active"
+  },
+  {
+    "id": "callout-compact",
+    "type": "blockPresentation",
+    "anchor": "4bf7fd17",
+    "variant": "compact",
+    "reason": "The callout is correct but sets loosely at this measure; a reviewed compact variant, not free styling.",
+    "status": "active"
+  },
+  {
+    "id": "old-subtitle-attempt",
+    "type": "metadata",
+    "field": "subtitle",
+    "value": "A Synthetic Book",
+    "reason": "Superseded by the longer subtitle already in the manuscript. Kept so the decision is on the record.",
+    "status": "superseded"
+  }
+]

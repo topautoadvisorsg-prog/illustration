@@ -18,6 +18,28 @@ Four books have shipped through it.
 | Books | DIRT RICH, No One Told Me That, 7 National Parks, the MG chapter book | Earlier Wildlands illustrated volumes |
 | Status | **Every book shipped in the last three months** | Preserved, not extended. No new books. No new features. |
 
+**One book needs something different? Correct the book, not the platform.**
+
+    book-specific change  ->  book-local correction
+    systemic defect       ->  shared platform change
+    manuscript            ->  frozen, always
+
+A typo, an author name, a running head, a contents entry, a heading treatment, a
+spacing nudge, a plate placement: all of these are book-local corrections keyed to
+stable block ids, and none of them require touching shared renderer code.
+
+```bash
+tsx scripts/qa/corrections.ts blocks   --manuscript book.md
+tsx scripts/qa/corrections.ts add      --corrections c.json --type text --id fix-1 \
+    --anchor e43f3d0a --expect "5 p.m.. and" --replace "5 p.m. and" --reason "..."
+tsx scripts/qa/corrections.ts report   --manuscript book.md --corrections c.json
+```
+
+An anchor that matches nothing, matches twice, or whose expected text has changed
+BLOCKS the build. See [docs/CORRECTIONS.md](docs/CORRECTIONS.md), which answers how to
+correct a typo, change metadata, change only a running head, keep a heading with its
+text, and when a change is systemic enough to belong in the platform instead.
+
 **One command builds a cover.** New production covers, paperback or hardcover,
 are made with a single tool:
 

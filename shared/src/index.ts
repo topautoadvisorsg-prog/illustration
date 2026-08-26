@@ -109,6 +109,161 @@ export const LayoutOverrideSchema = z
   .strict();
 export type LayoutOverride = z.infer<typeof LayoutOverrideSchema>;
 
+/**
+ * BOOK-LOCAL CORRECTIONS — the one place a single book differs.
+ *
+ * The rule this enforces, and the reason the layer exists at all:
+ *
+ *     book-specific change -> book-local correction
+ *     systemic defect      -> shared platform change
+ *     manuscript           -> frozen, always
+ *
+ * Before this existed, correcting one stray period meant editing a frozen
+ * manuscript, branching the shared renderer on a book name, or shipping the
+ * defect. All three are wrong, and the third is what usually happened.
+ *
+ * ─── WHY ONE DOCUMENT AND NOT SIX REGISTRIES ─────────────────────────────
+ * A text patch, a metadata change and a spacing nudge are the same kind of
+ * decision: this book, this anchor, this reason, reviewable and reversible.
+ * Splitting them into parallel registries would mean four places to look when
+ * a build reports something unmatched, and four chances for one of them to
+ * quietly lose its reporting.
+ *
+ * `layoutOverrides` is kept as it was. It predates this union, ships in real
+ * books, and a LAYOUT correction compiles into exactly the same override, so
+ * the two express one mechanism rather than competing.
+ *
+ * ─── EVERY MEMBER IS .strict() ON PURPOSE ────────────────────────────────
+ * An unknown property is an error, never ignored. A correction someone typed
+ * wrong must not look like a correction that applied.
+ */
+const CorrectionBase = {
+  /** Stable, operator-visible. Referenced by the report and the CLI. */
+  id: z.string().min(1).max(64),
+  /** Why this exists, for whoever regenerates the book next. Required. */
+  reason: z.string().min(1).max(300),
+  /**
+   * `superseded` keeps a correction on the record without applying it, so the
+   * history of a decision survives being reversed.
+   */
+  status: z.enum(['active', 'superseded']).default('active'),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+};
+
+/** Where a correction points. A stable block id, never a page number. */
+const BlockAnchor = z.string().min(1).max(128);
+
+export const CorrectionSchema = z.discriminatedUnion('type', [
+  /**
+   * TEXT — one punctuation or wording correction to one block.
+   *
+   * `expect` is a residue check, not decoration. A correction written against
+   * a manuscript that has since been revised must REFUSE rather than replace
+   * whatever now sits at that anchor.
+   *
+   * Safe to anchor by block id: `normaliseBlockText` keeps only alphanumerics,
+   * so fixing punctuation does not move the block it is anchored to.
+   */
+  z.object({
+    type: z.literal('text'),
+    ...CorrectionBase,
+    anchor: BlockAnchor,
+    /** The exact substring expected at the anchor today. */
+    expect: z.string().min(1).max(2000),
+    /** What it becomes. May be empty, which is a deletion. */
+    replace: z.string().max(2000),
+  }).strict(),
+
+  /**
+   * METADATA — one field, flowing to every output that displays it.
+   *
+   * Cover, title page and EPUB must not carry independent copies of an author
+   * name. Where a displayed form intentionally differs, that is a separate
+   * display correction, stated as such.
+   */
+  z.object({
+    type: z.literal('metadata'),
+    ...CorrectionBase,
+    field: z.enum(['title', 'subtitle', 'authorName', 'edition']),
+    value: z.string().max(500),
+  }).strict(),
+
+  /** HEADING DISPLAY — how one heading PRINTS, without touching the manuscript. */
+  z.object({
+    type: z.literal('headingDisplay'),
+    ...CorrectionBase,
+    anchor: BlockAnchor,
+    /** Replacement display text. Omit to keep the text and only strip marks. */
+    display: z.string().max(300).optional(),
+    /** Drop decorative marks (arrows, bullets) from the printed heading. */
+    stripDrawnMarks: z.boolean().optional(),
+  }).strict(),
+
+  /** RUNNING HEAD — the folio line for one section, without rewriting prose. */
+  z.object({
+    type: z.literal('runningHead'),
+    ...CorrectionBase,
+    /** Section slug, from `slugifySection`. */
+    section: z.string().min(1).max(128),
+    display: z.string().max(200),
+  }).strict(),
+
+  /** TOC DISPLAY — contents text that intentionally differs from the heading. */
+  z.object({
+    type: z.literal('tocDisplay'),
+    ...CorrectionBase,
+    section: z.string().min(1).max(128),
+    display: z.string().max(200),
+  }).strict(),
+
+  /**
+   * LAYOUT — spacing and page-breaking for one block.
+   *
+   * Compiles to exactly the same `LayoutOverride` the existing system uses.
+   * This is a second way to WRITE one, not a second way to APPLY one.
+   */
+  z.object({
+    type: z.literal('layout'),
+    ...CorrectionBase,
+    anchor: BlockAnchor,
+    override: LayoutOverrideSchema,
+  }).strict(),
+
+  /**
+   * ILLUSTRATION — a plate anchored to a BLOCK, never to a page number.
+   *
+   * Page-anchored stamping is the fragile path: it survives only until
+   * something upstream repaginates, and then it silently lands on the wrong
+   * page. A structural anchor moves with its content.
+   */
+  z.object({
+    type: z.literal('illustration'),
+    ...CorrectionBase,
+    anchor: BlockAnchor,
+    /** Asset name, resolved from the project illustration store. */
+    asset: z.string().min(1).max(200),
+    placement: z.enum(['after-block', 'chapter-end', 'section-start']).default('after-block'),
+    widthPercent: z.number().int().min(10).max(100).optional(),
+    side: z.enum(['recto', 'verso', 'any']).optional(),
+  }).strict(),
+
+  /**
+   * BLOCK PRESENTATION — a local presentation choice where the CONTENT is
+   * already right. Only approved variants, never free styling, and never a
+   * book name inside a renderer branch.
+   */
+  z.object({
+    type: z.literal('blockPresentation'),
+    ...CorrectionBase,
+    anchor: BlockAnchor,
+    variant: z.enum(['compact', 'roomy', 'closing-beat']),
+  }).strict(),
+]);
+
+export type Correction = z.infer<typeof CorrectionSchema>;
+export type CorrectionType = Correction['type'];
+
 export const ProjectStatusSchema = z.enum([
   'DRAFT',
   'MANUSCRIPT_UPLOADED',
@@ -1017,6 +1172,18 @@ export const ProjectConfigSchema = z.object({
    *     manuscript      -> frozen, always
    */
   layoutOverrides: z.record(z.string(), LayoutOverrideSchema).default({}),
+  /**
+   * BOOK-LOCAL CORRECTIONS. One ordered, versioned list per book.
+   *
+   * An array rather than a record because order is meaningful for text
+   * corrections on the same block, and because an id belongs IN the entry
+   * where it can be reported, not only in a key.
+   *
+   * A LAYOUT correction here and an entry in `layoutOverrides` above compile
+   * to the same thing. Both are supported: the record predates this list and
+   * ships in real books.
+   */
+  corrections: z.array(CorrectionSchema).default([]),
   /**
    * Illustrations, keyed by the stable block id they are anchored to. Same
    * reasoning as layoutOverrides above: never keyed by page.

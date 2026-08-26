@@ -37,18 +37,18 @@ to think.
 Sections divide a chapter without starting a new page. This one exists so the
 running-head logic has a heading it must NOT promote.
 
+This paragraph carries a deliberate defect for the correction layer to fix: the gate closes at 5 p.m.. and that doubled period is here on purpose.
+
 The things a bulleted list has to survive:
 
 - A short item.
-- An item long enough to wrap onto a second line, which is where most list
-  spacing bugs actually show themselves rather than on the short ones.
+- An item long enough to wrap in the measure, which is where list spacing bugs show themselves rather than on the short ones.
 - A third item, so the list has a middle as well as two ends.
 
 And the things a numbered list has to survive:
 
 1. Numbers that align.
-2. An item that wraps onto a second line so the hanging indent is exercised
-   rather than merely declared.
+2. An item long enough to wrap in the measure so the hanging indent is exercised rather than merely declared.
 3. A final item.
 
 > **Read This Before You Continue**
@@ -145,8 +145,6 @@ unset must draw it everywhere. Both behaviours are tested.
 Sources are their own section, not an appendix, and must not be numbered as a
 chapter.
 
-1. The Fixture Standards Board. *Nothing Real, Volume One.* Synthetic Press,
-   2026.
-2. The Fixture Standards Board. *Nothing Real, Volume Two.* Synthetic Press,
-   2026.
+1. The Fixture Standards Board. *Nothing Real, Volume One.* Synthetic Press, 2026.
+2. The Fixture Standards Board. *Nothing Real, Volume Two.* Synthetic Press, 2026.
 3. A third entry, so the list has a middle.
