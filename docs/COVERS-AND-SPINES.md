@@ -109,22 +109,26 @@ Hardcover trims: 5.5×8.5, 6×9, 6.14×9.21, 7×10, 8.25×11. Paperback offers s
 | Finding | Before | After |
 |---|---|---|
 | **Spine text floor** | 79, tested `>=` | **80** — KDP prints on "more than 79 pages". The old test admitted a 79-page book KDP would refuse. No shipped book affected; the thinnest is 116pp. |
-| **Groundwood** | assumed ≈0.00235 | **unsupported**, fails closed |
 | **Standard vs premium colour** | assumed one "colour" factor | **two separate factors**; collapsing them costs 0.057in on a 600-page book |
 | **Premium Color default** | `paperback-preview.ts` defaulted to 0.002347 for every book | **removed**; refuses without an explicit spine or thickness |
 | **Paperback barcode size** | applied as though published | labelled `HOUSE_POLICY`; KDP publishes it for hardcover only |
 | **Hardcover wrap** | `scripts/qa/cover-spec.ts` computed it from the trim, as though it were a paperback | **reads the calculator fixture**; the board is larger than the trim, and the old maths was short by 0.556in on the Seed Packet hardcover |
 | **Hardcover spine text** | reported ELIGIBLE unconditionally | **NOT PUBLISHED** — KDP states a page minimum for paperback only; asserting one invented a rule |
 | **Hardcover spine-safe** | inset by the 0.4in hinge, which clamps a 0.504in spine to zero width | the calculator's stated spine-safe box |
-| **Groundwood** | assumed unsupported, failed closed | resolved from two calculator readings at 0.00235 in/page, labelled as a fixture |
+| **Groundwood** | believed ≈0.00235 but unverified, so Phase 1B first made it fail closed | **0.00235 in/page**, from two Cover Calculator readings that agree exactly. Authority is `OFFICIAL_CALCULATOR_FIXTURE`: the old number was right, but it was a guess until it was read. |
 | **Cream page limit** | 828 | **776**. Published as "Black Ink & Cream Paper: 24 - 776". An 800-page cream book would have been accepted. |
 | **Hardcover page floor** | 75 | **76**. Two official sources disagree: GVBQ3CMEQW3W2VL6 publishes 75, the Cover Calculator refuses 75 and states 76. Verified by hand. We take the stricter number. |
 | **Spine-safe on the blueprint** | 0.709in typed by hand | 0.695in from the calculator. The old figure let spine type sit 0.007in per side closer to the fold than KDP allows. |
 | **Independent implementations** | 17 scripts with their own factors | **0**. A comment-stripped scan finds geometry constants only in the authority and its tests. |
 
-Every paperback factor the platform had been using was **confirmed correct**. The
-shipped spines and wraps did not move: 11 of 12 reference configurations are
-byte-identical, and the twelfth is the 79pp boundary above.
+Every paperback spine **multiplier** the platform had been using was confirmed
+correct against the published page. What was wrong sat around them: the cream
+page limit, the hardcover page floor, the spine-text minimum, and a 0.06in
+spine floor that overrode the formula outright.
+
+No shipped spine or wrap moved. The reference configurations are byte-identical
+apart from the two boundaries corrected on purpose: the 79pp spine-text case,
+and the 24pp case where the retired floor used to override the formula.
 
 ---
 
@@ -150,8 +154,9 @@ Every dimension prints with its arithmetic:
 ```
 
 Unsupported configurations exit 3 with `UNVERIFIED KDP CONFIGURATION` and what
-would resolve them. Verified: groundwood, hardcover without a fixture, and an
-unlisted trim all refuse.
+would resolve them. Verified: a hardcover page count with no calculator reading,
+and a trim Amazon does not list, both refuse. Groundwood no longer refuses; it
+resolves from the calculator readings above.
 
 ---
 ## Other duplications, confirmed

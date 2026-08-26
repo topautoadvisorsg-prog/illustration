@@ -20,7 +20,8 @@ import { parse as parseDotenv } from 'dotenv';
 import sharp from 'sharp';
 
 import { getKdpCoverDimensions } from '../src/pipeline/publishing-standard/kdp-cover-specs.js';
-import { computeCoverDimensions } from '../src/pipeline/publishing-standard/cover-dimensions.js';
+import { COVER_BLEED_IN } from '../src/pipeline/publishing-standard/cover-dimensions.js';
+import { resolvePaperbackSpine } from '../src/pipeline/publishing-standard/kdp-spec.js';
 
 const REPO_ROOT = nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.url)), '../../');
 
@@ -68,10 +69,19 @@ const HC = getKdpCoverDimensions({
   trimSize: '6x9',
   pageCount: 126,
 });
-const PB = computeCoverDimensions(
-  { trimSize: { widthIn: 6, heightIn: 9 }, paperStock: 'cream' } as never,
-  126,
-);
+// Only the spine comes from the authority; the wrap is the published arithmetic
+// around it. Written out rather than casting a partial ProjectConfig, so this
+// cannot silently drift if that type gains a field.
+const PB_SPINE_IN = resolvePaperbackSpine({
+  ink: 'BLACK_AND_WHITE',
+  paper: 'CREAM',
+  trim: '6x9',
+  pageCount: 126,
+}).spineIn;
+const PB = {
+  fullWidthIn: 6 * 2 + PB_SPINE_IN + COVER_BLEED_IN * 2,
+  fullHeightIn: 9 + COVER_BLEED_IN * 2,
+};
 console.log('\nEFFECTIVE PPI OF THE UPSCALED RASTER AT PRINTED SIZE');
 for (const [name, w, h] of [
   ['paperback wrap', PB.fullWidthIn, PB.fullHeightIn],

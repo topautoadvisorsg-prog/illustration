@@ -116,11 +116,16 @@ const contains = (r: Rect, inner: Rect): boolean =>
  * count Amazon will actually print. There is no minimum spine width in KDP's
  * specification, so there is none here.
  */
-function spineGateOk(spineIn: number, pageCount: number, paperStock: string): boolean {
+function spineGateOk(spineIn: number, pageCount: number, paperStock: 'white' | 'cream'): boolean {
   if (!(spineIn > 0)) return false;
   const paper = paperStock === 'cream' ? 'CREAM' : 'WHITE';
+  // BLACK_AND_WHITE is not an assumption. ProjectConfig models paperStock as
+  // white | cream only and carries no ink field, so a colour paperback cannot
+  // reach this function at all.
   const limit = pageCountLimit('PAPERBACK', 'BLACK_AND_WHITE', paper);
-  if (!limit) return true;
+  // Fail closed. An unrecognised combination is exactly the case we must not
+  // wave through, and this whole module exists to stop that.
+  if (!limit) return false;
   return pageCount >= limit.min && pageCount <= limit.max;
 }
 

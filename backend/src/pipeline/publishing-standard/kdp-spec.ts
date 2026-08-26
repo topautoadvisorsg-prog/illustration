@@ -9,14 +9,17 @@
  * The platform's worst habit was defaults that looked authoritative. So every
  * value declares what KIND of thing it is:
  *
- *   OFFICIAL_FORMULA       Amazon publishes the arithmetic. We can compute any
- *                          page count. Paperback spines are all of this kind.
- *   OFFICIAL_STATIC_RULE   Amazon publishes a fixed number — a bleed, a safe
+ *   OFFICIAL_FORMULA       Amazon publishes the arithmetic, so we can compute
+ *                          any page count. Every paperback spine factor except
+ *                          groundwood is of this kind.
+ *   OFFICIAL_STATIC_RULE   Amazon publishes a fixed number: a bleed, a safe
  *                          margin, a minimum page count for spine text.
  *   OFFICIAL_CALCULATOR_FIXTURE
+ *                          Amazon publishes NO formula, so the value must be
  *                          read from the Cover Calculator for one exact
- *                          configuration. Hardcover spines are all of this kind;
- *                          they live in `kdp-cover-specs.ts` as VERIFIED_SPECS.
+ *                          configuration. Every hardcover spine is of this
+ *                          kind, and so is groundwood. Hardcover readings live
+ *                          in `kdp-cover-specs.ts` as VERIFIED_SPECS.
  *   HOUSE_POLICY           Ours, not Amazon's. Labelled so nobody mistakes a
  *                          house rule for a print requirement.
  *   LEGACY_COMPATIBILITY   Historical behaviour kept only to reproduce an old
@@ -28,8 +31,9 @@
  * says so and names what would resolve it.
  *
  * ─── WHAT VERIFICATION CORRECTED ─────────────────────────────────────────────
- * Two things believed true going in were wrong, and both were caught by reading
- * the live page rather than trusting the brief:
+ * Five things believed true going in were wrong. Every one was caught by
+ * reading the live source rather than trusting the brief, and three of them
+ * would have produced a file KDP rejects:
  *
  *   GROUNDWOOD has NO published spine multiplier. Neither the cover page nor
  *   the groundwood help page states one; both defer to the Cover Calculator.
@@ -41,6 +45,21 @@
  *   listed separately with different multipliers — 0.002252 and 0.002347. A
  *   single "color" factor would have made every standard-colour spine 0.000095in
  *   per page too wide: 0.057in on a 600-page book.
+ *
+ *   CREAM DOES NOT SHARE WHITE'S PAGE LIMIT. White runs to 828, cream stops at
+ *   776. Both were recorded as 828, so an 800-page cream book would have been
+ *   accepted and refused at upload.
+ *
+ *   THE HARDCOVER PAGE FLOOR IS DISPUTED BY AMAZON ITSELF. GVBQ3CMEQW3W2VL6
+ *   publishes "75 - 550". The Cover Calculator refuses 75 and reports
+ *   "76 - 550". Verified by hand on 2026-08-26: 75 returns nothing, 76 returns
+ *   a full result. We take the stricter number, because a wrap the calculator
+ *   will not produce is a wrap nobody can check.
+ *
+ *   THERE IS NO MINIMUM SPINE WIDTH. The platform carried a 0.06in floor that
+ *   overrode the published formula between 24 and 26 pages on white paper, in
+ *   a range KDP prints. Amazon publishes no such minimum. It is gone from
+ *   canonical geometry and survives only as LEGACY_COMPATIBILITY.
  */
 
 export type KdpBinding = 'PAPERBACK' | 'HARDCOVER';
