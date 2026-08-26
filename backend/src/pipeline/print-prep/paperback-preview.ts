@@ -11,7 +11,15 @@ export interface PaperbackPreviewOpts {
   trimWidthIn?: number;
   trimHeightIn?: number;
   bleedIn?: number;
-  perPageIn?: number; // paper thickness; Premium Color ≈ 0.002347
+  /**
+   * Paper thickness, in/page. OPTIONAL and unusual — prefer `spineIn`.
+   *
+   * This used to DEFAULT to 0.002347, the Premium Color factor, regardless of
+   * what the book is actually printed on. A caller who omitted it silently
+   * priced a colour book's paper into a black-ink spine: 0.000095in per page
+   * too wide, 0.038in on a 400-page book. There is no default now.
+   */
+  perPageIn?: number;
   /**
    * Spine width, when the caller already has it.
    *
@@ -30,10 +38,23 @@ export async function composePaperbackGuidePreview(coverArtPng: Buffer, o: Paper
   const TRIM_W = o.trimWidthIn ?? 7;
   const TRIM_H = o.trimHeightIn ?? 10;
   const BLEED = o.bleedIn ?? 0.125;
-  const PER_PAGE = o.perPageIn ?? 0.002347; // Premium Color
   const SAFE = 0.25;
   const pages = o.pageCount % 2 === 0 ? o.pageCount : o.pageCount + 1; // KDP needs even
-  const spine = o.spineIn ?? +(pages * PER_PAGE).toFixed(3);
+  /**
+   * The guide must use the same spine the print file was built from. With
+   * neither a spine nor an explicit thickness there is nothing honest to draw,
+   * so this refuses rather than inventing one from a default factor. A guide
+   * that disagrees with the print file is worse than no guide — it is the
+   * picture the operator uses to decide whether the type is safe.
+   */
+  if (o.spineIn === undefined && o.perPageIn === undefined) {
+    throw new Error(
+      'composePaperbackGuidePreview: pass spineIn (preferred) or perPageIn. There is no ' +
+        'default paper thickness. The previous default was the Premium Color factor and it ' +
+        'was applied to black-ink books, drawing a guide that disagreed with the print file.',
+    );
+  }
+  const spine = o.spineIn ?? +(pages * o.perPageIn!).toFixed(3);
   const fullW = TRIM_W * 2 + spine + BLEED * 2;
   const fullH = TRIM_H + BLEED * 2;
   const dpi = o.dpi ?? 110;

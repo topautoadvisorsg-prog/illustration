@@ -11,10 +11,20 @@
  * every shipped paperback spine was actually cut to. The 7 NATIONAL PARKS row
  * matches the wrap that went to print — 0.270240in spine, 12.520240 x 9.250000in.
  *
- * They are NOT verified against KDP. Every measured reading in
- * kdp-cover-specs.ts is HARDCOVER; there is not one verified paperback reading
- * in this repository. Phase 1B reconciles the thicknesses against the current
- * official specification.
+ * ─── PHASE 1B RECONCILIATION, 2026-08-26 ───────────────────────────────────
+ * Checked against Amazon's live documentation. Every spine and wrap figure below
+ * was CONFIRMED correct — the paperback factors the platform has always used are
+ * the published ones:
+ *
+ *   B&W white  0.002252 in/page     B&W cream  0.0025 in/page
+ *   Source: G201953020 — Create a Paperback Cover, read 2026-08-26
+ *
+ * ONE value was corrected, and it is the only line in this file that moved:
+ * KDP prints spine text on books with MORE THAN 79 pages. The platform declared
+ * 79 and tested `>=`, admitting a 79-page book KDP would refuse. The 79pp row now
+ * expects false and an 80pp row was added beside it.
+ *
+ * No shipped book is affected — the thinnest is 116 pages.
  *
  * So a failure here means one of two very different things, and the message must
  * say which:
@@ -53,8 +63,9 @@ const GOLDEN: Golden[] = [
   {"label":"SEED PACKET — 6x9 cream 126pp","pageCount":126,"trim":"6x9","paperStock":"cream","spineIn":0.315,"fullWidthIn":12.565,"fullHeightIn":9.25,"spineTextAllowed":true},
   {"label":"WILDLANDS — 7x10 white 269pp","pageCount":269,"trim":"7x10","paperStock":"white","spineIn":0.605788,"fullWidthIn":14.855788,"fullHeightIn":10.25,"spineTextAllowed":true},
   {"label":"WILDLANDS — 7x10 white 275pp","pageCount":275,"trim":"7x10","paperStock":"white","spineIn":0.6193,"fullWidthIn":14.8693,"fullHeightIn":10.25,"spineTextAllowed":true},
-  {"label":"boundary — spine-text minimum, 79pp","pageCount":79,"trim":"6x9","paperStock":"white","spineIn":0.177908,"fullWidthIn":12.427908,"fullHeightIn":9.25,"spineTextAllowed":true},
-  {"label":"boundary — one page under, 78pp","pageCount":78,"trim":"6x9","paperStock":"white","spineIn":0.175656,"fullWidthIn":12.425656,"fullHeightIn":9.25,"spineTextAllowed":false},
+  {"label":"boundary — 79pp, NOT eligible: KDP prints spine text on MORE THAN 79 pages","pageCount":79,"trim":"6x9","paperStock":"white","spineIn":0.177908,"fullWidthIn":12.427908,"fullHeightIn":9.25,"spineTextAllowed":false},
+    {"label":"boundary — 80pp, the first eligible count","pageCount":80,"trim":"6x9","paperStock":"white","spineIn":0.18016,"fullWidthIn":12.43016,"fullHeightIn":9.25,"spineTextAllowed":true},
+  {"label":"boundary — 78pp, well under the spine-text floor","pageCount":78,"trim":"6x9","paperStock":"white","spineIn":0.175656,"fullWidthIn":12.425656,"fullHeightIn":9.25,"spineTextAllowed":false},
   {"label":"boundary — thin block hits the 0.06in floor","pageCount":10,"trim":"6x9","paperStock":"white","spineIn":0.06,"fullWidthIn":12.31,"fullHeightIn":9.25,"spineTextAllowed":false},
 ];
 

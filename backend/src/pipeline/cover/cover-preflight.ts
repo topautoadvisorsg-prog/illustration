@@ -15,6 +15,7 @@
  * should look at and may legitimately accept. The split matters, because a gate
  * that blocks on taste gets routed around, and then it is not a gate.
  */
+import { PAGE_THICKNESS_IN } from '../publishing-standard/cover-dimensions.js';
 import type { ProjectConfig } from '@wildlands/shared';
 import { getKdpCoverDimensions, type KdpCoverConfig } from '../publishing-standard/kdp-cover-specs.js';
 import { AVG_COST_PER_IMAGE_USD } from '../../services/cost/estimate.js';
@@ -135,7 +136,7 @@ export function runCoverPreflight(input: {
     'Paper stock',
     config.paperStock ? 'PASS' : 'ERROR',
     config.paperStock
-      ? `${config.paperStock} (${config.paperStock === 'cream' ? '0.0025' : '0.002252'} in per page)`
+      ? `${config.paperStock} (${PAGE_THICKNESS_IN[config.paperStock]} in per page, published KDP factor)`
       : 'No paper stock set. White and cream give different spine widths; guessing prints a misaligned wrap.',
   );
 
