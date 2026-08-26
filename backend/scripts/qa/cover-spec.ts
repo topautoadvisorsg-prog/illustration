@@ -37,6 +37,7 @@ import {
   type KdpPaper,
 } from '../../src/pipeline/publishing-standard/kdp-spec.js';
 import { getKdpCoverDimensions } from '../../src/pipeline/publishing-standard/kdp-cover-specs.js';
+import type { KdpCoverDimensions } from '../../src/pipeline/publishing-standard/kdp-cover-specs.js';
 
 const arg = (name: string): string | undefined => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -118,6 +119,8 @@ let spineSource: string;
 let bleedIn: number;
 let safeInsetIn: number;
 let hingeIn: number | null = null;
+/** Hardcover only: the calculator reading for this exact configuration. */
+let hc: KdpCoverDimensions | null = null;
 
 try {
   if (BINDING === 'PAPERBACK') {
@@ -144,36 +147,71 @@ try {
         : `${spineIn}in — interpolated between verified calculator readings`;
     spineAuthority = 'calculator-fixture';
     spineSource = dims.note;
-    bleedIn = HARDCOVER_RULES.caseWrapIn.value;
+    hc = dims;
+    // The calculator reports the wrap and hinge for this exact configuration.
+    // HARDCOVER_RULES.caseWrapIn (0.51in, "past the front cover edge") measures
+    // something else and disagrees with it; the reading wins for geometry.
+    bleedIn = dims.wrapIn;
     safeInsetIn = HARDCOVER_RULES.safeFromEdgeIn.value;
-    hingeIn = HARDCOVER_RULES.hingeIn.value;
+    hingeIn = dims.hingeIn;
   }
 } catch (e) {
   if (e instanceof UnverifiedKdpConfigurationError) die(e.message, 3);
   die(`UNVERIFIED KDP CONFIGURATION — official calculator/template required\n\n${(e as Error).message}`, 3);
 }
 
-const fullWidthIn = trimW * 2 + spineIn + bleedIn * 2;
-const fullHeightIn = trimH + bleedIn * 2;
+// A paperback wrap is built from the trim: the cover is the same size as the
+// page. A hardcover is NOT — the case board is larger than the trim on every
+// edge, so its panel size, wrap and spine-safe area are read from the
+// calculator fixture rather than recomputed. Deriving a hardcover wrap from the
+// trim understates it by more than half an inch, and KDP rejects the file.
+const panelW = hc ? hc.frontWidthIn : trimW;
+const panelH = hc ? hc.frontHeightIn : trimH;
+const fullWidthIn = hc ? hc.fullWidthIn : trimW * 2 + spineIn + bleedIn * 2;
+const fullHeightIn = hc ? hc.fullHeightIn : trimH + bleedIn * 2;
 const backX = bleedIn;
-const spineX = bleedIn + trimW;
-const frontX = bleedIn + trimW + spineIn;
+const spineX = bleedIn + panelW;
+const frontX = bleedIn + panelW + spineIn;
 
-const backPanel = rect(backX, bleedIn, trimW, trimH);
+const wrapExplanation = hc
+  ? `width  = ${hc.wrapIn} + ${panelW} + ${r3(spineIn)} + ${panelW} + ${hc.wrapIn} = ${r3(fullWidthIn)}in\n` +
+    `height = ${hc.wrapIn} + ${panelH} + ${hc.wrapIn} = ${r3(fullHeightIn)}in\n` +
+    `board  = ${panelW} x ${panelH}in — LARGER than the ${trimW} x ${trimH}in trim\n` +
+    `every figure read from the KDP Cover Calculator, none computed`
+  : `width  = ${bleedIn} + ${trimW} + ${r3(spineIn)} + ${trimW} + ${bleedIn} = ${r3(fullWidthIn)}in\n` +
+    `height = ${bleedIn} + ${trimH} + ${bleedIn} = ${r3(fullHeightIn)}in`;
+
+const backPanel = rect(backX, bleedIn, panelW, panelH);
 const spinePanel = rect(spineX, 0, spineIn, fullHeightIn);
-const frontPanel = rect(frontX, bleedIn, trimW, trimH);
+const frontPanel = rect(frontX, bleedIn, panelW, panelH);
 const safe = (p: Rect): Rect =>
   rect(p.xIn + safeInsetIn, p.yIn + safeInsetIn, p.widthIn - safeInsetIn * 2, p.heightIn - safeInsetIn * 2);
 
-const foldVariance = BINDING === 'PAPERBACK' ? PAPERBACK_RULES.foldVarianceIn.value : HARDCOVER_RULES.hingeIn.value;
-const spineSafe = rect(spineX + foldVariance, 0, Math.max(0, spineIn - foldVariance * 2), fullHeightIn);
-const spineTextEligible = BINDING === 'PAPERBACK' ? pageCount >= PAPERBACK_RULES.spineTextMinPages.value : true;
+// Paperback: the spine-safe area is the spine less the fold variance each side.
+// Hardcover: the calculator states it outright, centred on the wrap.
+const foldVariance = hc ? r3((spineIn - hc.spineSafeWidthIn) / 2) : PAPERBACK_RULES.foldVarianceIn.value;
+const spineSafe = hc
+  ? rect(
+      spineX + (spineIn - hc.spineSafeWidthIn) / 2,
+      (fullHeightIn - hc.spineSafeHeightIn) / 2,
+      hc.spineSafeWidthIn,
+      hc.spineSafeHeightIn,
+    )
+  : rect(spineX + foldVariance, 0, Math.max(0, spineIn - foldVariance * 2), fullHeightIn);
+
+// KDP publishes a spine-text page minimum for paperback only. Asserting one for
+// hardcover would be inventing a rule, so hardcover reports as not published.
+const spineTextEligible: boolean | null =
+  BINDING === 'PAPERBACK' ? pageCount >= PAPERBACK_RULES.spineTextMinPages.value : null;
 
 /** Barcode reserve: bottom-right of the BACK cover, which is the spine side when viewed. */
 const bc = BINDING === 'PAPERBACK' ? PAPERBACK_RULES.barcodeReserve.value : HARDCOVER_RULES.barcode.value;
 const bcFromBottom = BINDING === 'HARDCOVER' ? HARDCOVER_RULES.barcode.value.fromBottomIn : 0.25;
 const barcodeSafe = rect(
-  backPanel.xIn + backPanel.widthIn - 0.25 - bc.widthIn,
+  backPanel.xIn +
+    backPanel.widthIn -
+    (BINDING === 'HARDCOVER' ? HARDCOVER_RULES.barcode.value.fromSpineHingeIn : 0.25) -
+    bc.widthIn,
   backPanel.yIn + backPanel.heightIn - bcFromBottom - bc.heightIn,
   bc.widthIn,
   bc.heightIn,
@@ -188,6 +226,7 @@ const result = {
   ink: INK,
   paper: PAPER,
   trim: { widthIn: trimW, heightIn: trimH },
+  panel: { widthIn: r3(panelW), heightIn: r3(panelH), largerThanTrim: hc !== null },
   bleedIn: r3(bleedIn),
   spine: { widthIn: r3(spineIn), authority: spineAuthority, source: spineSource, explanation: spineExplanation },
   wrap: {
@@ -196,9 +235,7 @@ const result = {
     widthPx: Math.round(fullWidthIn * 300),
     heightPx: Math.round(fullHeightIn * 300),
     dpi: 300,
-    explanation:
-      `width  = ${bleedIn} + ${trimW} + ${r3(spineIn)} + ${trimW} + ${bleedIn} = ${r3(fullWidthIn)}in\n` +
-      `height = ${bleedIn} + ${trimH} + ${bleedIn} = ${r3(fullHeightIn)}in`,
+    explanation: wrapExplanation,
   },
   panels: { back: backPanel, spine: spinePanel, front: frontPanel },
   safeZones: { back: safe(backPanel), front: safe(frontPanel), spine: spineSafe, insetIn: safeInsetIn },
@@ -209,9 +246,11 @@ const result = {
     minPages: BINDING === 'PAPERBACK' ? PAPERBACK_RULES.spineTextMinPages.value : null,
     clearancePerSideIn: BINDING === 'PAPERBACK' ? PAPERBACK_RULES.spineTextSafeIn.value : null,
     note:
-      BINDING === 'PAPERBACK' && !spineTextEligible
-        ? `KDP prints spine text only on books with more than 79 pages; this is ${pageCount}.`
-        : undefined,
+      spineTextEligible === null
+        ? 'KDP publishes no spine-text page minimum for hardcover. Confirm in the Cover Calculator before setting spine type.'
+        : !spineTextEligible
+          ? `KDP prints spine text only on books with more than 79 pages; this is ${pageCount}.`
+          : undefined,
   },
   barcodeSafe,
   pageCountLimit: limit ? { min: limit.min, max: limit.max, source: limit.source.topic } : null,
@@ -233,8 +272,8 @@ if (PROOF) {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">` +
     `<rect width="${W}" height="${H}" fill="#e9ebed"/>` +
-    `<rect x="${px(backPanel.xIn)}" y="${px(backPanel.yIn)}" width="${px(trimW)}" height="${px(trimH)}" fill="#ffffff"/>` +
-    `<rect x="${px(frontPanel.xIn)}" y="${px(frontPanel.yIn)}" width="${px(trimW)}" height="${px(trimH)}" fill="#ffffff"/>` +
+    `<rect x="${px(backPanel.xIn)}" y="${px(backPanel.yIn)}" width="${px(panelW)}" height="${px(panelH)}" fill="#ffffff"/>` +
+    `<rect x="${px(frontPanel.xIn)}" y="${px(frontPanel.yIn)}" width="${px(panelW)}" height="${px(panelH)}" fill="#ffffff"/>` +
     `<rect x="${px(spineX)}" y="0" width="${px(spineIn)}" height="${H}" fill="#dfe4e8"/>` +
     box(backPanel, '#00a0c8', '10 6', 'BACK trim') +
     box(frontPanel, '#00a0c8', '10 6', 'FRONT trim') +
@@ -281,7 +320,16 @@ if (AS_JSON) {
   if (hingeIn !== null) console.log(L('hinge', `${hingeIn}in from the spine on each cover`));
   console.log(L('barcode reserve', rc(barcodeSafe)));
   console.log('');
-  console.log(L('spine text', spineTextEligible ? 'ELIGIBLE' : `NOT ELIGIBLE — ${result.spineText.note}`));
+  console.log(
+    L(
+      'spine text',
+      spineTextEligible === null
+        ? `NOT PUBLISHED — ${result.spineText.note}`
+        : spineTextEligible
+          ? 'ELIGIBLE'
+          : `NOT ELIGIBLE — ${result.spineText.note}`,
+    ),
+  );
   console.log(L('minimum DPI', String(result.minDpi)));
   if (PROOF) console.log(L('proof', PROOF));
   console.log('');
