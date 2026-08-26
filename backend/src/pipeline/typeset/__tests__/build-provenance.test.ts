@@ -139,7 +139,7 @@ describe('layout heuristics cannot leak between books', () => {
       const measureIn = std.trim.widthIn - std.margins.gutterIn - std.margins.outsideIn;
       // ~2.6 characters per em is conservative for the serif faces in use; the
       // point is only to catch a threshold no line on this trim could ever hit.
-      const plausibleMaxChars = (measureIn * 72) / std.type.bodySizePt * 2.9;
+      const plausibleMaxChars = (measureIn * 72) / std.type.bodyPt * 2.9;
       expect(bind, `${id}: threshold ${bind} exceeds what a ${measureIn.toFixed(3)}in measure can set`).toBeLessThanOrEqual(
         plausibleMaxChars,
       );
