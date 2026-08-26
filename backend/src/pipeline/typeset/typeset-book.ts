@@ -34,6 +34,7 @@ import type {
   TypesetTableStyles,
   TypesetLayoutStandard,
   HeadingBindPolicy,
+  HeadingDrawnMarks,
 } from './layout-standards/types.js';
 
 // ── Geometry ────────────────────────────────────────────────────────────────
@@ -232,12 +233,29 @@ function inlineMarkdown(s: string, longTokens?: LongTokenWrappingPolicy): string
  */
 const DRAWN_MARKS = /[\u2192\u27F6\u{1F6A9}]|\u26A0\uFE0F?/gu;
 
-export function inlineHeadingHtml(s: string): string {
-  return inlineMarkdown(stripDrawnMarks(s));
+/**
+ * THE DISPLAY HEADING, and the one decision a book is allowed to make about it.
+ *
+ * The running head and the contents entry ALWAYS drop drawn marks — see
+ * `plainHeadingText` and the reasoning there. The display heading is the one
+ * place where either answer is defensible, so the pinned standard chooses:
+ *
+ *   'draw'  (default)  the mark is set, drawn as an SVG glyph. Every book
+ *                      rendered before this policy existed did this, and a
+ *                      standard that omits the field keeps that exactly.
+ *   'strip'            the mark comes off, so display, running head and contents
+ *                      all say the same thing about the same title.
+ *
+ * The default is `draw` deliberately: an approved book must not change because
+ * a different book needed the opposite.
+ */
+export function inlineHeadingHtml(s: string, drawnMarks: HeadingDrawnMarks = 'draw'): string {
+  return inlineMarkdown(drawnMarks === 'strip' ? stripDrawnMarks(s) : s);
 }
 
 /**
- * Drawn marks come OFF a heading, everywhere a heading is set.
+ * Drawn marks off a heading. Used by `plainHeadingText` always, and by the
+ * display heading only when the standard asks for it.
  *
  * A mark like an arrow or a warning triangle is emphasis inside a sentence,
  * where it sits in the run of text and points at the words beside it. A heading
@@ -245,15 +263,16 @@ export function inlineHeadingHtml(s: string): string {
  * arrow hangs outside the left edge of the text column, throws the optical
  * centring off, and is the only glyph of its kind at that size in the book.
  *
+ * That is an argument about ONE BOOK'S typography, not about the renderer, which
+ * is why the display path is a policy on the standard rather than a rule here.
  * 7 NATIONAL PARKS heads its appendix with an arrow before "ALL FIGURES IN THIS
- * APPENDIX ARE CURRENT AS OF: August 2026". That mark was already dropped from
- * the running head and from the contents entry, for the same reason in each
- * case; leaving it on the display heading alone made the three disagree about
- * the same title.
+ * APPENDIX ARE CURRENT AS OF: August 2026"; that mark was already dropped from
+ * its running head and its contents entry, so its standard sets `strip` and the
+ * three agree. No other book changes.
  *
- * SAME LIST AS `plainHeadingText`, deliberately shared, so display, running head
- * and contents cannot drift apart again. Body text is untouched: an arrow inside
- * a paragraph is a real cross-reference and still draws.
+ * SAME LIST AS `plainHeadingText`, deliberately shared, so the paths cannot
+ * drift apart. Body text is untouched: an arrow inside a paragraph is a real
+ * cross-reference and still draws.
  */
 export function stripDrawnMarks(s: string): string {
   return s
@@ -1401,7 +1420,7 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
       const slug = slugifySection(s.title);
       const opener = stampBlockIds(
         [
-          `<header class="opener">${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}<h2>${inlineHeadingHtml(op.titleSource === 'source' ? s.sourceTitle : s.title)}</h2></header>`,
+          `<header class="opener">${label ? `<p class="kicker">${escapeHtml(label)}</p>` : ''}<h2>${inlineHeadingHtml(op.titleSource === 'source' ? s.sourceTitle : s.title, standard.headingDrawnMarks)}</h2></header>`,
         ],
         slug,
         s.title,

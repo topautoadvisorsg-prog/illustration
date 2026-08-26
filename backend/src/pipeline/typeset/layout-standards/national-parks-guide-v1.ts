@@ -57,6 +57,21 @@ export const NATIONAL_PARKS_GUIDE_TYPESET_V1: TypesetLayoutStandard = {
    */
   opener: { ...TRADE_NONFICTION_GUIDE_TYPESET_V1.opener },
 
+  /**
+   * This book heads its appendix `⟶ ALL FIGURES IN THIS APPENDIX ARE CURRENT AS
+   * OF: August 2026`. The running head and the contents entry already drop that
+   * arrow — a CSS string cannot carry an SVG, and the transliterated `->` printed
+   * along the top of pages 113 and 115 of the proof, where it read as a mistake.
+   *
+   * Leaving it on the display heading alone made the three disagree about the
+   * same title, and at display size a leading arrow hangs outside the left edge
+   * of the measure and throws the optical centring off.
+   *
+   * Set HERE rather than in the renderer: this is one book's typography, not a
+   * platform rule. Every other standard omits the field and keeps `draw`.
+   */
+  headingDrawnMarks: 'strip',
+
   blocks: {
     ...TRADE_NONFICTION_GUIDE_TYPESET_V1.blocks,
     /**

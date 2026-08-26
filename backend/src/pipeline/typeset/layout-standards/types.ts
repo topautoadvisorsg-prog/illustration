@@ -515,6 +515,20 @@ export interface TypesetBlockStyles {
  * that does not set it keeps the older behaviour exactly, which is what every
  * book frozen before this existed was built with.
  */
+/**
+ * What the DISPLAY heading does with a drawn mark — an arrow, a flag, a warning
+ * triangle.
+ *
+ * The running head and the contents entry always drop them; a CSS string cannot
+ * carry an SVG, and a transliterated "->" printed in a margin reads as a mistake.
+ * The display heading is the one place where either answer is defensible, so it
+ * belongs to the standard rather than to the renderer.
+ *
+ * ABSENT MEANS 'draw', which is what every book frozen before this existed was
+ * built with. An approved standard is never edited to change it — a new version is.
+ */
+export type HeadingDrawnMarks = 'draw' | 'strip';
+
 export interface HeadingBindPolicy {
   /**
    * Bind a SECOND paragraph when the first is no longer than this many
@@ -561,6 +575,10 @@ export interface TypesetLayoutStandard {
    * is never edited to add it — a new version is.
    */
   headingBind?: HeadingBindPolicy;
+  /**
+   * OPTIONAL. Absent means 'draw'. See HeadingDrawnMarks.
+   */
+  headingDrawnMarks?: HeadingDrawnMarks;
   furniture: TypesetPageFurniture;
   blocks: TypesetBlockStyles;
   terminalMicroSection: TerminalMicroSectionPolicy;

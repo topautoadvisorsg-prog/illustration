@@ -110,7 +110,12 @@ describe('section titles render inline emphasis', () => {
   it('draws an arrow the vendored faces do not carry, rather than printing tofu', () => {
     // U+27F6, the long form. U+2192 was already drawn; the long one was not, and
     // a character the face cannot set prints as an empty box.
-    const html = render(BANNER);
+    //
+    // Rendered with a standard that KEEPS drawn marks on the display heading —
+    // the default, and what every book did before `headingDrawnMarks` existed.
+    // National Parks now sets `strip`, so it is no longer the fixture for this
+    // particular rule. See the `headingDrawnMarks` block below.
+    const html = render(BANNER, EDUCATIONAL_NONFICTION_TYPESET_V1);
     expect(html).toContain('class="gl gl-arrow"');
     expect(html).not.toContain('⟶ ALL FIGURES');
   });
@@ -151,5 +156,74 @@ describe('the running head gets plain text, never markup', () => {
     expect(plainHeadingText('⟶ Onward')).toBe('Onward');
     expect(plainHeadingText('🚩 Flagged')).toBe('Flagged');
     expect(plainHeadingText('Plain title')).toBe('Plain title');
+  });
+});
+
+/**
+ * `headingDrawnMarks` — the one thing a standard may decide about a display
+ * heading, and the reason it is a standard field rather than a renderer rule.
+ *
+ * The running head and the contents entry ALWAYS drop drawn marks; a CSS string
+ * cannot hold an SVG. The display heading is the one place where either answer
+ * is defensible:
+ *
+ *   7 NATIONAL PARKS wants the arrow off, so its display heading agrees with the
+ *   running head and the contents about the same title.
+ *   Every other book wants it on, and must not change because of that.
+ *
+ * These assert the POLICY, not the sentence. A book that never sets the field
+ * behaves exactly as it did before the field existed.
+ */
+describe('headingDrawnMarks — per-standard, defaulting to draw', () => {
+  it('a standard that does not set it keeps drawing the mark', () => {
+    expect(EDUCATIONAL_NONFICTION_TYPESET_V1.headingDrawnMarks).toBeUndefined();
+    const html = render(BANNER, EDUCATIONAL_NONFICTION_TYPESET_V1);
+    expect(html).toContain('class="gl gl-arrow"');
+  });
+
+  it('National Parks strips the mark from the display heading', () => {
+    expect(NATIONAL_PARKS_GUIDE_TYPESET_V1.headingDrawnMarks).toBe('strip');
+    const html = render(BANNER, NATIONAL_PARKS_GUIDE_TYPESET_V1);
+    expect(html).not.toContain('class="gl gl-arrow"');
+    // The words survive; only the mark goes.
+    expect(html).toContain('ALL FIGURES ARE CURRENT AS OF:');
+  });
+
+  it('the two standards disagree only about the mark', () => {
+    const drawn = render(BANNER, EDUCATIONAL_NONFICTION_TYPESET_V1);
+    const stripped = render(BANNER, NATIONAL_PARKS_GUIDE_TYPESET_V1);
+    // 'BACK MATTER' is deliberately absent: the parser consumes it as the
+    // divider that switches following sections to kind 'back'. It is never a
+    // rendered heading, so it is not a witness for anything here.
+    for (const heading of ['A Chapter', 'Another Chapter', 'ALL FIGURES ARE CURRENT AS OF:']) {
+      expect(drawn).toContain(heading);
+      expect(stripped).toContain(heading);
+    }
+    // Emphasis in a heading is untouched by the policy, under both standards.
+    expect(drawn).toContain('<strong>August 2026</strong>');
+    expect(stripped).toContain('<strong>August 2026</strong>');
+  });
+
+  it('leaves body text alone — an arrow in a paragraph is a cross-reference', () => {
+    // The policy is about DISPLAY HEADINGS only. A mark inside a sentence points
+    // at the words beside it and still draws under either standard.
+    //
+    // Uses the BANNER shape on purpose: a lone chapter with no second chapter and
+    // no back-matter divider parses to zero sections, so a smaller fixture would
+    // assert nothing while appearing to pass.
+    const withArrow = BANNER.replace('Appendix body.', 'See the table ⟶ page 40.');
+    for (const standard of [EDUCATIONAL_NONFICTION_TYPESET_V1, NATIONAL_PARKS_GUIDE_TYPESET_V1]) {
+      const html = render(withArrow, standard);
+      expect(html).toContain('See the table');
+      expect(html).toContain('page 40.');
+    }
+  });
+
+  it('the running head and contents drop the mark regardless of the policy', () => {
+    for (const standard of [EDUCATIONAL_NONFICTION_TYPESET_V1, NATIONAL_PARKS_GUIDE_TYPESET_V1]) {
+      const html = render(BANNER, standard);
+      expect(html).toMatch(/data-title="[^"]*ALL FIGURES ARE CURRENT AS OF: August 2026"/);
+      expect(html).not.toMatch(/data-title="[^"]*⟶/);
+    }
   });
 });
