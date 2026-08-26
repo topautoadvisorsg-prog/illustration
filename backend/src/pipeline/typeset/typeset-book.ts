@@ -33,6 +33,7 @@ import type {
   TypesetPreformattedStyles,
   TypesetTableStyles,
   TypesetLayoutStandard,
+  HeadingBindPolicy,
 } from './layout-standards/types.js';
 
 // ── Geometry ────────────────────────────────────────────────────────────────
@@ -699,6 +700,8 @@ interface BodyHtmlOptions {
   longTokens?: LongTokenWrappingPolicy;
   /** Table styling. Absent means pipe rows are not read as tables at all. */
   tables?: TypesetTableStyles;
+  /** From the pinned standard. Absent binds one paragraph, as books shipped before it existed. */
+  headingBind?: HeadingBindPolicy;
   /** Fenced-block styling. Absent means fences are not recognised. */
   preformatted?: TypesetPreformattedStyles;
   /** Checklist styling. Absent means task items stay ordinary bullets. */
@@ -1096,14 +1099,26 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
    */
   const keepHeadingsWithText = (blocks: string[]): string[] => {
     const out: string[] = [];
+    const isPara = (b: string | undefined): boolean =>
+      Boolean(b && /^<p[ >]/.test(b) && !b.includes('scene-break'));
+    /**
+     * Absent policy binds ONE paragraph, which is the behaviour every book
+     * frozen before `headingBind` existed was built with. The threshold is never
+     * defaulted to a number here: a character count is a property of the measure,
+     * so a shared default would be one book's calibration silently applied to
+     * every other. See HeadingBindPolicy.
+     */
+    const bindUnder = opts.headingBind?.extraParagraphUnderChars;
+    const textLen = (b: string): number => b.replace(/<[^>]+>/g, '').trim().length;
     for (let i = 0; i < blocks.length; i++) {
       const cur = blocks[i]!;
       const next = blocks[i + 1];
       const isHeading = /^<h[34][ >]/.test(cur);
-      const nextIsPara = Boolean(next && /^<p[ >]/.test(next) && !next.includes('scene-break'));
-      if (isHeading && nextIsPara) {
-        out.push(`<div class="keep-with-next">${cur}${next}</div>`);
-        i++;
+      if (isHeading && isPara(next)) {
+        const after = blocks[i + 2];
+        const bindTwo = bindUnder !== undefined && textLen(next!) <= bindUnder && isPara(after);
+        out.push(`<div class="keep-with-next">${cur}${next}${bindTwo ? after : ''}</div>`);
+        i += bindTwo ? 2 : 1;
         continue;
       }
       out.push(cur);
@@ -1365,6 +1380,8 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
       return `<section class="tsec ${s.kind}${i === firstChapterIndex ? ' first-chapter' : ''}" id="tsec-${i}" data-title="${escapeHtml(plainHeadingText(s.title))}" data-label="${escapeHtml(label)}" data-kind="${s.kind}" data-section-slug="${slug}">
   ${opener}
   ${bodyToHtml(s.bodyLines, {
+    /** From the PINNED standard, never a shared constant. See HeadingBindPolicy. */
+    headingBind: standard.headingBind,
     micro: standard.terminalMicroSection,
     takeaway: standard.chapterTakeaway,
     alert: standard.alertPanel,

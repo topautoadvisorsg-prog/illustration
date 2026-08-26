@@ -555,6 +555,70 @@ export const PlanMetaSchema = z.object({
 });
 export type PlanMeta = z.infer<typeof PlanMetaSchema>;
 
+/**
+ * WHAT ACTUALLY BUILT A FROZEN BOOK.
+ *
+ * A pinned layout standard protects the DESIGN. It does not protect the ENGINE
+ * that reads it, and that gap cost NO ONE TOLD ME THAT its rev24 reproducibility:
+ * work committed for a different book moved two illustrations off the page and
+ * added a line to the copyright page of a book that had been frozen for five
+ * days. Nothing in the freeze record could even detect it, because the record
+ * named the standard and the manuscript and said nothing about the code.
+ *
+ * `engineFingerprint` is the load-bearing field, NOT `gitCommit`. It is a hash of
+ * the renderer sources actually read at build time, so it is meaningful even when
+ * the tree is dirty, when a file is untracked, or when — as happened here — the
+ * layout standard a book was pinned to existed only as an uncommitted file and
+ * was swept into an unrelated commit two days later. A commit id alone would have
+ * recorded a tree that never built this book.
+ *
+ * `configSnapshot` exists for the same reason. Project config is mutable and zod
+ * `.default()` writes defaulted keys back on parse, so a schema change made for
+ * one book silently stamped a new field into this frozen book's stored
+ * illustrations. A freeze that points at live config does not describe what was
+ * frozen; it describes today.
+ */
+export const BuildProvenanceSchema = z.object({
+  /** Hash of the renderer sources actually read for this build. Authoritative. */
+  engineFingerprint: z.string().min(16),
+  /** Which files went into that hash, so the fingerprint is auditable, not magic. */
+  engineFiles: z.array(z.object({ path: z.string().min(1), sha256: z.string().min(1) })).min(1),
+  /** Context, not identity: useful for a human, insufficient on its own. */
+  gitCommit: z.string().min(7).optional(),
+  gitBranch: z.string().optional(),
+  /** True when renderer sources differed from the commit. A clean build is reproducible; a dirty one is a snapshot. */
+  engineDirty: z.boolean(),
+  dirtyFiles: z.array(z.string()).default([]),
+  /** Set only when a dirty build was permitted on purpose. */
+  dirtyOverrideReason: z.string().optional(),
+  layoutStandardId: z.string().min(1),
+  productionProfileId: z.string().optional(),
+  manuscriptSha256: z.string().min(1),
+  canonicalManuscriptSha256: z.string().min(1).optional(),
+  /** sha256 of the canonical JSON of the config used, plus the config itself. */
+  configSnapshotSha256: z.string().min(1),
+  configSnapshot: z.unknown().optional(),
+  /** Every illustration as it was placed: art bytes and rectangle, not just a count. */
+  illustrations: z
+    .array(
+      z.object({
+        blockId: z.string().min(1),
+        assetSha256: z.string().min(1).optional(),
+        page: z.number().int().positive().optional(),
+        xIn: z.number().optional(),
+        yIn: z.number().optional(),
+        widthIn: z.number().optional(),
+        heightIn: z.number().optional(),
+      }),
+    )
+    .default([]),
+  pageCount: z.number().int().positive(),
+  pdfSha256: z.string().min(1),
+  nodeVersion: z.string().optional(),
+  builtAt: z.string().datetime(),
+});
+export type BuildProvenance = z.infer<typeof BuildProvenanceSchema>;
+
 export const ProofArtifactSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(['PAGE_PROOF', 'CHAPTER_PROOF', 'BOOK_PROOF', 'COVER_PROOF']),
@@ -566,6 +630,14 @@ export const ProofArtifactSchema = z.object({
   fileSizeBytes: z.number().int().nonnegative(),
   totalPages: z.number().int().nonnegative(),
   createdAt: z.string().datetime(),
+  /**
+   * OPTIONAL, and it has to be: every freeze recorded before this existed has
+   * none, and those records are history — they are not rewritten to pretend
+   * otherwise. A freeze WITHOUT provenance is exactly the thing this field was
+   * added to stop, and `assertReproducible` reports it as unreconstructable
+   * rather than guessing which engine was used.
+   */
+  provenance: BuildProvenanceSchema.optional(),
 });
 export type ProofArtifact = z.infer<typeof ProofArtifactSchema>;
 

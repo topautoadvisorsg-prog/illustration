@@ -492,6 +492,37 @@ export interface TypesetBlockStyles {
   };
 }
 
+/**
+ * How much text a heading drags with it, so a page break cannot strand it.
+ *
+ * A heading bound to the paragraph below it is enough ONLY when that paragraph
+ * runs to more than one line. When it is a single line the whole unit still fits
+ * at the foot of a page and the reader gets a heading, one line, and a page
+ * turn — the same defect, one line further on. Pulling one more paragraph into
+ * the unit closes it without leaving a hole.
+ *
+ * ─── WHY THIS IS PER-STANDARD AND NOT A SHARED CONSTANT ──────────────────────
+ * "One line" is a number of characters, and a number of characters is a function
+ * of the MEASURE. It is not portable between books.
+ *
+ * It shipped once as a shared `ONE_LINE_CHARS = 95`, measured off 7 NATIONAL
+ * PARKS at 6x9. NO ONE TOLD ME THAT sets 5.5x8.5 on a 4.375in measure where the
+ * longest line in 170 pages is 76 characters — nothing in that book can reach 95,
+ * so every heading-plus-paragraph pair qualified. It fired in 113 places, reflowed
+ * 24 pages and pushed two approved illustrations off their pages.
+ *
+ * So the threshold lives with the standard that was measured for it. A standard
+ * that does not set it keeps the older behaviour exactly, which is what every
+ * book frozen before this existed was built with.
+ */
+export interface HeadingBindPolicy {
+  /**
+   * Bind a SECOND paragraph when the first is no longer than this many
+   * characters. Measure it on the standard's own trim, never inherit it.
+   */
+  extraParagraphUnderChars: number;
+}
+
 export interface TypesetLayoutStandard {
   /** Versioned id, e.g. "educational-nonfiction-typeset@1". Never a bare name. */
   id: string;
@@ -524,6 +555,12 @@ export interface TypesetLayoutStandard {
    * toggle is about the premium chapter convention, not about back matter.
    */
   chaptersStartRecto: boolean;
+  /**
+   * OPTIONAL. Absent means a heading binds to exactly one following paragraph,
+   * which is how every book rendered before this existed. An approved standard
+   * is never edited to add it — a new version is.
+   */
+  headingBind?: HeadingBindPolicy;
   furniture: TypesetPageFurniture;
   blocks: TypesetBlockStyles;
   terminalMicroSection: TerminalMicroSectionPolicy;
