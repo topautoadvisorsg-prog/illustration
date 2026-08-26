@@ -436,7 +436,9 @@ function validateCoverInputs(config: ProjectConfig, pageCount: number, dimension
     },
     {
       key: 'spine_width',
-      ok: dimensions.spineIn >= 0.06,
+      // Was >= 0.06, the retired platform floor. KDP publishes no minimum
+      // spine width, so the only real failure is a non-positive spine.
+      ok: dimensions.spineIn > 0,
       message: `Spine width ${dimensions.spineIn.toFixed(3)}in.`,
     },
     {

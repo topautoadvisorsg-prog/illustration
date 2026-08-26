@@ -23,6 +23,7 @@ import { getProductionProfile } from '../production-profiles/registry.js';
 import { blueprintTextZones } from './cover-blueprint.js';
 import type { CoverSpec } from './cover-spec.js';
 import type { Rect } from './cover-geometry.js';
+import { pageCountLimit } from '../publishing-standard/kdp-spec.js';
 
 export type PreflightStatus = 'PASS' | 'WARNING' | 'ERROR';
 
@@ -109,6 +110,20 @@ const contains = (r: Rect, inner: Rect): boolean =>
   inner.x + inner.w <= r.x + r.w + 0.5 &&
   inner.y + inner.h <= r.y + r.h + 0.5;
 
+
+/**
+ * A spine is acceptable when the published formula produced it from a page
+ * count Amazon will actually print. There is no minimum spine width in KDP's
+ * specification, so there is none here.
+ */
+function spineGateOk(spineIn: number, pageCount: number, paperStock: string): boolean {
+  if (!(spineIn > 0)) return false;
+  const paper = paperStock === 'cream' ? 'CREAM' : 'WHITE';
+  const limit = pageCountLimit('PAPERBACK', 'BLACK_AND_WHITE', paper);
+  if (!limit) return true;
+  return pageCount >= limit.min && pageCount <= limit.max;
+}
+
 export function runCoverPreflight(input: {
   spec: CoverSpec;
   config: ProjectConfig;
@@ -171,7 +186,12 @@ export function runCoverPreflight(input: {
   add(
     'spine_width',
     'Spine width',
-    g.dims.spineIn >= 0.06 ? 'PASS' : 'ERROR',
+    // This used to gate on spineIn >= 0.06, which was the platform's retired
+    // spine floor rather than anything Amazon publishes. With the floor gone, a
+    // 24 to 26 page book on white paper computes below it, and KDP prints from
+    // 24, so that gate would have failed a valid book. The real question is
+    // whether the page count is inside the published printable range.
+    spineGateOk(g.dims.spineIn, g.pageCount, g.paperStock) ? 'PASS' : 'ERROR',
     `${g.dims.spineIn.toFixed(4)} in at ${g.pageCount} pages on ${g.paperStock} paper.`,
   );
 
