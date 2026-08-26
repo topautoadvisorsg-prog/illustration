@@ -79,9 +79,9 @@ const HARDCOVER_PENDING =
    under `_np_build/_superseded-*`. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
   interior: '0ca8ac579653517a1304b20907219f9da8af3d1ae1fc0d288b8ce46c6ff6c72b',
-  pbCover: '774dddb84ae33addb65bcaebb99eb4255ba7eaf5d500ba822f5dc227ea4255f6',
-  epub: 'bf005b8ab244825d2d2f96bf9210fb5ba1cca6c7926c03ab144168253f51b024',
-  kindleCover: '0b83d753e04c3c3edabd02f753f4ef20280c0408f9e784f896963c170a6ebc30',
+  pbCover: 'e302db9c5c2c48d9462fabd3c03e9973f4b4244199fd8314192c8824b1005c1e',
+  epub: '114bbeb619b394c12b1abf0148f4782e971e80c5886b9aa3b5b63befc036b63d',
+  kindleCover: 'd83f67a3ecab2ff3b0be36e9ee88d9fc70a7ae494a4278d50ffaaefcae6125b0',
 };
 
 const PAGES = 120;
