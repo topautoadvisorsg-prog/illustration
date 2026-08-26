@@ -19,7 +19,7 @@ and retrieval date in the module.
 | Black & white | Cream | `0.0025` in/page | |
 | Premium colour | White | `0.002347` in/page | |
 | Standard colour | White | `0.002252` in/page | **A separate published line.** Equal to B&W white today; do not collapse them, and do not assume it equals premium. |
-| Black & white | **Groundwood** | **none published** | Not listed on the cover page; the groundwood page defers to the Cover Calculator. **UNSUPPORTED** — never approximated from cream. |
+| Black & white | **Groundwood** | `0.00235` in/page | **NOT published.** Neither help page states a multiplier; both defer to the Cover Calculator. Read from the calculator instead: 120pp → 0.282in and 240pp → 0.564in, both exactly 0.00235. Authority is `OFFICIAL_CALCULATOR_FIXTURE`, never `OFFICIAL_FORMULA`. |
 
 Source: G201953020 — Create a Paperback Cover.
 
@@ -93,11 +93,12 @@ is kept as a labelled constraint, not used for layout.
 
 | Binding | Ink / paper | Pages |
 |---|---|---|
-| Paperback | B&W white / cream | 24–828 |
+| Paperback | B&W white | 24–828 |
+| Paperback | B&W cream | 24–**776** (lower than white) |
 | Paperback | B&W groundwood | 24–812 |
 | Paperback | Standard colour | 72–600 |
 | Paperback | Premium colour | 24–828 |
-| Hardcover | B&W white / cream, premium colour | 75–550 |
+| Hardcover | B&W white / cream, premium colour | **76**–550 (see below) |
 
 Hardcover trims: 5.5×8.5, 6×9, 6.14×9.21, 7×10, 8.25×11. Paperback offers sixteen.
 
@@ -115,6 +116,11 @@ Hardcover trims: 5.5×8.5, 6×9, 6.14×9.21, 7×10, 8.25×11. Paperback offers s
 | **Hardcover wrap** | `scripts/qa/cover-spec.ts` computed it from the trim, as though it were a paperback | **reads the calculator fixture**; the board is larger than the trim, and the old maths was short by 0.556in on the Seed Packet hardcover |
 | **Hardcover spine text** | reported ELIGIBLE unconditionally | **NOT PUBLISHED** — KDP states a page minimum for paperback only; asserting one invented a rule |
 | **Hardcover spine-safe** | inset by the 0.4in hinge, which clamps a 0.504in spine to zero width | the calculator's stated spine-safe box |
+| **Groundwood** | assumed unsupported, failed closed | resolved from two calculator readings at 0.00235 in/page, labelled as a fixture |
+| **Cream page limit** | 828 | **776**. Published as "Black Ink & Cream Paper: 24 - 776". An 800-page cream book would have been accepted. |
+| **Hardcover page floor** | 75 | **76**. Two official sources disagree: GVBQ3CMEQW3W2VL6 publishes 75, the Cover Calculator refuses 75 and states 76. Verified by hand. We take the stricter number. |
+| **Spine-safe on the blueprint** | 0.709in typed by hand | 0.695in from the calculator. The old figure let spine type sit 0.007in per side closer to the fold than KDP allows. |
+| **Independent implementations** | 17 scripts with their own factors | **0**. A comment-stripped scan finds geometry constants only in the authority and its tests. |
 
 Every paperback factor the platform had been using was **confirmed correct**. The
 shipped spines and wraps did not move: 11 of 12 reference configurations are

@@ -28,10 +28,10 @@ reaches a printed artifact.
 | **Illustration placement** | The plate's anchor: a stable block id plus `pageOffset` | Page numbers written into one-off scripts | `stamp-illustrations.ts` | **Low** — the stamper refuses to draw a stale anchor rather than clipping it | Unchanged | No |
 | **Fonts** | Vendored faces in `backend/assets/fonts`, embedded at render | System fonts if a family list drifts between the three files that name it | Typeset, cover type, EPUB | **Medium** — a silent fallback is invisible until the proof | Vendored only; assert embedding in CI | **Yes** — Phase 3 |
 | **Cover artwork** | The approved image file, referenced by hash | Per-book copies under many names in build folders | Wrap builder, Kindle crop | **Medium** — "approved" has been ambiguous between two similar paintings | Approved asset recorded on the project, identified by hash | **Yes** — Phase 1 |
-| **Paperback geometry** | `publishing-standard/cover-dimensions.ts`, which derives every figure from `kdp-spec.ts` | None left in `backend/src`. Track A's `render-html.ts` re-exports the shared module instead of holding its own copy | delivery-check, cover-geometry, readiness, cover-spine-repair, 18 cover scripts | **Low** — one implementation; every factor carries its authority and retrieval date; unsupported configurations refuse rather than approximate | Achieved | **Resolved — Phase 1A/1B** |
-| **Hardcover geometry** | `kdp-cover-specs.ts` `VERIFIED_SPECS` — measured calculator readings, fail-closed | 11 hardcover scripts with their own arithmetic | Hardcover builders, `scripts/qa/cover-spec.ts` | **Medium** — the authority is correct and the operator CLI now reads it, but the book scripts still bypass it. A hardcover case board is **larger than its trim**, so any trim-derived wrap is silently short by roughly half an inch | Route the remaining scripts through the same module | **Partly — Phase 1B**; scripts outstanding |
+| **Paperback geometry** | `publishing-standard/cover-dimensions.ts`, which derives every figure from `kdp-spec.ts` | None. Seventeen scripts carried their own factors; all now call the authority | delivery-check, cover-geometry, readiness, cover-spine-repair, the cover scripts | **Low** — one implementation; every factor carries its authority and retrieval date; unsupported configurations refuse rather than approximate | Achieved | **Resolved — Phase 1A/1B** |
+| **Hardcover geometry** | `kdp-cover-specs.ts` `VERIFIED_SPECS` — nine measured Cover Calculator readings, fail-closed | None. All six scripts that carried their own case-wrap arithmetic now call the authority | Hardcover builders, `scripts/qa/cover-spec.ts`, `lib/cover-blueprint.ts` | **Low** — one owner. A hardcover case board is **larger than its trim**, and nothing derives a hardcover wrap from trim arithmetic any more | Achieved | **Resolved — Phase 1B** |
 | **Spine typography** | `publishing-standard/spine-type.ts` (11 importers) | `stage-6-layout/cover-spine-typeset.ts` (3 importers); `cover/spine-band-repair.ts` (477 loc) vs `stage-6-layout/cover-spine-repair.ts` (248 loc), both live and different | Cover builders | **High** — two spine repairs and two typesetters | `publishing-standard/spine-type.ts`, single | **Yes** — Phase 1 |
-| **Barcode-safe area** | `kdp-spec.ts` — the paperback reserve labelled `HOUSE_POLICY`, the hardcover rectangle `OFFICIAL_STATIC_RULE` | 18 cover scripts still reimplement it | Cover validation, `scripts/qa/cover-spec.ts` | **Medium** — stated once now, and the operator CLI uses it as a 2.0×1.2in rectangle rather than a full-width row test; the per-book scripts have not been migrated | Route the scripts through `kdp-spec.ts` | **Partly — Phase 1B**; scripts outstanding |
+| **Barcode-safe area** | `kdp-spec.ts` — the hardcover rectangle as `OFFICIAL_STATIC_RULE`, the paperback reserve as `HOUSE_POLICY` because Amazon publishes none | None | Cover validation, `scripts/qa/cover-spec.ts` | **Low** — a 2.0×1.2in rectangle stated once, never a full-width row test, and the two bindings do not share a definition | Achieved | **Resolved — Phase 1B** |
 | **EPUB content** | `stage-8-epub/` reading the typeset content | The shipped `.epub`, whose internal `OEBPS/cover.jpeg` can go stale independently of the delivery folder | Kindle upload | **Medium** — a stale cover sealed inside a zip is invisible from the folder | Unchanged; assert the internal cover against the marketing cover | **Yes** — Phase 3 |
 | **Final artifact manifest** | The per-book `KDP-UPLOAD-MANIFEST.md` | The same four hashes duplicated inside `national-parks-package-check-3.ts` | Upload, package check | **Medium** — two files that must be edited in lockstep | Generated from the shipped files | **Yes** — Phase 5 |
 
@@ -61,3 +61,18 @@ made it so deliberately. Do not let them drift back.
 2. **A value that must be measured is refused, not guessed.** `kdp-cover-specs.ts`
    declines to interpolate a spine it has no reading for, and that has already
    prevented a guessed hardcover. Extend the readings; never relax the rule.
+
+## Kept honest by a test, not by memory
+
+This file went stale once: it described paperback geometry as UNRESOLVED after
+that had been fixed, and pointed at a Track A module that no longer held the
+logic. `backend/src/__tests__/source-of-truth-matrix.test.ts` now fails if
+
+- the paperback row says UNRESOLVED while published formulas exist,
+- a cover row names a module that does not exist, or names `render-html.ts`,
+  which is a re-export shim rather than an authority, or
+- any file outside the authority and its tests carries an executable cover-
+  geometry constant.
+
+That last check is the one with teeth: the matrix can only claim a single owner
+while nothing else quietly recomputes the same numbers.
