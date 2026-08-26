@@ -85,7 +85,7 @@ yarn workspace @wildlands/backend drizzle:migrate
 Run smoke tests when keys are present:
 
 ```bash
-yarn smoke
+(removed) yarn smoke pointed at a file that never landed on main. Preserved at docs/archive/recovered-2026-08-26/smoke-test.ts.
 ```
 
 ## What Can Go Wrong

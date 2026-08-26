@@ -88,7 +88,7 @@ yarn workspace @wildlands/backend test -- parse-manuscript-outline
 Via manuscript audit:
 
 ```bash
-yarn workspace @wildlands/backend audit:manuscript "C:/path/to/book.md"
+(removed) audit:manuscript pointed at a file that never landed on main. Preserved at docs/archive/recovered-2026-08-26/audit-manuscript.ts.
 ```
 
 ## Debugging

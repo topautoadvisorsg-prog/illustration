@@ -36,7 +36,7 @@ curl -X POST http://localhost:8001/api/pages/{page_id}/images/2/regenerate \
 |---|---|---|
 | `APPROVED_IMAGE_MISSING` | Approving a version that doesn't exist on disk | Verify storage path; check workers logs |
 | Race condition on approve+regenerate | Two clients hitting same page | DB row lock + optimistic version check |
-| Approval but upscale never starts | Worker not running | `yarn run worker:upscale` |
+| Approval but upscale never starts | Worker not running | (worker architecture removed; upscale runs in-process) |
 
 **Design notes:**
 - Approval is per-image-version, not per-page. A page can have many versions; only one is "active."

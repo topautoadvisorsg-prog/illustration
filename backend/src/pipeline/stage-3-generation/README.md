@@ -16,7 +16,7 @@
 **How to run it locally:**
 ```bash
 # Start the worker in another terminal
-yarn workspace @wildlands/backend run worker:image-generation
+(removed) The queue-worker architecture no longer exists. This stage runs in-process via the API. See docs/LEGACY.md.
 
 # Then enqueue via API
 curl -X POST http://localhost:8001/api/pages/{page_id}/generate-image \

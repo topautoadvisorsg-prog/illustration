@@ -27,7 +27,7 @@ if effectiveDPI_w < 300 || effectiveDPI_h < 300 â†’ FAIL â†’ re-upscal
 
 **How to run it locally:**
 ```bash
-yarn workspace @wildlands/backend run worker:upscale
+(removed) The queue-worker architecture no longer exists. This stage runs in-process via the API. See docs/LEGACY.md.
 ```
 
 **What can go wrong:**

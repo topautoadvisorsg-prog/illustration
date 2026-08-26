@@ -8,7 +8,7 @@ Typed wrapper around the Anthropic SDK.
 
 **Input/Output:** Function-level — see `claude.ts` (Phase 1.5).
 
-**How to run locally:** Used internally by Stage 1.5. Smoke-test via `yarn smoke`.
+**How to run locally:** Used internally by Stage 1.5. Smoke test removed; see docs/archive/recovered-2026-08-26/.
 
 **What can go wrong:**
 - 401 — bad `ANTHROPIC_API_KEY`

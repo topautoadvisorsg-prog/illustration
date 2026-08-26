@@ -34,7 +34,7 @@ vars (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) on the backend service.
 ## "All smoke tests SKIPPED"
 
 **Cause:** `.env` still has `your_*_here` placeholders.
-**Fix:** Replace placeholder values with real API keys. Re-run `yarn smoke`.
+**Fix:** Replace placeholder values with real API keys. The smoke target was removed; see docs/archive/recovered-2026-08-26/smoke-test.ts.
 
 ## "Env validation failed" at boot
 

@@ -58,7 +58,7 @@ Next phases after approval:
 ## How To Run Locally
 
 ```bash
-yarn workspace @wildlands/backend run worker:layout
+(removed) The queue-worker architecture no longer exists. This stage runs in-process via the API. See docs/LEGACY.md.
 ```
 
 ## What Can Go Wrong

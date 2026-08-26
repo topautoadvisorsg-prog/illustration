@@ -146,6 +146,14 @@ export const ImageStatusSchema = z.enum([
   'FAILED',
 ]);
 
+/**
+ * HISTORICAL. These name a queue-worker architecture that no longer exists.
+ *
+ * backend/src/workers/ was removed and the five worker package targets pointed
+ * at nothing until they were dropped. Every stage now runs in-process behind the
+ * API. The enum and its tables are retained because rows referencing these values
+ * still exist; nothing new should be built against them.
+ */
 export const JobTypeSchema = z.enum(['image-generation', 'upscale', 'layout', 'pdf-compile', 'epub-export']);
 export const JobStatusSchema = z.enum(['queued', 'active', 'completed', 'failed', 'dead-lettered']);
 export const ExportKindSchema = z.enum(['PREMIUM_PDF', 'KINDLE_EPUB']);
