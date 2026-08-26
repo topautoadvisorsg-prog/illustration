@@ -50,12 +50,19 @@ export const PAGE_THICKNESS_IN = {
 } as const;
 
 /**
- * PLATFORM DECISION, not a KDP rule.
+ * PLATFORM DECISION, not a KDP rule — and it OVERRIDES the published formula
+ * inside KDPs printable range.
  *
  * Amazon publishes no minimum spine. This floor stops a very short block
- * producing a spine narrower than the printer can fold to, where the arithmetic
- * gives no sign of trouble. It only ever engages below about 27 pages on white,
- * which is under KDP's 24-page printable minimum anyway.
+ * producing a spine narrower than the printer can fold to.
+ *
+ * BUT: on white paper it engages at 24, 25 and 26 pages, and KDP prints from 24.
+ * A 24-page book computes 0.054048in by the published formula and is returned as
+ * 0.06in here. That is a deliberate deviation from the specification in a range
+ * KDP will actually print, and it is the one place the platform knowingly
+ * disagrees with Amazon. It has never applied to a real book — the thinnest
+ * shipped is 116 pages — but it is a decision, not a detail, and it should be
+ * confirmed or dropped rather than left implicit.
  */
 export const MIN_SPINE_IN = 0.06;
 

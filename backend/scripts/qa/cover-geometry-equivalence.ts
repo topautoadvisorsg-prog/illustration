@@ -32,18 +32,23 @@ import { VERIFIED_SPECS } from '../../src/pipeline/publishing-standard/kdp-cover
  * the repository.
  */
 const CASES: Array<{ label: string; pageCount: number; widthIn: number; heightIn: number; paperStock: 'white' | 'cream' }> = [
-  { label: '7 NATIONAL PARKS — paperback, shipped', pageCount: 120, widthIn: 6, heightIn: 9, paperStock: 'white' },
+  // ── Shipped books. Page count and trim READ from the actual interior PDF on
+  //    2026-08-26, not assumed. Paper stock is stated only where the cover
+  //    build or a verified KDP reading confirms it.
+  { label: '7 NATIONAL PARKS — shipped, 6x9 white [PDF-CONFIRMED]', pageCount: 120, widthIn: 6, heightIn: 9, paperStock: 'white' },
+  { label: 'DIRT RICH / SEED PACKET — shipped, 6x9 cream [PDF-CONFIRMED]', pageCount: 126, widthIn: 6, heightIn: 9, paperStock: 'cream' },
+  { label: 'NO ONE TOLD ME THAT — shipped rev25, 5.5x8.5 [PDF-CONFIRMED, paper unconfirmed: white assumed]', pageCount: 170, widthIn: 5.5, heightIn: 8.5, paperStock: 'white' },
+  { label: 'THE WILDLANDS NEW ENGLAND — shipped, 7x10 white [PDF-CONFIRMED]', pageCount: 275, widthIn: 7, heightIn: 10, paperStock: 'white' },
+
+  // ── Earlier builds of National Parks, for spine-movement regression.
   { label: '7 NATIONAL PARKS — earlier 118pp build', pageCount: 118, widthIn: 6, heightIn: 9, paperStock: 'white' },
   { label: '7 NATIONAL PARKS — earlier 116pp build', pageCount: 116, widthIn: 6, heightIn: 9, paperStock: 'white' },
-  { label: 'NO ONE TOLD ME THAT — paperback rev3', pageCount: 156, widthIn: 6, heightIn: 9, paperStock: 'white' },
-  { label: 'DIRT RICH — paperback, cream', pageCount: 156, widthIn: 6, heightIn: 9, paperStock: 'cream' },
-  { label: 'DIRT RICH — rev4 pagination', pageCount: 164, widthIn: 6, heightIn: 9, paperStock: 'cream' },
-  { label: 'SEED PACKET — 6x9 cream 126pp', pageCount: 126, widthIn: 6, heightIn: 9, paperStock: 'cream' },
-  { label: 'WILDLANDS — 7x10 white 269pp', pageCount: 269, widthIn: 7, heightIn: 10, paperStock: 'white' },
-  { label: 'WILDLANDS — 7x10 white 275pp', pageCount: 275, widthIn: 7, heightIn: 10, paperStock: 'white' },
-  { label: 'boundary — spine-text minimum, 79pp', pageCount: 79, widthIn: 6, heightIn: 9, paperStock: 'white' },
-  { label: 'boundary — one page under, 78pp', pageCount: 78, widthIn: 6, heightIn: 9, paperStock: 'white' },
-  { label: 'boundary — thin block hits the 0.06in floor', pageCount: 10, widthIn: 6, heightIn: 9, paperStock: 'white' },
+
+  // ── Boundaries.
+  { label: 'boundary — 79pp, NOT eligible for spine text', pageCount: 79, widthIn: 6, heightIn: 9, paperStock: 'white' },
+  { label: 'boundary — 80pp, first eligible for spine text', pageCount: 80, widthIn: 6, heightIn: 9, paperStock: 'white' },
+  { label: 'boundary — 24pp, printable minimum', pageCount: 24, widthIn: 6, heightIn: 9, paperStock: 'white' },
+  { label: 'boundary — 828pp, printable maximum', pageCount: 828, widthIn: 6, heightIn: 9, paperStock: 'white' },
 ];
 
 const configFor = (c: (typeof CASES)[number]): ProjectConfig =>

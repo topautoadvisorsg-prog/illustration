@@ -170,6 +170,16 @@ describe('hardcover — published rules, and NO invented multiplier', () => {
   });
 });
 
+describe('the platform spine floor deviates from the published formula at 24-26pp', () => {
+  it('the published formula alone would give less than the platform floor', () => {
+    const f = PAPERBACK_SPINE_FACTOR_IN.BLACK_AND_WHITE!.WHITE!.value;
+    // KDP prints from 24 pages, so this range is real, not theoretical.
+    expect(24 * f).toBeCloseTo(0.054048, 6);
+    expect(24 * f).toBeLessThan(0.06);
+    expect(27 * f).toBeGreaterThan(0.06);
+  });
+});
+
 describe('wrap equations', () => {
   const wrap = (trimW: number, trimH: number, spineIn: number) => ({
     widthIn: PAPERBACK_RULES.bleedIn.value + trimW + spineIn + trimW + PAPERBACK_RULES.bleedIn.value,

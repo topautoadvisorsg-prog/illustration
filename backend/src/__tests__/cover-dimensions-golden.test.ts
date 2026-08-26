@@ -11,6 +11,14 @@
  * every shipped paperback spine was actually cut to. The 7 NATIONAL PARKS row
  * matches the wrap that went to print — 0.270240in spine, 12.520240 x 9.250000in.
  *
+ * ─── SHIPPED METADATA IS READ, NOT ASSUMED ─────────────────────────────────
+ * Page count and trim for every shipped row were read from the actual interior
+ * PDF on 2026-08-26. Three earlier rows were guesses and two of them were wrong:
+ * NO ONE TOLD ME THAT is 170pp at 5.5x8.5, not 156pp at 6x9, and the DIRT RICH /
+ * SEED PACKET lineage is 126pp, not 156. Paper stock cannot be read from a PDF,
+ * so it is stated only where the cover build or a verified KDP reading confirms
+ * it; NO ONE TOLD ME THAT is labelled as an assumption.
+ *
  * ─── PHASE 1B RECONCILIATION, 2026-08-26 ───────────────────────────────────
  * Checked against Amazon's live documentation. Every spine and wrap figure below
  * was CONFIRMED correct — the paperback factors the platform has always used are
@@ -54,19 +62,16 @@ interface Golden {
 }
 
 const GOLDEN: Golden[] = [
-  {"label":"7 NATIONAL PARKS — paperback, shipped","pageCount":120,"trim":"6x9","paperStock":"white","spineIn":0.27024,"fullWidthIn":12.52024,"fullHeightIn":9.25,"spineTextAllowed":true},
+  {"label":"7 NATIONAL PARKS — shipped, 6x9 white [PDF-CONFIRMED]","pageCount":120,"trim":"6x9","paperStock":"white","spineIn":0.27024,"fullWidthIn":12.52024,"fullHeightIn":9.25,"spineTextAllowed":true},
+  {"label":"DIRT RICH / SEED PACKET — shipped, 6x9 cream [PDF-CONFIRMED]","pageCount":126,"trim":"6x9","paperStock":"cream","spineIn":0.315,"fullWidthIn":12.565,"fullHeightIn":9.25,"spineTextAllowed":true},
+  {"label":"NO ONE TOLD ME THAT — shipped rev25, 5.5x8.5 [PDF-CONFIRMED, paper unconfirmed: white assumed]","pageCount":170,"trim":"5.5x8.5","paperStock":"white","spineIn":0.38284,"fullWidthIn":11.63284,"fullHeightIn":8.75,"spineTextAllowed":true},
+  {"label":"THE WILDLANDS NEW ENGLAND — shipped, 7x10 white [PDF-CONFIRMED]","pageCount":275,"trim":"7x10","paperStock":"white","spineIn":0.6193,"fullWidthIn":14.8693,"fullHeightIn":10.25,"spineTextAllowed":true},
   {"label":"7 NATIONAL PARKS — earlier 118pp build","pageCount":118,"trim":"6x9","paperStock":"white","spineIn":0.265736,"fullWidthIn":12.515736,"fullHeightIn":9.25,"spineTextAllowed":true},
   {"label":"7 NATIONAL PARKS — earlier 116pp build","pageCount":116,"trim":"6x9","paperStock":"white","spineIn":0.261232,"fullWidthIn":12.511232,"fullHeightIn":9.25,"spineTextAllowed":true},
-  {"label":"NO ONE TOLD ME THAT — paperback rev3","pageCount":156,"trim":"6x9","paperStock":"white","spineIn":0.351312,"fullWidthIn":12.601312,"fullHeightIn":9.25,"spineTextAllowed":true},
-  {"label":"DIRT RICH — paperback, cream","pageCount":156,"trim":"6x9","paperStock":"cream","spineIn":0.39,"fullWidthIn":12.64,"fullHeightIn":9.25,"spineTextAllowed":true},
-  {"label":"DIRT RICH — rev4 pagination","pageCount":164,"trim":"6x9","paperStock":"cream","spineIn":0.41,"fullWidthIn":12.66,"fullHeightIn":9.25,"spineTextAllowed":true},
-  {"label":"SEED PACKET — 6x9 cream 126pp","pageCount":126,"trim":"6x9","paperStock":"cream","spineIn":0.315,"fullWidthIn":12.565,"fullHeightIn":9.25,"spineTextAllowed":true},
-  {"label":"WILDLANDS — 7x10 white 269pp","pageCount":269,"trim":"7x10","paperStock":"white","spineIn":0.605788,"fullWidthIn":14.855788,"fullHeightIn":10.25,"spineTextAllowed":true},
-  {"label":"WILDLANDS — 7x10 white 275pp","pageCount":275,"trim":"7x10","paperStock":"white","spineIn":0.6193,"fullWidthIn":14.8693,"fullHeightIn":10.25,"spineTextAllowed":true},
-  {"label":"boundary — 79pp, NOT eligible: KDP prints spine text on MORE THAN 79 pages","pageCount":79,"trim":"6x9","paperStock":"white","spineIn":0.177908,"fullWidthIn":12.427908,"fullHeightIn":9.25,"spineTextAllowed":false},
-    {"label":"boundary — 80pp, the first eligible count","pageCount":80,"trim":"6x9","paperStock":"white","spineIn":0.18016,"fullWidthIn":12.43016,"fullHeightIn":9.25,"spineTextAllowed":true},
-  {"label":"boundary — 78pp, well under the spine-text floor","pageCount":78,"trim":"6x9","paperStock":"white","spineIn":0.175656,"fullWidthIn":12.425656,"fullHeightIn":9.25,"spineTextAllowed":false},
-  {"label":"boundary — thin block hits the 0.06in floor","pageCount":10,"trim":"6x9","paperStock":"white","spineIn":0.06,"fullWidthIn":12.31,"fullHeightIn":9.25,"spineTextAllowed":false},
+  {"label":"boundary — 79pp, NOT eligible for spine text","pageCount":79,"trim":"6x9","paperStock":"white","spineIn":0.177908,"fullWidthIn":12.427908,"fullHeightIn":9.25,"spineTextAllowed":false},
+  {"label":"boundary — 80pp, first eligible for spine text","pageCount":80,"trim":"6x9","paperStock":"white","spineIn":0.18016,"fullWidthIn":12.43016,"fullHeightIn":9.25,"spineTextAllowed":true},
+  {"label":"boundary — 24pp, printable minimum","pageCount":24,"trim":"6x9","paperStock":"white","spineIn":0.06,"fullWidthIn":12.31,"fullHeightIn":9.25,"spineTextAllowed":false},
+  {"label":"boundary — 828pp, printable maximum","pageCount":828,"trim":"6x9","paperStock":"white","spineIn":1.864656,"fullWidthIn":14.114656,"fullHeightIn":9.25,"spineTextAllowed":true},
 ];
 
 const configFor = (g: Golden) => {
