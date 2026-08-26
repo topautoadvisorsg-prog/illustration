@@ -96,7 +96,7 @@ The full matrix, including secondary copies and conflict risk, is
 | Layout standard | `typeset/layout-standards/registry.ts` — versioned, pinned per book, never "latest" |
 | Per-block exceptions | `ProjectConfig.layoutOverrides`, via the API |
 | Page count | The final interior PDF. Read it; never type it. |
-| Cover geometry | **UNRESOLVED.** Five implementations, three numbers, zero verified paperback readings. Phase 1. |
+| Cover geometry | `publishing-standard/kdp-spec.ts` — the published KDP factors and rules, each with its source and retrieval date. Hardcover spines from verified calculator fixtures in `kdp-cover-specs.ts`. |
 | Artifact hashes | Computed from the shipped file. The interior build is **not** byte-reproducible. |
 
 ---
@@ -235,9 +235,9 @@ sanctioned home for a *text* correction at book scope — that gap is Phase 2.
 The ranked list lives in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The three
 that shape current work:
 
-1. **Cover geometry has no single authority.** Five implementations, three
-   different per-page thicknesses, and every verified KDP reading in the
-   repository is hardcover. Phase 1.
+1. ~~Cover geometry has no single authority.~~ **Resolved in Phase 1A/1B.** One
+   module, every value sourced and dated. Remaining: hardcover fixtures at more
+   page counts, and the duplicated spine repairs and blueprints.
 2. **A comma costs a rebuild.** No book-scoped text correction layer exists, so
    trivial edits reach either the frozen manuscript or shared renderer code.
    Phase 2.

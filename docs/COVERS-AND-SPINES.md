@@ -1,42 +1,121 @@
 # Covers and spines
 
-> **Read this before touching any cover code.** Cover geometry currently has
-> **no single authority**. Five implementations disagree, three different
-> per-page paper thicknesses are in the tree, and **every verified KDP reading in
-> this repository is hardcover**. A wrong spine is scrap paper and a reprint.
+Every cover figure the platform uses comes from **one module that records where
+it came from and when it was read**: `publishing-standard/kdp-spec.ts`. Nothing
+downstream holds a literal factor.
 
 ---
 
-## The current state, with evidence
+## Published KDP specification, verified 2026-08-26
 
-| # | Source | Value | Consumers | Shipped covers from it |
-|---|---|---|---|---|
-| 1 | `stage-6-layout/render-html.ts` — `PAGE_THICKNESS_IN` via `computeCoverDimensions` | `white 0.002252`, `cream 0.0025`, clamped `max(0.06, …)` | delivery-check, cover-geometry, readiness, cover-spine-repair, render-chapter, whole-page routes | **Every shipped paperback** |
-| 2 | `publishing-standard/kdp-cover-specs.ts` — `VERIFIED_SPECS` | 4 measured readings + a linear model that self-checks to 0.001in and refuses if it misses | cover-preflight, 4 book scripts | Hardcover attempts only |
-| 3 | `print-prep/paperback-preview.ts` | `PER_PAGE = 0.002347` (Premium Color), as a **default** | Preview guides | None known |
-| 4 | `cover/cover-preflight.ts` | Literal `'0.0025'` / `'0.002252'` in a template string | Report text | Reporting only |
-| 5 | Per-book scripts | `0.002252` (National Parks) and `0.0025` (DIRT RICH) | Their own book | National Parks paperback, DIRT RICH |
+Read from Amazon's live documentation on that date. Each value carries its topic
+and retrieval date in the module.
 
-Sources 1 and 5 agree numerically **today**. They are copies, so they agree by
-luck rather than by construction. Source 3 is the dangerous one: it defaults to a
-colour-paper thickness regardless of what the book is actually printed on, unless
-the caller passes an override.
+### Paperback spine factors — `published-formula`
 
-### The four verified readings, and what they are missing
+| Ink | Paper | Factor | Note |
+|---|---|---|---|
+| Black & white | White | `0.002252` in/page | |
+| Black & white | Cream | `0.0025` in/page | |
+| Premium colour | White | `0.002347` in/page | |
+| Standard colour | White | `0.002252` in/page | **A separate published line.** Equal to B&W white today; do not collapse them, and do not assume it equals premium. |
+| Black & white | **Groundwood** | **none published** | Not listed on the cover page; the groundwood page defers to the Cover Calculator. **UNSUPPORTED** — never approximated from cream. |
+
+Source: G201953020 — Create a Paperback Cover.
+
+### Paperback static rules — `published-constraint`
+
+| Rule | Value | Source |
+|---|---|---|
+| Bleed, top/bottom/outside | 0.125in | G201953020 |
+| Content inside the outside edge | 0.25in | G201857950 |
+| Spine text minimum | **more than 79 pages, so 80** | G201953020 |
+| Spine text clearance | 0.0625in each side | G201953020 |
+| Fold variance | 0.0625in each side | G201953020 |
+| Minimum resolution | 300 DPI | G201857950 |
 
 ```
-HARDCOVER  CREAM  6x9    126pp -> 0.504 in
-HARDCOVER  WHITE  7x10   269pp -> 0.820 in
-HARDCOVER  WHITE  7x10   275pp -> 0.834 in
-HARDCOVER  WHITE  6x9    116pp -> 0.450 in
+Cover Width  = Bleed + Back Cover Width + Spine Width + Front Cover Width + Bleed
+Cover Height = Bleed + Trim Height + Bleed
 ```
 
-**There is not one paperback reading.** Every paperback spine that has gone to
-print came from the formula in source 1 — a module inside the track the owner has
-classified as legacy — and that formula has never been checked against KDP.
+### Hardcover static rules — `published-constraint`
+
+| Rule | Value |
+|---|---|
+| Case wrap past the front cover edge | 0.51in |
+| Hinge, spine to safe area | 0.4in |
+| Text and images from the book edge | 0.635in |
+| Barcode | 2.0 × 1.2in, ≥0.76in from the bottom, ≥0.25in from the spine hinge |
+| Minimum resolution | 300 DPI |
+
+Source: GDTKFJPNQCBTMRV6 — Create a Hardcover Cover.
+
+### Hardcover spine — `calculator-fixture`, and no multiplier exists
+
+**Amazon publishes no hardcover spine factor.** The help page directs you to the
+Cover Calculator with ink, paper, trim and page count. The stored readings happen
+to look linear; that is **not** evidence of a published factor and must not be
+turned into one. `HARDCOVER_RULES.spineFactor` is explicitly `null` with the
+reason recorded, and hardcover resolves through `kdp-cover-specs.ts`, which fails
+closed outside its verified anchors.
+
+### Page-count ranges and trims
+
+| Binding | Ink / paper | Pages |
+|---|---|---|
+| Paperback | B&W white / cream | 24–828 |
+| Paperback | B&W groundwood | 24–812 |
+| Paperback | Standard colour | 72–600 |
+| Paperback | Premium colour | 24–828 |
+| Hardcover | B&W white / cream, premium colour | 75–550 |
+
+Hardcover trims: 5.5×8.5, 6×9, 6.14×9.21, 7×10, 8.25×11. Paperback offers sixteen.
 
 ---
 
+## What reconciliation corrected
+
+| Finding | Before | After |
+|---|---|---|
+| **Spine text floor** | 79, tested `>=` | **80** — KDP prints on "more than 79 pages". The old test admitted a 79-page book KDP would refuse. No shipped book affected; the thinnest is 116pp. |
+| **Groundwood** | assumed ≈0.00235 | **unsupported**, fails closed |
+| **Standard vs premium colour** | assumed one "colour" factor | **two separate factors**; collapsing them costs 0.057in on a 600-page book |
+| **Premium Color default** | `paperback-preview.ts` defaulted to 0.002347 for every book | **removed**; refuses without an explicit spine or thickness |
+| **Paperback barcode size** | applied as though published | labelled `platform-decision`; KDP publishes it for hardcover only |
+
+Every paperback factor the platform had been using was **confirmed correct**. The
+shipped spines and wraps did not move: 11 of 12 reference configurations are
+byte-identical, and the twelfth is the 79pp boundary above.
+
+---
+
+## The operator CLI
+
+```bash
+tsx scripts/qa/cover-spec.ts --interior final-interior.pdf \
+    --binding paperback --ink bw --paper white --trim 6x9
+```
+
+`--json` for machines, `--proof out.png` for a geometry proof. **There is no
+`--pages` flag** — the page count is read from the PDF. A typed page count cannot
+be wrong loudly.
+
+Every dimension prints with its arithmetic:
+
+```
+  spine                 0.27024in
+                        120 pages x 0.002252 in/page = 0.270240in
+  authority             published-formula
+  source                G201953020 — Create a Paperback Cover (read 2026-08-26)
+  wrap                  width  = 0.125 + 6 + 0.27024 + 6 + 0.125 = 12.52024in
+```
+
+Unsupported configurations exit 3 with `UNVERIFIED KDP CONFIGURATION` and what
+would resolve them. Verified: groundwood, hardcover without a fixture, and an
+unlisted trim all refuse.
+
+---
 ## Other duplications, confirmed
 
 | Concern | A | B | Status |
