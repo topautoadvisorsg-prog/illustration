@@ -1,0 +1,40 @@
+# WHAT IS TRUE TODAY, AND WHAT IS DELIBERATELY NOT DONE HERE.
+#
+# Stored blobs in this repository are CRLF — uniformly, not mixed. Verified with
+# `git cat-file blob`, which applies no filters (`git show HEAD:<path>` DOES
+# filter on this machine and reports the opposite, which is misleading).
+#
+# The Phase 0A audit recorded "mixed CRLF and LF" and that was wrong. The tooling
+# failure behind it was an editor script comparing lines with `=== "}"` while the
+# lines ended in "\r" — a bug in the tool, not inconsistency in the repository.
+#
+# NO GLOBAL `text=auto eol=lf` HERE, on purpose. Declaring it would not change
+# anything today (`git add --renormalize .` alters zero blob hashes under this
+# machine's core.autocrlf=true), but it would arm a 966-file rewrite for the next
+# person who renormalizes on a differently-configured machine — landing in the
+# middle of another operator's book work.
+#
+# Converting the repository to LF is worth doing. It is a standalone, coordinated
+# commit made when main is quiet, not a side effect of a cleanup phase.
+#
+# What IS pinned below is the set where getting it wrong breaks something.
+
+# Binary — never convert, never diff as text.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.pdf   binary
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary
+*.ico   binary
+*.epub  binary
+*.traineddata binary
+
+# Windows shell files must keep CRLF or they fail to run.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Diff these as text even though the extension is unusual.
+*.tsv   text
