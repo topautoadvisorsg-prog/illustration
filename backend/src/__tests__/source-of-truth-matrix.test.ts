@@ -13,6 +13,7 @@
  *
  * If one fails, fix the document (or the code), not the test.
  */
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -125,9 +126,32 @@ const GEOMETRY_LITERALS = [
 const IS_AUTHORITY = /publishing-standard[\\/](kdp-spec|kdp-cover-specs|cover-dimensions)\.ts$/;
 const IS_TEST = /__tests__|\.test\.ts$/;
 
+/**
+ * TRACKED FILES ONLY.
+ *
+ * Walking the filesystem made this check depend on whose machine it ran on: the
+ * main checkout carries untracked scratch under `backend/scripts/_scratch/` that
+ * the remediation worktree does not, so the same commit passed in one and failed
+ * in the other. The repository's contract is about what is committed, so that is
+ * what gets scanned. A scratch file only becomes a violation when someone
+ * commits it, which is exactly when it should start failing.
+ */
+function trackedSourceFiles(): string[] {
+  const out = execFileSync('git', ['ls-files', '-z', '--', 'backend'], {
+    cwd: REPO,
+    encoding: 'utf8',
+    maxBuffer: 1 << 26,
+  });
+  return out
+    .split('\0')
+    .filter((f) => /\.(ts|mjs)$/.test(f))
+    .map((f) => path.join(REPO, f));
+}
+
 function scanForGeometryConstants(): string[] {
-  return walk(path.join(REPO, 'backend'))
+  return trackedSourceFiles()
     .filter((f) => !IS_AUTHORITY.test(f) && !IS_TEST.test(f))
+    .filter((f) => existsSync(f))
     .filter((f) => {
       const code = stripNonCode(readFileSync(f, 'utf8'));
       return GEOMETRY_LITERALS.some((re) => re.test(code));
