@@ -38,7 +38,7 @@
  */
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -98,8 +98,6 @@ function listEngineSources(): string[] {
   for (const dir of ENGINE_DIRS) {
     const abs = join(REPO_ROOT, dir);
     if (!existsSync(abs)) continue;
-    // readdirSync is imported lazily so this module stays cheap to import
-    const { readdirSync } = require('node:fs') as typeof import('node:fs');
     for (const name of readdirSync(abs).sort()) {
       if (name.endsWith('.ts') && !name.endsWith('.test.ts')) out.push(`${dir}/${name}`);
     }
