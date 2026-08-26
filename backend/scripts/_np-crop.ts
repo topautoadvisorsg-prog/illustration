@@ -5,4 +5,4 @@ await sharp(src!)
   .resize({ width: Math.round(Number(w) * Number(scale ?? 1)) })
   .png()
   .toFile(out!);
-console.log(`${out} <- ${src} [${l},${t} ${w}x${h}] x${scale ?? 1}`);
+console.log(`${out} <- [${l},${t} ${w}x${h}] x${scale ?? 1}`);

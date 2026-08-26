@@ -64,173 +64,143 @@ console.log(`page count : ${pageCount} (read from the PDF)`);
 console.log(`spine      : ${pageCount} x ${THICKNESS_WHITE_BW} = ${spineIn.toFixed(6)} in`);
 console.log(`wrap       : ${fullWidthIn.toFixed(6)} x ${fullHeightIn.toFixed(6)} in = ${W} x ${H} px @ ${DPI} DPI`);
 
-// ── Fit the art ────────────────────────────────────────────────────────────
+// ── Fit the art, one panel at a time ───────────────────────────────────────
 /**
- * SCALE GENTLY AND STRETCH THE SKY, because this artwork carries TYPE.
+ * THE ARTWORK IS A DIPTYCH, SO IT IS FITTED AS ONE.
  *
- * Filling the height exactly is the honest fit for a clean plate and the wrong
- * one here: it crops 0.68in from each side, and the model paints the title
- * closer to the edge than that. The first attempt at this cover sliced the last
- * letters off "7 NATIONAL PARKS" and "ROOKIE MISTAKES" for exactly that reason.
+ * The model painted two scenes with a flat olive band between them: a shaded
+ * canyon wall in forest for the back, a sunlit valley with a hiker for the
+ * front. The band was the spine, and the brief that produced it asked for "a
+ * plain, flat, EVEN field of the cover's dominant background colour" — correct
+ * while green was the accent colour of the title and author panels, wrong the
+ * moment those panels came off. It now matches nothing on the book and reads as
+ * a stripe someone forgot to remove.
  *
- * So the art is scaled less, cropped less, and the residual height made up by
- * stretching the TOP band, which is sky on both panels. The bottom is never
- * stretched: it holds the foreground rock and the author's name, and smearing a
- * recognisable object is worse than any margin gained. This is the same remedy
- * the approved cover used, for the same reason.
+ * THE BAND IS NOT THE SPINE. It is 102px of a 1536px painting, which lands
+ * 0.85in wide on the wrap: more than three times the 0.270in spine of a
+ * 120-page block, overhanging the fold by about 0.3in onto each panel. Painting
+ * over the strip between the folds would leave an olive sliver down each face.
+ *
+ * Nor can the photograph be carried across it, because there is no one
+ * photograph to carry. Three ways of inventing the missing 0.85in were built
+ * and rejected by eye: mirroring a band-width block of picture in from each
+ * side put a SECOND hiker on the spine beneath a symmetrical mountain;
+ * cross-fading a blurred column from each side turned dark forest into lit
+ * valley as a grey smear; mirroring each panel's own texture outward to the fold
+ * left a visible butterfly seam 0.3in inside the back cover.
+ *
+ * So the band is not filled. It is CUT, and each scene is fitted to its own
+ * panel — the back scene scaled to cover the back panel out to the fold, the
+ * front scene to cover the front panel out to the fold, at one shared scale so
+ * neither is distorted against the other. Every pixel on both faces is then real
+ * painted picture right up to the fold, and the only invented strip left on the
+ * cover is the 0.270in between the folds, which is the fold.
+ *
+ * The scale is the smallest that covers both panels, so the crop stays as gentle
+ * as it can be. Filling the height exactly is the honest fit for a clean plate
+ * and the wrong one here: it crops 0.68in a side, and the model paints the title
+ * closer to the edge than that — the first attempt at this cover sliced the last
+ * letters off "7 NATIONAL PARKS". The residual height is made up by stretching
+ * the TOP band, which is sky on both scenes. The bottom is never stretched: it
+ * holds the foreground rock and the author's name.
  */
 const native = await sharp(ART).metadata();
+const artW = native.width!;
+const artH = native.height!;
+const backRightPx = inPx(backRightIn);
+const frontLeftPx = inPx(frontLeftIn);
+
+/** The band is found by column variance: a painted flat field barely varies down its height. */
+const [bandA, bandB] = await (async (): Promise<[number, number]> => {
+  const { data, info } = await sharp(ART).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const ys: number[] = [];
+  for (let y = 2; y < artH - 2; y += 2) ys.push(y);
+  const flat = (x: number): boolean => {
+    const l = ys.map((y) => {
+      const i = (y * info.width + x) * info.channels;
+      return 0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]!;
+    });
+    const m = l.reduce((acc, v) => acc + v, 0) / l.length;
+    return Math.sqrt(l.reduce((acc, v) => acc + (v - m) ** 2, 0) / l.length) < 12;
+  };
+  const c = Math.round(artW / 2);
+  if (!flat(c)) throw new Error('no flat painted band down the middle of the artwork; this is not the art this fit was written for');
+  let a = c;
+  while (a - 1 >= 0 && flat(a - 1)) a -= 1;
+  let b = c;
+  while (b + 1 < artW && flat(b + 1)) b += 1;
+  return [a, b];
+})();
+/** Two columns either side are the antialiased edge of the band. They are not picture. */
+const FRINGE = 2;
+const backArtW = bandA - FRINGE;
+const frontArtX = bandB + 1 + FRINGE;
+const frontArtW = artW - frontArtX;
+console.log(`\nart        : ${artW} x ${artH} px`);
+console.log(`band       : painted flat at art x ${bandA}..${bandB} (${bandB - bandA + 1}px) — CUT, not filled`);
+console.log(`scenes     : back 0..${backArtW - 1} (${backArtW}px), front ${frontArtX}..${artW - 1} (${frontArtW}px)`);
+
+/** The smallest scale that covers both panels out to their folds, with a little left to crop. */
+const SPARE = 12;
 const scaleArg = process.argv.find((a) => a.startsWith('--scale='));
-const scale = scaleArg ? Number(scaleArg.split('=')[1]) : 2.5153;
-const scaledW = Math.round(native.width! * scale);
-const scaledH = Math.round(native.height! * scale);
-const sideCrop = Math.round((scaledW - W) / 2);
+const scale = scaleArg
+  ? Number(scaleArg.split('=')[1])
+  : Math.max((backRightPx + SPARE) / backArtW, (W - frontLeftPx + SPARE) / frontArtW);
+const scaledW = Math.round(artW * scale);
+const scaledH = Math.round(artH * scale);
 const skyStretch = H - scaledH;
-if (sideCrop < 0) throw new Error(`scale ${scale} too small: ${scaledW}px against a ${W}px wrap`);
-if (skyStretch < 0) throw new Error(`scale ${scale} too large: ${scaledH}px against a ${H}px wrap`);
-console.log(`art        : ${native.width} x ${native.height} px`);
-console.log(`fit        : x${scale} -> ${scaledW} x ${scaledH}px, cropping ${(sideCrop / DPI).toFixed(3)}in per side, retaining ${((W / scaledW) * 100).toFixed(1)}%`);
+if (skyStretch < 0) throw new Error(`scale ${scale.toFixed(4)} too large: ${scaledH}px against a ${H}px wrap`);
+const backScaledW = Math.round(backArtW * scale);
+const frontScaledX = Math.round(frontArtX * scale);
+const backCrop = backScaledW - backRightPx;
+const frontCrop = scaledW - frontScaledX - (W - frontLeftPx);
+if (backCrop < 0 || frontCrop < 0) {
+  throw new Error(`scale ${scale.toFixed(4)} does not cover both panels (back short by ${-backCrop}px, front by ${-frontCrop}px)`);
+}
+console.log(`fit        : x${scale.toFixed(4)} -> ${scaledW} x ${scaledH}px, one scale for both scenes`);
+console.log(`           : back panel ${backRightPx}px, cropping ${(backCrop / DPI).toFixed(3)}in off its outer edge`);
+console.log(`           : front panel ${W - frontLeftPx}px, cropping ${(frontCrop / DPI).toFixed(3)}in off its outer edge`);
 console.log(`sky stretch: ${skyStretch}px (${(skyStretch / DPI).toFixed(3)}in) added at the TOP only`);
 
-const body = await sharp(ART)
-  .resize(scaledW, scaledH, { kernel: 'lanczos3' })
-  .extract({ left: sideCrop, top: 0, width: W, height: scaledH })
+const scaled = await sharp(ART).resize(scaledW, scaledH, { kernel: 'lanczos3' }).png().toBuffer();
+const backPanel = await sharp(scaled).extract({ left: backCrop, top: 0, width: backRightPx, height: scaledH }).png().toBuffer();
+const frontPanel = await sharp(scaled).extract({ left: frontScaledX, top: 0, width: W - frontLeftPx, height: scaledH }).png().toBuffer();
+const body = await sharp({ create: { width: W, height: scaledH, channels: 3, background: '#000' } })
+  .composite([
+    { input: backPanel, left: 0, top: 0 },
+    { input: frontPanel, left: frontLeftPx, top: 0 },
+  ])
+  .png()
   .toBuffer();
 let wrap = await extendSkyUpward(body, W, scaledH, H);
 
-// -- Take the olive band off the spine --------------------------------------
+// ── The spine: the one strip that is not painted picture ───────────────────
 /**
- * The artwork paints a flat olive band down the middle of the wrap.
- *
- * That was correct for the cover it was made for: green was the accent colour of
- * the title and author panels, and the original brief asked for the spine to be
- * "a plain, flat, EVEN field of the cover's dominant background colour". Those
- * panels are gone now, so the band matches nothing on the book and reads as a
- * stripe someone forgot to remove.
- *
- * THE BAND IS NOT THE SPINE, AND IT IS MEASURED, NOT ASSUMED. The spine of a
- * 120-page block is 0.270in, 81px at 300 DPI. The painted band is 0.85in, about
- * 256px: it overhangs the fold by roughly 0.3in onto each panel. Filling only
- * the 81px between the folds would leave an olive sliver down each panel beside
- * a photographic spine, which is worse than the stripe. So the flat field is
- * found by column variance -- a painted flat field barely varies down its
- * height, a photograph varies a great deal -- and the fill covers what was
- * measured. It refuses to run if the field it finds does not contain the spine.
- *
- * WHAT REPLACES IT, AND WHY IT IS NOT CARRIED ACROSS.
- *
- * The obvious fix is to continue the photograph through the spine. It cannot be
- * done, because there is no one photograph: the model painted a DIPTYCH either
- * side of the band. Left of it is a shaded canyon wall in forest; right of it is
- * a sunlit valley with a hiker. They are different views. Anything that blends
- * one into the other has to invent 0.85in of picture that was never photographed
- * and it shows. Two attempts were built and rejected by eye:
- *
- *   Mirroring a band-width block of picture in from each side. The hiker stands
- *   0.5in from the right edge of the band, so this put a SECOND hiker on the
- *   spine under a perfectly symmetrical mountain.
- *
- *   Cross-fading one blurred column in from each side. No duplicated objects,
- *   but dark forest fading into bright valley over 0.85in is a grey smear, and
- *   the band still read as a band.
- *
- * So each panel keeps its own picture and nothing crosses the fold:
- *
- *   the 0.3in of band lying on the BACK panel is filled by mirroring the back
- *   panel's own texture outward to the fold,
- *   the 0.3in lying on the FRONT panel likewise from the front panel,
- *   and only the 0.27in BETWEEN the folds -- the spine itself, the part that is
- *   the fold -- carries a soft blend from one to the other.
- *
- * Mirroring is exact at the seam, so neither panel gains an edge. Both source
- * blocks are narrow enough to hold texture and no subject: the hiker is 0.2in
- * beyond the reach of the front sample and is checked for, not assumed.
+ * 0.270in, fold to fold. Both panels now run right up to it and they do not
+ * meet — shaded forest on one side, lit valley on the other — so it is a blend,
+ * and it is honest about being one. Sixteen columns of each panel are averaged
+ * into a single colour and blurred along their length so nothing streaks, the
+ * two are cross-faded across the strip, and the patch is feathered a thirtieth
+ * of an inch into each panel so the join has no edge of its own. At this width,
+ * on the fold, it reads as the roll of the fold, which is what it is.
  *
  * Done in code, not by another edit pass. The last two passes each risked the
- * back-cover text -- one of them corrupted a word -- and no image model needs to
- * be involved in filling a band this narrow.
+ * back-cover text — one of them corrupted a word — and no image model needs to
+ * be involved in a strip this narrow.
  */
 {
-  const x0 = inPx(backRightIn);
-  const x1 = inPx(frontLeftIn);
-  const centre = Math.round((x0 + x1) / 2);
-  const searchFrom = Math.max(0, centre - Math.round(1.4 * DPI));
-  const searchTo = Math.min(W - 1, centre + Math.round(1.4 * DPI));
-
-  const { data, info } = await sharp(wrap).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-  const rows: number[] = [];
-  for (let y = 4; y < H - 4; y += 5) rows.push(y);
-  const FLAT_SD = 12;
-  const isFlat = (x: number): boolean => {
-    const l: number[] = [];
-    let sum = 0;
-    for (const y of rows) {
-      const i = (y * info.width + x) * info.channels;
-      const v = 0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]!;
-      l.push(v);
-      sum += v;
-    }
-    const m = sum / l.length;
-    return Math.sqrt(l.reduce((acc, v) => acc + (v - m) ** 2, 0) / l.length) < FLAT_SD;
-  };
-
-  if (!isFlat(centre)) throw new Error(`no flat painted band at the spine centre (x=${centre}); this is not the artwork this was written for`);
-  let a = centre;
-  while (a - 1 >= searchFrom && isFlat(a - 1)) a -= 1;
-  let b = centre;
-  while (b + 1 <= searchTo && isFlat(b + 1)) b += 1;
-  const bandIn = (b - a + 1) / DPI;
-  if (a > x0 || b < x1 - 1) throw new Error(`the flat band (x ${a}..${b}) does not cover the spine (x ${x0}..${x1}); refusing to fill part of it`);
-  if (bandIn > 1.5) throw new Error(`flat field runs ${bandIn.toFixed(3)}in — too wide to be the painted spine band; not filling it`);
-
-  /** A few pixels past each measured edge, to swallow the antialiased fringe. */
-  const PAD = 4;
-  const bandL = a - PAD;
-  const bandR = b + PAD;
-  const overhangL = x0 - bandL;
-  const overhangR = bandR - x1 + 1;
-  if (overhangL < 1 || overhangR < 1) throw new Error('the band does not overhang the folds; this fill has nothing to do');
-
-  /**
-   * NOTHING RECOGNISABLE MAY BE MIRRORED, and that is checked by eye rather than
-   * by a number. The crossings test that finds type on the back panel does not
-   * transfer: dense foliage flips dark-to-light across a row far more often than
-   * a hiker does, so it would flag the safe block and pass the unsafe one. What
-   * keeps this honest is that each source block is only as wide as the overhang
-   * it fills -- about 0.3in, texture at this scale -- and that the finished wrap
-   * is rendered and looked at.
-   */
-  const srcL = bandL - overhangL;
-  const srcR = bandR + 1;
-  if (srcL < 0 || srcR + overhangR > W) throw new Error('not enough picture beside the band to mirror outward');
-
-  const mirrorL = await sharp(wrap).extract({ left: srcL, top: 0, width: overhangL, height: H }).flop().png().toBuffer();
-  const mirrorR = await sharp(wrap).extract({ left: srcR, top: 0, width: overhangR, height: H }).flop().png().toBuffer();
-  wrap = await sharp(wrap)
-    .composite([
-      { input: mirrorL, left: bandL, top: 0 },
-      { input: mirrorR, left: x1, top: 0 },
-    ])
-    .png()
-    .toBuffer();
-
-  /**
-   * THE SPINE ITSELF: 0.27in, on the fold, blended from what now sits either
-   * side of it. Sixteen columns per side averaged into one and blurred along
-   * their length, cross-faded across the strip, feathered into the panels at
-   * both ends so the join has no edge. At this width and in this position it
-   * reads as the roll of the fold.
-   */
   const SAMPLE_W = 16;
-  const FEATHER = 12;
-  const from = x0 - FEATHER;
-  const to = x1 - 1 + FEATHER;
+  const FEATHER = 10;
+  const from = backRightPx - FEATHER;
+  const to = frontLeftPx - 1 + FEATHER;
   const patchW = to - from + 1;
+  if (from - SAMPLE_W < 0 || to + SAMPLE_W >= W) throw new Error('no room either side of the spine to sample it from');
+
   const colFrom = async (left: number): Promise<Buffer> => {
     const one = await sharp(wrap)
       .extract({ left, top: 0, width: SAMPLE_W, height: H })
       .resize(1, H, { fit: 'fill', kernel: 'lanczos3' })
-      .blur(10)
+      .blur(8)
       .png()
       .toBuffer();
     return sharp(one).resize(patchW, H, { fit: 'fill', kernel: 'lanczos3' }).png().toBuffer();
@@ -246,7 +216,9 @@ let wrap = await extendSkyUpward(body, W, scaledH, H);
     for (let y = 0; y < H; y += 1) r.copy(m, y * patchW);
     return m;
   };
+  /** The back panel owns the left fold, the front panel the right, handing over between them. */
   const mixMask = tiled((x) => smoothstep(x / Math.max(1, patchW - 1)));
+  /** And the patch fades in and out across the feather at each end. */
   const edgeMask = tiled((x) => smoothstep(Math.min(1, Math.min(x / FEATHER, (patchW - 1 - x) / FEATHER))));
 
   const rightMasked = await sharp(rightFill)
@@ -262,11 +234,49 @@ let wrap = await extendSkyUpward(body, W, scaledH, H);
     .toBuffer();
   wrap = await sharp(wrap).composite([{ input: patch, left: from, top: 0 }]).png().toBuffer();
 
-  console.log(`\nspine band : flat painted field measured at x ${a}..${b} (${b - a + 1}px, ${bandIn.toFixed(3)}in)`);
-  console.log(`           : the spine itself is x ${x0}..${x1} (${x1 - x0}px, ${((x1 - x0) / DPI).toFixed(3)}in) — the band overhangs it both ways`);
-  console.log(`back panel : ${overhangL}px (${(overhangL / DPI).toFixed(3)}in) of band filled by mirroring x ${srcL}..${bandL - 1} outward`);
-  console.log(`front panel: ${overhangR}px (${(overhangR / DPI).toFixed(3)}in) of band filled by mirroring x ${srcR}..${srcR + overhangR - 1} outward`);
-  console.log(`spine strip: x ${from}..${to} blended across ${patchW}px, ${FEATHER}px feathered into each panel`);
+  console.log(`spine fill : x ${backRightPx}..${frontLeftPx - 1} (${frontLeftPx - backRightPx}px, ${((frontLeftPx - backRightPx) / DPI).toFixed(3)}in) blended between the panels`);
+  console.log(`           : patched x ${from}..${to}, ${FEATHER}px feathered into each panel`);
+}
+
+/** NOTHING PAINTED MAY BE LEFT BEHIND. The cut is verified, not assumed. */
+{
+  const { data, info } = await sharp(wrap).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const ys: number[] = [];
+  for (let y = 4; y < H - 4; y += 5) ys.push(y);
+  const sd = (x: number): number => {
+    const l = ys.map((y) => {
+      const i = (y * info.width + x) * info.channels;
+      return 0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]!;
+    });
+    const m = l.reduce((acc, v) => acc + v, 0) / l.length;
+    return Math.sqrt(l.reduce((acc, v) => acc + (v - m) ** 2, 0) / l.length);
+  };
+  /**
+   * A leftover of the band would lie BESIDE THE FOLD, so that is where this
+   * looks. It cannot reject every flat column on the cover: the outer inch of
+   * the back panel is cliff shadow, genuinely flat and near black, and rejecting
+   * that would fail every honest build. The blended spine strip itself is
+   * exempt; it is the fold.
+   */
+  const reach = Math.round(1.5 * DPI);
+  const faces: Array<[number, number, string]> = [
+    [Math.max(inPx(BLEED), backRightPx - reach), backRightPx - 1, 'back'],
+    [frontLeftPx, Math.min(W - inPx(BLEED) - 1, frontLeftPx + reach), 'front'],
+  ];
+  let flattest = Infinity;
+  for (const [lo, hi, name] of faces) {
+    for (let x = lo; x <= hi; x += 1) {
+      const v = sd(x);
+      if (v < flattest) flattest = v;
+      if (v < 12) {
+        throw new Error(
+          `REFUSING: a flat painted column survives on the ${name} face at x=${x} (${(x / DPI).toFixed(3)}in), ` +
+            `${(Math.abs(x < frontLeftPx ? backRightPx - x : x - frontLeftPx) / DPI).toFixed(3)}in from the fold. The band was not fully cut.`,
+        );
+      }
+    }
+  }
+  console.log(`flat check : nothing flat within 1.5in of either fold (flattest column sd ${flattest.toFixed(1)} against 12) — the olive band is gone`);
 }
 
 
