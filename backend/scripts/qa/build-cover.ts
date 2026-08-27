@@ -94,6 +94,27 @@ if ((faBaseline || faCap || faWidth) && !frontAuthor) {
 /** Cap the side crop, for artwork whose type sits near its own edge. */
 const maxSideCrop = flag('max-side-crop');
 
+/**
+ * A short list set across the front panel, under whatever the artwork paints.
+ * Lines are separated by a pipe so a list can carry its own separators.
+ */
+const flLines = flag('front-list');
+const flCap = flag('front-list-cap-height');
+const flGap = flag('front-list-gap');
+const flWidth = flag('front-list-max-width');
+const frontList =
+  flLines && flCap && flGap && flWidth
+    ? {
+        lines: flLines.split('|').map((l) => l.trim()).filter(Boolean),
+        capHeightIn: Number(flCap),
+        gapBelowTypeIn: Number(flGap),
+        maxWidthIn: Number(flWidth),
+      }
+    : undefined;
+if ((flLines || flCap || flGap || flWidth) && !frontList) {
+  die('build-cover: --front-list, --front-list-cap-height, --front-list-gap and --front-list-max-width go together.');
+}
+
 const OUT = flag('out');
 const PROOF = flag('proof');
 const MANIFEST = flag('manifest');
@@ -112,6 +133,7 @@ try {
     title,
     author,
     frontAuthor,
+    ...(frontList ? { frontList } : {}),
     ...(maxSideCrop ? { maxSideCropIn: Number(maxSideCrop) } : {}),
     subtitle: flag('subtitle'),
     spineText: has('no-spine-text') ? false : undefined,

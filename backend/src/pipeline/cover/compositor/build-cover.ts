@@ -75,6 +75,17 @@ export interface BuildCoverRequest {
   /** Cap the side crop so artwork carrying type near its edge is not sliced. See planArtwork. */
   maxSideCropIn?: number;
   /**
+   * A short list set across the FRONT panel, under whatever the artwork already
+   * paints there -- a series line, the places a guide covers.
+   *
+   * HUNG OFF THE PAINTED INK, not a fixed coordinate. The artwork decides where
+   * its subtitle ends and that moves between renders, so a hard-coded y prints
+   * the list through the subtitle on the next one. The panel is scanned for the
+   * lowest row of painted type and the list is placed a fixed distance beneath
+   * it, then walked down until the band it will occupy is genuinely clear.
+   */
+  frontList?: { lines: string[]; capHeightIn: number; gapBelowTypeIn: number; maxWidthIn: number };
+  /**
    * Set the author name on the FRONT panel, in real type, rather than relying on
    * the artwork to carry it.
    *
@@ -128,6 +139,7 @@ export interface BuildCoverResult {
   geometry: CoverGeometry;
   artworkPlan: ArtworkPlan;
   spineText: SpineTextOutcome;
+  frontList?: { lines: number; sizePx: number; widestIn: number; topIn: number; clearedSteps: number };
   checks: Check[];
   /** Clean production cover, no guides. */
   productionPdf: Buffer;
@@ -185,6 +197,9 @@ export async function buildCover(req: BuildCoverRequest): Promise<BuildCoverResu
   // ── spine typography ──────────────────────────────────────────────────────
   const wantSpineText = req.spineText ?? geometry.spineTextEligible !== false;
   const spineText: SpineTextOutcome = { requested: wantSpineText, placed: false };
+  let frontListPlaced:
+    | { lines: number; sizePx: number; widestIn: number; topIn: number; clearedSteps: number }
+    | undefined;
   let frontAuthorPlaced:
     | { sizePx: number; inkWidthIn: number; maxWidthIn: number; centreIn: number; baselineFromBottomIn: number }
     | undefined;
@@ -219,6 +234,99 @@ export async function buildCover(req: BuildCoverRequest): Promise<BuildCoverResu
       // is surfaced, not swallowed.
       spineText.reason = `Spine type could not be placed on a ${geometry.spineIn.toFixed(4)}in spine: ${(e as Error).message}`;
     }
+  }
+
+  // -- front-cover list, hung under whatever the artwork paints -------------
+  if (req.frontList) {
+    const fl = req.frontList;
+    const frontLeftIn = geometry.foldRightIn;
+    const centreIn = frontLeftIn + geometry.panelWidthIn / 2;
+    const maxPx = Math.round(fl.maxWidthIn * dpi);
+    const panelLeftPx = Math.round(frontLeftIn * dpi);
+    const panelWPx = Math.round(geometry.panelWidthIn * dpi);
+    const scanHPx = Math.round(geometry.fullHeightIn * 0.62 * dpi);
+
+    /**
+     * Type is found by EDGE CROSSINGS along each row, not brightness. A cover is
+     * a photograph with light lettering on it, so a brightness threshold counts
+     * sunlit rock as readily as a serif; a row of set type alternates many times
+     * across the measure and landscape does not.
+     */
+    const { data } = await sharp(composed)
+      .extract({ left: panelLeftPx, top: 0, width: panelWPx, height: scanHPx })
+      .greyscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const crossings = (y: number): number => {
+      let n = 0;
+      let prev = data[y * panelWPx]! > 170;
+      for (let x = 1; x < panelWPx; x += 1) {
+        const cur = data[y * panelWPx + x]! > 170;
+        if (cur !== prev) n += 1;
+        prev = cur;
+      }
+      return n;
+    };
+    const TYPE_ROW = 32;
+    let lowest = -1;
+    for (let y = 0; y < scanHPx; y += 1) if (crossings(y) >= TYPE_ROW) lowest = y;
+    if (lowest < 0) throw new Error('frontList: no painted type on the front panel to hang the list from');
+
+    let topIn = lowest / dpi + fl.gapBelowTypeIn;
+    /** The estimate is a start; the band it will occupy has to be READ before it is used. */
+    const bandIn = fl.capHeightIn * 3.2;
+    const busy = (t: number): boolean => {
+      const from = Math.max(0, Math.round(t * dpi));
+      const to = Math.min(scanHPx - 1, Math.round((t + bandIn) * dpi));
+      for (let y = from; y <= to; y += 1) if (crossings(y) >= TYPE_ROW) return true;
+      return false;
+    };
+    let guard = 0;
+    while (busy(topIn) && guard < 40) {
+      topIn += 0.1;
+      guard += 1;
+    }
+    if (guard >= 40) throw new Error('frontList: found no clear band on the front panel');
+
+    /** Sized by MEASURED ink to the requested cap height, then shrunk if too wide. */
+    const targetCapPx = fl.capHeightIn * dpi;
+    let sizePx = Math.round(targetCapPx / 0.7);
+    let widest = 0;
+    for (let i = 0; i < 60; i += 1) {
+      const w: number[] = [];
+      let capPx = 0;
+      for (const line of fl.lines) {
+        const probe =
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${maxPx * 3}" height="${Math.round(sizePx * 4)}">` +
+          `<text x="${Math.round((maxPx * 3) / 2)}" y="${Math.round(sizePx * 2.5)}" text-anchor="middle" ` +
+          `font-family="${COVER_FONT}" font-size="${sizePx}" fill="#fff">${escapeXml(line)}</text></svg>`;
+        const { info } = await sharp(Buffer.from(probe)).trim().toBuffer({ resolveWithObject: true });
+        w.push(info.width);
+        capPx = Math.max(capPx, info.height);
+      }
+      widest = Math.max(...w);
+      if (widest <= maxPx && Math.abs(capPx - targetCapPx) <= 2) break;
+      if (widest > maxPx) sizePx -= 1;
+      else sizePx = Math.max(8, Math.round(sizePx * (targetCapPx / Math.max(1, capPx))));
+      if (sizePx <= 8) break;
+    }
+
+    const leadPx = sizePx * 1.32;
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(geometry.fullWidthIn * dpi)}" ` +
+      `height="${Math.round(geometry.fullHeightIn * dpi)}">` +
+      fl.lines
+        .map(
+          (line, i) =>
+            `<text x="${Math.round(centreIn * dpi)}" y="${Math.round(topIn * dpi + leadPx * (i + 1))}" ` +
+            `text-anchor="middle" font-family="${COVER_FONT}" font-size="${sizePx}" ` +
+            `fill="${COVER_CREAM}" stroke="${COVER_HALO}" stroke-width="${(sizePx * 0.13).toFixed(2)}" ` +
+            `stroke-linejoin="round" paint-order="stroke">${escapeXml(line)}</text>`,
+        )
+        .join('') +
+      `</svg>`;
+    composed = await sharp(composed).composite([{ input: Buffer.from(svg), left: 0, top: 0 }]).toBuffer();
+    frontListPlaced = { lines: fl.lines.length, sizePx, widestIn: widest / dpi, topIn, clearedSteps: guard };
   }
 
   // -- front-cover author, set rather than painted --------------------------
@@ -326,11 +434,12 @@ export async function buildCover(req: BuildCoverRequest): Promise<BuildCoverResu
     geometry,
     artworkPlan,
     spineText,
+    frontList: frontListPlaced,
     checks,
     productionPdf,
     proofPng,
     manifest,
-    report: renderReport({ geometry, artworkPlan, spineText, checks, status, manifest }),
+    report: renderReport({ geometry, artworkPlan, spineText, frontList: frontListPlaced, checks, status, manifest }),
   };
 }
 
@@ -346,6 +455,8 @@ function renderReport(o: {
   geometry: CoverGeometry;
   artworkPlan: ArtworkPlan;
   spineText: SpineTextOutcome;
+  /** Present only when a front list was actually set. */
+  frontList?: { lines: number; sizePx: number; widestIn: number; topIn: number; clearedSteps: number };
   checks: Check[];
   status: string;
   manifest: CoverManifest;
@@ -382,6 +493,11 @@ function renderReport(o: {
         ? `NOT PLACED — ${o.spineText.reason ?? 'unknown'}`
         : 'not requested'),
   );
+  if (o.frontList) {
+    const fx = o.frontList;
+    out.push(L('front list', `${fx.lines} line(s) at ${fx.sizePx}px, widest ${fx.widestIn.toFixed(3)}in, top ${fx.topIn.toFixed(3)}in` +
+      (fx.clearedSteps ? `, cleared ${fx.clearedSteps} step(s) of painted type` : '')));
+  }
   if (o.manifest.frontAuthor) {
     const fa = o.manifest.frontAuthor;
     out.push(
