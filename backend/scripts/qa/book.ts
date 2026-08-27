@@ -4,6 +4,7 @@
  *   tsx scripts/qa/book.ts recipe    --project <id>
  *   tsx scripts/qa/book.ts reproduce --project <id>
  *   tsx scripts/qa/book.ts correct   --project <id> --corrections <file.json> [--confirm]
+ *   tsx scripts/qa/book.ts freeze    --project <id> --pdf <approved.pdf> --rev <n> [--confirm]
  *
  * ─── WHY THIS REPLACES SIX SCRIPTS ───────────────────────────────────────────
  * Correcting two sentences in NO ONE TOLD ME THAT produced four bespoke scripts
@@ -53,11 +54,12 @@ const die = (msg: string): never => {
   process.exit(1);
 };
 
-if (!command || !['recipe', 'reproduce', 'correct'].includes(command)) {
+if (!command || !['recipe', 'reproduce', 'correct', 'freeze'].includes(command)) {
   say('');
   say('  tsx scripts/qa/book.ts recipe    --project <id>');
   say('  tsx scripts/qa/book.ts reproduce --project <id>');
   say('  tsx scripts/qa/book.ts correct   --project <id> --corrections <file.json> [--confirm]');
+  say('  tsx scripts/qa/book.ts freeze    --project <id> --pdf <approved.pdf> --rev <n> [--confirm]');
   say('                                   [--reanchor <oldBlockId>:<newBlockId>]…');
   say('                                   [--accept-level-3 "<who approved it, and why>"]');
   say('');
@@ -79,14 +81,17 @@ const { openOperationalDatabase, ProductionWriteGrant, describeAccess } = await 
   '../../src/db/operational-access.js',
 );
 await import('../../src/env.js');
-const WILL_WRITE = command === 'correct' && CONFIRM;
+const WILL_WRITE = (command === 'correct' || command === 'freeze') && CONFIRM;
 const access = openOperationalDatabase({
   environment: 'production',
   intent: WILL_WRITE ? 'write' : 'read',
   ...(WILL_WRITE
     ? {
         grant: ProductionWriteGrant.declare({
-          reason: `Apply approved corrections to project ${PROJECT_ID} and store the corrected manuscript`,
+          reason:
+            command === 'freeze'
+              ? `Freeze the approved interior of project ${PROJECT_ID} as a BOOK_PROOF and store the export`
+              : `Apply approved corrections to project ${PROJECT_ID} and store the corrected manuscript`,
           confirmed: CONFIRM,
         }),
       }
@@ -94,7 +99,7 @@ const access = openOperationalDatabase({
 });
 const host = access.target;
 
-const { getProject, updateProjectConfig, replaceWorkingManuscript } = await import(
+const { getProject, updateProjectConfig, replaceWorkingManuscript, setProjectStatus } = await import(
   '../../src/db/repositories/projects.repo.js'
 );
 /**
@@ -103,7 +108,7 @@ const { getProject, updateProjectConfig, replaceWorkingManuscript } = await impo
  * and throws only after the writes before it have already landed. That is
  * exactly how a freeze ended up half-applied.
  */
-for (const [name, fn] of Object.entries({ getProject, updateProjectConfig, replaceWorkingManuscript })) {
+for (const [name, fn] of Object.entries({ getProject, updateProjectConfig, replaceWorkingManuscript, setProjectStatus })) {
   if (typeof fn !== 'function') die(`${name} is not exported by projects.repo — refusing to run`);
 }
 
@@ -129,8 +134,11 @@ let recipe;
 try {
   recipe = loadFrozenRecipe(PROJECT_ID!, liveConfig);
 } catch (err) {
-  if (err instanceof NoFrozenRecipeError) die(err.message);
-  throw err;
+  // A freeze is how the FIRST recipe comes into existence, so "no prior freeze"
+  // is a normal state for it and a fatal one for everything else.
+  if (err instanceof NoFrozenRecipeError && command === 'freeze') recipe = undefined;
+  else if (err instanceof NoFrozenRecipeError) die(err.message);
+  else throw err;
 }
 
 const OUT = path.join('.book', PROJECT_ID!);
@@ -140,12 +148,16 @@ say('');
 say(`${command.toUpperCase()} — ${project!.title}`);
 say('─'.repeat(94));
 say(describeAccess(access));
-say(`  freeze         ${recipe.freezeId}   ${recipe.pageCount}pp   ${recipe.builtAt}`);
-say(`  standard       ${recipe.layoutStandardId}   profile ${recipe.productionProfileId ?? '(default)'}`);
-say(
-  `  buildOptions   chaptersStartRecto=${recipe.buildOptions.chaptersStartRecto}   ` +
-    `${recipe.buildOptionsRecorded ? 'RECORDED' : 'INFERRED — not in the freeze record'}`,
-);
+if (recipe) {
+  say(`  freeze         ${recipe.freezeId}   ${recipe.pageCount}pp   ${recipe.builtAt}`);
+  say(`  standard       ${recipe.layoutStandardId}   profile ${recipe.productionProfileId ?? '(default)'}`);
+  say(
+    `  buildOptions   chaptersStartRecto=${recipe.buildOptions.chaptersStartRecto}   ` +
+      `${recipe.buildOptionsRecorded ? 'RECORDED' : 'INFERRED — not in the freeze record'}`,
+  );
+} else {
+  say('  freeze         (none yet — this would be the first)');
+}
 
 // ── recipe ───────────────────────────────────────────────────────────────────
 if (command === 'recipe') {
@@ -190,6 +202,227 @@ async function frozenModel() {
     );
   }
   return { bytes, model: await buildPageModel(bytes) };
+}
+
+// ── freeze ───────────────────────────────────────────────────────────────────
+/**
+ * Promote an APPROVED pdf to this book's shipping BOOK_PROOF.
+ *
+ * This existed only as `nottm-freeze-rev26.ts`, a book-specific script whose own
+ * header says "the generic path is scripts/qa/book.ts" — which was not true,
+ * because no such path existed. Every future book would have forked that script
+ * again, which is the pattern this file was written to end.
+ *
+ * The approved BYTES are what ship. A rebuild still happens, because a
+ * provenance record has to say where each illustration was PLACED and the only
+ * source for that is a build — but the rebuild's bytes are thrown away. PDFs are
+ * not byte-deterministic here (identical inputs, three different shas, identical
+ * pages), so the check is LAYOUT EQUIVALENCE: same page count, same text on every
+ * page, all illustrations stamped, none orphaned. Anything less and the rebuild
+ * describes a different artifact and may not be recorded against this one.
+ */
+if (command === 'freeze') {
+  const pdfPath = flag('pdf');
+  const rev = flag('rev');
+  if (!pdfPath) die('--pdf <approved.pdf> is required');
+  if (!rev || !/^\d+$/.test(rev)) die('--rev <n> is required (the revision number this freeze records)');
+
+  const { computeEngineFingerprint, assertEngineCleanForProduction, configSnapshotSha256, DirtyEngineError } =
+    await import('../../src/pipeline/build-provenance.js');
+  const { ProofArtifactSchema } = await import('@wildlands/shared');
+  const { PDFDocument } = await import('pdf-lib');
+
+  const PROOF_ID = `book-proof-rev${rev}`;
+  let failed = 0;
+  const check = (label: string, actual: unknown, expected: unknown) => {
+    const ok = String(actual) === String(expected);
+    if (!ok) failed += 1;
+    say(`    ${ok ? 'PASS' : 'FAIL'}  ${label.padEnd(40)} ${actual}${ok ? '' : `   expected ${expected}`}`);
+  };
+
+  /**
+   * 1 — the engine. A freeze must come from committed code: the fingerprint
+   * hashes file CONTENT, so bytes living only in an uncommitted file are
+   * unrecoverable once that file changes. That is how rev24 was lost.
+   */
+  say('');
+  say('  1 — ENGINE');
+  const fp = computeEngineFingerprint();
+  say(`    fingerprint  ${fp.engineFingerprint}`);
+  say(`    commit       ${fp.gitCommit?.slice(0, 12)} (${fp.gitBranch})`);
+  let dirtyOverrideReason: string | undefined;
+  try {
+    ({ dirtyOverrideReason } = assertEngineCleanForProduction(fp));
+    if (dirtyOverrideReason) {
+      say(`    clean        NO — OVERRIDDEN, and recorded in the provenance`);
+      for (const f of fp.dirtyFiles) say(`                 dirty: ${f}`);
+      say(`    reason       ${dirtyOverrideReason}`);
+    } else {
+      say(`    clean        yes — every renderer source is committed`);
+    }
+  } catch (err) {
+    if (!(err instanceof DirtyEngineError)) throw err;
+    say(`    clean        NO`);
+    for (const f of fp.dirtyFiles) say(`                 ${f}`);
+    die(`the renderer is dirty and a freeze must come from committed code. Commit the listed file(s) and re-run.`);
+  }
+
+  // 2 — the artifact and the stored state have to agree with each other
+  say('');
+  say('  2 — APPROVED ARTIFACT AND STORED STATE');
+  const onDisk = readFileSync(pdfPath!);
+  const pdfSha = sha(onDisk);
+  say(`    approved pdf ${pdfPath}`);
+  say(`    sha256       ${pdfSha}`);
+  const manuscript = (await storage.readProjectFile(project!.manuscriptPath!)).toString('utf8');
+  check('manuscript bytes match the project row', sha(manuscript), project!.manuscriptSha256);
+  const approvedPages = (await PDFDocument.load(onDisk)).getPageCount();
+  say(`    pages in pdf ${approvedPages}`);
+  const clash = (liveConfig.proofArtifacts ?? []).find((a: { id: string; sha256: string }) => a.id === PROOF_ID);
+  if (clash && clash.sha256 !== pdfSha) die(`${PROOF_ID} already exists with a different sha (${clash.sha256})`);
+  if (clash) say(`    NOTE: ${PROOF_ID} already recorded with this sha — reconciling, not re-freezing.`);
+
+  // 3 — rebuild for placements, then prove it describes THIS artifact
+  say('');
+  say('  3 — REBUILD (for illustration placements) + LAYOUT EQUIVALENCE');
+  const buildOptions = recipe?.buildOptions ?? { chaptersStartRecto: false };
+  const tStart = Date.now();
+  const built = await buildTypesetInterior(PROJECT_ID!, liveConfig, buildOptions);
+  say(`    built in     ${((Date.now() - tStart) / 1000).toFixed(1)}s`);
+  check('page count matches the approved pdf', built.pageCount, approvedPages);
+  check('illustrations orphaned', built.orphanedIllustrations.length, 0);
+  check('illustrations stamped', built.stampedIllustrations.length, Object.keys(liveConfig.illustrations ?? {}).length);
+  const approvedModel = await buildPageModel(onDisk);
+  const rebuiltModel = await buildPageModel(built.pdf);
+  const normPage = (pg: { lines: { text: string }[] }) => pg.lines.map((l) => l.text).join('').replace(/\s+/g, '');
+  const differing = approvedModel.pages
+    .map((pg, i) => (normPage(pg) === normPage(rebuiltModel.pages[i]!) ? -1 : i + 1))
+    .filter((n) => n > 0);
+  check('rebuild pages equal to approved', differing.length ? differing.join(',') : 0, 0);
+  say(`    note: rebuild sha ${sha(built.pdf).slice(0, 16)}… != approved — PDF bytes are not deterministic`);
+  if (failed) die(`${failed} precondition(s) failed. Nothing was written.`);
+  say('    every precondition holds.');
+
+  // 4 — provenance. The record pins the BYTES of the art, not just rectangles.
+  const illustrations: {
+    blockId: string; assetSha256?: string; page: number;
+    xIn: number; yIn: number; widthIn: number; heightIn: number;
+  }[] = [];
+  for (const s of built.stampedIllustrations) {
+    const entry = (liveConfig.illustrations ?? {})[s.blockId] as { approvedAssetPath?: string } | undefined;
+    let assetSha256: string | undefined;
+    if (entry?.approvedAssetPath) {
+      try {
+        assetSha256 = sha(await storage.readProjectFile(entry.approvedAssetPath));
+      } catch {
+        /* recorded as absent rather than guessed */
+      }
+    }
+    illustrations.push({
+      blockId: s.blockId, assetSha256, page: s.page,
+      xIn: s.xIn, yIn: s.yIn, widthIn: s.widthIn, heightIn: s.heightIn,
+    });
+  }
+  const builtAt = new Date().toISOString();
+  const provenance = {
+    engineFingerprint: fp.engineFingerprint,
+    engineFiles: fp.engineFiles,
+    gitCommit: fp.gitCommit,
+    gitBranch: fp.gitBranch,
+    engineDirty: fp.engineDirty,
+    dirtyFiles: fp.dirtyFiles,
+    ...(dirtyOverrideReason ? { dirtyOverrideReason } : {}),
+    layoutStandardId: built.layoutStandardId,
+    productionProfileId: built.productionProfileId,
+    manuscriptSha256: project!.manuscriptSha256,
+    canonicalManuscriptSha256: project!.canonicalManuscriptSha256,
+    configSnapshotSha256: configSnapshotSha256(liveConfig),
+    configSnapshot: liveConfig,
+    buildOptions,
+    illustrations,
+    pageCount: built.pageCount,
+    pdfSha256: pdfSha,
+    nodeVersion: process.version,
+    builtAt,
+  };
+  say('');
+  say('  4 — PROVENANCE');
+  say(`    configSnapshotSha256   ${provenance.configSnapshotSha256}`);
+  say(`    illustrations recorded ${illustrations.length} with page + rectangle`);
+  const unhashed = illustrations.filter((i) => !i.assetSha256).length;
+  if (unhashed) {
+    die(
+      `${unhashed} of ${illustrations.length} illustrations have no art hash. ` +
+        `The record is supposed to pin the BYTES, not just the rectangle.`,
+    );
+  }
+  say(`    art bytes hashed       ${illustrations.length}/${illustrations.length}`);
+  say(`    engineFiles pinned     ${fp.engineFiles.length}`);
+
+  const EXPORT_NAME = flag('export-name') ?? path.basename(pdfPath!);
+  const storagePath = `${PROJECT_ID}/exports/${EXPORT_NAME}`;
+  const artifact = ProofArtifactSchema.parse({
+    id: PROOF_ID,
+    kind: 'BOOK_PROOF',
+    title: flag('label') ?? `${project!.title} — interior rev${rev} (${built.pageCount}pp, FINAL — SHIPPING)`,
+    storagePath,
+    sha256: pdfSha,
+    fileSizeBytes: onDisk.length,
+    totalPages: built.pageCount,
+    createdAt: builtAt,
+    provenance,
+  });
+
+  // 5 — supersede prior shipping proofs, never delete them
+  const SUPERSEDE_NOTE = ` — SUPERSEDED by rev${rev}`;
+  const priorFinals = (liveConfig.proofArtifacts ?? []).filter(
+    (a: { kind: string; title: string }) => a.kind === 'BOOK_PROOF' && !a.title.includes('SUPERSEDED'),
+  );
+  say('');
+  say('  5 — SUPERSEDE');
+  for (const a of priorFinals) say(`    ${a.id}  "${a.title}"  ->  +"${SUPERSEDE_NOTE.trim()}"`);
+  if (!priorFinals.length) say('    (no un-superseded prior BOOK_PROOF)');
+  const nextArtifacts = [
+    ...(liveConfig.proofArtifacts ?? [])
+      .filter((a: { id: string }) => a.id !== PROOF_ID)
+      .map((a: { kind: string; title: string }) =>
+        a.kind === 'BOOK_PROOF' && !a.title.includes('SUPERSEDED')
+          ? { ...a, title: `${a.title}${SUPERSEDE_NOTE}` }
+          : a,
+      ),
+    artifact,
+  ];
+  const nextConfig = ProjectConfigSchema.parse({ ...liveConfig, proofArtifacts: nextArtifacts });
+
+  say('');
+  say('  6 — WRITE');
+  say(`    export        ${storagePath}`);
+  say(`    proof         ${PROOF_ID}`);
+  say(`    status        ${project!.status} -> EXPORTED`);
+  if (!CONFIRM) {
+    say('');
+    say('  DRY RUN COMPLETE — every gate passed. Re-run with --confirm to freeze.');
+    say('');
+    process.exit(0);
+  }
+
+  const stored = await storage.writeProjectFile(PROJECT_ID!, ['exports', EXPORT_NAME], onDisk);
+  if (stored.relativePath !== storagePath) die(`storage path drifted: ${stored.relativePath}`);
+  const readBack = await storage.readProjectFile(stored.relativePath);
+  if (sha(readBack) !== pdfSha) die(`uploaded bytes read back with a different sha (${sha(readBack)})`);
+  say(`    uploaded      ${stored.relativePath}  (read back and re-hashed: matches)`);
+  await updateProjectConfig(PROJECT_ID!, nextConfig as never);
+  await setProjectStatus(PROJECT_ID!, 'EXPORTED');
+  const after = await getProject(PROJECT_ID!);
+  const recorded = ((after as { config: { proofArtifacts?: { id: string; sha256: string }[] } }).config.proofArtifacts ?? [])
+    .find((a) => a.id === PROOF_ID);
+  if (!recorded || recorded.sha256 !== pdfSha) die('the proof artifact did not persist');
+  say(`    config        ${PROOF_ID} recorded, sha verified on ${host}`);
+  say(`    status        ${(after as { status: string }).status}`);
+  say('');
+  say(`  FROZEN — ${PROOF_ID}. The approved bytes are the stored bytes.`);
+  say('');
+  process.exit(0);
 }
 
 const integrity = checkRecipeIntegrity(recipe, liveConfig);
