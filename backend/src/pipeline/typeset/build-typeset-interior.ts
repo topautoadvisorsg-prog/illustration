@@ -54,6 +54,19 @@ export interface BuildTypesetInteriorOptions {
    * a read-only audit must not mutate the project it is auditing.
    */
   onResolvedStandard?: (standardId: string) => Promise<void>;
+  /**
+   * Build this manuscript text instead of the one the project row points at.
+   *
+   * Exists so a proposed correction can be BUILT WITHOUT BEING APPLIED. Without
+   * it, the only way to see what an edit does is to repoint the production
+   * manuscript pointer at a scratch file, build, and put the pointer back — a
+   * dry run that writes to production twice and leaves the project pointing at a
+   * temporary file if the build throws in between.
+   *
+   * Read-only by construction: nothing here writes, so a caller can evaluate a
+   * change and walk away having changed nothing.
+   */
+  manuscriptOverride?: { text: string; sha256: string };
 }
 
 export class TypesetInputMissingError extends Error {}
@@ -129,7 +142,9 @@ export async function buildTypesetInterior(
   }
 
   const storage = getProjectStorage();
-  const markdown = (await storage.readProjectFile(project.manuscriptPath)).toString('utf8');
+  const markdown =
+    options.manuscriptOverride?.text ??
+    (await storage.readProjectFile(project.manuscriptPath)).toString('utf8');
 
   const profile = getProductionProfile(config.productionProfileId);
   const standardId = resolveStandardId(config);

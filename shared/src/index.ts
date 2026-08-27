@@ -774,6 +774,19 @@ export const BuildProvenanceSchema = z.object({
   dirtyOverrideReason: z.string().optional(),
   layoutStandardId: z.string().min(1),
   productionProfileId: z.string().optional(),
+  /**
+   * The build OPTIONS, which are not part of config and were previously
+   * recorded nowhere.
+   *
+   * `chaptersStartRecto` decides whether every chapter is forced to a right-hand
+   * page, and it changes the page count of the whole book. Reproducing NO ONE
+   * TOLD ME THAT came back as 178 pages instead of 170 until the right value was
+   * found by trying both — a fact the freeze record already should have carried.
+   *
+   * Optional because every freeze written before this field existed has none.
+   * A recipe without it says so rather than guessing.
+   */
+  buildOptions: z.object({ chaptersStartRecto: z.boolean() }).optional(),
   manuscriptSha256: z.string().min(1),
   canonicalManuscriptSha256: z.string().min(1).optional(),
   /** sha256 of the canonical JSON of the config used, plus the config itself. */

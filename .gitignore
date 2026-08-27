@@ -173,3 +173,6 @@ backend/.fixture-smoke/
 
 # Page-QA proof packages (regenerated; large rasters)
 backend/.page-qa/
+
+# Fast-path working directory: rebuilt PDFs and page proofs, regenerable.
+backend/.book/
