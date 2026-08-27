@@ -40,6 +40,26 @@ BLOCKS the build. See [docs/CORRECTIONS.md](docs/CORRECTIONS.md), which answers 
 correct a typo, change metadata, change only a running head, keep a heading with its
 text, and when a change is systemic enough to belong in the platform instead.
 
+**One command corrects a FROZEN book.** Once a book has been frozen with build
+provenance, a small correction is one command, one build, one report — not an audit:
+
+```bash
+tsx scripts/qa/book.ts recipe    --project <id>   # what it was frozen from; still reproducible?
+tsx scripts/qa/book.ts reproduce --project <id>   # rebuild and prove it matches
+tsx scripts/qa/book.ts correct   --project <id> --corrections fixes.json --pages 64
+```
+
+Dry run by default, and genuinely read-only: the build runs off an in-memory
+manuscript override, so nothing in the project moves until `--confirm`. It reads the
+frozen recipe instead of rediscovering it, diffs against the stored frozen artifact,
+renders only the changed pages and their neighbours, and **escalates only when a coded
+trigger fires** — page count, unexpected diff, reflow without a text change, opener
+moved, illustration moved or orphaned, reference-target count, renderer fingerprint.
+
+Measured: a full 170-page build with 11 stamped illustrations is **19.6s**; text-only
+is **8.1s**; intake to first paginated PDF is **8.5s**. Compute was never the
+bottleneck — see [docs/CORRECTION-FAST-PATH.md](docs/CORRECTION-FAST-PATH.md).
+
 **One command builds a cover.** New production covers, paperback or hardcover,
 are made with a single tool:
 
@@ -276,6 +296,7 @@ sanctioned home for a *text* correction at book scope — that gap is Phase 2.
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Subsystems, diagrams, and the Track A/B boundary |
 | [docs/BOOK-PRODUCTION.md](docs/BOOK-PRODUCTION.md) | The operator path, end to end |
 | [docs/COVERS-AND-SPINES.md](docs/COVERS-AND-SPINES.md) | Geometry, KDP readings, safe zones, the current conflict |
+| [docs/CORRECTION-FAST-PATH.md](docs/CORRECTION-FAST-PATH.md) | Correcting a frozen book: the one command, the four levels, the escalation triggers |
 | [docs/QA-SYSTEM.md](docs/QA-SYSTEM.md) | What is checked today and what is not |
 | [docs/VISION-QA.md](docs/VISION-QA.md) | The vision-model QA engine that already exists — read before building a second one |
 | [docs/SOURCE-OF-TRUTH.md](docs/SOURCE-OF-TRUTH.md) | One authority per production datum |

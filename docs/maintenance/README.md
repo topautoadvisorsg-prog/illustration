@@ -5,6 +5,14 @@ Machine-generated inventories of the operator script surface. These are
 `backend/scripts/` changes materially, and use them to decide dispositions
 rather than deciding by filename.
 
+> **Known staleness.** These inventories predate `backend/scripts/qa/` and contain
+> **no rows for that directory at all** — not for `book.ts`, `build-cover.ts`,
+> `corrections.ts` or the `nottm-*` gates. The generator that produced them is not in
+> the repository, so the tables cannot be regenerated from here, and hand-writing rows
+> would mean guessing at derived columns (`importers`, `in_ci`, `destructive`). Treat a
+> missing `qa/` script as absent from the census, not as unclassified. Rebuilding the
+> generator is backlog.
+
 | File | Rows | What it covers |
 |---|---|---|
 | `script-census.tsv` | 310 | Every tracked script in `backend/scripts/` |
