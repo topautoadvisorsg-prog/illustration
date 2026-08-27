@@ -72,6 +72,8 @@ export interface BuildCoverRequest {
    */
   spineTargetClearIn?: number;
   spineGapIn?: number;
+  /** Cap the side crop so artwork carrying type near its edge is not sliced. See planArtwork. */
+  maxSideCropIn?: number;
   /**
    * Set the author name on the FRONT panel, in real type, rather than relying on
    * the artwork to carry it.
@@ -175,6 +177,7 @@ export async function buildCover(req: BuildCoverRequest): Promise<BuildCoverResu
   const artworkPlan = await planArtwork(req.artwork, geometry, {
     mode: req.fitMode,
     renderDpi: req.renderDpi,
+    maxSideCropIn: req.maxSideCropIn,
   });
   const dpi = artworkPlan.renderDpi;
   const placed = await renderArtwork(req.artwork, artworkPlan);
@@ -369,6 +372,9 @@ function renderReport(o: {
   out.push('');
   out.push(L('artwork', `${a.sourceWidthPx} x ${a.sourceHeightPx}px, fit "${a.mode}"`));
   out.push(L('effective PPI', `${a.effectivePpi.toFixed(1)} against a ${g.minDpi} minimum`));
+  if (a.topExtendIn > 0) {
+    out.push(L('side-crop cap', `${a.cropIn.leftIn.toFixed(3)}in per side; ${a.topExtendIn.toFixed(3)}in of sky stretched at the TOP`));
+  }
   out.push(
     L('spine text', o.spineText.placed
       ? `placed, ${(o.spineText.measuredClearPerSideIn ?? 0).toFixed(4)}in measured clearance per side`

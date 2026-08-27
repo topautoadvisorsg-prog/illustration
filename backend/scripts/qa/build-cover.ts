@@ -91,6 +91,9 @@ if ((faBaseline || faCap || faWidth) && !frontAuthor) {
   die('build-cover: --author-baseline, --author-cap-height and --author-max-width are given together or not at all.');
 }
 
+/** Cap the side crop, for artwork whose type sits near its own edge. */
+const maxSideCrop = flag('max-side-crop');
+
 const OUT = flag('out');
 const PROOF = flag('proof');
 const MANIFEST = flag('manifest');
@@ -109,6 +112,7 @@ try {
     title,
     author,
     frontAuthor,
+    ...(maxSideCrop ? { maxSideCropIn: Number(maxSideCrop) } : {}),
     subtitle: flag('subtitle'),
     spineText: has('no-spine-text') ? false : undefined,
     fitMode: (flag('fit') as FitMode | undefined) ?? undefined,

@@ -78,10 +78,10 @@ const ARTIFACTS = {
    under `_np_build/_superseded-*`. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
   interior: '8fd59b565fe32c411090a4eb403b210db069556e922764fa61fd3be1132499ec',
-  pbCover: '957df317491eac9e70f74b5a87a5ed4ec9416aa7cc7432cf620eb27ee622754c',
+  pbCover: 'd4fb6c4c7249f6263eb4f527d1aef56d5b9c870c21fbfc41c3edf6b387c00a07',
   epub: 'ec1502ee9eb1991c7282b9ec9c069b6f7b244df10e69bb6be95d5357b558da01',
-  hcCover: '7e57237660fd950282c7df425b179ce30366b8152e111fe8f3d36d8c8e2629d0',
-  kindleCover: '3f34e0cb2ea545394dd9759a15eb33db9f498f9e96477aa97a71ff310f14c4b6',
+  hcCover: '263e8d15f137daaa64dfe6fb27abe9c3322ad9335ae491b8683162ba8cd0532c',
+  kindleCover: '843e124930dfa41ea594b7abdda7631991cc5c1b8cb6b17d17b6e140b6d05696',
 };
 
 const PAGES = 120;
