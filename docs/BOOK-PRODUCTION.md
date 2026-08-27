@@ -131,6 +131,28 @@ field. A hash quoted from a log has already been reported wrong once.
 
 ---
 
+## Connecting to a database
+
+Operational scripts select their connection through **one** entry point:
+
+```ts
+const { openOperationalDatabase, ProductionWriteGrant } = await import(
+  '../src/db/operational-access.js',
+);
+await import('../src/env.js');
+openOperationalDatabase({ environment: 'production', intent: 'read' });
+```
+
+**Direct `process.env.DATABASE_URL` manipulation is prohibited.** So is reading
+`.env` yourself, and so is writing your own `127.0.0.1` check. `db/client.ts`
+refuses an off-box connection that nothing declared, so the old pattern now fails
+loudly instead of quietly working.
+
+- Production is identified by WHERE credentials are declared, not by the URL.
+- `intent: 'read'` needs no ceremony. A dry run should ask for `read`.
+- `intent: 'write'` against production needs a `ProductionWriteGrant`, which takes
+  a real reason and an explicit confirmation, and records the reason.
+
 ## Things that will bite you
 
 - **A plate vanished.** Its anchor went stale when pagination moved. The stamper

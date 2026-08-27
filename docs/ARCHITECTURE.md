@@ -237,17 +237,7 @@ them, because a register that only ever grows stops being read.
 
 ### P0 — unsafe or actively misleading
 
-1. **The database has no production guard, while storage does.**
-   `project-storage.ts` gates on `APP_ENVIRONMENT` and has a dedicated isolation
-   test. The database has no equivalent: **18 scripts reach production by
-   assigning `process.env.DATABASE_URL`** after the dotenv layers have run, each
-   re-implementing its own inline host check, or not. A script with a typo in
-   that check writes to production silently. Asymmetric protection is worse than
-   none, because the storage guard implies a safety that the database does not
-   have. *Fix: one `connectToProduction(reason)` helper that refuses unless
-   `APP_ENVIRONMENT=production`, plus a test mirroring the storage one.*
-
-2. **`scripts/` is the production surface and has no design.** 341 tracked (was
+1. **`scripts/` is the production surface and has no design.** 341 tracked (was
    310), **87 of them `_`-prefixed with no caller in code, CI or package.json**
    and no recorded disposition. `_project.ts` is in that same namespace and is
    load-bearing — read by 117 scripts and named in SOURCE-OF-TRUTH.md — so the
@@ -255,8 +245,18 @@ them, because a register that only ever grows stops being read.
    individually; do not bulk-delete. `docs/archive/HANDOFF_EVERY_PAGE_ILLUSTRATED.md`
    carries a standing operator instruction not to assume these are safe to remove.*
 
-3. **Generic QA tools wear book-specific filenames**, so the next book copies
+2. **Generic QA tools wear book-specific filenames**, so the next book copies
    rather than calls. `nottm-*` and `dirt-rich-*` are the current examples.
+
+3. **`scripts/` is not typechecked.** `backend/tsconfig.json` includes
+   `src/**/*` only, and `build` emits from it, so nothing ever compiled the
+   operator surface. That is how a call to `updateProjectStatus` — a function
+   `projects.repo` does not export — survived a dry run and failed only after
+   the writes before it had landed. `backend/tsconfig.scripts.json` exists and
+   covers `scripts/qa`, but is **not wired into `yarn typecheck`**: 21
+   pre-existing errors there, and 191 across the wider `scripts/`, would fail
+   the hook for unrelated reasons. *Fix: clear those 21, then add it to the
+   typecheck script.*
 
 ### P1 — real cost, no immediate danger
 
@@ -314,7 +314,27 @@ them, because a register that only ever grows stops being read.
     searchable, so a grep for a subsystem returns historical claims alongside
     current ones.
 
+### Backlog, recorded not scheduled
+
+- The 88 `UNKNOWN` entries in `docs/maintenance/underscore-scripts-disposition.tsv`
+  still need a per-file decision. They are CLIs that are RUN rather than
+  imported, so no importer is the expected state for a working tool.
+- 21 type errors in `scripts/qa`, 191 across `scripts/` — see P0.3.
+- `dirt-rich-*` and `seed-packet-*` set `APP_ENVIRONMENT='production'` on
+  themselves. Legitimate for a production run, but it means the storage guard is
+  satisfied by self-assertion rather than by the environment.
+- The `client.ts` tripwire treats "off-box" as production. Correct today because
+  there is no staging database; it would need the declaration to be extended
+  before one existed.
+
 ### Closed by work already shipped
+
+- ~~The database has no production guard while storage does; 18 scripts assign
+  `process.env.DATABASE_URL` by hand.~~ Closed by `db/operational-access.ts`:
+  one entry point, environment by declaration rather than URL sniffing, read and
+  write intent separated, a `ProductionWriteGrant` that cannot be built from a
+  bare `true`, and a tripwire in `client.ts` so an ad-hoc connection is refused
+  rather than merely discouraged. All 18 migrated; 14 tests.
 
 - ~~Cover geometry has no single authority (five implementations, zero verified
   readings).~~ Closed by the Phase 1B/1C compositor: `cover/compositor/geometry.ts`

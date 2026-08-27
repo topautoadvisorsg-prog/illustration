@@ -60,6 +60,36 @@ Measured: a full 170-page build with 11 stamped illustrations is **19.6s**; text
 is **8.1s**; intake to first paginated PDF is **8.5s**. Compute was never the
 bottleneck — see [docs/CORRECTION-FAST-PATH.md](docs/CORRECTION-FAST-PATH.md).
 
+**One way to reach a database.** Operational scripts must select their connection
+through the sanctioned entry point. Reading `.env` by hand, assigning
+`process.env.DATABASE_URL`, or inventing a localhost check is **prohibited** — that
+is how eighteen scripts each ended up with their own safety story, and how the one
+written to BE the safe path ended up with no host check at all.
+
+```ts
+const { openOperationalDatabase, ProductionWriteGrant } = await import(
+  '../src/db/operational-access.js',
+);
+await import('../src/env.js');           // dotenv layers run first
+openOperationalDatabase({ environment: 'production', intent: 'read' });
+```
+
+A write asks for it, and says why:
+
+```ts
+openOperationalDatabase({
+  environment: 'production',
+  intent: 'write',
+  grant: ProductionWriteGrant.declare({ reason: 'Freeze rev26', confirmed: CONFIRM }),
+});
+```
+
+The environment is decided by WHERE credentials are declared — production in `.env`,
+development in `.env.development.local` — never by what the URL looks like. A
+production write with no grant is refused, a grant cannot be built from a bare
+`true`, and `db/client.ts` refuses an off-box connection that nothing declared, so
+the old pattern fails rather than quietly working.
+
 **One command builds a cover.** New production covers, paperback or hardcover,
 are made with a single tool:
 
