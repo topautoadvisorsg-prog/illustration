@@ -122,7 +122,7 @@ let wrap = await sharp(ART)
 const PARKS = ['Yellowstone', 'Grand Canyon', 'Yosemite', 'Zion', 'Great Smoky Mountains', 'Rocky Mountain', 'Acadia'];
 const TITLE_LINES = ['7 NATIONAL', 'PARKS', 'WITHOUT THE', 'ROOKIE MISTAKES'];
 const SUBTITLE_LINES = ["What's Worth Your Time, What to Skip,", 'and What I Learned the Hard Way'];
-const AUTHOR = 'Tom Everett';
+const AUTHOR = 'Wes Denman';
 
 const BACK_BLOCKS: CopyBlockSpec[] = [
   {
@@ -143,7 +143,7 @@ const BACK_BLOCKS: CopyBlockSpec[] = [
   {
     kind: 'para',
     text:
-      'Tom Everett drove to Zion at twenty-seven with no plan, got turned back at the canyon mouth, ' +
+      'Wes Denman drove to Zion at twenty-seven with no plan, got turned back at the canyon mouth, ' +
       'and learned at the junction that the permit he needed had been drawn months earlier. ' +
       'The afternoon he salvaged is still one of the best of his life. He has never stopped being ' +
       'annoyed about the day he wasted getting to it.',

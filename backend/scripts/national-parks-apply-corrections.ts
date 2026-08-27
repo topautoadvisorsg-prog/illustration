@@ -27,9 +27,9 @@ const MANUSCRIPT =
   'C:/Users/jovan/Downloads/national parks book/LAYOUT-7-national-parks-without-the-rookie-mistakes.md';
 
 /** The file as corrected on 2026-08-23. Refuse anything else. */
-const CORRECTED_SHA = '26615fa372fc96c093875af27b5302b576d611ad247288d4bdacec554d265d08';
+const CORRECTED_SHA = '70f2fe06ca3998e2a9425499d0f77f66178932fd263dc3fd1885ab8315171012';
 /** What it replaces, so a stale file is named rather than merely rejected. */
-const PREVIOUS_SHA = '7d12bb3099a4e1b7a43875011785a2818641ed3506e8c59386dbc2d6b3c878eb';
+const PREVIOUS_SHA = '6d40499c1b6244a027b91b223e9cd7e670a532df401eab76032e471334ef3d79';
 
 const { P } = await import('./_project.js');
 const { getProject, setManuscript } = await import('../src/db/repositories/projects.repo.js');

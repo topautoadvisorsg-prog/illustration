@@ -287,13 +287,13 @@ if (RASTER) {
   const ON_FRONT: Array<[string, string]> = [
     ['Title on the front', '7 National Parks Without the Rookie Mistakes'],
     ['Subtitle on the front', "What's Worth Your Time, What to Skip, and What I Learned the Hard Way"],
-    ['Author on the front', 'Tom Everett'],
+    ['Author on the front', 'Wes Denman'],
   ];
   for (const [label, needle] of ON_FRONT) {
     if (frontText.includes(squash(needle))) pass(label, `"${needle.slice(0, 46)}" present`);
     else fail(label, `"${needle.slice(0, 46)}" NOT ON THE FRONT COVER`);
   }
-  if (spineText.includes(squash('Tom Everett'))) pass('Author on the spine', 'present');
+  if (spineText.includes(squash('Wes Denman'))) pass('Author on the spine', 'present');
   else fail('Author on the spine', 'missing');
   if (backText.length > 400) pass('back-cover copy', `${backText.length} characters of copy on the back panel`);
   else fail('back-cover copy', `only ${backText.length} characters on the back panel`);

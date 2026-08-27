@@ -52,26 +52,22 @@ const ARTIFACTS = {
   interior: '7-national-parks-interior-6x9-120pp.pdf',
   pbCover: '7-national-parks-cover-PAPERBACK-6x9-120pp.pdf',
   epub: '7-national-parks-KINDLE.epub',
+  hcCover: '7-national-parks-cover-HARDCOVER-6x9-120pp.pdf',
   kindleCover: '7-national-parks-KINDLE-cover-1600x2560.jpg',
 } as const;
 
 /**
- * THE HARDCOVER COVER IS NOT IN THE PACKAGE, AND THAT IS THE POINT.
+ * THE HARDCOVER COVER IS IN THE PACKAGE.
  *
- * The corrections took the interior from 116 pages to 120, and a hardcover spine
- * cannot be derived from a formula the way a paperback's can — it comes from
- * Amazon's Cover Calculator. `kdp-cover-specs` holds one verified reading for
- * this configuration, at 116pp, and refuses to interpolate from a single point.
+ * It was pending for as long as there was no verified Cover Calculator reading
+ * at this page count, and `kdp-cover-specs` refuses to interpolate a hardcover
+ * spine from a single anchor. The reading was taken on 2026-08-26 for
+ * HARDCOVER/CASE_LAMINATE, BLACK_AND_WHITE, WHITE paper, 6x9in at 120pp:
+ * full wrap 14.034 x 10.417in, spine 0.459in, board 6.197 x 9.236in.
  *
- * So there is no hardcover wrap to ship, and the 116pp one would be wrong by
- * design: a 0.450in spine on a 120-page block. It is quarantined under
- * `_np_build/_superseded-116pp/` rather than left where it could be uploaded.
- * This check reports the gap rather than passing a package that is missing a
- * file someone is waiting to upload.
+ * The 116pp wrap stays quarantined under `_np_build/_superseded-116pp/`. Its
+ * 0.450in spine is wrong for a 120-page block and it must never be uploaded.
  */
-const HARDCOVER_PENDING =
-  'hardcover wrap: BLOCKED until the KDP Cover Calculator is read for ' +
-  'HARDCOVER/CASE_LAMINATE, BLACK_AND_WHITE, WHITE paper, 6x9in, 120pp';
 
 /* The three cover files have been re-cut repeatedly across 2026-08-22/23 as the
    front-cover treatment settled, and the INTERIOR changed once, on 2026-08-23,
@@ -81,10 +77,11 @@ const HARDCOVER_PENDING =
    the parity blanks unmoved. Every superseded file is kept, named with its hash,
    under `_np_build/_superseded-*`. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
-  interior: '0ca8ac579653517a1304b20907219f9da8af3d1ae1fc0d288b8ce46c6ff6c72b',
-  pbCover: 'e302db9c5c2c48d9462fabd3c03e9973f4b4244199fd8314192c8824b1005c1e',
-  epub: '114bbeb619b394c12b1abf0148f4782e971e80c5886b9aa3b5b63befc036b63d',
-  kindleCover: 'd83f67a3ecab2ff3b0be36e9ee88d9fc70a7ae494a4278d50ffaaefcae6125b0',
+  interior: '8fd59b565fe32c411090a4eb403b210db069556e922764fa61fd3be1132499ec',
+  pbCover: '957df317491eac9e70f74b5a87a5ed4ec9416aa7cc7432cf620eb27ee622754c',
+  epub: 'ec1502ee9eb1991c7282b9ec9c069b6f7b244df10e69bb6be95d5357b558da01',
+  hcCover: '7e57237660fd950282c7df425b179ce30366b8152e111fe8f3d36d8c8e2629d0',
+  kindleCover: '3f34e0cb2ea545394dd9759a15eb33db9f498f9e96477aa97a71ff310f14c4b6',
 };
 
 const PAGES = 120;
@@ -97,14 +94,14 @@ const PB_WRAP_W = 0.125 * 2 + 6 * 2 + PB_SPINE;
 const PB_WRAP_H = 9 + 0.25;
 const PLATES_EXPECTED = 15;
 
-/** Hardcover: the verified Cover Calculator reading, 6x9 case laminate, 116pp. */
+/** Hardcover: the verified Cover Calculator reading, 6x9 case laminate, at THIS page count. */
 const HC = getKdpCoverDimensions({
   binding: 'HARDCOVER',
   coverType: 'CASE_LAMINATE',
   interiorType: 'BLACK_AND_WHITE',
   paperType: 'WHITE',
   trimSize: '6x9',
-  pageCount: 116,
+  pageCount: PAGES,
 });
 const HC_WRAP_W = HC.fullWidthIn;
 const HC_WRAP_H = HC.fullHeightIn;
@@ -117,7 +114,7 @@ const sha = (b: Buffer): string => createHash('sha256').update(b).digest('hex');
 const abs = (rel: string): string => path.join(DIR, ...rel.split('/'));
 
 // ── 1. The exact bytes ─────────────────────────────────────────────────────
-console.log('1. FILE IDENTITY — four artifacts (the hardcover wrap is pending)');
+console.log('1. FILE IDENTITY — five artifacts, all three editions');
 const bytes = {} as Record<keyof typeof ARTIFACTS, Buffer>;
 for (const key of Object.keys(ARTIFACTS) as Array<keyof typeof ARTIFACTS>) {
   const rel = ARTIFACTS[key];
@@ -249,7 +246,25 @@ for (const [label, buf, wantW, wantH, note] of [
   else fail(`${label} annotations`, 'annotations or a form are present on a print cover');
 }
 
-fail(HARDCOVER_PENDING, `no wrap exists for a ${PAGES}-page block; the ${116}pp one is quarantined, not shipped`);
+{
+  /** Measured against the calculator reading for THIS page count, not a formula. */
+  const bytes = readFileSync(abs(ARTIFACTS.hcCover));
+  const doc = await PDFDocument.load(bytes);
+  const pg = doc.getPage(0);
+  const w = pg.getWidth() / PT;
+  const h = pg.getHeight() / PT;
+  const okW = Math.abs(w - HC_WRAP_W) < 0.002;
+  const okH = Math.abs(h - HC_WRAP_H) < 0.002;
+  if (okW && okH) {
+    pass(
+      'hardcover wrap',
+      `${w.toFixed(6)} x ${h.toFixed(6)} in — spine ${HC.spineIn}in, board ${HC.frontWidthIn} x ${HC.frontHeightIn}in, ` +
+        `from the Cover Calculator reading for ${PAGES}pp (${HC.provenance})`,
+    );
+  } else {
+    fail('hardcover wrap', `${w.toFixed(6)} x ${h.toFixed(6)} in against a required ${HC_WRAP_W} x ${HC_WRAP_H} in`);
+  }
+}
 
 // ── 5. Kindle ──────────────────────────────────────────────────────────────
 console.log('\n5. KINDLE');
@@ -289,7 +304,7 @@ console.log('\n5. KINDLE');
 
   for (const [label, needle] of [
     ['Title', '7 National Parks Without the Rookie Mistakes'],
-    ['Author', 'Tom Everett'],
+    ['Author', 'Wes Denman'],
   ] as Array<[string, string]>) {
     if (opfXml.includes(needle)) pass(`${label} in the OPF`, 'present');
     else fail(`${label} in the OPF`, 'NOT FOUND in the package metadata');
@@ -364,7 +379,7 @@ console.log('\n6. DELIVERY FOLDER');
    * form during the same sitting as the uploads, and keeping them in the same
    * folder is what stops that being done from memory.
    */
-  const COMPANION_DOCS = ['AMAZON-BOOK-DESCRIPTION.md'];
+  const COMPANION_DOCS = ['AMAZON-BOOK-DESCRIPTION.md', '7-national-parks-cover-HARDCOVER-6x9-120pp.json'];
   const expected = [...Object.values(ARTIFACTS), MANIFEST, ...COMPANION_DOCS].sort();
   for (const f of found) console.log(`   ${f}`);
   const extra = found.filter((e) => !expected.includes(e));

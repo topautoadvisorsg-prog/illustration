@@ -23,7 +23,7 @@ if (!PDF_PATH) throw new Error('usage: national-parks-fidelity.ts <pdf>');
 
 const MANUSCRIPT =
   'C:/Users/jovan/Downloads/national parks book/LAYOUT-7-national-parks-without-the-rookie-mistakes.md';
-const SHIPPING_SHA = '26615fa372fc96c093875af27b5302b576d611ad247288d4bdacec554d265d08';
+const SHIPPING_SHA = '70f2fe06ca3998e2a9425499d0f77f66178932fd263dc3fd1885ab8315171012';
 
 const sha = (b: Buffer | string): string => createHash('sha256').update(b as never).digest('hex');
 
@@ -467,7 +467,7 @@ console.log('\n7. FRONT MATTER AND IDENTITY');
 {
   const disclosure = lines
     .map((l) => l.trim())
-    .find((l) => l.includes('Tom Everett is a pen name and a composite narrator'))!;
+    .find((l) => l.includes('Wes Denman is a pen name and a composite narrator'))!;
   const clean = deMark(disclosure);
   if (inPdf(clean)) pass('composite-narrator disclosure', 'present, verbatim');
   else fail('composite-narrator disclosure', 'NOT FOUND — this is a legal disclosure and must print');
@@ -475,8 +475,8 @@ console.log('\n7. FRONT MATTER AND IDENTITY');
   const REQUIRED: Array<[string, string]> = [
     ['Title', '7 National Parks Without the Rookie Mistakes'],
     ['Subtitle', "What's Worth Your Time, What to Skip, and What I Learned the Hard Way"],
-    ['Author', 'Tom Everett'],
-    ['Copyright line', 'Copyright © 2026 by Tom Everett'],
+    ['Author', 'Wes Denman'],
+    ['Copyright line', 'Copyright © 2026 by Wes Denman'],
     ['Rights statement', 'All rights reserved.'],
     ['Front-matter note 1', 'A note on how this book was written'],
     ['Front-matter note 2', 'The other note, the legal one'],

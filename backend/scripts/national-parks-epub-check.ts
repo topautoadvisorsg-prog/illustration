@@ -16,7 +16,7 @@ if (!EPUB) throw new Error('usage: national-parks-epub-check.ts <epub>');
 
 const MANUSCRIPT =
   'C:/Users/jovan/Downloads/national parks book/LAYOUT-7-national-parks-without-the-rookie-mistakes.md';
-const SHIPPING_SHA = '26615fa372fc96c093875af27b5302b576d611ad247288d4bdacec554d265d08';
+const SHIPPING_SHA = '70f2fe06ca3998e2a9425499d0f77f66178932fd263dc3fd1885ab8315171012';
 
 let failures = 0;
 let warnings = 0;
@@ -277,9 +277,9 @@ console.log('\n7. IDENTITY');
   for (const [label, needle] of [
     ['Title', '7 National Parks Without the Rookie Mistakes'],
     ['Subtitle', "What's Worth Your Time, What to Skip, and What I Learned the Hard Way"],
-    ['Author', 'Tom Everett'],
-    ['Composite-narrator disclosure', 'Tom Everett is a pen name and a composite narrator'],
-    ['Copyright line', 'Copyright © 2026 by Tom Everett'],
+    ['Author', 'Wes Denman'],
+    ['Composite-narrator disclosure', 'Wes Denman is a pen name and a composite narrator'],
+    ['Copyright line', 'Copyright © 2026 by Wes Denman'],
     ['Rights statement', 'All rights reserved.'],
   ] as Array<[string, string]>) {
     if (inBook(needle)) pass(label, 'present');

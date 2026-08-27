@@ -70,6 +70,27 @@ const author = flag('author') ?? '';
 if (!title) die('build-cover: --title is required.');
 if (!author) die('build-cover: --author is required.');
 
+/**
+ * Front-cover author placement, MEASURED off the approved artwork.
+ *
+ * Given together or not at all: a name set at a guessed baseline is worse than
+ * no name, because it looks deliberate and is wrong.
+ */
+const faBaseline = flag('author-baseline');
+const faCap = flag('author-cap-height');
+const faWidth = flag('author-max-width');
+const frontAuthor =
+  faBaseline && faCap && faWidth
+    ? {
+        baselineFromBottomIn: Number(faBaseline),
+        capHeightIn: Number(faCap),
+        maxWidthIn: Number(faWidth),
+      }
+    : undefined;
+if ((faBaseline || faCap || faWidth) && !frontAuthor) {
+  die('build-cover: --author-baseline, --author-cap-height and --author-max-width are given together or not at all.');
+}
+
 const OUT = flag('out');
 const PROOF = flag('proof');
 const MANIFEST = flag('manifest');
@@ -87,6 +108,7 @@ try {
     trim,
     title,
     author,
+    frontAuthor,
     subtitle: flag('subtitle'),
     spineText: has('no-spine-text') ? false : undefined,
     fitMode: (flag('fit') as FitMode | undefined) ?? undefined,
