@@ -15,12 +15,10 @@ const REV5_PDF = 'e382e2e56bc3ef31904e6c5b680b86fc1be194fd78726ea084095b23dcf0cc
 const CANONICAL = 'bc27f4d50bb22be1eb4d0f4d83fa4041d97983cbbabc91077e496ee2205b358c';
 const DIR = 'C:/Users/jovan/Downloads/dirt rich book';
 
-const envFile = readFileSync('../.env', 'utf8');
-const prodUrl = envFile.match(/^DATABASE_URL\s*=\s*"?([^"\n\r]+)"?/m)?.[1];
-if (!prodUrl || prodUrl.includes('127.0.0.1')) throw new Error('no remote DATABASE_URL');
 
 const { getEnv } = await import('../src/env.js');
-process.env.DATABASE_URL = prodUrl;
+const { openOperationalDatabase, describeAccess } = await import('../src/db/operational-access.js');
+const __access = openOperationalDatabase({ environment: 'production', intent: 'read' });
 process.env.APP_ENVIRONMENT = 'production';
 const env = getEnv();
 if (env.APP_ENVIRONMENT !== 'production') throw new Error('env did not resolve to production');

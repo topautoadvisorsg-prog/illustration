@@ -31,8 +31,8 @@ const REPO_ROOT = nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.ur
 // Let env.ts do its normal load, then declare this process production before
 // anything reads env. getEnv() caches lazily, so this override wins.
 await import('../src/env.js');
-const PROD = parseDotenv(readFileSync(nodePath.join(REPO_ROOT, '.env')));
-process.env.DATABASE_URL = PROD.DATABASE_URL;
+const { openOperationalDatabase, describeAccess } = await import('../src/db/operational-access.js');
+const __access = openOperationalDatabase({ environment: 'production', intent: 'read' });
 process.env.APP_ENVIRONMENT = 'production';
 
 const PROJECT_ID = 'a4e2bbda-645f-4583-9123-7d24ab515c9c';

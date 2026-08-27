@@ -26,8 +26,8 @@ import { resolvePaperbackSpine } from '../src/pipeline/publishing-standard/kdp-s
 const REPO_ROOT = nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.url)), '../../');
 
 await import('../src/env.js');
-const PROD = parseDotenv(readFileSync(nodePath.join(REPO_ROOT, '.env')));
-process.env.DATABASE_URL = PROD.DATABASE_URL;
+const { openOperationalDatabase, describeAccess } = await import('../src/db/operational-access.js');
+const __access = openOperationalDatabase({ environment: 'production', intent: 'read' });
 process.env.APP_ENVIRONMENT = 'production';
 
 const [SRC, OUT] = process.argv.slice(2);

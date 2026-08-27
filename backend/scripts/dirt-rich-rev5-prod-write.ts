@@ -23,24 +23,31 @@ const NEXT = 'C:/Users/jovan/Downloads/dirt rich book/REV5-CANDIDATE-working-man
 const BACKUP = 'C:/Users/jovan/Downloads/dirt rich book/REV4-live-working-manuscript.backup.md';
 const COMMIT = process.argv.includes('--commit');
 
-const envFile = readFileSync('../.env', 'utf8');
-const prodUrl = envFile.match(/^DATABASE_URL\s*=\s*"?([^"\n\r]+)"?/m)?.[1];
-if (!prodUrl) throw new Error('no DATABASE_URL in .env');
-if (prodUrl.includes('127.0.0.1') || prodUrl.includes('localhost')) {
-  throw new Error('.env DATABASE_URL is not remote — refusing');
-}
-
-// env.ts runs dotenv with override:true in its module body, so it must be
-// imported BEFORE these are set, or it overwrites them with the dev values.
+const { openOperationalDatabase, ProductionWriteGrant, describeAccess } = await import(
+  '../src/db/operational-access.js',
+);
+// env.ts loads dotenv with override:true in its module body, so it must be imported
+// BEFORE the connection is selected or it puts the dev values back.
 const { getEnv } = await import('../src/env.js');
-process.env.DATABASE_URL = prodUrl;
+// A DRY RUN reads only, so it asks for read intent and needs no grant. Only a
+// --commit run requests write, and that request has to carry a reason.
+const __access = openOperationalDatabase({
+  environment: 'production',
+  intent: COMMIT ? 'write' : 'read',
+  ...(COMMIT
+    ? {
+        grant: ProductionWriteGrant.declare({
+          reason: 'Replace the DIRT RICH rev4 working manuscript with the rev5 candidate',
+          confirmed: COMMIT,
+        }),
+      }
+    : {}),
+});
 process.env.APP_ENVIRONMENT = 'production';
 const env = getEnv();
-if (env.APP_ENVIRONMENT !== 'production' || env.DATABASE_URL.includes('127.0.0.1')) {
-  throw new Error('env did not resolve to production — refusing');
-}
-console.log(`target : ${env.DATABASE_URL.replace(/(:\/\/[^:]+):[^@]+@/, '$1:***@')}`);
-console.log(`mode   : ${COMMIT ? 'COMMIT' : 'DRY RUN'}\n`);
+console.log(describeAccess(__access));
+console.log(`mode   : ${COMMIT ? 'COMMIT' : 'DRY RUN'}`);
+console.log('');
 
 const { getProject, replaceWorkingManuscript } = await import('../src/db/repositories/projects.repo.js');
 const { getProjectStorage } = await import('../src/services/storage/project-storage.js');

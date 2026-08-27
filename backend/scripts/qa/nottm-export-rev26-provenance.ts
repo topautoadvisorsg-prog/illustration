@@ -21,14 +21,12 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const PROJECT_ID = '3b7ed37a-8a07-4bfd-a0c3-14ae5dc4a6ff';
 const OUT = 'C:/Users/jovan/Downloads/NO_ONE_TOLD_ME_THAT_KDP/_provenance/rev26.provenance.json';
 
-const PROD_URL = readFileSync(path.join(REPO_ROOT, '.env'), 'utf8')
-  .split(/\r?\n/)
-  .find((l) => l.startsWith('DATABASE_URL='))!
-  .slice('DATABASE_URL='.length)
-  .trim()
-  .replace(/^["']|["']$/g, '');
+const { openOperationalDatabase, describeAccess } = await import(
+  '../../src/db/operational-access.js',
+);
+// Read-only.
 await import('../../src/env.js');
-process.env.DATABASE_URL = PROD_URL;
+const __access = openOperationalDatabase({ environment: 'production', intent: 'read' });
 
 const { getProject } = await import('../../src/db/repositories/projects.repo.js');
 const project = (await getProject(PROJECT_ID)) as { config: { proofArtifacts?: { id: string; provenance?: unknown }[] } } | undefined;

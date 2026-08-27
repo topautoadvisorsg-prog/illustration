@@ -20,8 +20,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '../../');
 
 await import('../src/env.js');
-const PROD = parseDotenv(readFileSync(path.join(REPO_ROOT, '.env')));
-process.env.DATABASE_URL = PROD.DATABASE_URL;
+const { openOperationalDatabase, describeAccess } = await import('../src/db/operational-access.js');
+const __access = openOperationalDatabase({ environment: 'production', intent: 'read' });
 process.env.APP_ENVIRONMENT = 'production';
 
 const [SRC, PROMPT_FILE, OUT] = process.argv.slice(2);

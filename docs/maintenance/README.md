@@ -18,6 +18,30 @@ rather than deciding by filename.
 | `script-census.tsv` | 310 | Every tracked script in `backend/scripts/` |
 | `unknown-review.tsv` | 68 | The scripts the census could not classify, reviewed individually |
 | `scratch-inventory.tsv` | 431 | Every file in the untracked `backend/scripts/_scratch/` workbench |
+| `underscore-scripts-disposition.tsv` | 111 | Every tracked `backend/scripts/_*.ts`, classified so the next cleanup does not start from zero |
+
+## The `_`-script disposition
+
+`underscore-scripts-disposition.tsv` exists because the `_` prefix does **not**
+mean scratch. `_project.ts` carries that prefix and has **114 importers**; it is
+named in SOURCE-OF-TRUTH.md and refuses to default to a book. Sorting by filename
+would have archived it.
+
+| Disposition | Count | Means |
+|---|---|---|
+| `SHARED_LIBRARY` | 1 | Three or more importers. Load-bearing. |
+| `ACTIVE` | 2 | Imported, or named in package.json / CI. |
+| `HISTORICAL` | 20 | No importer, but named in a document, so it had a purpose worth recording. |
+| `UNKNOWN` | 88 | No import, package.json, CI or doc reference could be found. |
+
+**`UNKNOWN` means unknown, not dead.** These are operator CLIs — they are RUN,
+not imported, so having no importer is the expected state for a perfectly good
+tool. Nothing here justifies deletion on its own, and
+`docs/archive/HANDOFF_EVERY_PAGE_ILLUSTRATED.md` carries a standing operator
+instruction not to assume these files are safe to remove.
+
+Regenerate by re-running the classification against imports, `package.json`, CI
+and `docs/`. It is deliberately cheap and deliberately not a second census.
 
 ## How the census was built
 

@@ -60,23 +60,34 @@ if (!command || !['recipe', 'reproduce', 'correct'].includes(command)) {
 }
 if (!PROJECT_ID) die('--project <id> is required');
 
-// ── production connection, scoped to this process ────────────────────────────
+// ── production connection ────────────────────────────────────────────────────
 /**
- * `env.ts` loads `.env` then `.env.development.local` with override, so the
- * developer database always wins. This reads the production URL out of `.env`
- * and puts it back AFTER the dotenv layers have run and BEFORE any database
- * client is constructed. No file is edited; nothing else changes behaviour.
+ * Selected through the sanctioned entry point, which is the only thing in this
+ * repository allowed to decide which database a script talks to.
+ *
+ * `correct --confirm` writes to a production book, so it asks for write intent
+ * and carries a grant. Everything else here reads. Until this migration this
+ * script read `.env` itself and had NO host check at all, which made the
+ * sanctioned fast path the least guarded of the five write-capable scripts.
  */
-const PROD_URL = readFileSync(path.join(REPO_ROOT, '.env'), 'utf8')
-  .split(/\r?\n/)
-  .find((l) => l.startsWith('DATABASE_URL='))
-  ?.slice('DATABASE_URL='.length)
-  .trim()
-  .replace(/^["']|["']$/g, '');
-if (!PROD_URL) die('.env has no DATABASE_URL');
-const host = PROD_URL!.replace(/.*@/, '').replace(/\?.*/, '');
+const { openOperationalDatabase, ProductionWriteGrant, describeAccess } = await import(
+  '../../src/db/operational-access.js',
+);
 await import('../../src/env.js');
-process.env.DATABASE_URL = PROD_URL;
+const WILL_WRITE = command === 'correct' && CONFIRM;
+const access = openOperationalDatabase({
+  environment: 'production',
+  intent: WILL_WRITE ? 'write' : 'read',
+  ...(WILL_WRITE
+    ? {
+        grant: ProductionWriteGrant.declare({
+          reason: `Apply approved corrections to project ${PROJECT_ID} and store the corrected manuscript`,
+          confirmed: CONFIRM,
+        }),
+      }
+    : {}),
+});
+const host = access.target;
 
 const { getProject, updateProjectConfig, replaceWorkingManuscript } = await import(
   '../../src/db/repositories/projects.repo.js'
@@ -123,7 +134,7 @@ mkdirSync(OUT, { recursive: true });
 say('');
 say(`${command.toUpperCase()} — ${project!.title}`);
 say('─'.repeat(94));
-say(`  connection     ${host}   (this process only)`);
+say(describeAccess(access));
 say(`  freeze         ${recipe.freezeId}   ${recipe.pageCount}pp   ${recipe.builtAt}`);
 say(`  standard       ${recipe.layoutStandardId}   profile ${recipe.productionProfileId ?? '(default)'}`);
 say(

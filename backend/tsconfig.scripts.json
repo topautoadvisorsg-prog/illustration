@@ -1,0 +1,28 @@
+{
+  // TYPECHECK-ONLY config for the operator script surface.
+  //
+  // `tsconfig.json` includes `src/**/*` only, and `build` emits from it, so
+  // scripts/ was never typechecked by anything. That is how a call to
+  // `updateProjectStatus` — a function projects.repo does not export — survived
+  // a dry run and failed only after the writes before it had already landed.
+  // Destructuring a missing name from `await import()` yields undefined
+  // silently; the compiler catches it, and nothing was running the compiler.
+  //
+  // Separate file rather than widening tsconfig.json, because `build` emits from
+  // that one and scripts must not land in dist/.
+  //
+  // NOT WIRED INTO `yarn typecheck` YET. Running it today reports 21 errors in
+  // files this config did not introduce — build-calibration-set (8), build-cover
+  // (5), cover-spec (4), corrections (3), cover-geometry-equivalence (1). Fix
+  // those, then add `&& tsc --noEmit -p tsconfig.scripts.json` to the typecheck
+  // script. Until then run it by hand; it already earns its keep, having caught
+  // four dangling references left by the DATABASE_URL migration.
+  //
+  // SCOPE: scripts/qa only. The wider scripts/ surface has 191 pre-existing type
+  // errors, almost all in the old `_`-prefixed scratch tools, and fixing those is
+  // not this. scripts/qa is the curated directory new operator tooling belongs in,
+  // so this makes the sanctioned surface typechecked without an unrelated cleanup.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "rootDir": "." },
+  "include": ["src/**/*", "scripts/qa/**/*.ts"]
+}

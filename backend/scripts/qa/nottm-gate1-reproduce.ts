@@ -32,21 +32,12 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const PROJECT_ID = '3b7ed37a-8a07-4bfd-a0c3-14ae5dc4a6ff';
 
 /** The production connection string, read from `.env` and used only here. */
-function productionDatabaseUrl(): string {
-  const raw = readFileSync(path.join(REPO_ROOT, '.env'), 'utf8');
-  const line = raw.split(/\r?\n/).find((l) => l.startsWith('DATABASE_URL='));
-  if (!line) throw new Error('.env has no DATABASE_URL');
-  return line.slice('DATABASE_URL='.length).trim().replace(/^["']|["']$/g, '');
-}
-const PROD_URL = productionDatabaseUrl();
-const host = PROD_URL.replace(/.*@/, '').replace(/\?.*/, '');
-if (host.startsWith('127.0.0.1') || host.startsWith('localhost')) {
-  throw new Error(`.env DATABASE_URL is not a production host (${host}). Refusing to continue.`);
-}
-
-// Import env first so its dotenv layers run, THEN reclaim the connection.
+const { openOperationalDatabase, describeAccess } = await import(
+  '../../src/db/operational-access.js',
+);
+// Read-only: this gate proves reproduction, it never writes.
 await import('../../src/env.js');
-process.env.DATABASE_URL = PROD_URL;
+const __access = openOperationalDatabase({ environment: 'production', intent: 'read' });
 
 const { getProject } = await import('../../src/db/repositories/projects.repo.js');
 const { getProjectStorage } = await import('../../src/services/storage/project-storage.js');
@@ -56,10 +47,10 @@ const { ProjectConfigSchema } = await import('@wildlands/shared');
 console.log('');
 console.log('GATE 1 — REPRODUCE THE SHIPPING LAYOUT');
 console.log('─'.repeat(90));
-console.log(`  connection       ${host}   (this process only)`);
+console.log(`  connection       ${__access.target}   (this process only)`);
 
 const project = await getProject(PROJECT_ID);
-if (!project) throw new Error(`project ${PROJECT_ID} not found on ${host}`);
+if (!project) throw new Error(`project ${PROJECT_ID} not found on ${__access.target}`);
 const config = ProjectConfigSchema.parse(project.config);
 
 console.log(`  project          ${project.title}`);

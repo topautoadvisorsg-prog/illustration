@@ -20,13 +20,11 @@ const PROD_PROJECT = 'a4e2bbda-645f-4583-9123-7d24ab515c9c';
 const REV4_SHA = '7247b4766de764f28555fd260dd9709dadadaed672715a75b2085bf9065345d7';
 const OUT = 'C:/Users/jovan/Downloads/dirt rich book/DIRT-RICH-INTERIOR-PRINT-READY-REV4.pdf';
 
-const envFile = readFileSync('../.env', 'utf8');
-const prodUrl = envFile.match(/^DATABASE_URL\s*=\s*"?([^"\n\r]+)"?/m)?.[1];
-if (!prodUrl || prodUrl.includes('127.0.0.1')) throw new Error('no remote DATABASE_URL in .env');
 
 // env.ts runs dotenv with override:true at import, so import first, then set.
 const { getEnv } = await import('../src/env.js');
-process.env.DATABASE_URL = prodUrl;
+const { openOperationalDatabase, describeAccess } = await import('../src/db/operational-access.js');
+const __access = openOperationalDatabase({ environment: 'production', intent: 'read' });
 process.env.APP_ENVIRONMENT = 'production';
 const env = getEnv();
 if (env.APP_ENVIRONMENT !== 'production') throw new Error('env did not resolve to production');

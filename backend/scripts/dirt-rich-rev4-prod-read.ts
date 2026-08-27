@@ -24,21 +24,13 @@ const PROD_PROJECT = 'a4e2bbda-645f-4583-9123-7d24ab515c9c';
 const REV3_SHA = 'e2a5f7832fed47e9e787a6b140f7283484bed6c56a7b7ee9b5048ed4be9e6dd4';
 const CANONICAL_SHA = 'bc27f4d50bb22be1eb4d0f4d83fa4041d97983cbbabc91077e496ee2205b358c';
 
-/** Read the production URL from .env itself — process.env holds the dev override. */
-const envFile = readFileSync('../.env', 'utf8');
-const prodUrl = envFile.match(/^DATABASE_URL\s*=\s*"?([^"\n\r]+)"?/m)?.[1];
-if (!prodUrl) throw new Error('no DATABASE_URL in .env');
-if (prodUrl.includes('127.0.0.1') || prodUrl.includes('localhost')) {
-  throw new Error('.env DATABASE_URL is not a remote production URL — refusing');
-}
-
 // ORDER MATTERS. env.ts calls dotenv with `override: true` in its MODULE BODY,
-// so it overwrites process.env the moment it is imported. Setting the variables
-// first and importing after would silently hand back the dev database — which
-// is exactly what happened on the first run of this script, and the guard below
-// is what caught it. Import first, re-declare second, read the cache third.
+// so it overwrites process.env the moment it is imported. The connection must be
+// selected AFTER that import, which is why the entry point is called here rather
+// than at the top of the file.
+const { openOperationalDatabase } = await import('../src/db/operational-access.js');
 const { getEnv } = await import('../src/env.js');
-process.env.DATABASE_URL = prodUrl;
+openOperationalDatabase({ environment: 'production', intent: 'read' });
 process.env.APP_ENVIRONMENT = 'production';
 const env = getEnv();
 const host = env.DATABASE_URL.replace(/(:\/\/[^:]+):[^@]+@/, '$1:***@');

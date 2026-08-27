@@ -60,8 +60,8 @@ import { computeCoverDimensions } from '../src/pipeline/publishing-standard/cove
 // spine. `getEnv()` caches lazily, so overriding here (after the hoisted imports
 // have done their dotenv load) still wins, provided nothing has read env yet.
 const __REPO_ROOT = nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.url)), '../../');
-const __PROD = parseDotenv(readFileSync(nodePath.join(__REPO_ROOT, '.env')));
-process.env.DATABASE_URL = __PROD.DATABASE_URL;
+const { openOperationalDatabase, describeAccess } = await import('../src/db/operational-access.js');
+const __access = openOperationalDatabase({ environment: 'production', intent: 'read' });
 process.env.APP_ENVIRONMENT = 'production';
 const PROJECT_ID = 'a4e2bbda-645f-4583-9123-7d24ab515c9c'; // PRODUCTION — title/subtitle live here
 // Downloads was reorganised on 2026-08-17 and the loose book files were moved

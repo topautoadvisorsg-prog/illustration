@@ -62,19 +62,23 @@ const CORRECTIONS = [
   },
 ];
 
-const raw = readFileSync(path.join(REPO_ROOT, '.env'), 'utf8');
-const PROD_URL = raw
-  .split(/\r?\n/)
-  .find((l) => l.startsWith('DATABASE_URL='))!
-  .slice('DATABASE_URL='.length)
-  .trim()
-  .replace(/^["']|["']$/g, '');
-const host = PROD_URL.replace(/.*@/, '').replace(/\?.*/, '');
-if (host.startsWith('127.0.0.1') || host.startsWith('localhost')) {
-  throw new Error(`.env DATABASE_URL is not production (${host}). Refusing.`);
-}
+const { openOperationalDatabase, ProductionWriteGrant, describeAccess } = await import(
+  '../../src/db/operational-access.js',
+);
+// A dry run reads; only a confirmed run asks to write, and that request carries a reason.
 await import('../../src/env.js');
-process.env.DATABASE_URL = PROD_URL;
+const __access = openOperationalDatabase({
+  environment: 'production',
+  intent: CONFIRM ? 'write' : 'read',
+  ...(CONFIRM
+    ? {
+        grant: ProductionWriteGrant.declare({
+          reason: 'Apply two approved cross-reference corrections to NO ONE TOLD ME THAT',
+          confirmed: CONFIRM,
+        }),
+      }
+    : {}),
+});
 
 const { getProject, updateProjectConfig, replaceWorkingManuscript } = await import(
   '../../src/db/repositories/projects.repo.js'
@@ -97,7 +101,7 @@ const die = (msg: string): never => {
 say('');
 say(`GATES 2-3 — ${CONFIRM ? 'APPLYING' : 'DRY RUN (nothing will be written)'}`);
 say('─'.repeat(94));
-say(`  connection       ${host}   (this process only)`);
+say(`  connection       ${__access.target}   (this process only)`);
 
 const project = await getProject(PROJECT_ID);
 if (!project) die(`project ${PROJECT_ID} not found`);

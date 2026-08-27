@@ -1,0 +1,112 @@
+path	disposition	importers	in_package_json	in_ci	doc_refs	evidence
+backend/scripts/_activate.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_approve1.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_approveall.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_approverr.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_audit.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_audit_all.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_backmatter.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_badgecount.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_batch.ts	HISTORICAL	0	False	False	1	named in ENTRY_CENTRIC_ARCHITECTURE_SPEC.md
+backend/scripts/_beforeafter.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_bookcfg.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_bpmany.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_buildbook.ts	HISTORICAL	0	False	False	1	named in README.md
+backend/scripts/_cachetest.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_capacity.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_chlist.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_compare5.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_contactsheet.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_dbgprev.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_delines.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_drypaginate.ts	HISTORICAL	0	False	False	1	named in HANDOFF_EVERY_PAGE_ILLUSTRATED.md
+backend/scripts/_err.ts	HISTORICAL	0	False	False	1	named in ERROR_HANDLING_STANDARD.md
+backend/scripts/_exp_fetch_spec.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_exp_generate.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_exp_lib.ts	ACTIVE	2	False	False	0	2 importer(s)
+backend/scripts/_exp_smoke.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_exp_validate.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_export.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_findpage.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_findrenders.ts	HISTORICAL	0	False	False	1	named in HANDOFF_EVERY_PAGE_ILLUSTRATED.md
+backend/scripts/_fixline.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_fixmove.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_flipbook.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_fmkeys.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_folioview.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_folioz.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_full.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_geocheck.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_grid.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_inspect.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_keys.ts	HISTORICAL	0	False	False	1	named in SPEC_PAGINATION_V1.md
+backend/scripts/_layoutfix.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_layoutpreview.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_movehead.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_moveline.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_msrange.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_msread.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_notillus.ts	HISTORICAL	0	False	False	1	named in HANDOFF_EVERY_PAGE_ILLUSTRATED.md
+backend/scripts/_openeraudit.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_openerbreak.ts	HISTORICAL	0	False	False	1	named in HANDOFF_EVERY_PAGE_ILLUSTRATED.md
+backend/scripts/_orphanaudit.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_orphanscan.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_overflowscan.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_pdfdims.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_pdfimg.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_pdfpage.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_planstate.ts	HISTORICAL	0	False	False	1	named in HANDOFF_EVERY_PAGE_ILLUSTRATED.md
+backend/scripts/_ppdiag.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_preflight.ts	ACTIVE	2	False	False	3	2 importer(s)
+backend/scripts/_prepcheck.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_prog.ts	HISTORICAL	0	False	False	1	named in SPEC_PROJECT_LIST_REGION_LABEL.md
+backend/scripts/_project.ts	SHARED_LIBRARY	114	False	False	5	114 importers
+backend/scripts/_projects.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_prompt.ts	HISTORICAL	0	False	False	1	named in architecture.md
+backend/scripts/_proofchapter.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_proofsheet.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_prunesize.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_purge.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_qa_billingcheck.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_qa_failcheck.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_qa_listversions.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_qa_pull.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_qa_pullversion.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_qa_rerender.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_r2count.ts	HISTORICAL	0	False	False	1	named in R2_MIGRATION_PLAN.md
+backend/scripts/_r2migrate.ts	HISTORICAL	0	False	False	1	named in R2_MIGRATION_PLAN.md
+backend/scripts/_r2prune.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_railcheck.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_recoverscan.ts	HISTORICAL	0	False	False	1	named in HANDOFF_EVERY_PAGE_ILLUSTRATED.md
+backend/scripts/_rendercount.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_renderinv.ts	HISTORICAL	0	False	False	1	named in HANDOFF_EVERY_PAGE_ILLUSTRATED.md
+backend/scripts/_rendertextcheck.ts	HISTORICAL	0	False	False	1	named in HANDOFF_EVERY_PAGE_ILLUSTRATED.md
+backend/scripts/_restorerenders.ts	HISTORICAL	0	False	False	1	named in HANDOFF_EVERY_PAGE_ILLUSTRATED.md
+backend/scripts/_resubject.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_revert.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_review.ts	HISTORICAL	0	False	False	4	named in VISION-QA.md,operator-workflow-review.md
+backend/scripts/_review_chapter.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_rft.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_sample.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_seq.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_setfullwidthtext.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_setlayout.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_setopenerscene.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_setpagescene.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_specdiff.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_specpeek.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_specpeek2.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_storagecheck.ts	HISTORICAL	0	False	False	1	named in R2_MIGRATION_PLAN.md
+backend/scripts/_storedprompt.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_subj.ts	HISTORICAL	0	False	False	2	named in SPEC_BOOK_INTAKE.md,SPEC_PAGINATION_V1.md
+backend/scripts/_subjch.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_syncimg.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_testb.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_textcheck.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_verifyload.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_view.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_viewver.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_watch.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_zz_mon.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_zz_run.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
+backend/scripts/_zz_verify.ts	UNKNOWN	0	False	False	0	no import, package.json, CI or doc reference found
