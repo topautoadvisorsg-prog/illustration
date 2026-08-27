@@ -16,13 +16,34 @@ about the platform, not a recommendation.
    canonical and the hash then proves the wrong thing.
 2. **Set the book up**: trim, paper stock, and the layout-standard id. The
    standard is pinned by version. There is deliberately no "latest".
-3. **Paginate.** The flow engine settles the page count.
-4. **Front and back matter.**
+3. **Paginate — TRACK A ONLY.** The flow engine settles the page count.
+   **On the typeset track (Track B) this step does not exist.** Intake reports
+   `breakdown SKIPPED` and `paginate SKIPPED`, because page breaks come from the
+   typesetter itself. Running them would build manifests and page rows nothing
+   reads. Which track you are on is decided by the production profile's
+   `bodyRenderTrack`.
+4. **Front and back matter.** Track B books carry their own title, copyright and
+   contents pages, produced by the same standard as the body.
 5. **Render and review.** Look at pages. This is a gate, not a formality.
 6. **Build.**
 7. Set `PROJECT_ID` in the repo-root `.env` before running any operator script.
    `scripts/_project.ts` reads it and **refuses to default to a book**, so a
    script cannot silently act on the wrong project.
+
+**How long this takes, measured on the platform** (5.5x8.5, 211 KB / 3,136-line
+manuscript, `bw-educational-nonfiction`):
+
+| Step | Measured |
+|---|---|
+| Intake: create project + upload manuscript + readiness audit | 0.4 s |
+| First typeset build (168 pp, 28 sections, no illustrations) | 8.1 s |
+| Same book with 11 stamped 300 ppi illustrations | 19.6 s |
+| **Intake to first paginated PDF** | **8.5 s** |
+
+Compute is not the constraint. The wall clock is the review passes in step 5 —
+budget tens of minutes of looking at pages, not hours of machine time. A first
+intake can legitimately come back `BLOCKED` on the readiness audit (a parse
+retention gap, unvendored fonts); resolving that is judgment, not a rebuild.
 
 Adding a **new book class** means adding a new versioned entry to
 `typeset/layout-standards/registry.ts`. Never edit an existing standard in place:
@@ -37,11 +58,11 @@ Pick the smallest level that fits.
 
 | You want to change | Level | How |
 |---|---|---|
-| A comma, a word, a label | **Book-specific** | **No sanctioned path today.** Either edit the frozen manuscript and rebuild, or change shared renderer code. Both are wrong for a comma. This gap is Phase 2. |
+| A comma, a word, a label | **Book-specific** | A `text` correction. On a book frozen WITH provenance: `tsx scripts/qa/book.ts correct` — one command, one build, one report. See [CORRECTION-FAST-PATH.md](CORRECTION-FAST-PATH.md). Otherwise `scripts/qa/corrections.ts`. |
 | Author, title, imprint | Book-specific | `ProjectConfig` via the API — but the cover currently also carries it in script literals and in painted artwork |
 | Keep a heading with its text | Book-specific | A `keepTogether` layout override on the block id, via the API or the console panel. **This already works and is the model.** |
 | Move one illustration | Artifact | Change the plate's anchor — block id plus `pageOffset` — and re-stamp |
-| Running head, TOC entry | Systemic today | Currently a shared renderer change. Should be book-local. Phase 2. |
+| Running head, TOC entry | Book-specific | A `runningHead` or `tocDisplay` correction, keyed by section slug. No renderer change. |
 | Page design for a whole class of books | Book-class | A **new version** of that layout standard |
 | A genuine renderer defect | Systemic | Shared code, with a test |
 

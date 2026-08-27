@@ -1,4 +1,10 @@
 /**
+ * HISTORICAL - DO NOT USE FOR NEW BOOKS.
+ *
+ * One-off export of the rev26 freeze record to the KDP package.
+ *
+ * Kept, not deleted: it is the record of a write to a production book.
+ *
  * Export the rev26 freeze record to the KDP package, next to rev24 and rev25.
  *
  *   tsx scripts/qa/nottm-export-rev26-provenance.ts

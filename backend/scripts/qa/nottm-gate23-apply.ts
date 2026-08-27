@@ -1,4 +1,11 @@
 /**
+ * HISTORICAL - DO NOT USE FOR NEW BOOKS.
+ *
+ * Superseded by `scripts/qa/book.ts correct`. This applied two approved sentences
+ * to NO ONE TOLD ME THAT rev26 and is kept as the audit trail for that write.
+ *
+ * Kept, not deleted: it is the record of a write to a production book.
+ *
  * GATES 2 and 3 — make the control exact, then apply two approved sentences.
  *
  *   tsx scripts/qa/nottm-gate23-apply.ts --confirm

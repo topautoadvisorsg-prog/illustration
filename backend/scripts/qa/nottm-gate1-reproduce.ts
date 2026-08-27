@@ -1,4 +1,11 @@
 /**
+ * HISTORICAL - DO NOT USE FOR NEW BOOKS.
+ *
+ * Superseded by `scripts/qa/book.ts reproduce`, which does the same job for any
+ * book by reading the frozen recipe instead of hard-coding this one.
+ *
+ * Kept, not deleted: it is the record of a write to a production book.
+ *
  * GATE 1 — prove the production project reproduces the SHIPPING layout.
  *
  * Read-only. Nothing is written to the database, to storage, or to the book.

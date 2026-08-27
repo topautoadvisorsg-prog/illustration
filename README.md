@@ -89,7 +89,7 @@ marked in its own header as `HISTORICAL — DO NOT USE FOR NEW BOOKS` or
 ```
 backend/
   src/
-    api/                     Fastify routes. projects.routes.ts is 3,092 loc and 43 routes.
+    api/                     Fastify routes. projects.routes.ts is 3,096 loc and 43 routes.
     pipeline/
       stage-1-ingestion/     extract -> sanitize -> parse outline -> block ids
       stage-1.75-pagination/ flow engine, capacity, rebalance. Best-tested subsystem.
@@ -105,10 +105,11 @@ backend/
     db/                      Drizzle schema, 16 migrations, repositories.
     services/                Model providers, storage, redis, cost, page-quality, review routing.
     mcp/                     The platform as agent-callable tools. No business logic.
-  scripts/                   310 operator tools. See docs/maintenance/.
+  scripts/                   341 tracked operator tools. See docs/maintenance/
+                             (its census is stale — 310 rows, no qa/ coverage).
     _scratch/                UNTRACKED workbench. Never a production authority.
-frontend/src/                Operator console. 4,178 loc of plain JS; ProductionConsole.js is 3,699.
-shared/src/index.ts          1,467 loc of Zod schemas. The contract between all three workspaces.
+frontend/src/                Operator console. 4,017 loc of plain JS; ProductionConsole.js is 3,699.
+shared/src/index.ts          1,673 loc of Zod schemas. The contract between all three workspaces.
 docs/                        See the documentation index below.
 ```
 
@@ -186,7 +187,7 @@ The full matrix, including secondary copies and conflict risk, is
   reachable. Do not weaken it to make a test run.
 - **Spending is opt-in.** MCP tools that spend refuse without `confirm: true`;
   the console enforces the same on its buttons.
-- Of the 310 operator scripts, **75 mutate state, 13 both mutate and spend, and
+- Of the 310 scripts the census covered, **75 mutate state, 13 both mutate and spend, and
   2 are destructive**. Check [docs/maintenance/](docs/maintenance/README.md)
   before running one you do not recognise.
 

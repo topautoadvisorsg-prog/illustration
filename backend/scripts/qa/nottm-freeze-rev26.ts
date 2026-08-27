@@ -1,4 +1,11 @@
 /**
+ * HISTORICAL - DO NOT USE FOR NEW BOOKS.
+ *
+ * The rev26 freeze of NO ONE TOLD ME THAT. Kept as the audit trail for that
+ * freeze; the generic path is `scripts/qa/book.ts`.
+ *
+ * Kept, not deleted: it is the record of a write to a production book.
+ *
  * FREEZE rev26 as the shipping paperback interior of NO ONE TOLD ME THAT.
  *
  *   tsx scripts/qa/nottm-freeze-rev26.ts [--confirm]
