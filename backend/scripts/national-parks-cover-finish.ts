@@ -66,7 +66,7 @@ const BARCODE_H = 1.2;
 const BARCODE_CLEAR = 0.25;
 const FOLD_VARIANCE_IN = 0.0625;
 const TARGET_CLEAR_IN = 0.075;
-const AUTHOR = 'Tom Everett';
+const AUTHOR = 'Wes Denman';
 const SPINE_END_INSET_IN = 0.7;
 
 const inPx = (n: number): number => Math.round(n * DPI);

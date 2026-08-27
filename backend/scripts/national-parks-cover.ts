@@ -94,7 +94,7 @@ const BARCODE_MARGIN_IN = 0.25;
 // ── Content ────────────────────────────────────────────────────────────────
 const TITLE_FLAT = '7 National Parks Without the Rookie Mistakes';
 const SUBTITLE = "What's Worth Your Time, What to Skip, and What I Learned the Hard Way";
-const AUTHOR = 'Tom Everett';
+const AUTHOR = 'Wes Denman';
 
 const PARKS = [
   'GREAT SMOKY MOUNTAINS',

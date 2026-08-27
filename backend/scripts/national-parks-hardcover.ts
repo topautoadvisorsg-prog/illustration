@@ -356,7 +356,7 @@ const spineWpx = Math.round(d.spineIn * DPI);
 const safeStripPx = Math.round(d.spineSafeWidthIn * DPI);
 
 const TITLE = '7 National Parks Without the Rookie Mistakes';
-const AUTHOR = 'Tom Everett';
+const AUTHOR = 'Wes Denman';
 
 /**
  * The type sits inside the spine SAFE area in both directions: KDP's spine safe

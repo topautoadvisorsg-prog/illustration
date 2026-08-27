@@ -321,7 +321,7 @@ const safeStripIn = spineIn - FOLD_VARIANCE_IN * 2;
 const safeStripPx = Math.round(safeStripIn * DPI);
 
 const TITLE = '7 National Parks Without the Rookie Mistakes';
-const AUTHOR = 'Tom Everett';
+const AUTHOR = 'Wes Denman';
 
 /**
  * Type may occupy the trim height less a quarter inch at head and foot. The wrap

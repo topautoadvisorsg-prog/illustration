@@ -25,6 +25,10 @@ import { createHash } from 'node:crypto';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import { planSpineType } from '../../publishing-standard/spine-type.js';
+import { COPY_CREAM as COVER_CREAM, COPY_FONT as COVER_FONT, COPY_HALO as COVER_HALO } from '../../publishing-standard/cover-copy-column.js';
+
+const escapeXml = (t: string): string =>
+  t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 import type { ArtworkPlan, FitMode } from './artwork.js';
 import { planArtwork, renderArtwork } from './artwork.js';
 import type { CoverGeometry } from './geometry.js';
@@ -35,7 +39,7 @@ import { validateCover, worstStatus } from './validate.js';
 import type { KdpBinding, KdpInk, KdpPaper } from '../../publishing-standard/kdp-spec.js';
 
 /** Bumped when the geometry contract or the manifest shape changes. */
-export const COMPOSITOR_VERSION = '1.0.0';
+export const COMPOSITOR_VERSION = '1.1.0';
 
 export interface BuildCoverRequest {
   /** The interior that is actually shipping. Its page count and hash are authoritative. */
@@ -68,6 +72,28 @@ export interface BuildCoverRequest {
    */
   spineTargetClearIn?: number;
   spineGapIn?: number;
+  /** Cap the side crop so artwork carrying type near its edge is not sliced. See planArtwork. */
+  maxSideCropIn?: number;
+  /**
+   * Set the author name on the FRONT panel, in real type, rather than relying on
+   * the artwork to carry it.
+   *
+   * 7 NATIONAL PARKS had the name painted into the raster. Changing it then meant
+   * a paid image edit and a visual re-read of every other word on the cover,
+   * because a model asked to touch one string can corrupt another -- it did,
+   * once. With the name set here it is an argument, and a future change costs a
+   * rebuild rather than a render.
+   *
+   * `baselineFromBottomIn` and `capHeightIn` are MEASURED off the approved
+   * artwork the first time, so the type lands where the design already put it.
+   * There is no default position: a cover this is wrong on is a cover nobody
+   * asked for, so the caller states it or nothing is drawn.
+   */
+  frontAuthor?: {
+    baselineFromBottomIn: number;
+    capHeightIn: number;
+    maxWidthIn: number;
+  };
   /** Injected so a caller can produce a reproducible manifest. */
   builtAt?: string;
 }
@@ -87,6 +113,13 @@ export interface CoverManifest {
   geometryAuthority: string;
   geometrySource: string;
   effectivePpi: number;
+  /**
+   * Where the author was SET on the front panel, when it was set rather than
+   * left to the artwork. Recorded so the placement can be reproduced without
+   * re-measuring the approved cover, which is the whole reason the name is no
+   * longer baked into the raster.
+   */
+  frontAuthor?: { name: string; sizePx: number; inkWidthIn: number; baselineFromBottomIn: number };
   status: 'READY' | 'BLOCKED';
 }
 
@@ -144,6 +177,7 @@ export async function buildCover(req: BuildCoverRequest): Promise<BuildCoverResu
   const artworkPlan = await planArtwork(req.artwork, geometry, {
     mode: req.fitMode,
     renderDpi: req.renderDpi,
+    maxSideCropIn: req.maxSideCropIn,
   });
   const dpi = artworkPlan.renderDpi;
   const placed = await renderArtwork(req.artwork, artworkPlan);
@@ -151,6 +185,9 @@ export async function buildCover(req: BuildCoverRequest): Promise<BuildCoverResu
   // ── spine typography ──────────────────────────────────────────────────────
   const wantSpineText = req.spineText ?? geometry.spineTextEligible !== false;
   const spineText: SpineTextOutcome = { requested: wantSpineText, placed: false };
+  let frontAuthorPlaced:
+    | { sizePx: number; inkWidthIn: number; maxWidthIn: number; centreIn: number; baselineFromBottomIn: number }
+    | undefined;
   let composed = placed;
 
   if (wantSpineText && geometry.spineTextEligible === false) {
@@ -184,6 +221,62 @@ export async function buildCover(req: BuildCoverRequest): Promise<BuildCoverResu
     }
   }
 
+  // -- front-cover author, set rather than painted --------------------------
+  if (req.frontAuthor) {
+    const fa = req.frontAuthor;
+    const frontLeftIn = geometry.foldRightIn;
+    const centreIn = frontLeftIn + geometry.panelWidthIn / 2;
+    const maxPx = Math.round(fa.maxWidthIn * dpi);
+    /**
+     * Sized by MEASURED ink, not by a font-size guess. Cap height is what the
+     * eye reads and what was measured off the approved cover; the size that
+     * produces it depends on the face, so it is searched for rather than
+     * computed.
+     */
+    const targetCapPx = fa.capHeightIn * dpi;
+    let sizePx = Math.round(targetCapPx / 0.7);
+    let inkW = 0;
+    for (let guard = 0; guard < 60; guard += 1) {
+      const probe =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${maxPx * 3}" height="${Math.round(sizePx * 4)}">` +
+        `<text x="${Math.round((maxPx * 3) / 2)}" y="${Math.round(sizePx * 2.5)}" text-anchor="middle" ` +
+        `font-family="${COVER_FONT}" font-size="${sizePx}" font-weight="700" fill="#fff">` +
+        `${escapeXml(req.author)}</text></svg>`;
+      const { info } = await sharp(Buffer.from(probe)).trim().toBuffer({ resolveWithObject: true });
+      const capPx = info.height;
+      inkW = info.width;
+      if (Math.abs(capPx - targetCapPx) <= 1 || sizePx <= 8) break;
+      sizePx = Math.max(8, Math.round(sizePx * (targetCapPx / Math.max(1, capPx))));
+    }
+    /** Shrink further only if the name is wider than the design allows. */
+    while (inkW > maxPx && sizePx > 8) {
+      sizePx -= 1;
+      const probe =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${maxPx * 3}" height="${Math.round(sizePx * 4)}">` +
+        `<text x="${Math.round((maxPx * 3) / 2)}" y="${Math.round(sizePx * 2.5)}" text-anchor="middle" ` +
+        `font-family="${COVER_FONT}" font-size="${sizePx}" font-weight="700" fill="#fff">` +
+        `${escapeXml(req.author)}</text></svg>`;
+      const { info } = await sharp(Buffer.from(probe)).trim().toBuffer({ resolveWithObject: true });
+      inkW = info.width;
+    }
+    const baselinePx = Math.round((geometry.fullHeightIn - fa.baselineFromBottomIn) * dpi);
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(geometry.fullWidthIn * dpi)}" ` +
+      `height="${Math.round(geometry.fullHeightIn * dpi)}">` +
+      `<text x="${Math.round(centreIn * dpi)}" y="${baselinePx}" text-anchor="middle" ` +
+      `font-family="${COVER_FONT}" font-size="${sizePx}" font-weight="700" ` +
+      `fill="${COVER_CREAM}" stroke="${COVER_HALO}" stroke-width="${(sizePx * 0.11).toFixed(2)}" ` +
+      `stroke-linejoin="round" paint-order="stroke">${escapeXml(req.author)}</text></svg>`;
+    composed = await sharp(composed).composite([{ input: Buffer.from(svg), left: 0, top: 0 }]).toBuffer();
+    frontAuthorPlaced = {
+      sizePx,
+      inkWidthIn: inkW / dpi,
+      maxWidthIn: fa.maxWidthIn,
+      centreIn,
+      baselineFromBottomIn: fa.baselineFromBottomIn,
+    };
+  }
+
   const checks = validateCover({
     geometry,
     artwork: artworkPlan,
@@ -215,6 +308,16 @@ export async function buildCover(req: BuildCoverRequest): Promise<BuildCoverResu
     geometryAuthority: geometry.spineAuthority,
     geometrySource: geometry.spineSource,
     effectivePpi: artworkPlan.effectivePpi,
+    ...(frontAuthorPlaced
+      ? {
+          frontAuthor: {
+            name: req.author,
+            sizePx: frontAuthorPlaced.sizePx,
+            inkWidthIn: frontAuthorPlaced.inkWidthIn,
+            baselineFromBottomIn: frontAuthorPlaced.baselineFromBottomIn,
+          },
+        }
+      : {}),
     status,
   };
 
@@ -269,6 +372,9 @@ function renderReport(o: {
   out.push('');
   out.push(L('artwork', `${a.sourceWidthPx} x ${a.sourceHeightPx}px, fit "${a.mode}"`));
   out.push(L('effective PPI', `${a.effectivePpi.toFixed(1)} against a ${g.minDpi} minimum`));
+  if (a.topExtendIn > 0) {
+    out.push(L('side-crop cap', `${a.cropIn.leftIn.toFixed(3)}in per side; ${a.topExtendIn.toFixed(3)}in of sky stretched at the TOP`));
+  }
   out.push(
     L('spine text', o.spineText.placed
       ? `placed, ${(o.spineText.measuredClearPerSideIn ?? 0).toFixed(4)}in measured clearance per side`
@@ -276,6 +382,13 @@ function renderReport(o: {
         ? `NOT PLACED — ${o.spineText.reason ?? 'unknown'}`
         : 'not requested'),
   );
+  if (o.manifest.frontAuthor) {
+    const fa = o.manifest.frontAuthor;
+    out.push(
+      L('front author', `"${fa.name}" set at ${fa.sizePx}px, ${fa.inkWidthIn.toFixed(3)}in wide, ` +
+        `baseline ${fa.baselineFromBottomIn}in from the foot`),
+    );
+  }
   out.push('');
   out.push('  CHECKS');
   for (const c of o.checks) out.push(`    [${c.status.padEnd(4)}] ${c.label}: ${c.detail}`);

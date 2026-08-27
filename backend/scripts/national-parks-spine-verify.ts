@@ -28,7 +28,7 @@ import { PAGE_THICKNESS_IN } from '../src/pipeline/publishing-standard/cover-dim
 const DEL = 'C:/Users/jovan/Downloads/7-NATIONAL-PARKS-KDP-UPLOAD';
 const DPI = 300;
 const TITLE = '7 National Parks Without the Rookie Mistakes';
-const AUTHOR = 'Tom Everett';
+const AUTHOR = 'Wes Denman';
 const GAP_IN = 0.5;
 /** KDP's hard floor, and the house target that sits above it. */
 const KDP_FLOOR_IN = 0.0625;

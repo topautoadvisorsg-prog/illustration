@@ -72,6 +72,34 @@ export const NATIONAL_PARKS_GUIDE_TYPESET_V1: TypesetLayoutStandard = {
    */
   headingDrawnMarks: 'strip',
 
+  /**
+   * A HEADING KEEPS TWO LINES OF TEXT WITH IT, NOT ONE BLOCK.
+   *
+   * Binding a heading to the next paragraph is enough only when that paragraph
+   * runs to two lines. When it is a single line the whole unit still fits at the
+   * foot of a page, so the reader gets a heading, one line, and a page turn --
+   * the defect the binding exists to prevent, moved one line further on.
+   *
+   * This book has exactly two such headings and both shipped that way twice:
+   *   p58  "Below the rim: who should, who shouldn't, and which trail"
+   *        over "Descending even a little changes the park from a view into a
+   *        place. If you can, do it."                        86 characters
+   *   p64  "Wildlife and what to look for"
+   *        over "The most dangerous animal at the Grand Canyon is a squirrel.
+   *        I'm not being cute."                              80 characters
+   *
+   * MEASURED ON THIS TRIM, never inherited. 87 clears both observed lines and
+   * sits just under the 87.79 ceiling this standard's own 4.625in measure can
+   * physically set at 11pt, so it can never become a threshold that fires on
+   * every heading in the book. 88 was tried first and the provenance test
+   * rejected it on exactly that arithmetic, which is the guard working.
+   *
+   * The alternative, forcing each heading to the next page with break-before,
+   * was tried and is worse: it fixed the heading and left a two-thirds-empty
+   * page behind it.
+   */
+  headingBind: { extraParagraphUnderChars: 87 },
+
   blocks: {
     ...TRADE_NONFICTION_GUIDE_TYPESET_V1.blocks,
     /**

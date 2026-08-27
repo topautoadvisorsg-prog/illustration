@@ -85,6 +85,31 @@ const OVERRIDES: Record<string, LayoutOverride> = {
    */
   '40abccae': { breakBefore: 'page', note: 'Appendix: keep the Acadia permit entry whole; its name was stranded at the foot of p115.' },
   /**
+   * CHAPTER 8'S CLOSING PARAGRAPH GETS ITS OWN PAGE, so its plate has one.
+   *
+   * A typeset change tightened the book from 120 pages to 118. Two of those
+   * pages were the tail of Yosemite's closing passage and the parity blank
+   * behind it, and they were carrying artwork: the Yosemite chapter-end plate
+   * sat on the first and the Rocky Mountain frontispiece on the second. With
+   * the pages gone the plates had nowhere to go, and the stamper dropped both
+   * rather than clip them -- silently, because a plate that does not fit is not
+   * an error, it is a placement that no longer holds.
+   *
+   * Removing a blank page is right when it is blank. These were not: they were
+   * illustrated, and the illustrations are approved. So the break comes back.
+   *
+   * ONE override restores both. Pushing this paragraph to a new page gives the
+   * Yosemite plate the page it is anchored to, and moves Chapter 9's opening
+   * onto the next recto -- which puts the parity blank back in front of it, and
+   * the Rocky Mountain frontispiece is anchored to that chapter opening at
+   * offset -1, so it lands there again on its own.
+   *
+   * `breakBefore` rather than a bigger placement or a smaller plate: the art is
+   * approved at its size and the page count is the thing being restored, not
+   * worked around.
+   */
+  '22904bd9': { breakBefore: 'page', note: "Ch8 coda to its own page, restoring the Yosemite plate's page and the parity blank that carries the Rocky Mountain frontispiece." },
+  /**
    * The two heading orphans are NOT here any more.
    *
    * They were fixed with `breakBefore: page`, which moved each heading to the

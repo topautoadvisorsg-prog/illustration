@@ -32,7 +32,7 @@ const bookDescription = {
     'Permits, timed entry and release dates, collected and dated at the back',
   ],
   authorBio:
-    'Tom Everett drove to Zion at twenty-seven with no plan, got turned back at the canyon mouth, ' +
+    'Wes Denman drove to Zion at twenty-seven with no plan, got turned back at the canyon mouth, ' +
     'and learned at the junction that the permit he needed had been drawn months earlier. The ' +
     'afternoon he salvaged is still one of the best of his life. He has never stopped being annoyed ' +
     'about the day he wasted getting to it.',

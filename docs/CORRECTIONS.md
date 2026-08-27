@@ -108,6 +108,37 @@ The property set is closed: `spaceBeforeEm`, `spaceAfterEm`, `keepWithNext`,
 field would turn the escape hatch into a second, unversioned layout system
 competing with the standard.
 
+### When it is the BOOK's typography, not one heading
+
+A per-block override is right for one stranded heading. It is wrong when the
+same thing happens wherever a heading is followed by a short paragraph, because
+then it is not an exception, it is the book's typography, and writing it out
+block by block means finding every instance by eye.
+
+For that case the layout standard carries the policy:
+
+```ts
+headingBind: { extraParagraphUnderChars: 87 },
+```
+
+A heading is bound to the paragraph after it, and to a SECOND paragraph when the
+first is no longer than that many characters. Binding to one block is not enough
+on its own: when that block is a single line the whole unit still fits at the
+foot of a page, so the reader gets a heading, one line, and a page turn, which is
+the defect the binding exists to prevent moved one line further on. It shipped
+that way twice in 7 NATIONAL PARKS before the policy existed.
+
+**The threshold is measured on that standard's own trim and never inherited.**
+Two guards in `build-provenance.test.ts` enforce it: a standard that omits the
+field keeps the old behaviour, and a threshold larger than the standard's measure
+can physically set is rejected. 7 NATIONAL PARKS was first set to 88 and the
+second guard refused it, because a 4.625in measure at 11pt tops out at 87.79
+characters. 87 is the number that both fits the guard and clears the two lines
+the book actually has, at 86 and 80 characters.
+
+Absent means the old behaviour, so no approved book changes when this is added
+to another standard.
+
 ---
 
 ## The correction types

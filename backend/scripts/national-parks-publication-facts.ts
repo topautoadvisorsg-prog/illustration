@@ -36,7 +36,7 @@ const MANUSCRIPT =
 const markdown = readFileSync(MANUSCRIPT, 'utf8');
 
 /** The disclosure, taken from the source rather than retyped. */
-const ANCHOR = 'Tom Everett is a pen name and a composite narrator.';
+const ANCHOR = 'Wes Denman is a pen name and a composite narrator.';
 const line = markdown
   .split('\n')
   .map((l) => l.trim())
@@ -61,9 +61,9 @@ const patch = {
   config: {
     publishing: {
       copyrightYear: 2026,
-      copyrightHolder: 'Tom Everett',
+      copyrightHolder: 'Wes Denman',
       // Verbatim, exactly as the operator specified it.
-      copyrightLine: 'Copyright © 2026 by Tom Everett',
+      copyrightLine: 'Copyright © 2026 by Wes Denman',
       rightsStatement: 'All rights reserved.',
       // Off: not invented. See the header.
       edition: '',

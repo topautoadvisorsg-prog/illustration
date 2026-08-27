@@ -48,6 +48,11 @@ export interface ArtworkPlan {
   effectivePpi: number;
   /** Inches of source removed on each edge. Zero unless mode is 'cover'. */
   cropIn: { leftIn: number; rightIn: number; topIn: number; bottomIn: number };
+  /**
+   * Inches of picture manufactured at the TOP by stretching the sky, when the
+   * side-crop cap stopped the art from covering the height on its own.
+   */
+  topExtendIn: number;
   /** True when the aspect ratio was not preserved. */
   distorted: boolean;
   sourceAspect: number;
@@ -58,6 +63,24 @@ export interface PlanArtworkOptions {
   mode?: FitMode;
   /** Pixels per inch the production raster is built at. Defaults to the binding's minimum. */
   renderDpi?: number;
+  /**
+   * CAP HOW MUCH OF EACH SIDE 'cover' IS ALLOWED TO EAT.
+   *
+   * A wrap is proportionally taller than most generated artwork, so filling the
+   * height crops the sides -- 0.68in per side for a 3:2 painting on a 6x9
+   * paperback wrap. That is fine for a photograph and ruinous for artwork that
+   * carries TYPE near its edge: the title of 7 NATIONAL PARKS ended up 0.122in
+   * PAST the trim line and would have printed with its last letters sliced off.
+   *
+   * With this set, the scale comes down until the side crop fits the cap, and
+   * the height that is then missing is made up by stretching the TOP band of the
+   * picture -- sky on a landscape wrap, which has no feature a stretch can
+   * distort. The bottom is never stretched: it carries the foreground and the
+   * author's name.
+   *
+   * Absent, behaviour is unchanged and every existing cover is unaffected.
+   */
+  maxSideCropIn?: number;
 }
 
 export async function planArtwork(
@@ -87,7 +110,12 @@ export async function planArtwork(
     scaleFactorX = sx;
     scaleFactorY = sy;
   } else {
-    const s = mode === 'cover' ? Math.max(sx, sy) : Math.min(sx, sy);
+    let s = mode === 'cover' ? Math.max(sx, sy) : Math.min(sx, sy);
+    if (mode === 'cover' && opts.maxSideCropIn !== undefined) {
+      /** The largest scale whose side crop still fits the cap. Never below a full-width fit. */
+      const capped = (targetWidthPx + 2 * opts.maxSideCropIn * renderDpi) / sourceWidthPx;
+      s = Math.max(sx, Math.min(s, capped));
+    }
     scaleFactorX = s;
     scaleFactorY = s;
   }
@@ -96,6 +124,8 @@ export async function planArtwork(
   const scaledH = sourceHeightPx * scaleFactorY;
   const overflowW = Math.max(0, scaledW - targetWidthPx);
   const overflowH = Math.max(0, scaledH - targetHeightPx);
+  /** Height the capped scale cannot cover, made up by stretching the top band. */
+  const topExtendPx = Math.max(0, targetHeightPx - Math.round(scaledH));
 
   return {
     mode,
@@ -117,6 +147,7 @@ export async function planArtwork(
       topIn: overflowH / 2 / renderDpi,
       bottomIn: overflowH / 2 / renderDpi,
     },
+    topExtendIn: topExtendPx / renderDpi,
     distorted: Math.abs(scaleFactorX - scaleFactorY) > 1e-9,
     sourceAspect: sourceWidthPx / sourceHeightPx,
     targetAspect: targetWidthPx / targetHeightPx,
@@ -130,6 +161,42 @@ export async function planArtwork(
  * detail with nothing to show for it.
  */
 export async function renderArtwork(artwork: Buffer, plan: ArtworkPlan): Promise<Buffer> {
+  if (plan.topExtendIn > 0) {
+    /**
+     * The capped-crop path. Resample once at the capped scale, take the middle
+     * for the width, then rebuild the height by stretching the top band of what
+     * remains. One resample of the picture, one of the band.
+     */
+    const scaledW = Math.round(plan.sourceWidthPx * plan.scaleFactorX);
+    const scaledH = Math.round(plan.sourceHeightPx * plan.scaleFactorY);
+    const sideCrop = Math.max(0, Math.round((scaledW - plan.targetWidthPx) / 2));
+    const body = await sharp(artwork)
+      .resize(scaledW, scaledH, { kernel: 'lanczos3' })
+      .extract({ left: sideCrop, top: 0, width: plan.targetWidthPx, height: scaledH })
+      .toBuffer();
+    const stretch = plan.targetHeightPx - scaledH;
+    const band = Math.round(scaledH * 0.5);
+    return sharp({ create: { width: plan.targetWidthPx, height: plan.targetHeightPx, channels: 3, background: '#000' } })
+      .composite([
+        {
+          input: await sharp(body)
+            .extract({ left: 0, top: 0, width: plan.targetWidthPx, height: band })
+            .resize(plan.targetWidthPx, band + stretch, { fit: 'fill', kernel: 'lanczos3' })
+            .toBuffer(),
+          left: 0,
+          top: 0,
+        },
+        {
+          input: await sharp(body)
+            .extract({ left: 0, top: band, width: plan.targetWidthPx, height: scaledH - band })
+            .toBuffer(),
+          left: 0,
+          top: band + stretch,
+        },
+      ])
+      .png()
+      .toBuffer();
+  }
   const fit = plan.mode === 'exact' ? 'fill' : plan.mode === 'cover' ? 'cover' : 'contain';
   return sharp(artwork)
     .resize({
