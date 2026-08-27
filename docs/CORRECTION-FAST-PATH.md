@@ -121,6 +121,45 @@ renderer moved. The fast path **stops and says so**. This needs the wider checks
 and a deliberate new freeze — it is not something a text edit should cause as a
 side effect.
 
+**Stopping is the default, not the only outcome.** The refusal exists so that
+structural movement is never a *side effect*; it is not a claim that a frozen
+book can never legitimately reflow. Once someone has looked at the movement and
+accepted it, that IS the deliberate decision the refusal was asking for:
+
+```
+--accept-level-3 "<who approved it, and why>"
+```
+
+The reason is recorded with the correction. Without the flag the behaviour is
+unchanged: the tool refuses and nothing is written. Do not reach for it to get
+past a surprise — a Level 3 you did not expect means you do not yet understand
+what your edit did.
+
+#### Correcting the opening words of an illustrated block
+
+A block's id is a hash of its opening words, so correcting those words moves the
+id and orphans the art anchored to it. That must not be a reason to leave a
+known defect in a book: the artwork exists to serve the text, not the other way
+round.
+
+```
+--reanchor <oldBlockId>:<newBlockId>
+```
+
+carries the illustration across, preserving the asset, placement and size
+exactly. It is deliberately **not** inferred from "one plate was orphaned and
+one block is new" — that heuristic holds right up until two blocks move, and
+then it silently swaps two plates. State the move; the tool then proves it,
+failing the build unless the target actually stamped, the old id is gone, the
+printed size is unchanged, and zero illustrations are orphaned. On `--confirm`
+the move is written to the live config too, so the next build of that book does
+not orphan the plate again.
+
+Derive the new id with the platform's own `computeBlockId`, and only trust it if
+the **old** id reproduces exactly from the same inputs. If it does not, you have
+guessed the section slug or the block kind, and a guess here silently moves art
+onto the wrong page.
+
 ### Level 4 — platform defect
 
 The requested change cannot be verified because the tooling is broken.

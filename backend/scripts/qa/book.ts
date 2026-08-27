@@ -41,6 +41,9 @@ const flag = (name: string): string | undefined => {
   return i >= 0 ? argv[i + 1] : undefined;
 };
 const has = (name: string) => argv.includes(`--${name}`);
+/** Every value of a repeatable flag, in the order given. */
+const flags = (name: string): string[] =>
+  argv.reduce<string[]>((acc, a, i) => (a === `--${name}` && argv[i + 1] ? [...acc, argv[i + 1]!] : acc), []);
 const CONFIRM = has('confirm');
 const PROJECT_ID = flag('project');
 
@@ -55,6 +58,8 @@ if (!command || !['recipe', 'reproduce', 'correct'].includes(command)) {
   say('  tsx scripts/qa/book.ts recipe    --project <id>');
   say('  tsx scripts/qa/book.ts reproduce --project <id>');
   say('  tsx scripts/qa/book.ts correct   --project <id> --corrections <file.json> [--confirm]');
+  say('                                   [--reanchor <oldBlockId>:<newBlockId>]…');
+  say('                                   [--accept-level-3 "<who approved it, and why>"]');
   say('');
   process.exit(1);
 }
@@ -291,6 +296,60 @@ for (const c of corrections) {
   }
 }
 
+/**
+ * ─── RE-ANCHORING AN ILLUSTRATION ────────────────────────────────────────────
+ * A block's identity is a hash of its opening words, so correcting the opening
+ * words of an illustrated block moves its id and orphans the art. Refusing the
+ * correction on those grounds would mean a page can be illustrated OR correct
+ * but not both, which is the wrong way round: the artwork exists to serve the
+ * text.
+ *
+ * So the move is allowed, but only as a stated intention. `--reanchor old:new`
+ * carries the art across, and this is deliberately NOT inferred from "exactly
+ * one illustration was orphaned and exactly one block is new" — that heuristic
+ * is right until the day two blocks move and it silently swaps two plates.
+ *
+ * Every value is preserved verbatim. Re-anchoring changes WHICH BLOCK the art
+ * hangs on and nothing else: not the asset, not the placement, not the size.
+ */
+interface Reanchor { from: string; to: string }
+const reanchors: Reanchor[] = flags('reanchor').map((spec) => {
+  const [from, to, ...rest] = spec.split(':');
+  if (!from || !to || rest.length) die(`--reanchor expects <oldBlockId>:<newBlockId>, got ${JSON.stringify(spec)}`);
+  return { from: from!, to: to! };
+});
+
+const frozenIllustrations: Record<string, unknown> = { ...(recipe.configSnapshot.illustrations ?? {}) };
+const buildIllustrations: Record<string, unknown> = { ...frozenIllustrations };
+if (reanchors.length) {
+  say('');
+  say(`  0 — RE-ANCHOR — ${reanchors.length} illustration(s)`);
+  const seenFrom = new Set<string>();
+  const seenTo = new Set<string>();
+  for (const { from, to } of reanchors) {
+    if (!(from in frozenIllustrations)) {
+      die(`--reanchor ${from}:${to} — ${from} is not an illustration in the frozen config snapshot. ` +
+          `Known: ${Object.keys(frozenIllustrations).join(', ') || '(none)'}`);
+    }
+    if (to in frozenIllustrations) die(`--reanchor ${from}:${to} — ${to} is ALREADY an illustration key; this would overwrite it.`);
+    if (seenFrom.has(from)) die(`--reanchor — ${from} given twice.`);
+    if (seenTo.has(to)) die(`--reanchor — two illustrations re-anchored onto ${to}.`);
+    if (from === to) die(`--reanchor ${from}:${to} — source and target are the same block.`);
+    seenFrom.add(from);
+    seenTo.add(to);
+    buildIllustrations[to] = frozenIllustrations[from];
+    delete buildIllustrations[from];
+    say(`    ${from} -> ${to}   (asset, placement and size carried over verbatim)`);
+  }
+  if (Object.keys(buildIllustrations).length !== Object.keys(frozenIllustrations).length) {
+    die('re-anchoring changed the number of illustrations — refusing to build.');
+  }
+}
+/** Frozen recipe, with only the authorised anchor moves applied. */
+const buildConfig = reanchors.length
+  ? { ...recipe.configSnapshot, illustrations: buildIllustrations }
+  : recipe.configSnapshot;
+
 say('');
 say(`  ${CONFIRM ? 'APPLYING' : 'DRY RUN (read-only — the build runs off an in-memory override)'} — ${corrections.length} correction(s)`);
 
@@ -340,7 +399,7 @@ const t0 = Date.now();
  * books, and a correction must change the text and nothing else.
  */
 const previousManuscript = manuscriptPath!;
-const built = await buildTypesetInterior(PROJECT_ID!, recipe.configSnapshot, {
+const built = await buildTypesetInterior(PROJECT_ID!, buildConfig, {
   ...recipe.buildOptions,
   manuscriptOverride: { text: corrected, sha256: sha(corrected) },
 });
@@ -362,6 +421,39 @@ const assessment = assessChange({
   correctedManuscript: corrected,
   engineMatches: integrity.engineMatches || engineProvenInert,
 });
+
+/**
+ * A re-anchor is only correct if the art actually landed. `--reanchor` names an
+ * intention; this is the proof. Without it a typo'd target id would report a
+ * clean build with one plate silently missing from the book.
+ */
+if (reanchors.length) {
+  const stampedBy = new Map(built.stampedIllustrations.map((s: { blockId: string }) => [s.blockId, s]));
+  const frozenBy = new Map(recipe.illustrations.map((i: { blockId: string }) => [i.blockId, i]));
+  say('');
+  say('  3b — RE-ANCHOR VERIFICATION');
+  const bad: string[] = [];
+  for (const { from, to } of reanchors) {
+    const now: any = stampedBy.get(to);
+    const before: any = frozenBy.get(from);
+    if (!now) { bad.push(`${to} did not stamp`); say(`    FAIL  ${from} -> ${to}   not stamped`); continue; }
+    if (stampedBy.has(from)) { bad.push(`${from} still stamped`); say(`    FAIL  ${from} still stamped — the old block did not move`); continue; }
+    // Same plate, same printed size. The page number may legitimately change
+    // when the corrected text reflows; the geometry may not.
+    const sizeSame = before
+      ? Math.abs(now.widthIn - before.widthIn) < 1e-6 && Math.abs(now.heightIn - before.heightIn) < 1e-6
+      : true;
+    if (!sizeSame) bad.push(`${to} changed printed size`);
+    say(`    ${sizeSame ? 'PASS' : 'FAIL'}  ${from} -> ${to}   p${before?.page ?? '?'} -> p${now.page}   ` +
+        `${now.widthIn.toFixed(4)}×${now.heightIn.toFixed(4)}in @ ${Math.round(now.nativePpi)}ppi` +
+        (before ? ` (was ${before.widthIn.toFixed(4)}×${before.heightIn.toFixed(4)}in)` : ''));
+  }
+  if (built.orphanedIllustrations.length) {
+    for (const o of built.orphanedIllustrations) say(`    FAIL  orphaned ${o.blockId} — ${o.reason}`);
+    bad.push(`${built.orphanedIllustrations.length} orphaned`);
+  }
+  if (bad.length) die(`re-anchor did not verify: ${bad.join('; ')}. Nothing was written.`);
+}
 
 say('');
 say('  4 — REGRESSION');
@@ -404,13 +496,53 @@ if (!CONFIRM) {
   process.exit(assessment.level >= 3 ? 1 : 0);
 }
 
-if (assessment.level >= 3) {
+/**
+ * LEVEL 3 IS A DECISION, NOT A DEFAULT.
+ *
+ * The fast path refuses structural movement because it must never happen as a
+ * SIDE EFFECT of a text edit — that is precisely how a 95-character heuristic
+ * reflowed 24 pages of a frozen book. It is not a claim that a frozen book can
+ * never reflow again. When the product owner has looked at the movement and
+ * accepted it, that is the deliberate decision the refusal was asking for, and
+ * it is recorded here in the assessment rather than worked around in a
+ * throwaway script.
+ */
+const level3Reason = flag('accept-level-3');
+if (assessment.level >= 3 && !level3Reason) {
   die(
     `this correction is LEVEL ${assessment.level}, not a fast-path edit. Nothing was written — ` +
       `the build ran off an in-memory override, so the project is exactly as it was found. ` +
       `Structural movement needs the wider checks and a new freeze, which is a deliberate ` +
-      `decision rather than a side effect of a text edit.`,
+      `decision rather than a side effect of a text edit. If it HAS been decided, re-run with ` +
+      `--accept-level-3 "<who approved it, and why>".`,
   );
+}
+if (assessment.level >= 3) {
+  say('');
+  say(`  LEVEL ${assessment.level} ACCEPTED — ${level3Reason}`);
+}
+
+/**
+ * The anchor move is persisted to the LIVE config, not just used for this build.
+ * Leaving it in-memory would store a manuscript whose illustrated block no
+ * longer exists in the config, so the next build of this book would orphan the
+ * plate and nobody would know why.
+ */
+if (reanchors.length) {
+  const liveIllustrations: Record<string, unknown> = { ...(liveConfig.illustrations ?? {}) };
+  for (const { from, to } of reanchors) {
+    if (!(from in liveIllustrations)) die(`live config no longer has illustration ${from} — refusing to write a partial re-anchor`);
+    liveIllustrations[to] = liveIllustrations[from];
+    delete liveIllustrations[from];
+  }
+  await updateProjectConfig(PROJECT_ID!, { ...liveConfig, illustrations: liveIllustrations } as never);
+  const after = await getProject(PROJECT_ID!);
+  const keys = Object.keys((after as any)?.config?.illustrations ?? {});
+  for (const { from, to } of reanchors) {
+    if (keys.includes(from) || !keys.includes(to)) die(`re-anchor did not persist: ${from} -> ${to}. Config now has ${keys.join(', ')}`);
+  }
+  say('');
+  say(`  5b — CONFIG WRITTEN     ${reanchors.map((r) => `${r.from}->${r.to}`).join(', ')}   verified on ${host}`);
 }
 
 // ── commit the corrected manuscript under a real name ────────────────────────
