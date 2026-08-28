@@ -49,10 +49,10 @@ const MANIFEST = 'KDP-UPLOAD-MANIFEST.md';
  * and at upload time the only thing that matters is picking the right file.
  */
 const ARTIFACTS = {
-  interior: '7-national-parks-interior-6x9-120pp.pdf',
-  pbCover: '7-national-parks-cover-PAPERBACK-6x9-120pp.pdf',
+  interior: '7-national-parks-interior-6x9-122pp.pdf',
+  pbCover: '7-national-parks-cover-PAPERBACK-6x9-122pp.pdf',
   epub: '7-national-parks-KINDLE.epub',
-  hcCover: '7-national-parks-cover-HARDCOVER-6x9-120pp.pdf',
+  hcCover: '7-national-parks-cover-HARDCOVER-6x9-122pp.pdf',
   kindleCover: '7-national-parks-KINDLE-cover-1600x2560.jpg',
 } as const;
 
@@ -61,9 +61,13 @@ const ARTIFACTS = {
  *
  * It was pending for as long as there was no verified Cover Calculator reading
  * at this page count, and `kdp-cover-specs` refuses to interpolate a hardcover
- * spine from a single anchor. The reading was taken on 2026-08-26 for
- * HARDCOVER/CASE_LAMINATE, BLACK_AND_WHITE, WHITE paper, 6x9in at 120pp:
- * full wrap 14.034 x 10.417in, spine 0.459in, board 6.197 x 9.236in.
+ * spine from a single anchor. The reading was taken on 2026-08-27 for
+ * HARDCOVER/CASE_LAMINATE, BLACK_AND_WHITE, WHITE paper, 6x9in at 122pp:
+ * full wrap 14.039 x 10.417in, spine 0.464in, board 6.197 x 9.236in.
+ *
+ * Read, not interpolated. The model's interpolation for 122pp agreed on the
+ * wrap and the spine and put the SPINE SAFE AREA at 0.235in against Amazon's
+ * 0.339in, which is the number the spine copy is set inside.
  *
  * The 116pp wrap stays quarantined under `_np_build/_superseded-116pp/`. Its
  * 0.450in spine is wrong for a 120-page block and it must never be uploaded.
@@ -77,14 +81,14 @@ const ARTIFACTS = {
    the parity blanks unmoved. Every superseded file is kept, named with its hash,
    under `_np_build/_superseded-*`. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
-  interior: 'c74eace0d0dca0a8e3f8764bf802c739baa59c1c21b6fb188ac710bc85722bcd',
-  pbCover: 'f2b3e907b5048f473e2e7119e9f9471e2c6b1f09faa17a8896170329320978b2',
+  interior: '27ee30d2d6d41cbd91fcdef0681b9705ee773728833d57826290c3cde6d412a2',
+  pbCover: '65dd7ed40101b78a48a40345441199353eac0be46b98dad9ab10612897c26b71',
   epub: 'ec1502ee9eb1991c7282b9ec9c069b6f7b244df10e69bb6be95d5357b558da01',
-  hcCover: '7b374ee796f8232ddbbe746889fb1febe310ddc7c10357cbfd2800456b3d1da9',
-  kindleCover: 'a16e3bef6a4ac38c79a31c2a3537cbed4e6b9537a048ebb490b769e9ede1efdc',
+  hcCover: '71c26d35d43bfb7b8564847424ba117d410bf0a264f04d09e2381fff051ffa84',
+  kindleCover: '2b4499252c0723fd743da832eb242d2c40b79f6a7e9c498852e4727177e62376',
 };
 
-const PAGES = 120;
+const PAGES = 122;
 const PT = 72;
 
 /** Paperback: spine is derived from this interior's own page count. */
@@ -92,7 +96,7 @@ const PB_THICKNESS = PAGE_THICKNESS_IN.white;
 const PB_SPINE = PAGES * PB_THICKNESS;
 const PB_WRAP_W = 0.125 * 2 + 6 * 2 + PB_SPINE;
 const PB_WRAP_H = 9 + 0.25;
-const PLATES_EXPECTED = 15;
+const PLATES_EXPECTED = 16;
 
 /** Hardcover: the verified Cover Calculator reading, 6x9 case laminate, at THIS page count. */
 const HC = getKdpCoverDimensions({
@@ -379,7 +383,7 @@ console.log('\n6. DELIVERY FOLDER');
    * form during the same sitting as the uploads, and keeping them in the same
    * folder is what stops that being done from memory.
    */
-  const COMPANION_DOCS = ['AMAZON-BOOK-DESCRIPTION.md', '7-national-parks-cover-HARDCOVER-6x9-120pp.json'];
+  const COMPANION_DOCS = ['AMAZON-BOOK-DESCRIPTION.md', '7-national-parks-cover-HARDCOVER-6x9-122pp.json'];
   const expected = [...Object.values(ARTIFACTS), MANIFEST, ...COMPANION_DOCS].sort();
   for (const f of found) console.log(`   ${f}`);
   const extra = found.filter((e) => !expected.includes(e));

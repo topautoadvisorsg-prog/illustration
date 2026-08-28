@@ -263,6 +263,48 @@ export const VERIFIED_SPECS: VerifiedSpec[] = [
     barcodeMarginHeightIn: 0.375,
   },
   {
+    // 7 NATIONAL PARKS, hardcover, after the safety-panel repair took the
+    // interior from 120 to 122 pages.
+    //
+    // Read rather than interpolated, and the reading is why. Interpolating
+    // between the stored anchors gave the right full width and the right spine
+    // -- 14.039 and 0.464 -- and a SPINE SAFE AREA of 0.235in against Amazon's
+    // 0.339in. Spine type is set inside that band, so a model that is right
+    // about the two numbers anyone eyeballs and wrong about the one that
+    // governs the copy is the worst kind of nearly-right.
+    //
+    // Read from the KDP Cover Calculator on 2026-08-27. Inputs exactly:
+    //   Binding type      Hardcover
+    //   Cover Type        Hardcover (case laminate)
+    //   Interior type     Black & white
+    //   Paper type        White paper
+    //   Reading Direction Left to Right
+    //   Measurement units Inches
+    //   Interior trim     6 x 9 in
+    //   Page count        122
+    config: {
+      binding: 'HARDCOVER',
+      coverType: 'CASE_LAMINATE',
+      interiorType: 'BLACK_AND_WHITE',
+      paperType: 'WHITE',
+      trimSize: '6x9',
+      pageCount: 122,
+    },
+    verifiedOn: '2026-08-27',
+    fullWidthIn: 14.039,
+    fullHeightIn: 10.417,
+    spineIn: 0.464,
+    frontWidthIn: 6.197,
+    frontHeightIn: 9.236,
+    marginIn: 0.125,
+    wrapIn: 0.591,
+    hingeIn: 0.394,
+    spineSafeWidthIn: 0.339,
+    spineSafeHeightIn: 8.986,
+    barcodeMarginWidthIn: 0.25,
+    barcodeMarginHeightIn: 0.375,
+  },
+  {
     // NO ONE TOLD ME THAT, hardcover edition of the shipped 170pp interior.
     //
     // Read from the KDP Cover Calculator on 2026-08-26. Inputs exactly:

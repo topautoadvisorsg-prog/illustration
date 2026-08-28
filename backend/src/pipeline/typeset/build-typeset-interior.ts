@@ -19,7 +19,7 @@ import { getProjectStorage } from '../../services/storage/project-storage.js';
 import { getProductionProfile } from '../production-profiles/registry.js';
 import { resolveTypesetLayoutStandard } from './layout-standards/registry.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from './layout-standards/educational-nonfiction-v1.js';
-import { renderTypesetBook } from './render-typeset.js';
+import { renderTypesetBook, type TypesetBlockProbe } from './render-typeset.js';
 import type { TypesetReport } from './typeset-book.js';
 import type { TypesetBlockRef } from './block-identity.js';
 import { stampIllustrations, type StampedIllustration } from './stamp-illustrations.js';
@@ -36,6 +36,13 @@ export interface TypesetInterior {
   orphanedOverrides: string[];
   stampedIllustrations: StampedIllustration[];
   orphanedIllustrations: { blockId: string; reason: string }[];
+  /**
+   * Where every block landed, when a deep probe was run (it is, whenever the
+   * book has artwork). Exposed because the page a block occupies, and how much
+   * of the page it fills, are facts about the built book that callers otherwise
+   * have to re-derive by reading the PDF back.
+   */
+  probe: TypesetBlockProbe[] | undefined;
 }
 
 export interface BuildTypesetInteriorOptions {
@@ -247,5 +254,6 @@ export async function buildTypesetInterior(
     orphanedOverrides: result.overrides.orphaned,
     stampedIllustrations,
     orphanedIllustrations,
+    probe: result.probe,
   };
 }

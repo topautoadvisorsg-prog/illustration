@@ -110,6 +110,43 @@ const OVERRIDES: Record<string, LayoutOverride> = {
    */
   '22904bd9': { breakBefore: 'page', note: "Ch8 coda to its own page, restoring the Yosemite plate's page and the parity blank that carries the Rocky Mountain frontispiece." },
   /**
+   * CHAPTER 6'S CODA TO ITS OWN PAGE — the same repair chapter 8 already uses.
+   *
+   * Giving the Yellowstone safety panel a page of its own lengthens the chapter
+   * by one leaf, and the leaf it takes is the parity blank that used to sit at
+   * p54 carrying the Grand Canyon frontispiece. The build then correctly
+   * refused that frontispiece: a full-page plate with no page to be on.
+   *
+   * Moving the three-paragraph coda to a page of its own ends the chapter on a
+   * recto, which forces the next chapter to the recto after that and hands the
+   * blank verso back. The frontispiece is anchored to Chapter 7's opener at
+   * offset -1, so it lands there again on its own, and the Yellowstone closing
+   * plate rides with the coda block it is anchored to.
+   *
+   * The book grows by two pages. That is what keeping every plate and an unbroken
+   * safety panel costs here; the alternative was a bare blank recto.
+   */
+  '79bb8ccd': { breakBefore: 'page', note: "Ch6 coda to its own page, handing back the parity blank that carries the Grand Canyon frontispiece." },
+  /**
+   * THE YELLOWSTONE SAFETY PANEL, ON ITS OWN PAGE.
+   *
+   * It broke across pp49-50 with only 0.92in spilling onto the second leaf, so
+   * the reader met a closed box at the foot of one page and an unlabelled
+   * fragment of another at the head of the next.
+   *
+   * `keepTogether` alone was the cheaper repair and it is not available here.
+   * Moving the panel whole to p50 pushes 2.26in down the rest of the chapter,
+   * and the space that absorbs it is the chapter-end white on p53 where the
+   * Yellowstone closing plate sits. Measured: p53 drops to 1.13in of free
+   * region against a plate that needs 4.05in, and the build refuses the plate.
+   *
+   * So the panel takes a page of its own. That costs a leaf and it does not
+   * disturb where the chapter's own art sits, which the cheaper option would
+   * have destroyed. The panel fills 41% of the text block, so the page carries
+   * an illustration under it — see the Yellowstone distances plate.
+   */
+  'b526d11d': { breakBefore: 'page', breakAfter: 'page', note: 'Ch6 NOBODY WARNED ME (distances) alone on its page; it split across pp49-50 and keepTogether alone would have cost the p53 plate.' },
+  /**
    * THE ROCKY MOUNTAIN SAFETY PANEL, KEPT WHOLE.
    *
    * NOBODY WARNED ME on afternoon thunderstorms above treeline broke across
@@ -153,7 +190,11 @@ const next = { ...config, layoutOverrides: { ...(config.layoutOverrides ?? {}), 
 console.log(`project   : ${P}`);
 console.log(`overrides : ${before} -> ${Object.keys(next.layoutOverrides).length}\n`);
 for (const [id, o] of Object.entries(OVERRIDES)) {
-  const what = o.keepTogether ? 'keepTogether' : o.breakBefore ? `breakBefore:${o.breakBefore}` : '?';
+  const what = [
+    o.keepTogether ? 'keepTogether' : '',
+    o.breakBefore ? `breakBefore:${o.breakBefore}` : '',
+    o.breakAfter ? `breakAfter:${o.breakAfter}` : '',
+  ].filter(Boolean).join(' + ');
   console.log(`  ${id}  ${what.padEnd(18)} ${o.note ?? ''}`);
 }
 
