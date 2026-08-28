@@ -81,7 +81,7 @@ const ARTIFACTS = {
    the parity blanks unmoved. Every superseded file is kept, named with its hash,
    under `_np_build/_superseded-*`. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
-  interior: '27ee30d2d6d41cbd91fcdef0681b9705ee773728833d57826290c3cde6d412a2',
+  interior: 'c40fb9bbdaa64913b7504ae655b4ce910c90b883fb58fb46cc0d6571c69cd43a',
   pbCover: '65dd7ed40101b78a48a40345441199353eac0be46b98dad9ab10612897c26b71',
   epub: 'ec1502ee9eb1991c7282b9ec9c069b6f7b244df10e69bb6be95d5357b558da01',
   hcCover: '71c26d35d43bfb7b8564847424ba117d410bf0a264f04d09e2381fff051ffa84',
