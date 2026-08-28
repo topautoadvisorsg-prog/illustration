@@ -63,6 +63,25 @@ console.log(`profile  : ${result.productionProfileId}`);
 console.log(`blocks   : ${result.blocks.length}`);
 if (result.orphanedOverrides.length) console.log(`orphaned overrides: ${result.orphanedOverrides.join(', ')}`);
 
+/**
+ * A DROPPED PLATE MUST BE LOUD.
+ *
+ * The stamper refuses art that no longer fits the page it is anchored to, which
+ * is right — better a missing plate than one printed over the type or into the
+ * margin. But the refusal was returned and never printed, so a repagination
+ * could quietly take an illustration out of the book and every other line of
+ * this summary would still read normal: right page count, right block count, no
+ * overflow. The book was two plates short and the build said nothing.
+ *
+ * Printed here, and the exit code carries it, so a silent drop cannot reach a
+ * delivery folder again.
+ */
+if (result.orphanedIllustrations.length) {
+  console.log(`
+ILLUSTRATIONS DROPPED (${result.orphanedIllustrations.length}):`);
+  for (const o of result.orphanedIllustrations) console.log(`  ${o.blockId}  ${o.reason}`);
+}
+
 const r = result.report;
 console.log(`\ntrim     : ${r.trim.widthIn} x ${r.trim.heightIn} in`);
 console.log(
@@ -85,4 +104,4 @@ for (const s of r.sectionStarts) {
  * there after the build finished and look like a hang — the render itself takes
  * about thirteen seconds.
  */
-process.exit(0);
+process.exit(result.orphanedIllustrations.length > 0 ? 2 : 0);

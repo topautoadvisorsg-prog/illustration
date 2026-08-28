@@ -1376,6 +1376,12 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
   const ap = standard.alertPanel;
   const qa = standard.quickAnswerIndex;
   const openerAlign = op.centered ? 'center' : 'left';
+  /**
+   * How far a divider's title has to move to sit on the centre of the paper:
+   * half the difference between the binding margin and the outside one, which
+   * is exactly the amount the text column leans toward the outside edge.
+   */
+  const DIVIDER_SHIFT = ((m.gutterIn - m.outsideIn) / 2).toFixed(4);
   const smallCaps = furn.runningHeadSmallCaps ? 'small-caps' : 'normal';
   const folioContent = furn.folio === 'none' ? 'none' : 'counter(page)';
   const title = config.publishing?.title ?? config.title;
@@ -1429,7 +1435,27 @@ export function buildTypesetHtml(input: TypesetHtmlInput): string {
       // `data-title` feeds the running head through `string-set`, and a CSS
       // string can only carry characters — so the attribute gets the plain form
       // while the opener above gets the rendered one.
-      return `<section class="tsec ${s.kind}${i === firstChapterIndex ? ' first-chapter' : ''}" id="tsec-${i}" data-title="${escapeHtml(plainHeadingText(s.title))}" data-label="${escapeHtml(label)}" data-kind="${s.kind}" data-section-slug="${slug}">
+      /**
+       * A DIVIDER IS A PAGE WITH A TITLE AND NOTHING ELSE.
+       *
+       * The part dividers carry a heading and a stamped plate and no body at
+       * all. On every other page the text column is offset for the binding, and
+       * a heading centred in that column is centred correctly, because it is
+       * centred over the text it belongs to. A divider has no text: the reader
+       * sees a title and a picture on an otherwise empty leaf and judges both
+       * against the edges of the paper. So the page itself is made symmetric
+       * (see the divider page rule), which centres the title on the trim the
+       * same way the plate is centred on the trim.
+       *
+       * A horizontal rule counts as empty. Each part divider in this manuscript
+       * is a heading followed by `---`, and the standard drops a scene break
+       * that sits directly under a heading, so the rule sets nothing. Testing
+       * for a literally empty body found no dividers at all.
+       */
+      const isDivider = s.bodyLines.every(
+        (l) => !l.trim() || /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(l),
+      );
+      return `<section class="tsec ${s.kind}${isDivider ? ' divider' : ''}${i === firstChapterIndex ? ' first-chapter' : ''}" id="tsec-${i}" data-title="${escapeHtml(plainHeadingText(s.title))}" data-label="${escapeHtml(label)}" data-kind="${s.kind}" data-section-slug="${slug}">
   ${opener}
   ${bodyToHtml(s.bodyLines, {
     /** From the PINNED standard, never a shared constant. See HeadingBindPolicy. */
@@ -1506,6 +1532,22 @@ ${fonts.css}
   @top-right { content: ${runningHead(furn.rectoRunningHead)}; font-family: '${t.bodyFont}', serif; font-variant: ${smallCaps}; font-size: ${t.labelPt}pt; letter-spacing: ${furn.runningHeadLetterSpacingEm}em; text-align: right; }
   @bottom-center { content: ${folioContent}; font-family: '${t.bodyFont}', serif; font-size: ${t.captionPt + t.folioPtDelta}pt; text-align: center; width: 100%; }
 }
+/* A DIVIDER PAGE IS CENTRED ON THE PAPER, NOT ON THE COLUMN.
+   Every page sets its text column off-centre by half the difference between the
+   binding margin and the outside one, which is right for type that has to clear
+   a spine, and right for a heading standing over body text set in that same
+   column. A part divider has no body: the reader sees a title and a plate on
+   empty paper and judges both against the edges of the sheet, and the plate is
+   centred on the sheet. A title 1/16in off the art it labels reads as crooked.
+   This was first tried as a named page with symmetric margins. Paged.js does
+   not apply a named page's margins here, so the shift is made on the element,
+   where it also cannot disturb pagination: position:relative moves painted
+   ink and nothing else, so no line rewraps and the page count cannot move.
+   Paged.js marks each sheet's side, and the column leans toward the outside
+   edge, so the correction is toward the spine: right on a verso, left on a
+   recto. */
+.pagedjs_left_page .tsec.divider > .opener { position: relative; left: ${DIVIDER_SHIFT}in; }
+.pagedjs_right_page .tsec.divider > .opener { position: relative; left: -${DIVIDER_SHIFT}in; }
 /* A chapter-opening page carries no running head — only the drop folio.
    :first scopes this to the FIRST page of each named-page run, so the rest of
    the chapter keeps its running heads. */

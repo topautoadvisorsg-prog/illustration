@@ -110,6 +110,29 @@ const OVERRIDES: Record<string, LayoutOverride> = {
    */
   '22904bd9': { breakBefore: 'page', note: "Ch8 coda to its own page, restoring the Yosemite plate's page and the parity blank that carries the Rocky Mountain frontispiece." },
   /**
+   * THE ROCKY MOUNTAIN SAFETY PANEL, KEPT WHOLE.
+   *
+   * NOBODY WARNED ME on afternoon thunderstorms above treeline broke across
+   * pp87-88, and the two halves each drew a complete four-sided box, so the
+   * spread showed two separate panels instead of one continuing. The
+   * continuation also carries no label, so the second box read as an unlabelled
+   * quote of its own. On a panel whose subject is a storm that kills people
+   * above treeline, that is the wrong thing to be ambiguous about.
+   *
+   * Pinned HERE rather than by flipping `keepTogether` on the standard.
+   * Book-wide was tried and measured: every panel that starts low then moves
+   * whole to the next leaf and pushes about three inches down the rest of its
+   * chapter. In chapters 6 and 9 that space is the chapter-end white the
+   * closing plates sit in, and the build correctly refused two of the fifteen
+   * plates that no longer fit. One panel, pinned, costs one chapter.
+   *
+   * `keepTogether` rather than `breakBefore`: break-inside lets the panel stay
+   * where it is whenever it fits, and move only when it would otherwise split.
+   * A hard break would push it to a new page even on the pages where there was
+   * never a problem.
+   */
+  'fdfaae85': { keepTogether: true, note: 'Ch9 NOBODY WARNED ME (afternoon storms) kept whole; it split across pp87-88 and drew two closed boxes.' },
+  /**
    * The two heading orphans are NOT here any more.
    *
    * They were fixed with `breakBefore: page`, which moved each heading to the

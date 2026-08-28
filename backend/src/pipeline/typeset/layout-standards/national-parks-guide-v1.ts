@@ -115,12 +115,24 @@ export const NATIONAL_PARKS_GUIDE_TYPESET_V1: TypesetLayoutStandard = {
   /**
    * NOBODY WARNED ME, boxed.
    *
-   * `keepTogether: false` deliberately. These run 125-258 words — the longest is
-   * about four fifths of a page — and forcing the box whole would push a
-   * near-page-length panel to the next leaf whenever it started low, buying a
-   * large hole in the middle of a chapter. The heading is the panel's label, so
-   * a box that does break still announces itself at the top; a page-sized hole
-   * has nothing to recommend it. Judged again on the rendered pages.
+   * `keepTogether` stays FALSE as a book-wide policy, and the panels that must
+   * not break are pinned individually instead. That is not the tidier option;
+   * it is the one the pages allow.
+   *
+   * Turning it on globally was tried and measured. These panels run 125-258
+   * words, so a panel that starts low moves whole to the next leaf and pushes
+   * roughly three inches of text down the rest of the chapter. In chapters 6
+   * and 9 that space was not spare: it was the white at the chapter end that
+   * the closing plates sit in. The build dropped two of the fifteen plates,
+   * correctly refusing art that no longer fit, and the book lost more than it
+   * gained.
+   *
+   * So the break is decided per panel, in national-parks-layout-overrides.ts,
+   * where the cost can be checked against the plate that shares the chapter.
+   * See the split-panel rules in typeset-book.ts: a panel that IS allowed to
+   * break is supposed to read as one box continuing, and pp87-88 showed that
+   * treatment is not reaching the rendered page. Until that is fixed, any panel
+   * that would split needs pinning rather than trusting the continuation.
    */
   alertPanel: {
     enabled: true,

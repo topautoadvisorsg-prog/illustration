@@ -29,6 +29,13 @@ import type { PageIllustration } from '@wildlands/shared';
 import type { TypesetBlockProbe } from './render-typeset.js';
 import type { TypesetMargins } from './typeset-book.js';
 
+/**
+ * KDP's smallest permitted binding margin, for interiors up to 150 pages. A
+ * page-centred plate has to clear this on the spine side even though the type
+ * column around it is set further in.
+ */
+const MIN_BINDING_MARGIN_IN = 0.375;
+
 const PT_PER_IN = 72;
 
 export interface StampInput {
@@ -136,20 +143,21 @@ export async function stampIllustrations(input: StampInput): Promise<StampResult
     const regionTopIn = typeBottomIn + artGapIn;
     const regionBottomIn = input.trim.heightIn - input.margins.bottomIn;
     /**
-     * WHICH SIDE THE GUTTER IS ON DEPENDS ON THE LEAF.
+     * THE SAFE REGION IS ASYMMETRIC. THE PLATE IS NOT CENTRED IN IT.
      *
-     * This read `left = gutter` unconditionally. That is true on a recto and
-     * wrong on every verso, because the binding margin swaps sides at every page
-     * turn. With a 0.625in gutter against a 0.5in outside margin the two text
-     * centres are 0.125in apart, so every verso plate sat an eighth of an inch
-     * toward the spine while every recto plate was exact.
+     * Which side the gutter falls on depends on the leaf: odd page numbers are
+     * rectos and take the binding margin on the left, versos take it on the
+     * right. That asymmetry is correct for TYPE, which has to clear the
+     * binding, and it decides the region a plate is allowed to occupy.
      *
-     * Four of the ten plates in 7 NATIONAL PARKS were off this way. It is the
-     * shape of defect no data check can see: the plate is present, the right
-     * size, the right colour space and the right resolution, and visibly not
-     * centred on the page.
+     * It is the wrong thing to centre a plate in. Centring inside the type
+     * column puts every plate 0.0625in off the centre of the paper, in a
+     * direction that flips at every page turn. Measured against the column it
+     * reads as exact; looked at, it reads as crooked, and a reader turning
+     * pages sees the art swing left, right, left.
      *
-     * Odd page numbers are rectos.
+     * So the region below still governs whether a plate FITS, and the paper
+     * governs where it SITS.
      */
     const isRecto = pageNumber % 2 === 1;
     const regionLeftIn = isRecto ? input.margins.gutterIn : input.margins.outsideIn;
@@ -170,9 +178,28 @@ export async function stampIllustrations(input: StampInput): Promise<StampResult
       continue;
     }
 
-    // Centred in the region, so the leftover stays as deliberate white rather
-    // than the art drifting to one end of it.
-    const xIn = regionLeftIn + (regionWIn - wIn) / 2;
+    /**
+     * Centred on the physical page, so the art reads square to the trim on
+     * every leaf. Vertical placement stays inside the region, where the type
+     * above it is what the art has to clear.
+     *
+     * Page-centring gives back half the gutter/outside difference on the
+     * binding side, so it is checked rather than assumed: a plate that would
+     * encroach past the binding minimum is reported, never quietly printed
+     * into the spine.
+     */
+    const xIn = (input.trim.widthIn - wIn) / 2;
+    const bindingClearanceIn = xIn;
+    if (bindingClearanceIn < MIN_BINDING_MARGIN_IN - 0.001) {
+      orphaned.push({
+        blockId,
+        reason:
+          `centring ${wIn.toFixed(2)}in of art on the page leaves ` +
+          `${bindingClearanceIn.toFixed(3)}in at the binding on p${pageNumber}, ` +
+          `under the ${MIN_BINDING_MARGIN_IN}in minimum`,
+      });
+      continue;
+    }
     const topIn = regionTopIn + (regionHIn - hIn) / 2;
 
     /**
