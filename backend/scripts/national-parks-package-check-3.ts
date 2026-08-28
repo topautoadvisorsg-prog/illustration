@@ -49,10 +49,10 @@ const MANIFEST = 'KDP-UPLOAD-MANIFEST.md';
  * and at upload time the only thing that matters is picking the right file.
  */
 const ARTIFACTS = {
-  interior: '7-national-parks-interior-6x9-122pp.pdf',
-  pbCover: '7-national-parks-cover-PAPERBACK-6x9-122pp.pdf',
+  interior: '7-national-parks-interior-6x9-120pp.pdf',
+  pbCover: '7-national-parks-cover-PAPERBACK-6x9-120pp.pdf',
   epub: '7-national-parks-KINDLE.epub',
-  hcCover: '7-national-parks-cover-HARDCOVER-6x9-122pp.pdf',
+  hcCover: '7-national-parks-cover-HARDCOVER-6x9-120pp.pdf',
   kindleCover: '7-national-parks-KINDLE-cover-1600x2560.jpg',
 } as const;
 
@@ -61,9 +61,9 @@ const ARTIFACTS = {
  *
  * It was pending for as long as there was no verified Cover Calculator reading
  * at this page count, and `kdp-cover-specs` refuses to interpolate a hardcover
- * spine from a single anchor. The reading was taken on 2026-08-27 for
- * HARDCOVER/CASE_LAMINATE, BLACK_AND_WHITE, WHITE paper, 6x9in at 122pp:
- * full wrap 14.039 x 10.417in, spine 0.464in, board 6.197 x 9.236in.
+ * spine from a single anchor. The reading was taken on 2026-08-26 for
+ * HARDCOVER/CASE_LAMINATE, BLACK_AND_WHITE, WHITE paper, 6x9in at 120pp:
+ * full wrap 14.034 x 10.417in, spine 0.459in, board 6.197 x 9.236in.
  *
  * Read, not interpolated. The model's interpolation for 122pp agreed on the
  * wrap and the spine and put the SPINE SAFE AREA at 0.235in against Amazon's
@@ -81,14 +81,14 @@ const ARTIFACTS = {
    the parity blanks unmoved. Every superseded file is kept, named with its hash,
    under `_np_build/_superseded-*`. */
 const EXPECT_SHA: Record<keyof typeof ARTIFACTS, string> = {
-  interior: 'c40fb9bbdaa64913b7504ae655b4ce910c90b883fb58fb46cc0d6571c69cd43a',
-  pbCover: '65dd7ed40101b78a48a40345441199353eac0be46b98dad9ab10612897c26b71',
+  interior: 'c034508373d827bf457236d1d5d313c18e13a6603b371f2a01aacfef1f4621fc',
+  pbCover: 'ef6247924090b1462b1f727f208595874fb49af689f51352255eade299d4161f',
   epub: 'ec1502ee9eb1991c7282b9ec9c069b6f7b244df10e69bb6be95d5357b558da01',
-  hcCover: '71c26d35d43bfb7b8564847424ba117d410bf0a264f04d09e2381fff051ffa84',
-  kindleCover: '2b4499252c0723fd743da832eb242d2c40b79f6a7e9c498852e4727177e62376',
+  hcCover: '54b25a5e23297ac4ffd249c8510f499aa109d9858729778e58ca34a3ebbc4848',
+  kindleCover: '7daf5c382a96a53784bd0f3a858bde7e28991c354fa0b453a01e6534b5c247a5',
 };
 
-const PAGES = 122;
+const PAGES = 120;
 const PT = 72;
 
 /** Paperback: spine is derived from this interior's own page count. */
@@ -383,7 +383,7 @@ console.log('\n6. DELIVERY FOLDER');
    * form during the same sitting as the uploads, and keeping them in the same
    * folder is what stops that being done from memory.
    */
-  const COMPANION_DOCS = ['AMAZON-BOOK-DESCRIPTION.md', '7-national-parks-cover-HARDCOVER-6x9-122pp.json'];
+  const COMPANION_DOCS = ['AMAZON-BOOK-DESCRIPTION.md', '7-national-parks-cover-HARDCOVER-6x9-120pp.json'];
   const expected = [...Object.values(ARTIFACTS), MANIFEST, ...COMPANION_DOCS].sort();
   for (const f of found) console.log(`   ${f}`);
   const extra = found.filter((e) => !expected.includes(e));

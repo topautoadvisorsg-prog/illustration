@@ -110,24 +110,6 @@ const OVERRIDES: Record<string, LayoutOverride> = {
    */
   '22904bd9': { breakBefore: 'page', note: "Ch8 coda to its own page, restoring the Yosemite plate's page and the parity blank that carries the Rocky Mountain frontispiece." },
   /**
-   * CHAPTER 6'S CODA TO ITS OWN PAGE — the same repair chapter 8 already uses.
-   *
-   * Giving the Yellowstone safety panel a page of its own lengthens the chapter
-   * by one leaf, and the leaf it takes is the parity blank that used to sit at
-   * p54 carrying the Grand Canyon frontispiece. The build then correctly
-   * refused that frontispiece: a full-page plate with no page to be on.
-   *
-   * Moving the three-paragraph coda to a page of its own ends the chapter on a
-   * recto, which forces the next chapter to the recto after that and hands the
-   * blank verso back. The frontispiece is anchored to Chapter 7's opener at
-   * offset -1, so it lands there again on its own, and the Yellowstone closing
-   * plate rides with the coda block it is anchored to.
-   *
-   * The book grows by two pages. That is what keeping every plate and an unbroken
-   * safety panel costs here; the alternative was a bare blank recto.
-   */
-  '79bb8ccd': { breakBefore: 'page', note: "Ch6 coda to its own page, handing back the parity blank that carries the Grand Canyon frontispiece." },
-  /**
    * THE YELLOWSTONE SAFETY PANEL, ON ITS OWN PAGE.
    *
    * It broke across pp49-50 with only 0.92in spilling onto the second leaf, so

@@ -1,0 +1,13 @@
+await import('../src/env.js');
+const ID = process.argv[2]!;
+const P = '92c4ab36-4956-4435-b656-d2679fbc73d9';
+const { ProjectConfigSchema } = await import('@wildlands/shared');
+const { getProject, updateProjectConfig } = await import('../src/db/repositories/projects.repo.js');
+const project = await getProject(P);
+const config = ProjectConfigSchema.parse(project!.config);
+const o = { ...(config.layoutOverrides ?? {}) };
+if (!o[ID]) throw new Error(`no override ${ID}`);
+delete o[ID];
+await updateProjectConfig(P, ProjectConfigSchema.parse({ ...config, layoutOverrides: o }));
+console.log(`removed ${ID}; ${Object.keys(o).length} overrides remain`);
+process.exit(0);

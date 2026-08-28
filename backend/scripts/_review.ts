@@ -1,43 +1,54 @@
-/* Read-only: build a contact sheet (top + bottom strip of each page) for the
- * pages of a chapter that have ALREADY rendered, so we can catch a systematic
- * issue mid-batch before it carries through the rest. */
-import { writeFileSync } from 'node:fs';
-import sharp from 'sharp';
-import { eq, and, desc } from 'drizzle-orm';
-import { getDb } from '../src/db/client.js';
-import { pages, wholePageRenders } from '../src/db/schema/index.js';
-import { listPaginatedPagesForProject } from '../src/db/repositories/pagination.repo.js';
-import { getProjectStorage } from '../src/services/storage/project-storage.js';
-
-import { P } from './_project.js';
-const CH = process.argv[2] ?? 'CH02';
-const MINS = Number(process.argv[3] ?? '60');
-const cutoff = new Date(Date.now() - MINS * 60_000);
-const db = getDb();
-const storage = getProjectStorage();
-const all = await listPaginatedPagesForProject(P);
-const chap = all.filter((p) => new RegExp('^' + CH + '_').test(p.pageKey || '')).sort((a, b) => (a.plannedPageNumber ?? 0) - (b.plannedPageNumber ?? 0));
-const W = 540, LBL = 22;
-const rows: { buf: Buffer; h: number }[] = [];
-let done = 0;
-for (const pg of chap) {
-  const row = (await db.select().from(pages).where(and(eq(pages.projectId, P), eq(pages.pageKey, pg.pageKey))))[0];
-  const r = (await db.select().from(wholePageRenders).where(and(eq(wholePageRenders.pageId, row.id), eq(wholePageRenders.active, true))).orderBy(desc(wholePageRenders.version)).limit(1))[0];
-  if (!r?.imagePath || !(new Date(r.createdAt as any) > cutoff)) continue;
-  done++;
-  const img = await storage.readProjectFile(r.imagePath);
-  const m = await sharp(img).metadata(); const h = m.height!, w = m.width!;
-  const top = await sharp(img).extract({ left: 0, top: 0, width: w, height: Math.round(h * 0.15) }).resize({ width: W }).toBuffer();
-  const bt = Math.round(h * 0.85);
-  const bot = await sharp(img).extract({ left: 0, top: bt, width: w, height: h - bt }).resize({ width: W }).toBuffer();
-  const tH = (await sharp(top).metadata()).height!, bH = (await sharp(bot).metadata()).height!;
-  const lbl = await sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${LBL}"><rect width="100%" height="100%" fill="#2b1d10"/><text x="6" y="16" font-family="sans-serif" font-size="13" fill="#fff">folio ${pg.plannedPageNumber} · ${pg.pageKey} · TOP / BOTTOM</text></svg>`)).png().toBuffer();
-  const rowH = LBL + tH + 5 + bH + 10;
-  rows.push({ buf: await sharp({ create: { width: W, height: rowH, channels: 3, background: '#ddd' } }).composite([{ input: lbl, top: 0, left: 0 }, { input: top, top: LBL, left: 0 }, { input: bot, top: LBL + tH + 5, left: 0 }]).png().toBuffer(), h: rowH });
+/** READ-ONLY. How full is every page of the shipped interior, and what is on it. */
+import { readFileSync } from 'node:fs';
+const PDF = process.argv[2]!;
+const pdfjs = await import('pdfjs-dist/legacy/build/pdf.js');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(pdfjs as any).GlobalWorkerOptions.workerSrc = '';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const doc = await (pdfjs as any).getDocument({ data: new Uint8Array(readFileSync(PDF)), useSystemFonts: false, disableFontFace: true }).promise;
+const { OPS } = pdfjs as unknown as { OPS: Record<string, number> };
+type M = [number, number, number, number, number, number];
+const mul = (a: M, b: M): M => [a[0]*b[0]+a[1]*b[2], a[0]*b[1]+a[1]*b[3], a[2]*b[0]+a[3]*b[2], a[2]*b[1]+a[3]*b[3], a[4]*b[0]+a[5]*b[2]+b[4], a[4]*b[1]+a[5]*b[3]+b[5]];
+const TOP = 0.625, BOT = 0.625, H = 9;
+const BLOCK = H - TOP - BOT;
+const rows: { p: number; textIn: number; artIn: number; fill: number; first: string }[] = [];
+for (let p = 1; p <= doc.numPages; p += 1) {
+  const page = await doc.getPage(p);
+  const tc = await page.getTextContent();
+  let hi = -Infinity, lo = Infinity; const strs: string[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const it of tc.items as any[]) {
+    if (!it.str?.trim()) continue;
+    const yTop = H - it.transform[5] / 72;
+    if (yTop < 0.55 || yTop > 8.5) continue;      // skip running head and folio
+    hi = Math.max(hi, yTop); lo = Math.min(lo, yTop); strs.push(it.str);
+  }
+  const textIn = Number.isFinite(hi) ? hi - TOP : 0;
+  let artIn = 0;
+  const ops = await page.getOperatorList();
+  const fns = ops.fnArray as number[]; const args = ops.argsArray as unknown[][];
+  let ctm: M = [1,0,0,1,0,0]; const stack: M[] = [];
+  for (let i = 0; i < fns.length; i += 1) {
+    const fn = fns[i]!;
+    if (fn === OPS.save) stack.push([...ctm] as M);
+    else if (fn === OPS.restore) ctm = stack.pop() ?? ctm;
+    else if (fn === OPS.transform) ctm = mul(args[i] as unknown as M, ctm);
+    else if (fn === OPS.paintImageXObject) artIn += Math.hypot(ctm[2], ctm[3]) / 72;
+  }
+  const fill = Math.min(1, Math.max(textIn, 0) / BLOCK + (artIn > 0 && textIn < 0.1 ? artIn / BLOCK : 0));
+  const inked = artIn > 0 ? Math.min(1, (Math.max(textIn, 0) + artIn) / BLOCK) : fill;
+  rows.push({ p, textIn: Math.max(textIn, 0), artIn, fill: inked, first: strs.join(' ').replace(/\s+/g, ' ').slice(0, 52) });
 }
-const totalH = rows.reduce((s, r) => s + r.h + 6, 6);
-let y = 6; const comps: sharp.OverlayOptions[] = [];
-for (const r of rows) { comps.push({ input: r.buf, top: y, left: 0 }); y += r.h + 6; }
-writeFileSync(`C:/Users/jovan/Downloads/_review_${CH}.png`, await sharp({ create: { width: W, height: totalH, channels: 3, background: '#fff' } }).composite(comps).png().toBuffer());
-console.log(`reviewed ${done} done ${CH} pages → _review_${CH}.png`);
+console.log(`${doc.numPages} pages. Text block ${BLOCK.toFixed(2)}in.\n`);
+console.log('  page  text    art     filled   opening words');
+console.log('  ' + '-'.repeat(84));
+for (const r of rows) {
+  const blank = r.textIn === 0 && r.artIn === 0;
+  const flag = blank ? '  (parity blank)' : r.fill < 0.45 ? '  <<< UNDER HALF' : '';
+  if (r.fill < 0.62 || blank) {
+    console.log(`  p${String(r.p).padStart(3)}  ${r.textIn.toFixed(2)}in  ${r.artIn.toFixed(2)}in  ${(r.fill * 100).toFixed(0).padStart(4)}%   ${r.first}${flag}`);
+  }
+}
+const bad = rows.filter((r) => r.fill < 0.45 && !(r.textIn === 0 && r.artIn === 0));
+console.log(`\n${bad.length} page(s) under half full and not a parity blank: ${bad.map((b) => `p${b.p}`).join(', ') || 'none'}`);
 process.exit(0);
