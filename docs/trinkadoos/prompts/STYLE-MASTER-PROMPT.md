@@ -202,6 +202,29 @@ For every scene, output:
 
 ---
 
+## Which character reference to attach — wardrobe state
+
+There are two wardrobe states and the wrong sheet puts the children in the wrong clothes.
+
+- `characters/four-children-everyday.png` — Bram, Tessa, Nico and Sivi as ordinary kids: hoodies,
+  cardigans, jeans, sneakers. **No costumes, no Packs.**
+- `characters/<name>.png` — the adventure form: hood, ears/horn/shell/wings, and that child's
+  backpack.
+
+Book 1 changes wardrobe exactly once, at Spread 8, and changes back on page 32:
+
+| Units | State | Attach |
+| --- | --- | --- |
+| Page 3, Spreads 1–7 | ordinary clothes — they have not dressed yet | everyday sheet |
+| Spread 8 | the dressing itself, clothes half on | **both** — everyday and the four adventure sheets |
+| Spreads 9–14 | in adventure form | the four adventure sheets |
+| Page 32 | back in ordinary clothes, Packs stored | everyday sheet |
+
+The Packs are found at Spread 5 and worn from Spread 8. Before Spread 8 no child wears a Pack,
+so a prompt for those pages must not attach a sheet that shows one.
+
+Zinumi has one state and one sheet throughout.
+
 ## Pack status — RESOLVED
 
 All four Pack-carrying children now show a backpack on their own sheet.
