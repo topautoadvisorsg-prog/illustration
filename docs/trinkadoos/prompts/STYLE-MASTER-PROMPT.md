@@ -7,9 +7,9 @@ Read it before writing any prompt; it overrides habit and overrides anything ear
 
 Approved assets it refers to:
 
-- **Style anchor:** `references/style/trinkadoos-style-reference_glowing-passage.png`
 - **Character sheets:** `references/characters/` — `bram-bear`, `tessa-unicorn`, `nico-turtle`,
   `sivi-butterfly`, `zinumi-fairy`
+- **Style anchor: none yet.** Outstanding. Do not substitute a test render for it.
 
 ---
 
@@ -202,20 +202,16 @@ For every scene, output:
 
 ---
 
-## Open conflict to resolve before rendering
+## Pack status
 
-**The backpack rule and the approved sheets disagree, and the one existing render is off-model.**
+Confirmed against the sheets, and the owner is reissuing the two that are wrong:
 
-- **Sivi's sheet** shows a **butterfly backpack** — clear in the back and 3/4 views.
-- **Nico's sheet** shows a **turtle-shell backpack**.
-- **Bram's sheet** shows a **crossbody satchel**, captioned *"SATCHEL DETAIL — Sturdy satchel with
-  paw motif."* No backpack anywhere on his sheet.
-- **Tessa's sheet** shows a **crossbody satchel bag**.
-- **Zinumi's sheet** shows a small side pouch.
+| | Sheet shows | |
+| --- | --- | --- |
+| Sivi | butterfly **backpack** | correct |
+| Nico | turtle-shell **backpack** | correct |
+| Bram | crossbody satchel, captioned "SATCHEL DETAIL" | being reissued as a backpack |
+| Tessa | crossbody satchel bag | being reissued as a backpack |
+| Zinumi | small side pouch | she is a fairy, not one of the four Pack-carrying children — separate question |
 
-And in `style/trinkadoos-style-reference_glowing-passage.png`, **Sivi is carrying a crossbody
-satchel, not her backpack** — exactly the substitution the rule forbids.
-
-So "backpacks must read as backpacks, never satchels" cannot be applied literally to Bram and
-Tessa without contradicting their own approved sheets. Until the owner rules on it, prompts should
-follow **each character's own sheet**, and Sivi's pack is always a **backpack**.
+Until the reissued sheets land, do not write prompts that describe Bram's or Tessa's pack.

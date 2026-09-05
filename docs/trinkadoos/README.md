@@ -50,17 +50,19 @@ The approved visual bible.
 - `characters/` — five full character sheets: `bram-bear`, `tessa-unicorn`, `nico-turtle`,
   `sivi-butterfly`, `zinumi-fairy`. Each carries front/side/back/3-4 views, detail callouts and an
   expression row. These are the identity anchor — characters are never redesigned from them.
-- `style/trinkadoos-style-reference_glowing-passage.png` — the locked style anchor. Book 1
-  Spread 3 rendered clean, no text in frame.
-- `style/_reference-with-text-DO-NOT-USE-AS-TARGET.png` — the same scene with story text baked
-  into the artwork. Kept only as the example of what must never ship: text is added manually
-  afterwards, never rendered.
+**There is no approved style reference yet.** A rendered cave scene briefly sat here as one; it
+was a test image, not owner-supplied and not final, and it has been removed. The character sheets
+carry the look in the meantime, but a real style anchor is still outstanding and rendering waits
+on it.
 
 The earlier crops taken from the old four-up sheet are gone. That sheet mislabelled three of the
 four children and called Sivi *Lyra*; these individual sheets are correct and supersede it.
 
-**`prompts/STYLE-MASTER-PROMPT.md` is the standing instruction for every image prompt.** It also
-records an unresolved conflict: the backpack rule versus what Bram's and Tessa's own sheets show.
+**`prompts/STYLE-MASTER-PROMPT.md` is the standing instruction for every image prompt.**
+
+Packs: Nico and Sivi already carry backpacks on their sheets. Bram and Tessa carry crossbody
+satchels and are being reissued by the owner so they read as backpacks. Zinumi is a fairy, not one
+of the four Pack-carrying children, so her small pouch is a separate question.
 
 ## Not kept here, on purpose
 
