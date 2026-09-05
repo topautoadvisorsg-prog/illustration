@@ -45,10 +45,22 @@ notes/       production records
 
 ### `references/`
 
-The four approved character crops, named for **who each child actually is**: Bram → bear,
-Tessa → unicorn, Nico → turtle, Sivi → butterfly. The delivered character sheet still carries the
-stale name *Lyra* for Sivi. Zinumi has a separate approved sheet held by the owner and is not in
-this folder yet.
+The approved visual bible.
+
+- `characters/` — five full character sheets: `bram-bear`, `tessa-unicorn`, `nico-turtle`,
+  `sivi-butterfly`, `zinumi-fairy`. Each carries front/side/back/3-4 views, detail callouts and an
+  expression row. These are the identity anchor — characters are never redesigned from them.
+- `style/trinkadoos-style-reference_glowing-passage.png` — the locked style anchor. Book 1
+  Spread 3 rendered clean, no text in frame.
+- `style/_reference-with-text-DO-NOT-USE-AS-TARGET.png` — the same scene with story text baked
+  into the artwork. Kept only as the example of what must never ship: text is added manually
+  afterwards, never rendered.
+
+The earlier crops taken from the old four-up sheet are gone. That sheet mislabelled three of the
+four children and called Sivi *Lyra*; these individual sheets are correct and supersede it.
+
+**`prompts/STYLE-MASTER-PROMPT.md` is the standing instruction for every image prompt.** It also
+records an unresolved conflict: the backpack rule versus what Bram's and Tessa's own sheets show.
 
 ## Not kept here, on purpose
 
