@@ -116,15 +116,41 @@ const MOTION: Record<ShotKind, string> = {
   TRANSITION: 'the characters take a few steps away from camera as the light moves',
 };
 
-/** Cues that mean all four children are on the page without naming them. */
+/**
+ * Cues that mean the rest of the core children are on the page without naming them.
+ *
+ * A cue names whoever is doing something and refers to everyone else in a phrase.
+ * Book 1 Spread 13 is the case: "one small boy … his hand flat against it. The
+ * other three hanging back, giving him room." Only Bram is named, so a
+ * name-and-a-few-phrases match attached one reference and silently dropped the
+ * three children the cue explicitly puts in frame.
+ *
+ * Bare "children" earns its place the same way — Spread 2 ("Children small against
+ * it") and Spread 14 ("Children silhouetted against it, arms up") name nobody at all,
+ * and Spread 14 is the payoff spread of the book.
+ *
+ * These resolve to the four children, never to Zinumi: she is a separate character
+ * who joins a scene only when the cue or the story text actually places her there.
+ * "the other three" and "all three" resolve to all four alongside whoever is named —
+ * over-including a child who is present but unnamed is recoverable at review;
+ * dropping one is not, because the render simply comes back without them.
+ */
 const GROUP_PHRASES = [
-  // Bare "children" earns its place: Book 1 Spread 2 ("Children small against it")
-  // and Spread 14 ("Children silhouetted against it, arms up") name nobody, and
-  // without it the payoff spread of the book would have been briefed with no
-  // character reference attached at all.
-  '\\bchildren\\b', 'all four', 'four faces', 'the others', 'the four of them',
-  'everybody', 'each pack', 'four sets', 'all of them',
+  '\\bchildren\\b',
+  'the other three', 'all three',
+  'the others', 'everybody else', 'the rest of them',
+  'his friends', 'her friends', 'their friends',
+  'all four', 'four faces', 'the four of them',
+  'everybody', 'all of them',
 ];
+/*
+ * "four sets" and "each pack" were in this list and are now out. They count
+ * OBJECTS, not people. Once detection started reading the story text as well as
+ * the cue, Spread 7 — "Inside the packs, folded and waiting, were clothes. Four
+ * sets. Exactly four." — matched on the clothes and pulled all four children into
+ * a spread whose art is deliberately just Nico and Sivi. A group phrase has to
+ * denote people, or it drags the cast in on the strength of the scenery.
+ */
 const KIDS = ['Bram', 'Tessa', 'Nico', 'Sivi'];
 
 /**
@@ -147,7 +173,24 @@ function guardsFor(art: string, present: CharacterRef[]): string[] {
 function build(spec: TitleSpec, units: BriefUnit[]): VisualUnit[] {
   const out: VisualUnit[] = [];
   units.forEach((u, index) => {
-    const present = charactersInScene(u.art, CAST, { groupPhrases: GROUP_PHRASES, groupMembers: KIDS });
+    /*
+     * Character detection reads the ART cue AND the story text on that page.
+     *
+     * The cue names whoever the picture is about; the text often names the rest.
+     * Book 1 Spread 11's cue names only Bram and Tessa, while its text carries
+     * "'It's broken,' said Sivi" and "Nico crouched by a root" — two children the
+     * cue never mentions but the page plainly contains. Spread 12 is the same
+     * shape: the cue stages three powers, the text shelters "his friends" under
+     * Bram's, and Tessa is one of them.
+     *
+     * Guards still key off the ART cue alone. They describe how the picture is
+     * drawn, not what the page says, and widening them would fire the outfit rule
+     * on any page whose text happens to mention a hood.
+     */
+    const present = charactersInScene(`${u.art}\n${u.text.join(' ')}`, CAST, {
+      groupPhrases: GROUP_PHRASES,
+      groupMembers: KIDS,
+    });
     const refs = [STYLE_REF, ...present.map((c) => c.ref)];
     const guards = guardsFor(u.art, present);
     const loadBearing = LOAD_BEARING[`${spec.book}:${u.key}`];
