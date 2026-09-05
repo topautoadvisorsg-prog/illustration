@@ -202,16 +202,18 @@ For every scene, output:
 
 ---
 
-## Pack status
+## Pack status — RESOLVED
 
-Confirmed against the sheets, and the owner is reissuing the two that are wrong:
+All four Pack-carrying children now show a backpack on their own sheet.
 
-| | Sheet shows | |
-| --- | --- | --- |
-| Sivi | butterfly **backpack** | correct |
-| Nico | turtle-shell **backpack** | correct |
-| Bram | crossbody satchel, captioned "SATCHEL DETAIL" | being reissued as a backpack |
-| Tessa | crossbody satchel bag | being reissued as a backpack |
-| Zinumi | small side pouch | **settled: leave as-is.** She is a fairy, not one of the four Pack-carrying children, so the backpack rule does not apply to her |
+| | Sheet shows |
+| --- | --- |
+| Bram | teddy-bear **backpack**, paw motif — *"BACKPACK DETAIL"*, *"ALWAYS WITH: His backpack"* |
+| Tessa | lavender star **backpack** — *"BOOTS & BACKPACK DETAIL … a magical backpack"* |
+| Nico | turtle-shell **backpack** |
+| Sivi | butterfly **backpack** |
+| Zinumi | small side pouch — **settled, leave as-is.** She is a fairy, not one of the four Pack-carrying children, so the backpack rule does not reach her |
 
-Until the reissued sheets land, do not write prompts that describe Bram's or Tessa's pack.
+Bram's and Tessa's sheets were reissued by the owner on 2026-09-04; the earlier versions showed
+crossbody satchels. The rule "backpacks must read as backpacks, never satchels" now applies
+cleanly to all four children with no contradiction against their own references.

@@ -60,10 +60,9 @@ four children and called Sivi *Lyra*; these individual sheets are correct and su
 
 **`prompts/STYLE-MASTER-PROMPT.md` is the standing instruction for every image prompt.**
 
-Packs: Nico and Sivi already carry backpacks on their sheets. Bram and Tessa carry crossbody
-satchels and are being reissued by the owner so they read as backpacks. Zinumi is a fairy, not one
-of the four Pack-carrying children, so the backpack rule does not apply to her — her pouch stays
-as drawn, settled by the owner.
+Packs: all four children carry a backpack on their own sheet — Bram's teddy-bear pack, Tessa's
+star pack, Nico's turtle shell, Sivi's butterfly pack. Zinumi is a fairy, not one of the four
+Pack-carrying children, so the backpack rule does not reach her; her pouch stays as drawn.
 
 ## Not kept here, on purpose
 
