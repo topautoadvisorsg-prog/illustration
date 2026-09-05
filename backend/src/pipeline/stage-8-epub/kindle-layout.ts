@@ -117,15 +117,18 @@ export function keepHeadingsWithContent(html: string): string {
   const out: string[] = [];
   let i = 0;
   while (i < blocks.length) {
-    if (!HEADING.test(blocks[i])) {
-      out.push(blocks[i]);
+    // Indexed reads are asserted, not guarded: both loops already bound the
+    // index by `blocks.length`, so the element cannot be undefined. This is
+    // narrowing for `noUncheckedIndexedAccess` only — no behaviour changes.
+    if (!HEADING.test(blocks[i]!)) {
+      out.push(blocks[i]!);
       i += 1;
       continue;
     }
-    const run = [blocks[i]];
+    const run = [blocks[i]!];
     let j = i + 1;
-    while (j < blocks.length && HEADING.test(blocks[j])) {
-      run.push(blocks[j]);
+    while (j < blocks.length && HEADING.test(blocks[j]!)) {
+      run.push(blocks[j]!);
       j += 1;
     }
     const next = j < blocks.length ? blocks[j] : undefined;
