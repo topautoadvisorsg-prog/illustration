@@ -58,6 +58,25 @@ export interface ModelPage {
   inkBox: Box | null;
   /** Fraction of the text block's height that carries body lines. */
   density: number;
+  /**
+   * Bounding boxes of every painted image on the page, in PDF points.
+   *
+   * `inkBox` is named for everything drawn but has only ever held TEXT, so a
+   * page could carry a full-width illustration and still measure as empty. That
+   * is not corrected in place -- `inkBox` feeds CONTENT_OFF_PAGE, whose
+   * calibration is text-based -- so images are reported alongside it instead.
+   */
+  images: Box[];
+  /** Total painted image area as a fraction of the whole page. */
+  imageAreaFraction: number;
+  /**
+   * How much of the AVAILABLE text block this page's text actually occupies.
+   *
+   * Distinct from `density`, which measures how tightly lines are packed WITHIN
+   * whatever span they occupy and therefore reports 1.0 for two consecutive
+   * lines on an otherwise empty leaf. This measures the leaf.
+   */
+  textFill: number;
   /** The tallest continuous vertical gap inside the text block, in points. */
   largestGapPt: number;
   /** Where that gap sits, as a fraction from the top of the text block. */
@@ -75,6 +94,10 @@ export interface BookNorms {
   leadingPt: number;
   /** The measure: the 97th-percentile body line width. */
   measurePt: number;
+  /** First-baseline height of the text block, inferred from the book. */
+  textBlockTopPt: number;
+  /** Last-baseline height of the text block, inferred from the book. */
+  textBlockBottomPt: number;
 }
 
 export interface PageModel {
@@ -121,11 +144,14 @@ export async function buildPageModel(pdfBytes: Buffer): Promise<PageModel> {
     pdfjs as unknown as { getDocument: (o: unknown) => { promise: Promise<PdfDoc> } }
   ).getDocument({ data: new Uint8Array(pdfBytes), useSystemFonts: false, disableFontFace: true }).promise;
 
-  const raw: Array<{ n: number; widthPt: number; heightPt: number; lines: PageLine[] }> = [];
+  const OPS = (pdfjs as unknown as { OPS: Record<string, number> }).OPS;
+
+  const raw: Array<{ n: number; widthPt: number; heightPt: number; lines: PageLine[]; images: Box[] }> = [];
   for (let i = 1; i <= doc.numPages; i += 1) {
     const page = await doc.getPage(i);
     const vp = page.getViewport({ scale: 1 });
     const tc = await page.getTextContent();
+    const images = await imageBoxes(page, OPS);
 
     /** Items sharing a baseline within a point are one line. */
     const buckets = new Map<number, Array<{ x: number; w: number; s: string; size: number; font: string }>>();
@@ -160,7 +186,7 @@ export async function buildPageModel(pdfBytes: Buffer): Promise<PageModel> {
       });
     }
     lines.sort((a, b) => b.y - a.y);
-    raw.push({ n: i, widthPt: vp.width, heightPt: vp.height, lines });
+    raw.push({ n: i, widthPt: vp.width, heightPt: vp.height, lines, images });
   }
 
   const norms = inferNorms(raw);
@@ -169,13 +195,21 @@ export async function buildPageModel(pdfBytes: Buffer): Promise<PageModel> {
     const body = p.lines.filter((l) => !isFurniture(p, l, norms));
     const bodySized = body.filter((l) => isBodySize(l, norms));
     const gap = largestGap(body, norms);
+    const textBox = boxOf(body);
+    const pageArea = Math.max(1, p.widthPt * p.heightPt);
+    const imageArea = p.images.reduce(
+      (a, b) => a + Math.max(0, b.x1 - b.x0) * Math.max(0, b.y1 - b.y0),
+      0,
+    );
     return {
       ...p,
       body,
       furniture,
-      textBox: boxOf(body),
+      textBox,
       inkBox: boxOf(p.lines),
       density: densityOf(body, bodySized, norms),
+      imageAreaFraction: Math.min(1, imageArea / pageArea),
+      textFill: textFillOf(textBox, norms),
       largestGapPt: gap.pt,
       largestGapAt: gap.at,
       headings: body.filter((l) => isHeadingSize(l, norms)),
@@ -191,7 +225,7 @@ export async function buildPageModel(pdfBytes: Buffer): Promise<PageModel> {
   };
 }
 
-function inferNorms(pages: Array<{ lines: PageLine[] }>): BookNorms {
+function inferNorms(pages: Array<{ heightPt: number; lines: PageLine[] }>): BookNorms {
   // Body size: the size carrying the most CHARACTERS, not the most lines. A book
   // with many short headings would otherwise elect a heading size as its body.
   const sizes = new Map<number, number>();
@@ -228,7 +262,122 @@ function inferNorms(pages: Array<{ lines: PageLine[] }>): BookNorms {
     .sort((a, b) => a - b);
   const measurePt = widths.length ? widths[Math.floor(widths.length * 0.97)]! : 0;
 
-  return { bodySizePt, leadingPt, measurePt };
+  // The text block, from the book rather than from the standard that set it. A
+  // percentile, not the extreme: one page with an unusually tall first line or a
+  // deep descender must not define the block for the other hundred and seventy.
+  const partial: BookNorms = {
+    bodySizePt,
+    leadingPt,
+    measurePt,
+    textBlockTopPt: 0,
+    textBlockBottomPt: 0,
+  };
+  const tops: number[] = [];
+  const bottoms: number[] = [];
+  for (const p of pages) {
+    const body = p.lines.filter((l) => !isFurniture(p, l, partial));
+    if (!body.length) continue;
+    tops.push(Math.max(...body.map((l) => l.y)));
+    bottoms.push(Math.min(...body.map((l) => l.y)));
+  }
+  tops.sort((a, b) => a - b);
+  bottoms.sort((a, b) => a - b);
+  const textBlockTopPt = tops.length ? tops[Math.floor(tops.length * 0.95)]! : 0;
+  const textBlockBottomPt = bottoms.length ? bottoms[Math.floor(bottoms.length * 0.05)]! : 0;
+
+  return { bodySizePt, leadingPt, measurePt, textBlockTopPt, textBlockBottomPt };
+}
+
+/**
+ * Painted images on a page, as boxes in PDF points.
+ *
+ * The operator list is walked with the CTM tracked through save/restore/transform,
+ * because an image occupies the unit square under whatever matrix is current when
+ * it is painted. Verified against this book's stamped illustrations, which report
+ * 252.0 x 168.0pt against a placement of 3.5 x 2.333in.
+ */
+async function imageBoxes(page: PdfPage, OPS: Record<string, number>): Promise<Box[]> {
+  if (!page.getOperatorList || !OPS) return [];
+  const PAINTS = new Set(
+    [
+      'paintImageXObject',
+      'paintInlineImageXObject',
+      'paintImageMaskXObject',
+      'paintImageXObjectRepeat',
+      'paintImageMaskXObjectGroup',
+      'paintInlineImageXObjectGroup',
+      'paintImageMaskXObjectRepeat',
+      'paintSolidColorImageMask',
+    ]
+      .map((k) => OPS[k])
+      .filter((v): v is number => typeof v === 'number'),
+  );
+  let list: { fnArray: number[]; argsArray: unknown[] };
+  try {
+    list = await page.getOperatorList();
+  } catch {
+    // Before this, the model read TEXT only, so no malformed content stream
+    // could stop an audit. Returning no boxes costs at most a real plate being
+    // raised for REVIEW; throwing would cost the whole report.
+    return [];
+  }
+  const mul = (a: number[], b: number[]): number[] => [
+    a[0]! * b[0]! + a[2]! * b[1]!,
+    a[1]! * b[0]! + a[3]! * b[1]!,
+    a[0]! * b[2]! + a[2]! * b[3]!,
+    a[1]! * b[2]! + a[3]! * b[3]!,
+    a[0]! * b[4]! + a[2]! * b[5]! + a[4]!,
+    a[1]! * b[4]! + a[3]! * b[5]! + a[5]!,
+  ];
+  let ctm = [1, 0, 0, 1, 0, 0];
+  const stack: number[][] = [];
+  const out: Box[] = [];
+  for (let k = 0; k < list.fnArray.length; k += 1) {
+    const fn = list.fnArray[k]!;
+    if (fn === OPS.save) stack.push(ctm.slice());
+    else if (fn === OPS.restore) ctm = stack.pop() ?? [1, 0, 0, 1, 0, 0];
+    else if (fn === OPS.transform) ctm = mul(ctm, list.argsArray[k] as number[]);
+    // A FORM XOBJECT CARRIES ITS OWN MATRIX and pdfjs does not emit a separate
+    // `transform` for it — the matrix rides on the begin op and the canvas
+    // backend applies it. Ignoring these measured any image painted INSIDE a
+    // form under the wrong matrix. This book contains 26 form XObjects; its
+    // seven illustrations happen to sit outside all of them, so the numbers
+    // came out right by luck rather than by the walk being correct.
+    else if (fn === OPS.paintFormXObjectBegin) {
+      stack.push(ctm.slice());
+      const m = (list.argsArray[k] as [number[], unknown] | undefined)?.[0];
+      if (Array.isArray(m) && m.length === 6) ctm = mul(ctm, m);
+    } else if (fn === OPS.paintFormXObjectEnd) ctm = stack.pop() ?? [1, 0, 0, 1, 0, 0];
+    else if (PAINTS.has(fn)) {
+      const corners: Array<[number, number]> = [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [1, 1],
+      ];
+      const pts = corners.map(([x, y]) => [
+        ctm[0]! * x + ctm[2]! * y + ctm[4]!,
+        ctm[1]! * x + ctm[3]! * y + ctm[5]!,
+      ]);
+      const xs = pts.map((p) => p[0]!);
+      const ys = pts.map((p) => p[1]!);
+      out.push({ x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) });
+    }
+  }
+  return out;
+}
+
+/**
+ * How much of the text block this page's text occupies, from the box geometry.
+ *
+ * One leading is added to both sides: a single line has zero baseline span but
+ * occupies a line, and the block's own capacity runs one line past its last
+ * baseline for the same reason.
+ */
+function textFillOf(textBox: Box | null, norms: BookNorms): number {
+  const capacity = norms.textBlockTopPt - norms.textBlockBottomPt + norms.leadingPt;
+  if (!textBox || capacity <= 0) return 0;
+  return Math.min(1, (textBox.y1 - textBox.y0 + norms.leadingPt) / capacity);
 }
 
 function boxOf(lines: PageLine[]): Box | null {
@@ -284,6 +433,7 @@ interface PdfTextItem {
 interface PdfPage {
   getViewport(o: { scale: number }): { width: number; height: number };
   getTextContent(): Promise<{ items: PdfTextItem[] }>;
+  getOperatorList?(): Promise<{ fnArray: number[]; argsArray: unknown[] }>;
 }
 interface PdfDoc {
   numPages: number;

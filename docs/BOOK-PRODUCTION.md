@@ -128,6 +128,11 @@ field. A hash quoted from a log has already been reported wrong once.
 - [ ] Cover guide proof rendered **and looked at**
 - [ ] EPUB: sources section present, internal cover current, EPUBCheck clean
 - [ ] Pages rendered and reviewed by a human
+- [ ] **Both** typecheck gates green: `tsc -p tsconfig.json` (library) AND
+      `node scripts/typecheck-ratchet.mjs` (scripts). The first does not cover
+      the second.
+- [ ] Printed contents folios checked against real section starts, after the
+      LAST repagination
 
 ---
 
@@ -164,3 +169,19 @@ loudly instead of quietly working.
   README.
 - **Four tests fail on a clean checkout.** Known and pre-existing: they read real
   book manuscripts from absolute paths outside the repository. Not your change.
+- **Every render throws `TypesetUnavailableError`.** Chromium is required and
+  there is no fallback on Windows. `export CHROMIUM_PATH=".../chrome.exe"`. It
+  reads like a broken build and is a missing environment variable.
+- **"tsc is clean" does not mean the scripts are.** `tsconfig.json` includes
+  `src/**/*` only, and operator scripts run through `tsx`, which transpiles
+  WITHOUT typechecking — so a type error there reaches runtime with nothing in
+  front of it. `tsconfig.scripts.json` plus `scripts/typecheck-ratchet.mjs`
+  covers `scripts/**` as a ratchet: it records today's per-file error counts and
+  fails only on a file that gets WORSE. Run both gates and report them
+  separately.
+- **A cover looks stale for no reason.** Its manifest records the interior's
+  sha256. Rebuild both covers whenever the interior changes, even when the page
+  count does not, or they claim an interior that no longer exists.
+- **Page numbers in a comment are a description of a build, not a fact.** One
+  book moved 184 -> 175 -> 174 -> 173 -> 172 in a single session. Re-measure
+  before quoting a page number, including one you wrote an hour ago.

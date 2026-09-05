@@ -27,6 +27,7 @@
 import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from './educational-nonfiction-v1.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V2 } from './educational-nonfiction-v2.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V3 } from './educational-nonfiction-v3.js';
+import { EDUCATIONAL_NONFICTION_TYPESET_V4 } from './educational-nonfiction-v4.js';
 import { NATIONAL_PARKS_GUIDE_TYPESET_V1 } from './national-parks-guide-v1.js';
 import { TRADE_NONFICTION_GUIDE_TYPESET_V1 } from './trade-nonfiction-guide-v1.js';
 import { TRADE_NONFICTION_GUIDE_TYPESET_V2 } from './trade-nonfiction-guide-v2.js';
@@ -36,6 +37,10 @@ export const TYPESET_LAYOUT_STANDARDS: Record<string, TypesetLayoutStandard> = {
   [EDUCATIONAL_NONFICTION_TYPESET_V1.id]: EDUCATIONAL_NONFICTION_TYPESET_V1,
   [EDUCATIONAL_NONFICTION_TYPESET_V2.id]: EDUCATIONAL_NONFICTION_TYPESET_V2,
   [EDUCATIONAL_NONFICTION_TYPESET_V3.id]: EDUCATIONAL_NONFICTION_TYPESET_V3,
+  // @4 adds the optional bold-run-in trigger for the alert panel. @3 is left
+  // exactly as approved: NO ONE TOLD ME THAT is pinned to it and must not gain
+  // six safety boxes it was never approved with.
+  [EDUCATIONAL_NONFICTION_TYPESET_V4.id]: EDUCATIONAL_NONFICTION_TYPESET_V4,
   // A different FAMILY, not a version of the educational line: different trim,
   // different reader, different components. Registering it leaves both
   // educational versions exactly as they were approved.

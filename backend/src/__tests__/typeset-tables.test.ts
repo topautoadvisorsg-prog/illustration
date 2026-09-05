@@ -24,6 +24,8 @@ import {
 } from '../pipeline/typeset/typeset-book.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V1 } from '../pipeline/typeset/layout-standards/educational-nonfiction-v1.js';
 import { EDUCATIONAL_NONFICTION_TYPESET_V2 } from '../pipeline/typeset/layout-standards/educational-nonfiction-v2.js';
+import { EDUCATIONAL_NONFICTION_TYPESET_V4 } from '../pipeline/typeset/layout-standards/educational-nonfiction-v4.js';
+import { TYPESET_LAYOUT_STANDARDS } from '../pipeline/typeset/layout-standards/registry.js';
 import type { TypesetLayoutStandard, TypesetTableStyles } from '../pipeline/typeset/layout-standards/types.js';
 
 const TABLES: TypesetTableStyles = {
@@ -219,5 +221,44 @@ describe('C2 — the real DIRT RICH tables, cell for cell', () => {
 
   it('leaves no literal pipe rows anywhere in the body', () => {
     expect(html).not.toMatch(/<p[^>]*>\|/);
+  });
+});
+
+/**
+ * REPEATED HEADERS ON A SPLIT TABLE.
+ *
+ * Paged.js does not repeat table headers — `table-header-group` exists in its
+ * embedded CSS-syntax database and nowhere in its layout code — so the renderer
+ * places them itself after pagination, into space the page already has.
+ *
+ * These tests pin the BLAST RADIUS rather than the DOM work, which needs a real
+ * paged document. The claim being protected is "no other book takes the new
+ * path", and it is only true while every other standard leaves the flag off.
+ */
+describe('repeatHeader — scope of the repeated-header pass', () => {
+  it('is requested by exactly one standard in the registry', () => {
+    const asking = Object.values(TYPESET_LAYOUT_STANDARDS).filter((s) => s.tables?.repeatHeader === true);
+    expect(asking.map((s) => s.id)).toEqual([EDUCATIONAL_NONFICTION_TYPESET_V4.id]);
+  });
+
+  it('leaves every other standard on the untouched path', () => {
+    for (const s of Object.values(TYPESET_LAYOUT_STANDARDS)) {
+      if (s.id === EDUCATIONAL_NONFICTION_TYPESET_V4.id) continue;
+      expect(s.tables?.repeatHeader ?? false).toBe(false);
+    }
+  });
+
+  it('still emits the CSS hint alongside the placed header', () => {
+    // Harmless if Paged.js ever implements it: the pass skips a fragment that
+    // already has a thead, so the two cannot produce two headers.
+    const md = `# F\n\n## Chapter One \u2014 X\n\n| A | B |\n|---|---|\n| 1 | 2 |\n`;
+    const html = buildTypesetHtml({
+      sections: parseTypesetSections(md),
+      config: CONFIG,
+      margins: { topIn: 0.75, bottomIn: 0.75, outsideIn: 0.625, gutterIn: 0.75 },
+      layoutStandard: EDUCATIONAL_NONFICTION_TYPESET_V4,
+    } as never);
+    expect(html).toContain('table.tset-table thead { display: table-header-group; }');
+    expect((html.match(/<thead/g) ?? []).length).toBe(1);
   });
 });

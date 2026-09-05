@@ -201,6 +201,44 @@ describe('the barcode reserve', () => {
     expect(pb.barcodeSafe.xIn).not.toBeCloseTo(hc.barcodeSafe.xIn, 3);
   });
 
+  // Regression, 2026-09-03. The clearance was being measured from the back panel's
+  // edge rather than from the HINGE, which put the barcode a full hinge width too
+  // close to the spine and 0.144in inside the flex zone on a 184pp 6x9 case. The
+  // hinge sits inside the board, so the panel edge is the wrong datum.
+  //
+  // This asserts the PROPOSITION from KDP's quoted rule - "at least 0.25in from the
+  // spine hinge" - across every hardcover configuration the resolver will accept,
+  // rather than pinning one x value that a later geometry change would silently
+  // invalidate.
+  it('keeps the hardcover barcode clear of the hinge, never just the panel edge', async () => {
+    const trims = ['5.5x8.5', '6x9', '7x10'] as const;
+    const pages = [80, 120, 184, 300];
+    let checked = 0;
+    for (const trim of trims) {
+      for (const pageCount of pages) {
+        let g;
+        try {
+          g = resolveCoverGeometry({ binding: 'HARDCOVER', ink: 'BLACK_AND_WHITE', paper: 'WHITE', trim, pageCount });
+        } catch {
+          continue; // configuration has no verified calculator reading; fails closed elsewhere
+        }
+        if (g.hingeIn == null) continue;
+        const barcodeRight = g.barcodeSafe.xIn + g.barcodeSafe.widthIn;
+        const hingeLeft = g.backPanel.xIn + g.backPanel.widthIn - g.hingeIn;
+        expect(hingeLeft - barcodeRight).toBeGreaterThanOrEqual(0.25 - 1e-6);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('leaves the paperback barcode measured from the fold, with no hinge applied', async () => {
+    const g = resolveCoverGeometry({ binding: 'PAPERBACK', ink: 'BLACK_AND_WHITE', paper: 'WHITE', trim: '6x9', pageCount: 184 });
+    expect(g.hingeIn).toBeNull();
+    const barcodeRight = g.barcodeSafe.xIn + g.barcodeSafe.widthIn;
+    expect(g.backPanel.xIn + g.backPanel.widthIn - barcodeRight).toBeCloseTo(0.25, 4);
+  });
+
   it('blocks a cover whose declared content invades it', async () => {
     const g = resolveCoverGeometry({ binding: 'PAPERBACK', ink: 'BLACK_AND_WHITE', paper: 'WHITE', trim: '6x9', pageCount: 120 });
     const r = await buildCover({

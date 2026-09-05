@@ -1133,6 +1133,71 @@ function bodyToHtml(lines: string[], opts: BodyHtmlOptions = {}): string {
     }
   }
 
+  /**
+   * RUN-IN ALERTS — the same treatment, opened by a bold run-in.
+   *
+   * Runs AFTER the heading pass, so a paragraph already absorbed into a panel is
+   * part of an `<aside>` string by now and cannot match again.
+   *
+   * The guard is structural on three counts, and each one corresponds to a real
+   * occurrence in BEFORE YOU NEED IT that must NOT be boxed:
+   *
+   *   `^<p...><strong>`  the bold must OPEN the paragraph, so a bold run later
+   *                      in the same paragraph is untouched (L2568);
+   *   element is `<p>`   so the phrase inside a bullet is untouched, because a
+   *                      list item is inside a `<ul>` element (L2865);
+   *   exact phrase       so a mid-sentence mention in plain text never matches
+   *                      (L2531), and so 308 unrelated bold run-ins are ignored.
+   */
+  const runIns = alert?.runIn?.runIns ?? [];
+  const emphaticRunIns = alert?.runIn?.emphaticRunIns ?? [];
+  if (alert?.enabled && (runIns.length || emphaticRunIns.length)) {
+    /** Trailing presentation punctuation is not part of the phrase. */
+    const bare = (s: string): string =>
+      s
+        .replace(/<[^>]+>/g, '')
+        .replace(/[\s:;,.\u2014\u2013-]+$/u, '')
+        .trim();
+    const wanted = new Set(runIns.map((r) => bare(r).toLowerCase()));
+    /** The top tier. Membership here selects the variant; nothing else does. */
+    const emphatic = new Set(emphaticRunIns.map((r) => bare(r).toLowerCase()));
+    for (let i = html.length - 1; i >= 0; i -= 1) {
+      const open = html[i]!.match(/^<p(?:\s+class="([^"]*)")?><strong>(.+?)<\/strong>/);
+      if (!open) continue;
+      // A Quick-Answer entry is a lookup row, not a body paragraph.
+      if ((open[1] ?? '').split(/\s+/).includes('qa-entry')) continue;
+      const label = bare(open[2]!);
+      const key = label.toLowerCase();
+      if (!wanted.has(key) && !emphatic.has(key)) continue;
+      const isImmediate = emphatic.has(key);
+      /**
+       * What follows the run-in inside the same paragraph stays as body text.
+       * The connector belongs to the run-in, not to the sentence after it:
+       * `**Tell somebody today**, rather than waiting` must not open the panel
+       * body with a comma.
+       */
+      const rest = html[i]!
+        .slice(open[0]!.length)
+        .replace(/<\/p>$/, '')
+        .replace(/^[\s:;,\u2014\u2013-]+/u, '')
+        .trim();
+      let end = i + 1;
+      if (alert.runIn?.absorbAdjacentList) {
+        while (end < html.length && /^<(?:ul|ol)[\s>]/.test(html[end]!)) end += 1;
+      }
+      const body = [rest ? `<p>${rest}</p>` : '', ...html.slice(i + 1, end)]
+        .filter(Boolean)
+        .join('\n');
+      const cls = isImmediate ? 'alert-panel alert-panel--immediate' : 'alert-panel';
+      const mark = isImmediate && alert.emphatic?.flag ? ALERT_FLAG : '';
+      html.splice(
+        i,
+        end - i,
+        `<aside class="${cls}"><p class="alert-label">${mark}${escapeHtml(label)}</p>${body}</aside>`,
+      );
+    }
+  }
+
   /** Every block carries a stable id; overrides target these, never pages. */
   /**
    * KEEP A HEADING WITH THE TEXT IT INTRODUCES.
@@ -1697,7 +1762,11 @@ ul { list-style: disc; }
 .alert-panel p { text-indent: 0; }
 .alert-panel > p + p { margin-top: .3em; }
 .alert-panel ul, .alert-panel ol { margin: .3em 0; }
-.alert-panel > ul + p, .alert-panel > ol + p { margin-top: .5em; }
+.alert-panel > ul + p, .alert-panel > ol + p { margin-top: .5em; }${ap.emphatic ? `
+/* IMMEDIATE — a tier above same-day. Only the rule weight changes here; the
+   flag on the label is emitted in the markup, and .gl-flag already sizes it. A
+   standard that declares no emphatic variant emits none of this. */
+.alert-panel--immediate { border-width: ${ap.emphatic.borderPt}pt; }` : ''}
 /* Chapter takeaway: the recurring closing beat. break-before: avoid keeps it
    with the chapter content it belongs to instead of opening a near-empty page;
    break-inside: avoid means the label can never be stranded from its sentence. */
@@ -1830,7 +1899,7 @@ p.warn { text-indent: 0; padding-left: 1.26em; break-inside: avoid; }
 /* :first-child only — a warning sign used again mid-sentence is ordinary
    inline punctuation and must not be pulled into the margin. */
 p.warn > .gl-warn:first-child { margin-left: -1.26em; }
-${input.frontMatter ? frontMatterCss({ headingFont: t.headingFont, bodyFont: t.bodyFont, bodyPt: t.bodyPt, displayPt: t.bodyPt * t.chapterTitleScale, labelPt: t.labelPt, captionPt: t.captionPt }) : ''}
+${input.frontMatter ? frontMatterCss({ headingFont: t.headingFont, bodyFont: t.bodyFont, bodyPt: t.bodyPt, displayPt: t.bodyPt * t.chapterTitleScale, labelPt: t.labelPt, captionPt: t.captionPt, tocEntrySpacingEm: standard.contents?.entrySpacingEm }) : ''}
 ${overrides.css}</style></head>
 <body>
 ${input.frontMatter ? buildFrontMatterHtml({ config: input.config, entries: input.frontMatter.entries, publication: input.frontMatter.publication as never }) : ''}
@@ -1885,4 +1954,18 @@ export interface TypesetReport {
   marginsIn: TypesetMargins;
   bodyPt: number;
   lineHeight: number;
+  /**
+   * Pages where a repeated table header was REQUESTED and could not be placed.
+   *
+   * `repeatHeader: true` is an explicit production request. Paged.js does not
+   * repeat table headers, so the renderer places them itself, and it declines
+   * when the continuation page has less free space than the header needs —
+   * adding it there would push the last row off the page.
+   *
+   * Declining SILENTLY is the failure mode this field exists to prevent: the
+   * book would print a headerless continuation page and every check would stay
+   * green. Empty on any book that does not ask for repeated headers, and on
+   * every book where the request was honoured.
+   */
+  repeatHeaderSkipped: number[];
 }

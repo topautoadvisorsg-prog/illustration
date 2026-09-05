@@ -133,6 +133,13 @@ if (jsonOut) {
           bodyLines: p.body.length,
           furniture: p.furniture.length,
           density: Number(p.density.toFixed(4)),
+          // `density` measures packing WITHIN the occupied span and reports 1.0
+          // for two lines on an empty leaf. `textFill` measures the leaf, and is
+          // what STRANDED_CONTINUATION judges on — so it has to be in the dump
+          // a person uses to argue with a finding.
+          textFill: Number(p.textFill.toFixed(4)),
+          imageAreaFraction: Number(p.imageAreaFraction.toFixed(4)),
+          images: p.images.length,
           largestGapPt: Number(p.largestGapPt.toFixed(2)),
           textBox: p.textBox,
           blank: p.blank,

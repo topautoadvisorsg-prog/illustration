@@ -160,7 +160,8 @@ export function resolveCoverGeometry(req: CoverGeometryRequest): CoverGeometry {
       pageCount,
     });
     spineIn = hc.spineIn;
-    spineAuthority = 'OFFICIAL_CALCULATOR_FIXTURE';
+    // A derived spine must not present itself as a calculator reading.
+    spineAuthority = hc.provenance === 'derived' ? 'DERIVED_FROM_CALCULATOR_FIXTURES' : 'OFFICIAL_CALCULATOR_FIXTURE';
     spineSource = hc.note;
     spineExplanation =
       hc.provenance === 'verified'
@@ -183,7 +184,9 @@ export function resolveCoverGeometry(req: CoverGeometryRequest): CoverGeometry {
     ? `width  = ${hc.wrapIn} + ${panelWidthIn} + ${r3(spineIn)} + ${panelWidthIn} + ${hc.wrapIn} = ${r3(fullWidthIn)}in\n` +
       `height = ${hc.wrapIn} + ${panelHeightIn} + ${hc.wrapIn} = ${r3(fullHeightIn)}in\n` +
       `board  = ${panelWidthIn} x ${panelHeightIn}in, LARGER than the ${trimWidthIn} x ${trimHeightIn}in trim\n` +
-      `every figure read from the KDP Cover Calculator, none computed`
+      (hc.provenance === 'derived'
+        ? `geometry DERIVED from calculator readings at other trims, not read for this one`
+        : `every figure read from the KDP Cover Calculator, none computed`)
     : `width  = ${outerMarginIn} + ${trimWidthIn} + ${r3(spineIn)} + ${trimWidthIn} + ${outerMarginIn} = ${r3(fullWidthIn)}in\n` +
       `height = ${outerMarginIn} + ${trimHeightIn} + ${outerMarginIn} = ${r3(fullHeightIn)}in`;
 
@@ -215,7 +218,23 @@ export function resolveCoverGeometry(req: CoverGeometryRequest): CoverGeometry {
 
   const bc = binding === 'PAPERBACK' ? PAPERBACK_RULES.barcodeReserve.value : HARDCOVER_RULES.barcode.value;
   const bcFromBottomIn = binding === 'HARDCOVER' ? HARDCOVER_RULES.barcode.value.fromBottomIn : 0.25;
-  const bcFromSpineIn = binding === 'HARDCOVER' ? HARDCOVER_RULES.barcode.value.fromSpineHingeIn : 0.25;
+  // FIXED 2026-09-03. KDP's hardcover rule is quoted in kdp-spec.ts as "at least
+  // 0.25in (6mm) from the spine HINGE" - not from the panel edge. The hinge is the
+  // strip where the case flexes when the book is opened, and it sits INSIDE the
+  // board, immediately against the spine: the wrap reconciles as
+  // 2*caseWrap + 2*board + spine, with no extra slice for the hinge.
+  //
+  // hingeIn was already being resolved from the Cover Calculator and carried on the
+  // result, but nothing consumed it. Measuring the clearance from backPanel's right
+  // edge therefore placed the barcode one whole hinge width too far towards the
+  // spine - 0.394in on a 6x9 - which on a 184pp case put 0.144in of the barcode
+  // inside the flex zone, where print creases and a scanner can fail.
+  //
+  // Paperback is unaffected: it has no hinge and keeps its 0.25in from the fold.
+  const bcFromSpineIn =
+    binding === 'HARDCOVER'
+      ? HARDCOVER_RULES.barcode.value.fromSpineHingeIn + (hingeIn ?? 0)
+      : 0.25;
   // Lower-RIGHT of the back panel, which is the spine side when the wrap is
   // viewed flat with the back on the left.
   const barcodeSafe = rect(

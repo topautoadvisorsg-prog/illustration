@@ -39,6 +39,10 @@
 
 import { ProjectConfigSchema, type ProjectConfig } from '@wildlands/shared';
 import { parseTypesetSections, plainHeadingText, type TypesetSection } from '../typeset/typeset-book.js';
+import {
+  isKnownTypesetLayoutStandard,
+  resolveTypesetLayoutStandard,
+} from '../typeset/layout-standards/registry.js';
 import { DEFAULT_RIGHTS_STATEMENT } from '../typeset/front-matter.js';
 import type { EpubChapter, EpubChapterKind, EpubMeta, EpubModel } from './assemble-epub.js';
 
@@ -154,6 +158,8 @@ export interface BodyHtmlResult {
   words: number;
   figuresUsed: string[];
   missingFigures: string[];
+  /** How many safety blocks were promoted. Absent when no policy was supplied. */
+  safety?: SafetyPassResult;
 }
 
 /**
@@ -169,6 +175,8 @@ export interface BodyHtmlResult {
 export function typesetBodyToHtml(
   lines: string[],
   figures: Map<string, EpubFigure> = new Map(),
+  /** From the pinned standard. Absent leaves every paragraph exactly as before. */
+  alert?: EpubAlertRunIns,
 ): BodyHtmlResult {
   const out: string[] = [];
   const figuresUsed: string[] = [];
@@ -445,7 +453,102 @@ export function typesetBodyToHtml(
   }
   flushAll();
 
-  return { html: out.join('\n'), words, figuresUsed, missingFigures };
+  const safety = applySafetyTiers(out, alert);
+
+  return { html: out.join('\n'), words, figuresUsed, missingFigures, safety };
+}
+
+/**
+ * THE SAFETY TIERS, CARRIED INTO A FILE THAT HAS NO PAGES.
+ *
+ * The print edition marks three levels — routine, same-day, immediately — with a
+ * plain paragraph, a 0.75pt box, and a 1.5pt box carrying a drawn flag. None of
+ * that survives reflow: rule weights are meaningless when the reader picks the
+ * font size, and the flag is an image.
+ *
+ * Without this pass all three collapsed into `<p><strong>…</strong></p>`,
+ * identical to the 314 ORDINARY bold run-ins in the same manuscript. A girl
+ * reading the ebook saw "get medical help immediately" set exactly like "wash
+ * your hands". The words were all there; the hierarchy the whole standard exists
+ * to express was not.
+ *
+ * ─── THE SAME STRUCTURAL RULE AS PRINT, NOT A LOOKALIKE ────────────────────
+ * The markers come from the pinned layout standard's own `alertPanel.runIn`
+ * policy — the SAME declaration the print matcher reads. Nothing here decides
+ * what a safety block is; if the two ever disagreed, one edition would box a
+ * paragraph the other left plain.
+ *
+ * Structural, never a keyword search: the bold must OPEN the paragraph, and the
+ * label must match after trailing punctuation is normalised away. A mid-sentence
+ * mention, a bold run later in a paragraph and the phrase inside a bullet are all
+ * left as ordinary text — this manuscript contains all three.
+ *
+ * ─── WHAT THE EBOOK USES INSTEAD OF A RULE WEIGHT ──────────────────────────
+ * Semantic classes on an `<aside>`, styled with a left border, inset and spacing
+ * that scale with the reader's own font size because they are set in `em`. The
+ * label keeps the author's exact words. No colour is load-bearing, no image is
+ * load-bearing, and with the stylesheet stripped entirely the reader still gets
+ * a distinct block opening with "Tell somebody today" or "Do this now".
+ */
+export interface EpubAlertRunIns {
+  runIns: readonly string[];
+  emphaticRunIns?: readonly string[];
+  absorbAdjacentList?: boolean;
+}
+
+/** Trailing presentation punctuation is not part of the phrase. Matches print. */
+const bareLabel = (s: string): string =>
+  s
+    .replace(/<[^>]+>/g, '')
+    .replace(/[\s:;,.\u2014\u2013-]+$/u, '')
+    .trim();
+
+export interface SafetyPassResult {
+  sameDay: number;
+  immediate: number;
+}
+
+/** Rewrites `blocks` in place. Returns how many of each tier it promoted. */
+export function applySafetyTiers(blocks: string[], alert?: EpubAlertRunIns): SafetyPassResult {
+  const result: SafetyPassResult = { sameDay: 0, immediate: 0 };
+  if (!alert) return result;
+  const wanted = new Set((alert.runIns ?? []).map((r) => bareLabel(r).toLowerCase()));
+  const emphatic = new Set((alert.emphaticRunIns ?? []).map((r) => bareLabel(r).toLowerCase()));
+  if (!wanted.size && !emphatic.size) return result;
+
+  for (let i = blocks.length - 1; i >= 0; i -= 1) {
+    const open = blocks[i]!.match(/^<p><strong>(.+?)<\/strong>/);
+    if (!open) continue;
+    const label = bareLabel(open[1]!);
+    const key = label.toLowerCase();
+    if (!wanted.has(key) && !emphatic.has(key)) continue;
+    const isImmediate = emphatic.has(key);
+
+    // The connector belongs to the run-in, not to the sentence after it:
+    // `**Tell somebody today**, rather than waiting` must not open the block
+    // body with a comma.
+    const rest = blocks[i]!
+      .slice(open[0]!.length)
+      .replace(/<\/p>$/, '')
+      .replace(/^[\s:;,\u2014\u2013-]+/u, '')
+      .trim();
+
+    let end = i + 1;
+    if (alert.absorbAdjacentList) {
+      while (end < blocks.length && /^<(?:ul|ol)[\s>]/.test(blocks[end]!)) end += 1;
+    }
+    const body = [rest ? `<p>${rest}</p>` : '', ...blocks.slice(i + 1, end)].filter(Boolean).join('\n');
+    const cls = isImmediate ? 'safety safety-immediate' : 'safety safety-same-day';
+    blocks.splice(
+      i,
+      end - i,
+      `<aside class="${cls}" epub:type="notice">` +
+        `<p class="safety-label">${escapeXml(label)}</p>${body}</aside>`,
+    );
+    if (isImmediate) result.immediate += 1;
+    else result.sameDay += 1;
+  }
+  return result;
 }
 
 /** Section kind → the classification the preview UI and the packer understand. */
@@ -542,6 +645,26 @@ export function assembleTypesetEpubModel(input: TypesetEpubInput): EpubModel {
   const figures = input.figures ?? new Map<string, EpubFigure>();
   const sectionFigures = input.sectionFigures ?? new Map<string, EpubFigure>();
   const usedSectionFigures: string[] = [];
+  /**
+   * The safety markers come from the book's OWN pinned standard, so the ebook
+   * and the print interior can never disagree about what a safety block is.
+   * A standard that declares no run-in policy leaves every paragraph untouched,
+   * which is how every previously shipped ebook rendered.
+   */
+  const standard = isKnownTypesetLayoutStandard(config.typesetLayoutStandardId ?? '')
+    ? resolveTypesetLayoutStandard(config.typesetLayoutStandardId!)
+    : undefined;
+  const ap = standard?.alertPanel;
+  const alertRunIns: EpubAlertRunIns | undefined =
+    ap?.enabled && ap.runIn && (ap.runIn.runIns?.length || ap.runIn.emphaticRunIns?.length)
+      ? {
+          runIns: ap.runIn.runIns ?? [],
+          emphaticRunIns: ap.runIn.emphaticRunIns ?? [],
+          absorbAdjacentList: ap.runIn.absorbAdjacentList,
+        }
+      : undefined;
+  let sameDayBlocks = 0;
+  let immediateBlocks = 0;
   const sections = parseTypesetSections(markdown);
   const warnings: string[] = [];
   const skipped: string[] = [];
@@ -576,7 +699,9 @@ export function assembleTypesetEpubModel(input: TypesetEpubInput): EpubModel {
   let figuresEmbedded = 0;
 
   for (const s of sections) {
-    const built = typesetBodyToHtml(s.bodyLines, figures);
+    const built = typesetBodyToHtml(s.bodyLines, figures, alertRunIns);
+    sameDayBlocks += built.safety?.sameDay ?? 0;
+    immediateBlocks += built.safety?.immediate ?? 0;
     const nav = navTitleOf(s);
     const plainNav = plainTitleOf(s);
     /**
@@ -641,6 +766,22 @@ export function assembleTypesetEpubModel(input: TypesetEpubInput): EpubModel {
   }
   if (bodyChapters === 0) {
     warnings.push('No numbered chapters were found in the manuscript — check the heading convention.');
+  }
+
+  /**
+   * A DECLARED POLICY THAT MATCHES NOTHING IS A DEFECT, NOT A QUIET ZERO.
+   *
+   * The first reflowable build of an illustrated safety book shipped with every
+   * tier flattened and reported success, because nothing was watching for the
+   * absence. If a standard declares safety run-ins, the manuscript that pins it
+   * is expected to contain them.
+   */
+  if (alertRunIns && sameDayBlocks + immediateBlocks === 0) {
+    warnings.push(
+      `Layout standard ${config.typesetLayoutStandardId} declares safety run-ins ` +
+        `(${[...alertRunIns.runIns, ...(alertRunIns.emphaticRunIns ?? [])].join(', ')}) ` +
+        `but NONE matched — every safety block in this ebook is set as ordinary text.`,
+    );
   }
 
   return {

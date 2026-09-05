@@ -50,3 +50,17 @@ re-rendered and compared the output image against the approved render.
 **Pages used to reproduce:** `CH02_P015` (barred owl, folio 55) and `CH02_P021`
 (wood frog, folio 66). Both re-rendered against the corrected blueprint now match the
 approved composition (title + text top, animal anchored bottom).
+
+## FLAKY — `pagination.routes.guards.test.ts` fails only in the full suite
+
+Two of its cases ("returns 409 when approved pages exist…", "proceeds past the
+guard when mode is replace") fail intermittently under `vitest run`, and the
+COUNT VARIES between runs — two failures, then one, then none. The same file
+passes 7/7 in isolation.
+
+Confirmed not caused by any recent change: reverting the change under suspicion
+and re-running reproduced the failure anyway. It is shared state or worker
+ordering inside the suite, not the code under test.
+
+Do not chase this while investigating an unrelated change. Re-run the file on its
+own; if it passes there, the full-suite failure is this.

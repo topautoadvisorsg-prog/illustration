@@ -46,6 +46,25 @@ export const SPINE_FONT = 'Georgia, serif';
 export const SPINE_CREAM = '#F2E8D5';
 export const SPINE_HALO = '#101a14';
 
+/**
+ * SPINE TYPE IS SOLID BLACK, AT FULL OPACITY, WITH NO HALO.
+ *
+ * The spine was set in SPINE_CREAM with a 0.85-opacity dark halo, and against
+ * this book's cream spine ground that is cream-on-cream: the owner reported it
+ * as faint and hard to read, and the proof confirms it. Owner direction is
+ * solid black, 100% opacity, no transparency and no grey.
+ *
+ * The halo goes with it rather than being restated in black. Its whole purpose
+ * was to hold light type against a varying illustration; black on this ground
+ * does not need it, and a translucent stroke is exactly what was ruled out.
+ * Dropping it also shrinks the measured typography footprint, so fold clearance
+ * can only improve -- it is measured on alpha, halo included, further down.
+ *
+ * SPINE_CREAM and SPINE_HALO are deliberately left alone: back-cover-copy.ts
+ * sets the back cover with them, and the back cover is not changing.
+ */
+export const SPINE_INK = '#000000';
+
 /** Georgia's caps are ~0.69em; the cap height is what has to fit the fold-safe strip. */
 export const GEORGIA_CAP_RATIO = 0.69;
 
@@ -140,6 +159,23 @@ export interface SpineTypeRequest {
   safeLengthPx: number;
   /** Clear space between the end of the title and the start of the author block. */
   gapPx: number;
+  /**
+   * Ink for the spine type. Defaults to SPINE_INK (solid black).
+   *
+   * A REQUEST FIELD, NOT A CONSTANT, because the book now carries two approved
+   * cover versions that differ only here. Hard-coding the colour would make one
+   * of them unbuildable without editing the library.
+   */
+  inkHex?: string;
+  /**
+   * How far to lift the author's name off the foot of the safe zone.
+   *
+   * Defaults to 0, which pins the author flush to the bottom end exactly as
+   * before — so an existing build reproduces byte for byte. A positive value
+   * moves it up toward the title, and is subtracted from the length available
+   * to the type so the fit still converges honestly.
+   */
+  authorFootInsetPx?: number;
   /** Fraction of the fold-safe width the title's cap height should fill. */
   capFill?: number;
   letterSpacing?: number;
@@ -221,10 +257,14 @@ export async function planSpineType(req: SpineTypeRequest): Promise<SpineTypePla
   const widthLimitedPx = Math.floor((req.foldSafeWidthPx / GEORGIA_CAP_RATIO) * capFill);
   const authorSizeRatio = 0.72;
 
+  const footInset = req.authorFootInsetPx ?? 0;
+  const ink = req.inkHex ?? SPINE_INK;
+
   const lengthAt = (px: number): number =>
     Math.round((titleRef * px) / REF_PX) +
     req.gapPx +
-    Math.round((authorRef * Math.floor(px * authorSizeRatio)) / REF_PX);
+    Math.round((authorRef * Math.floor(px * authorSizeRatio)) / REF_PX) +
+    footInset;
 
   /* Everything below is a function of the title size, so that the size can be
      chosen by MEASURING candidates rather than by trusting a ratio. */
@@ -234,7 +274,7 @@ export async function planSpineType(req: SpineTypeRequest): Promise<SpineTypePla
     const authorLengthPx = Math.round((authorRef * authorPx) / REF_PX);
     const safeTopX = -req.safeLengthPx / 2;
     const safeBotX = req.safeLengthPx / 2;
-    const authorCentreX = safeBotX - authorLengthPx / 2;
+    const authorCentreX = safeBotX - footInset - authorLengthPx / 2;
     const titleCentreX = (safeTopX + (authorCentreX - authorLengthPx / 2 - req.gapPx)) / 2;
     return {
       authorPx,
@@ -259,14 +299,12 @@ export async function planSpineType(req: SpineTypeRequest): Promise<SpineTypePla
     const title =
       `<text x="${g.titleCentreX}" y="${g.titleDy}" text-anchor="middle" ` +
       `font-family="${SPINE_FONT}" font-size="${px}" font-weight="600" ` +
-      `fill="${SPINE_CREAM}" stroke="${SPINE_HALO}" stroke-width="${g.haloTitle}" stroke-opacity="0.85" ` +
-      `paint-order="stroke fill" stroke-linejoin="round" ` +
+      `fill="${ink}" fill-opacity="1" stroke="none" ` +
       `letter-spacing="${letterSpacing}">${escapeXml(req.title)}</text>`;
     const author =
       `<text x="${g.authorCentreX}" y="${g.authorDy}" text-anchor="middle" ` +
       `font-family="${SPINE_FONT}" font-size="${g.authorPx}" font-weight="400" ` +
-      `fill="${SPINE_CREAM}" stroke="${SPINE_HALO}" stroke-width="${g.haloAuthor}" stroke-opacity="0.85" ` +
-      `paint-order="stroke fill" stroke-linejoin="round" ` +
+      `fill="${ink}" fill-opacity="1" stroke="none" ` +
       `letter-spacing="${letterSpacing}">${escapeXml(req.author)}</text>`;
     const inner = which === 'title' ? title : which === 'author' ? author : `${title}${'\n'}    ${author}`;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${req.spineWidthPx}" height="${req.wrapHeightPx}">

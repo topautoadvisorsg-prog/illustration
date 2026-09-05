@@ -190,6 +190,15 @@ ${toc}
  * The contents page keeps its folio, because a reader looking up a page number
  * benefits from knowing where they are.
  */
+/**
+ * The generator's own contents spacing, used when a standard declares none.
+ *
+ * A named constant rather than an inlined literal, so the default and an
+ * explicit override are visibly the same quantity and a standard that sets this
+ * value to 0.62 produces byte-identical CSS to one that omits it.
+ */
+export const DEFAULT_TOC_ENTRY_SPACING_EM = 0.62;
+
 export function frontMatterCss(t: {
   headingFont: string;
   bodyFont: string;
@@ -197,7 +206,19 @@ export function frontMatterCss(t: {
   displayPt: number;
   labelPt: number;
   captionPt: number;
+  /** From the layout standard's `contents` policy. Absent keeps the default. */
+  tocEntrySpacingEm?: number;
 }): string {
+  /**
+   * The default emits the ORIGINAL LITERAL, `.62em`, not `0.62em`.
+   *
+   * `${0.62}` stringifies with a leading zero, which is the same length in CSS
+   * and a different string in a diff. Every standard that declares no contents
+   * policy must produce byte-identical output to before this setting existed,
+   * or the next fingerprint comparison reports a change in every book on the
+   * platform and someone has to work out that it was nothing.
+   */
+  const tocGap = t.tocEntrySpacingEm === undefined ? '.62' : String(t.tocEntrySpacingEm);
   return `
 /* ── Front matter ──────────────────────────────────────────────────────── */
 /* Named page strips the running head and folio. Paged.js resolves margin boxes
@@ -247,7 +268,7 @@ export function frontMatterCss(t: {
 .toc-heading { font-family: '${t.headingFont}', 'Oswald', sans-serif; font-weight: 500;
   font-size: ${(t.displayPt * 0.5).toFixed(2)}pt; letter-spacing: .04em; margin: 0 0 1.2em; }
 .toc { list-style: none; margin: 0; padding: 0; font-family: '${t.bodyFont}', serif; font-size: ${t.bodyPt}pt; }
-.toc-entry { display: flex; align-items: baseline; gap: .4em; margin: 0 0 .62em; break-inside: avoid; }
+.toc-entry { display: flex; align-items: baseline; gap: .4em; margin: 0 0 ${tocGap}em; break-inside: avoid; }
 .toc-text { flex: 0 1 auto; }
 /* The label is set in the display face so a chapter reads as a chapter without
    the word being repeated inside the title. */

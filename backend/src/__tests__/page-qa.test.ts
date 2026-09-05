@@ -18,7 +18,16 @@ import type { BookNorms, ModelPage, PageLine, PageModel } from '../pipeline/page
 import { classifyPages } from '../pipeline/page-qa/page-roles.js';
 import { runDeterministicRules, statusOf } from '../pipeline/page-qa/deterministic-rules.js';
 
-const NORMS: BookNorms = { bodySizePt: 12, leadingPt: 15.5, measurePt: 313 };
+const NORMS: BookNorms = {
+  bodySizePt: 12,
+  leadingPt: 15.5,
+  measurePt: 313,
+  // A full `bodyPage` below runs from y=540 down to 540 - 29 * 15.5 = 90.5, so
+  // these are this synthetic book's real text block rather than a guess.
+  textBlockTopPt: 540,
+  textBlockBottomPt: 90.5,
+};
+const BLOCK_CAPACITY_PT = NORMS.textBlockTopPt - NORMS.textBlockBottomPt + NORMS.leadingPt;
 const W = 396; // 5.5in
 const H = 612; // 8.5in
 
@@ -44,6 +53,8 @@ function assemble(n: number, all: PageLine[], over: Partial<ModelPage> = {}): Mo
   const furniture = all.filter((l) => l.y > H - 54 || l.y < 54);
   const body = all.filter((l) => !(l.y > H - 54 || l.y < 54));
   const ys = body.map((l) => l.y);
+  const images = over.images ?? [];
+  const imageArea = images.reduce((a, b) => a + (b.x1 - b.x0) * (b.y1 - b.y0), 0);
   const page: ModelPage = {
     n,
     widthPt: W,
@@ -54,6 +65,11 @@ function assemble(n: number, all: PageLine[], over: Partial<ModelPage> = {}): Mo
     textBox: body.length ? { x0: 60, x1: 60 + NORMS.measurePt, y0: Math.min(...ys), y1: Math.max(...ys) } : null,
     inkBox: all.length ? { x0: Math.min(...all.map((l) => l.x0)), x1: Math.max(...all.map((l) => l.x1)), y0: Math.min(...all.map((l) => l.y)), y1: Math.max(...all.map((l) => l.y)) } : null,
     density: body.length / 30,
+    images,
+    imageAreaFraction: imageArea / (W * H),
+    textFill: body.length
+      ? Math.min(1, (Math.max(...ys) - Math.min(...ys) + NORMS.leadingPt) / BLOCK_CAPACITY_PT)
+      : 0,
     largestGapPt: 0,
     largestGapAt: 0,
     headings: body.filter((l) => l.size > NORMS.bodySizePt + 1),
@@ -127,6 +143,153 @@ describe('sparse pages are judged by role, not by emptiness', () => {
     ], { density: 0.27 });
     const { findings } = audit([bodyPage(1), half, bodyPage(3), bodyPage(4)]);
     expect(codes(findings.filter((f) => f.page === 2))).toContain('SPARSE_PAGE');
+  });
+});
+
+/**
+ * STRANDED CONTINUATION.
+ *
+ * Six fixtures, and only two of them fire. The rule earns its place by what it
+ * leaves alone: a plate, a composed ending, a blank and an opener are all
+ * legitimately empty, and a detector that flags them is a detector that gets
+ * switched off.
+ *
+ * The two that DO fire are the shapes measured on a real 175-page interior,
+ * where each produced no finding of any kind -- not a defect, and not even the
+ * EXPECTED note that would have proved the page was seen.
+ */
+describe('stranded continuation pages, whatever their assigned role', () => {
+  const stranded = (f: ReturnType<typeof audit>['findings'], page: number) =>
+    codes(f.filter((x) => x.page === page)).includes('STRANDED_CONTINUATION');
+
+  it('fires on a two-line continuation, which classifies as PLATE because it is empty', () => {
+    // PLATE is assigned by `body.length <= 2 && headings.length === 0`, so the
+    // page is exempted from the whitespace check BECAUSE it is nearly empty.
+    const p2 = assemble(2, [
+      line(540, 'and that is the whole of it, once you have seen it written'),
+      line(524.5, 'down.'),
+      line(30, '2', { size: 9 }),
+    ]);
+    const { roles, findings } = audit([bodyPage(1), p2, bodyPage(3)]);
+    expect(roles[1]!.role).toBe('PLATE');
+    expect(stranded(findings, 2)).toBe(true);
+    const f = findings.find((x) => x.page === 2 && x.code === 'STRANDED_CONTINUATION')!;
+    expect(f.severity).toBe('REVIEW');
+    expect(f.suggests).toBe('layout');
+  });
+
+  it('fires on a three-line continuation before an opener, which classifies as CHAPTER_END', () => {
+    // CHAPTER_END is assigned from the NEXT page alone and says nothing about
+    // this one, so three stranded lines are exempt for a reason external to them.
+    const p2 = assemble(2, [
+      line(540, 'Everything after this point is a lookup, not a read-through.'),
+      line(524.5, 'Find the thing that is worrying you, and go to the page it'),
+      line(509, 'names.'),
+      line(30, '2', { size: 9 }),
+    ]);
+    const opener = assemble(3, [
+      line(540, 'Chapter Two', { size: 24 }),
+      line(440, 'The chapter begins here with its first paragraph.'),
+      line(30, '3', { size: 9 }),
+    ]);
+    const { roles, findings } = audit([bodyPage(1), p2, opener, bodyPage(4)]);
+    expect(roles[1]!.role).toBe('CHAPTER_END');
+    expect(stranded(findings, 2)).toBe(true);
+  });
+
+  it('leaves a real illustration plate alone: the page carries image ink', () => {
+    // 252 x 168pt is the placement this book's stamped illustrations actually
+    // use -- 17.5% of a 5.5 x 8.5in page, well over the 2% bar.
+    //
+    // The caption sits at the TOP of the text block ON PURPOSE, so the
+    // vertical-position condition cannot exclude this page and the IMAGE guard
+    // is the only thing that can. A fixture excluded by two conditions at once
+    // proves neither of them.
+    const plate = assemble(
+      2,
+      [line(540, 'A small zipped pouch, closed and waiting.'), line(30, '2', { size: 9 })],
+      { images: [{ x0: 72, x1: 324, y0: 200, y1: 368 }] },
+    );
+    const { findings } = audit([bodyPage(1), plate, bodyPage(3)]);
+    expect(stranded(findings, 2)).toBe(false);
+  });
+
+  it('leaves a four-line closing beat alone: it is a composition, not a fragment', () => {
+    const beat = assemble(2, [
+      line(400, 'Here it is, from an adult, in writing:'),
+      line(370, 'Your body is yours. Nobody else gets a say in who touches it,'),
+      line(354.5, 'or when, or how. Not a friend, not a relative, not a'),
+      line(339, 'stranger, and not an adult.'),
+      line(30, '2', { size: 9 }),
+    ]);
+    const { findings } = audit([bodyPage(1), beat, bodyPage(3)]);
+    expect(stranded(findings, 2)).toBe(false);
+  });
+
+  it('leaves a parity blank alone: there is no body to strand', () => {
+    const { findings } = audit([bodyPage(1), assemble(2, []), bodyPage(3)]);
+    expect(stranded(findings, 2)).toBe(false);
+  });
+
+  it('leaves a chapter opener alone: it carries a heading', () => {
+    const opener = assemble(2, [
+      line(540, 'Chapter Two', { size: 24 }),
+      line(440, 'The chapter begins here.'),
+      line(30, '2', { size: 9 }),
+    ]);
+    const { roles, findings } = audit([bodyPage(1), opener, bodyPage(3)]);
+    expect(roles[1]!.role).toBe('CHAPTER_OPENER');
+    expect(stranded(findings, 2)).toBe(false);
+  });
+
+  /**
+   * THE POSITION PAIR. Same three lines, same emptiness, same absence of a
+   * heading or an image -- only the vertical position differs. Everything the
+   * rule can see is held constant except the one thing under test.
+   */
+  describe('position is what separates stranded from placed', () => {
+    const NOTE = [
+      'And if your question is not here — there is a much longer version',
+      'of this list at the back, with about thirty-five questions on it.',
+      'Look there next.',
+    ];
+    const at = (top: number) =>
+      assemble(2, [
+        ...NOTE.map((s, i) => line(top - i * NORMS.leadingPt, s)),
+        line(30, '2', { size: 9 }),
+      ]);
+
+    it('fires when a short continuation starts at the top of the text block', () => {
+      const { findings } = audit([bodyPage(1), at(NORMS.textBlockTopPt), bodyPage(3)]);
+      expect(stranded(findings, 2)).toBe(true);
+    });
+
+    it('does not fire on the same content placed lower down the page', () => {
+      // A fifth of the way in — the depth the approved closing beat sits at.
+      const lower = NORMS.textBlockTopPt - NORMS.leadingPt * 6;
+      const { findings } = audit([bodyPage(1), at(lower), bodyPage(3)]);
+      expect(stranded(findings, 2)).toBe(false);
+    });
+
+    it('tolerates one line of slack, so a hair below the top still counts', () => {
+      const { findings } = audit([
+        bodyPage(1),
+        at(NORMS.textBlockTopPt - NORMS.leadingPt),
+        bodyPage(3),
+      ]);
+      expect(stranded(findings, 2)).toBe(true);
+    });
+  });
+
+  it('does not fire on a full body page, which is the whole book', () => {
+    const { findings } = audit([bodyPage(1), bodyPage(2), bodyPage(3)]);
+    expect(codes(findings)).not.toContain('STRANDED_CONTINUATION');
+  });
+
+  it('is REVIEW, never a hard failure: a short page is not automatically defective', () => {
+    const p2 = assemble(2, [line(540, 'down.'), line(30, '2', { size: 9 })]);
+    const { status } = audit([bodyPage(1), p2, bodyPage(3)]);
+    expect(status.status).not.toBe('BLOCKED');
   });
 });
 

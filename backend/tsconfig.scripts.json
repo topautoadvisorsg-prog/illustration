@@ -18,11 +18,25 @@
   // script. Until then run it by hand; it already earns its keep, having caught
   // four dangling references left by the DATABASE_URL migration.
   //
-  // SCOPE: scripts/qa only. The wider scripts/ surface has 191 pre-existing type
-  // errors, almost all in the old `_`-prefixed scratch tools, and fixing those is
-  // not this. scripts/qa is the curated directory new operator tooling belongs in,
-  // so this makes the sanctioned surface typechecked without an unrelated cleanup.
+  // SCOPE: ALL of scripts/, as of the ratchet below. This was previously narrowed
+  // to scripts/qa because the wider surface carried too many pre-existing errors
+  // to gate on — 467 today, 186 of them in throwaway `_scratch` tools. Narrowing
+  // meant the other 600-odd scripts stayed unchecked, and that is where the one
+  // file with an unterminated string literal had been sitting: a script that
+  // could never have run, in a directory nothing was looking at.
+  //
+  // `scripts/typecheck-ratchet.mjs` makes the wide scope usable. It records the
+  // per-file error counts that exist today and fails only when a file gets WORSE
+  // or a new file arrives with errors — so every script written from now on is
+  // fully typechecked, and the backlog is visible and can only shrink.
+  //
+  //   yarn typecheck           library (src/) — must be clean
+  //   yarn typecheck:scripts   scripts/ — ratcheted
+  //   yarn typecheck:all       both, labelled
+  //
+  // src/** stays in `include` because the scripts import it; the ratchet reports
+  // any src/ error separately and refuses to absorb it into the baseline.
   "extends": "./tsconfig.json",
   "compilerOptions": { "noEmit": true, "rootDir": "." },
-  "include": ["src/**/*", "scripts/qa/**/*.ts"]
+  "include": ["src/**/*", "scripts/**/*.ts"]
 }

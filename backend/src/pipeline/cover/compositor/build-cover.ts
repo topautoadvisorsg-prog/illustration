@@ -60,6 +60,10 @@ export interface BuildCoverRequest {
 
   /** Default: place it whenever the binding allows. Set false to suppress. */
   spineText?: boolean;
+  /** Ink for the spine type. Omitted = solid black. */
+  spineInkHex?: string;
+  /** Lift the spine author's name this far off the foot of the safe zone. */
+  spineAuthorFootInsetIn?: number;
   fitMode?: FitMode;
   renderDpi?: number;
   jpegQuality?: number;
@@ -104,6 +108,18 @@ export interface BuildCoverRequest {
     baselineFromBottomIn: number;
     capHeightIn: number;
     maxWidthIn: number;
+    /**
+     * OPTIONAL ink and halo. Absent means the house cream with a dark halo,
+     * which is what every cover built before this used and what a photographic
+     * wrap needs.
+     *
+     * Illustrated covers are the reason this exists. On BEFORE YOU NEED IT the
+     * name sits over a cream field, where cream-on-cream is invisible; it wants
+     * the same navy the artwork already uses for the title. Sampled from the
+     * art rather than guessed, so the two match exactly.
+     */
+    fill?: string;
+    halo?: string;
   };
   /** Injected so a caller can produce a reproducible manifest. */
   builtAt?: string;
@@ -222,6 +238,10 @@ export async function buildCover(req: BuildCoverRequest): Promise<BuildCoverResu
         safeLengthPx: Math.round(safeLengthIn * dpi),
         gapPx: Math.round((req.spineGapIn ?? 0.35) * dpi),
         targetClearPx: Math.round(targetClearIn * dpi),
+        inkHex: req.spineInkHex,
+        authorFootInsetPx: req.spineAuthorFootInsetIn
+          ? Math.round(req.spineAuthorFootInsetIn * dpi)
+          : undefined,
       });
       composed = await sharp(composed)
         .composite([{ input: Buffer.from(plan.svg), left: Math.round(geometry.foldLeftIn * dpi), top: 0 }])
@@ -373,7 +393,8 @@ export async function buildCover(req: BuildCoverRequest): Promise<BuildCoverResu
       `height="${Math.round(geometry.fullHeightIn * dpi)}">` +
       `<text x="${Math.round(centreIn * dpi)}" y="${baselinePx}" text-anchor="middle" ` +
       `font-family="${COVER_FONT}" font-size="${sizePx}" font-weight="700" ` +
-      `fill="${COVER_CREAM}" stroke="${COVER_HALO}" stroke-width="${(sizePx * 0.11).toFixed(2)}" ` +
+      `fill="${fa.fill ?? COVER_CREAM}" stroke="${fa.halo ?? COVER_HALO}" ` +
+      `stroke-width="${(sizePx * 0.11).toFixed(2)}" ` +
       `stroke-linejoin="round" paint-order="stroke">${escapeXml(req.author)}</text></svg>`;
     composed = await sharp(composed).composite([{ input: Buffer.from(svg), left: 0, top: 0 }]).toBuffer();
     frontAuthorPlaced = {

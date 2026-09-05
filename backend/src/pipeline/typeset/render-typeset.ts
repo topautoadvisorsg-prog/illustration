@@ -122,6 +122,53 @@ export class TypesetUnavailableError extends Error {
  * compiled by the browser untouched. Do not convert these back to arrow
  * functions.
  */
+/**
+ * REPEAT A SPLIT TABLE'S HEADER ON ITS CONTINUATION PAGES.
+ *
+ * Paged.js 0.4.3 has no table-header repetition: its only `thead` reference
+ * honours `break-inside: avoid`, and `table-header-group` appears solely inside
+ * its embedded CSS-syntax database. So `tables.repeatHeader` emitted correct CSS
+ * that nothing acted on, and a thirty-five-row lookup table continued onto a
+ * second page with no column headings.
+ *
+ * ─── WHY AFTER LAYOUT, NOT DURING IT ──────────────────────────────────────
+ * Running inside Paged.js's layout would mean participating in chunking, which
+ * is the engine work this deliberately avoids. Instead the header is placed once
+ * pagination has finished, into space the page already has — so no line moves,
+ * no break shifts and no page is added.
+ *
+ * ─── WHY IT MAY DECLINE ───────────────────────────────────────────────────
+ * A header costs a row's height. If the continuation fragment has less slack
+ * than the header needs, adding it would push the last row past the page bottom.
+ * Rather than trade a missing header for clipped content, it declines and
+ * REPORTS the page, because `repeatHeader: true` is an explicit request and a
+ * renderer that cannot honour one must say so.
+ *
+ * Fragments are found by Paged.js's own `data-split-from` marking, the same
+ * contract the alert-panel stylesheet has relied on since before this existed.
+ */
+export const REPEAT_TABLE_HEADERS_JS = `(() => {
+  const skipped = [];
+  const frags = document.querySelectorAll('table[data-split-from]');
+  for (const t of frags) {
+    if (t.querySelector('thead')) continue;
+    const pageEl = t.closest('.pagedjs_page');
+    const pageNo = pageEl ? Number(pageEl.getAttribute('data-page-number')) : null;
+    const id = t.getAttribute('data-block-id');
+    const source = id ? document.querySelector('table[data-block-id="' + id + '"] thead') : null;
+    if (!source) { skipped.push(pageNo); continue; }
+    const box = pageEl ? pageEl.querySelector('.pagedjs_page_content') : null;
+    if (!box) { skipped.push(pageNo); continue; }
+    const slack = box.getBoundingClientRect().bottom - t.getBoundingClientRect().bottom;
+    const need = source.getBoundingClientRect().height;
+    if (!(slack >= need)) { skipped.push(pageNo); continue; }
+    const clone = source.cloneNode(true);
+    clone.setAttribute('data-repeated', 'true');
+    t.insertBefore(clone, t.firstChild);
+  }
+  return skipped;
+})()`;
+
 const MEASURE_JS = `(() => {
   const d = document;
   function pageNumOf(el) {
@@ -377,6 +424,15 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 180_000 });
     await page.waitForFunction(TYPESET_DONE_JS, { timeout: 300_000, polling: 250 });
 
+    /**
+     * Placed BEFORE the measurement, so a header that did not fit shows up in
+     * the overflow numbers rather than hiding behind them.
+     */
+    const wantsRepeatHeader = input.layoutStandard?.tables?.repeatHeader === true;
+    let repeatHeaderSkipped: number[] = wantsRepeatHeader
+      ? ((await page.evaluate(REPEAT_TABLE_HEADERS_JS)) as number[])
+      : [];
+
     let measured = (await page.evaluate(MEASURE_JS)) as Omit<
       TypesetReport,
       'trim' | 'marginsIn' | 'bodyPt' | 'lineHeight'
@@ -426,6 +482,10 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
       html = htmlFor(pages);
       await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 180_000 });
       await page.waitForFunction(TYPESET_DONE_JS, { timeout: 300_000, polling: 250 });
+      // The second pass is a fresh document, so the headers are placed again.
+      repeatHeaderSkipped = wantsRepeatHeader
+        ? ((await page.evaluate(REPEAT_TABLE_HEADERS_JS)) as number[])
+        : [];
       measured = (await page.evaluate(MEASURE_JS)) as typeof measured;
 
       // The numbers are laid into a fixed-width slot precisely so their arrival
@@ -473,6 +533,7 @@ export async function renderTypesetBook(input: RenderTypesetInput): Promise<Rend
         marginsIn: margins,
         bodyPt: input.config.typography.bodyPt,
         lineHeight: input.config.typography.lineHeight,
+        repeatHeaderSkipped,
       },
     };
   } finally {

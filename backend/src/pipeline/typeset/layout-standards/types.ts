@@ -217,6 +217,52 @@ export interface ChapterTakeawayPolicy {
  * section, which is where these blocks consistently end: bullets, then a
  * closing reassurance paragraph that belongs with them.
  */
+/**
+ * RUN-IN ALERTS — the same panel, opened by a bold run-in instead of a heading.
+ *
+ * `alertPanel` could only ever be opened by an ALL-CAPS H3. BEFORE YOU NEED IT
+ * marks its same-day safety tier with a bold run-in at the head of a paragraph
+ * (`**Tell somebody today:**`) and contains no all-caps H3 at all, so its most
+ * urgent guidance set as ordinary prose — typographically identical to the
+ * routine advice beside it. The same missing capability was recorded against the
+ * trade line in `trade-nonfiction-guide-v1.ts`: "needs a run-in matcher, which
+ * does not exist yet. Left deliberately unstyled." There it cost a closing beat;
+ * here it costs the safety hierarchy.
+ *
+ * ─── STRUCTURAL, NOT A KEYWORD SEARCH ────────────────────────────────────
+ * The bold must OPEN the paragraph. A mid-sentence mention, a bold run later in
+ * the same paragraph, and the phrase inside a bullet are all left alone. That
+ * distinction is the whole point: BEFORE YOU NEED IT has 314 bold run-ins, of
+ * which 6 are safety, and 4 inline references to the same phrase that must stay
+ * ordinary text.
+ */
+export interface AlertRunInPolicy {
+  /**
+   * Run-in texts that open a panel. Compared case-insensitively after trailing
+   * presentation punctuation is removed, because the same marker is authored
+   * both as `**Tell somebody today**,` and as `**Tell somebody today:**`.
+   */
+  runIns: readonly string[];
+  /**
+   * Absorb a list that DIRECTLY follows the run-in paragraph.
+   *
+   * The panel is the run-in plus an adjacent list and nothing else. Running on
+   * to the next heading, as the heading matcher does, would swallow the
+   * reassurance paragraph that deliberately sits outside these boxes ("None of
+   * these mean something is seriously wrong").
+   */
+  absorbAdjacentList: boolean;
+  /**
+   * OPTIONAL. Run-ins that open the EMPHATIC variant of the panel rather than
+   * the standard one — the third tier, above same-day.
+   *
+   * Listed here INSTEAD OF in `runIns`, not as well as: the matcher takes the
+   * union, and membership here is what selects the variant. Absent means one
+   * panel weight, which is the behaviour every book shipped with.
+   */
+  emphaticRunIns?: readonly string[];
+}
+
 export interface AlertPanelPolicy {
   enabled: boolean;
   /** Heading texts that open a panel. Compared case-insensitively. */
@@ -231,6 +277,37 @@ export interface AlertPanelPolicy {
    * as two unrelated fragments, and the second half loses its heading.
    */
   keepTogether: boolean;
+  /**
+   * OPTIONAL. Absent means headings-only matching — the behaviour every book
+   * shipped with. An approved standard is never edited to add a capability it
+   * was not approved with; register a new version instead.
+   */
+  runIn?: AlertRunInPolicy;
+  /**
+   * OPTIONAL. A heavier variant of the same panel, for a tier above same-day.
+   *
+   * BEFORE YOU NEED IT carries three semantic tiers — routine, same-day and
+   * immediately — declared in its own QA record, but only two visual levels
+   * existed. Giving the top tier the SAME box as same-day would assert that
+   * "tell somebody today" and "get medical help immediately" are equivalent,
+   * which is worse than leaving it unmarked: it is a false equivalence rather
+   * than a missing one.
+   *
+   * Two channels separate it, and neither is colour, because the interior
+   * prints black and a reader may be holding a photocopy: the rule weight
+   * doubles, and the label carries the drawn flag the urgent-heading treatment
+   * already uses.
+   *
+   * Absent means no variant, no extra class and no extra stylesheet rule — an
+   * approved standard is never edited to add a capability it was not approved
+   * with.
+   */
+  emphatic?: {
+    /** Border width for the variant. The base panel's `borderPt` is the floor. */
+    borderPt: number;
+    /** Prefix the label with the drawn alert flag. */
+    flag: boolean;
+  };
 }
 
 /**
@@ -537,6 +614,28 @@ export interface HeadingBindPolicy {
   extraParagraphUnderChars: number;
 }
 
+/**
+ * CONTENTS LIST — how tightly the entries set.
+ *
+ * OPTIONAL, and absent means exactly what it meant before this existed. A
+ * contents page is a LOOKUP, not running prose, and it sets tighter than body
+ * text for the same reason a table does; but that is a judgement a book class
+ * makes, not one the front-matter generator should make for every book on the
+ * platform.
+ *
+ * The number that forced this: BEFORE YOU NEED IT lists 26 sections. At the
+ * generator's hardcoded 0.62em, 21 fitted on the contents page and FIVE spilled
+ * onto a second leaf that was then 82% white — the emptiest page in the book, on
+ * a page whose whole job is to be scanned in one look.
+ */
+export interface TypesetContentsPolicy {
+  /**
+   * Space below each entry, in em. The generator's own value is 0.62; anything
+   * lower sets the list more compactly without touching the type size.
+   */
+  entrySpacingEm: number;
+}
+
 export interface TypesetLayoutStandard {
   /** Versioned id, e.g. "educational-nonfiction-typeset@1". Never a bare name. */
   id: string;
@@ -591,6 +690,11 @@ export interface TypesetLayoutStandard {
    * capability it was not approved with.
    */
   longTokens?: LongTokenWrappingPolicy;
+  /**
+   * OPTIONAL. Absent means the front-matter generator's own contents spacing,
+   * so every standard that does not declare this renders identically.
+   */
+  contents?: TypesetContentsPolicy;
   /**
    * OPTIONAL. Absent means pipe rows are not read as tables — the behaviour
    * every shipped book has. See `TypesetTableStyles`.

@@ -48,6 +48,51 @@ If no — don't do it.
 
 ---
 
+## RULE 1B — THREE PAID PROVIDERS. KNOW WHICH ONE YOU ARE SPENDING.
+
+This cost a real agent a real afternoon and real money. It reported "we are out
+of credit", was told to use OpenAI, and answered "we don't have anything" — while
+a funded OpenAI key sat in `.env` the whole time. It had exhausted a DIFFERENT
+provider that cannot generate an image at all.
+
+| Key in the repo-root `.env` | What it is for | What it CANNOT do |
+|---|---|---|
+| `OPENAI_API_KEY` | image GENERATION (`gpt-image-2`, ~$0.05/image), vision QA and text review (`gpt-4.1-mini`) | — |
+| `REPLICATE_API_TOKEN` | UPSCALING ONLY (Real-ESRGAN, `stage-5-upscale/`) | **cannot generate an image.** It enlarges one you already have. |
+| `ANTHROPIC_API_KEY` | text only (`claude-sonnet-4-5`) | cannot make images |
+
+Running out on one says NOTHING about the others. They are separate accounts.
+
+**Generate an image like this, and no other way:**
+
+```ts
+import { generateImage } from '../src/services/openai/openai.js';
+const img = await generateImage({ prompt, size: '1536x1024', quality: 'high' });
+```
+
+Working reference to copy: `scripts/before-you-need-it-illustrations.ts` — seven
+illustrations for ~$0.35, prints the cost before spending, writes each prompt
+beside its PNG and a manifest with sha256 and alt text.
+
+**"OPENAI_API_KEY is not configured" does not mean the key is missing.** That
+error fires only from `isPlaceholder()` — the value looked like
+`your_openai_api_key_here`, which means you read `.env.example`. `src/env.ts`
+resolves the repo root from its OWN module path, loads `.env.example` first and
+then `.env` with `override: true`. Your working directory is irrelevant. Never
+hand-roll dotenv and never read `.env` yourself.
+
+**Before you spend: say the count times the unit price and WAIT for a yes.**
+Never batch-generate on your own initiative. If an image comes back wrong, say so
+and regenerate deliberately — never retry in a loop.
+
+**Two traps.** `OPENAI_REVIEW_MODEL` defaults to `gpt-5.5` in `src/env.ts` and is
+pinned to `gpt-4.1-mini` in `.env`; if that line ever goes missing, review calls
+silently get expensive. And on the ai-whole-page track, `whole-page-render`
+generates ONE PAID IMAGE PER PAGE — a 200-page book is 200 generations. Know
+which track you are on before starting anything.
+
+---
+
 ## RULE 2 — RENDER ONCE, THEN THE OPERATOR DECIDES.
 
 Render each page exactly once, then show the operator the actual image. Never auto-retry,

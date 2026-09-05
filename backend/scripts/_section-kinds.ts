@@ -1,0 +1,10 @@
+import { parseTypesetSections } from '../src/pipeline/typeset/typeset-book.js';
+import { readManuscript } from './before-you-need-it-config.js';
+const { md } = readManuscript();
+const s = parseTypesetSections(md);
+const counts: Record<string, number> = {};
+for (const x of s) counts[x.kind] = (counts[x.kind] ?? 0) + 1;
+console.log('section kinds:', counts);
+console.log('\nfirst 8:');
+for (const x of s.slice(0, 8)) console.log(`  ${x.kind.padEnd(8)} ${x.title.slice(0, 60)}`);
+process.exit(0);

@@ -235,6 +235,27 @@ The full matrix, including secondary copies and conflict risk, is
 | Kindle cover | A 1600x2560 crop of the finished paperback wrap |
 | Delivery package | Per-book delivery folder plus a manifest of hashes |
 
+### What costs money, and on which key
+
+Three providers, three accounts, three keys in the repo-root `.env`. Exhausting
+one tells you nothing about the others — see RULE 1B in `CLAUDE.md`.
+
+| Service | Key | Model | Cost |
+|---|---|---|---|
+| `services/openai/openai.ts` — image **generation** | `OPENAI_API_KEY` | `gpt-image-2` | **~$0.05/image** |
+| `services/vision/vision-core.ts` — vision QA | `OPENAI_API_KEY` | `gpt-4.1-mini` | cents |
+| `services/openai/text-review.ts` | `OPENAI_API_KEY` | `gpt-4.1-mini` | cents |
+| `services/openai/prompt-review.ts` | `OPENAI_API_KEY` | `gpt-4.1-mini` | cents |
+| `stage-5-upscale/` — **upscaling only** | `REPLICATE_API_TOKEN` | Real-ESRGAN | per run |
+| `services/claude/claude.ts` — text | `ANTHROPIC_API_KEY` | `claude-sonnet-4-5` | per call |
+
+Image generation is the only expensive one. Everything else is a rounding error.
+If usage ever shows `gpt-5.5`, the `.env` pin was lost — stop and report it.
+
+Only ONE API route spends (`whole-page.routes.ts`, prompt review, cheap). No
+route generates images. The BullMQ queue in `services/redis/queues.ts` has no
+worker in this repo, so nothing spends in the background on its own.
+
 ---
 
 ## Local development
@@ -324,6 +345,7 @@ sanctioned home for a *text* correction at book scope — that gap is Phase 2.
 
 | Document | What it is for |
 |---|---|
+| [CLAUDE.md](CLAUDE.md) | **Read first.** Operating rules for agents — scope discipline, and RULE 1B: which of the three paid providers you are about to spend |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Subsystems, diagrams, and the Track A/B boundary |
 | [docs/BOOK-PRODUCTION.md](docs/BOOK-PRODUCTION.md) | The operator path, end to end |
 | [docs/COVERS-AND-SPINES.md](docs/COVERS-AND-SPINES.md) | Geometry, KDP readings, safe zones, the current conflict |
@@ -361,6 +383,13 @@ that shape current work:
   before re-paginating; recover from R2.
 - **An override stopped applying.** Block ids come from manuscript text. If the
   text moved, the override no longer matches — it is reported, not dropped.
+- **"OPENAI_API_KEY is not configured; image generation is disabled."** The key
+  is almost certainly fine. That error comes only from `isPlaceholder()`, so you
+  are reading `.env.example`, not `.env`. `src/env.ts` finds the repo root from
+  its own module path — cwd cannot cause this.
+- **"Out of credit" on image generation.** Check WHICH provider. Replicate is the
+  upscaler and cannot generate anything; running it dry does not touch the OpenAI
+  balance. See RULE 1B in `CLAUDE.md`.
 - **A change to `shared/` had no effect.** You are in a worktree. See above.
 - **Four tests fail on a clean checkout.** Known and pre-existing. They read real
   book manuscripts from absolute paths outside the repository, including one

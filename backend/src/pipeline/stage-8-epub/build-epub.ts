@@ -33,11 +33,17 @@ import { getProjectStorage } from '../../services/storage/project-storage.js';
 import { assembleEpubModel, type EpubMeta, type EpubModel, type EpubSourcePage, type HeroAssembleInput, type HeroRef } from './assemble-epub.js';
 import { loadHeroPlan } from './hero-plan.js';
 import { assembleTypesetEpubModel, type EpubFigure } from './assemble-typeset-epub.js';
+import { applyKindleLayout, KINDLE_LAYOUT_CSS } from './kindle-layout.js';
 import { toRoman } from '../publishing-standard/index.js';
 
 /** Minimal reader-theme-friendly CSS — relative units only (no fixed px) so
  *  Kindle reflow is never broken. The device controls fonts/colors. */
-const EPUB_CSS = [
+/**
+ * EXPORTED so a book built outside the database path uses the SAME ebook
+ * stylesheet as one built through it. A second copy of this would be two
+ * editions of the platform's ebook look, drifting apart silently.
+ */
+export const EPUB_CSS = [
   // NOTHING MAY BE WIDER THAN THE SCREEN, at any reader font size.
   //
   // A reflowable book is read at whatever size its reader has chosen, and the
@@ -48,16 +54,47 @@ const EPUB_CSS = [
   // nothing at ordinary sizes, where no break is ever needed. Measured across
   // all 24 documents at 320 and 375px, at 100/150/200/250%.
   'body { overflow-wrap: break-word; }',
+
+  /* ── THE THREE SAFETY TIERS, IN A FILE WITH NO PAGES ───────────────────────
+     Print separates them with a 0.75pt box, a 1.5pt box and a drawn flag. None
+     of that transfers: rule weights mean nothing when the reader sets the font
+     size, and a flag is an image.
+
+     So EVERY dimension here is in `em` and scales with the reader's own type,
+     and the hierarchy is carried by THREE independent channels — border weight,
+     inset, and label emphasis — so losing any one of them still leaves the two
+     tiers distinguishable. Nothing depends on colour: the borders are declared
+     in `currentColor`, which is legible on e-ink and in a night theme alike, and
+     with the stylesheet stripped entirely the reader still meets a separate
+     block opening with the author's own words. */
+  '.safety { margin: 1.2em 0; padding: 0.6em 0 0.6em 0.9em; border-left: 0.22em solid currentColor; }',
+  '.safety-immediate { padding-left: 1.2em; border-left-width: 0.45em; margin: 1.6em 0; }',
+  '.safety .safety-label { font-weight: bold; margin: 0 0 0.35em; }',
+  /* The top tier only. Letter-spacing and case are PRESENTATION — the author's
+     wording is unchanged, which is what the label element actually contains. */
+  '.safety-immediate .safety-label { text-transform: uppercase; letter-spacing: 0.06em; }',
+  '.safety p { margin: 0.35em 0; }',
+  '.safety ul, .safety ol { margin: 0.35em 0 0.35em 1.2em; }',
+
   'h1, h2, h3, h4, h5, h6 { overflow-wrap: break-word; word-break: break-word; }',
   'h1 { font-size: 1.6em; margin: 1em 0 0.3em; }',
   'h2 { font-size: 1.3em; margin: 1.2em 0 0.2em; }',
   'h3 { font-size: 1.1em; margin: 1em 0 0.2em; }',
   'h4 { font-size: 1em; font-weight: bold; margin: 0.8em 0 0.2em; }',
-  // ORPHAN CONTROL — a heading/sub-heading must never strand at the bottom of a
-  // Kindle screen away from the text it introduces. break-after:avoid glues each
-  // heading to the block that follows it, so it rolls to the next screen WITH its
-  // paragraph; break-inside:avoid stops a heading from splitting. Reflowable, so
-  // this fixes every device/font-size at once (no per-"page" edits possible).
+  // ORPHAN CONTROL, DECLARATIVE HALF — AND IT IS ONLY HALF.
+  //
+  // This comment used to say that break-after:avoid "glues each heading to the
+  // block that follows it, so it rolls to the next screen WITH its paragraph".
+  // That is true of every compliant engine and FALSE OF KINDLE, which ignores
+  // the property. All four books shipped on that belief and all four stranded
+  // headings at the foot of a screen with their paragraph beginning after the
+  // turn. The break-inside here is not the safety net it looks like either: it
+  // stops a heading's OWN lines from splitting and says nothing about the
+  // paragraph beneath it.
+  //
+  // The rules are kept, because they are correct and they work everywhere else.
+  // The half that actually holds on Kindle is the div.keep wrapper emitted by
+  // kindle-layout.ts.
   'h1, h2, h3, h4, h5, h6 { page-break-after: avoid; break-after: avoid; -webkit-column-break-after: avoid; page-break-inside: avoid; break-inside: avoid; }',
   'p { margin: 0 0 0.7em; line-height: 1.5; }',
   // Keep the scientific-name byline with its entry title (never split the two).
@@ -138,6 +175,9 @@ const EPUB_CSS = [
   'ul, ol { margin: 0 0 0.8em 1.2em; padding-left: 1em; }',
   'li { margin: 0 0 0.35em; }',
   'code { font-family: monospace; font-size: 0.95em; }',
+  // The two Kindle layout repairs: the keep-together wrapper that actually
+  // survives Kindle's renderer, and real title-page / front-matter styling.
+  ...KINDLE_LAYOUT_CSS,
 ].join('\n');
 
 export interface BuildEpubResult {
@@ -567,7 +607,16 @@ export async function buildKindleEpub(
 
   // Use the EPub class (named export) rather than the default function: under
   // some ESM loaders the CJS default export isn't unwrapped to a callable.
-  const epubDoc = await new EPub(epubOptions, model.chapters).render();
+  /* THE TWO KINDLE LAYOUT REPAIRS, applied at the one point every chapter from
+     either assembler passes through, so neither can miss one and no future
+     caller has to remember. Blocks are re-nested, never edited: no wording,
+     ordering or element changes. See kindle-layout.ts. */
+  const laidOut = model.chapters.map((ch) => ({
+    ...ch,
+    content: applyKindleLayout((ch as { kind?: string }).kind, ch.content),
+  }));
+
+  const epubDoc = await new EPub(epubOptions, laidOut).render();
   const buffer = await epubDoc.genEpub();
   return { buffer, model, meta, coverEmbedded, fileName, entrySource };
 }

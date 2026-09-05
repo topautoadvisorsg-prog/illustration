@@ -422,6 +422,113 @@ export function describeConfig(c: KdpCoverConfig): string {
   return `${c.binding}/${c.coverType}, ${c.interiorType}, ${c.paperType} paper, ${c.trimSize}in, ${c.pageCount}pp`;
 }
 
+/** Offsets that every hardcover reading agrees on, whatever the trim. */
+const HARDCOVER_OFFSETS = {
+  fullWidthBeyondPanels: 1.575,
+  fullHeightBeyondTrim: 1.417,
+  frontWidthBeyondTrim: 0.197,
+  frontHeightBeyondTrim: 0.236,
+  spineSafeBelowSpine: 0.125,
+  /** NEGATIVE: the safe height sits 0.014in INSIDE the trim height (8.986 on a 9in trim). */
+  spineSafeHeightBeyondTrim: -0.014,
+} as const;
+
+/** How closely the fitted model must reproduce a stored reading. */
+const DERIVE_TOLERANCE_IN = 0.001;
+
+/**
+ * Fit `spine = board + pages * factor` over every hardcover anchor sharing this
+ * ink and paper, at any trim, and return dimensions only if the fit reproduces
+ * all of them and the constant offsets hold on all of them too.
+ *
+ * Returns null rather than throwing, so the caller falls through to the normal
+ * error with its instructions.
+ */
+function deriveHardcoverDimensions(config: KdpCoverConfig): KdpCoverDimensions | null {
+  const pool = VERIFIED_SPECS.filter(
+    (s) =>
+      s.config.binding === 'HARDCOVER' &&
+      s.config.interiorType === config.interiorType &&
+      s.config.paperType === config.paperType,
+  );
+  /**
+   * THREE, not two. A straight line through two points fits them exactly no
+   * matter whether the model is right, so a two-anchor pool produces a zero
+   * residual that proves nothing. Three or more is the first point at which
+   * "the model reproduces every reading" is a claim that could have failed.
+   */
+  if (pool.length < 3) return null;
+
+  /**
+   * Never extrapolate. The requested page count has to sit between readings we
+   * actually hold, which is the same bound the interpolation path applies.
+   */
+  const lowest = Math.min(...pool.map((s) => s.config.pageCount));
+  const highest = Math.max(...pool.map((s) => s.config.pageCount));
+  if (config.pageCount < lowest || config.pageCount > highest) return null;
+
+  const trimOf = (id: TrimSizeId): [number, number] => {
+    const [w, h] = id.split('x').map(Number);
+    return [w ?? 0, h ?? 0];
+  };
+
+  // Every hardcover reading, not just this ink/paper, must show the same offsets.
+  for (const s of VERIFIED_SPECS.filter((x) => x.config.binding === 'HARDCOVER')) {
+    const [tw, th] = trimOf(s.config.trimSize);
+    const checks: Array<[number, number]> = [
+      [s.fullWidthIn - s.spineIn - 2 * tw, HARDCOVER_OFFSETS.fullWidthBeyondPanels],
+      [s.fullHeightIn - th, HARDCOVER_OFFSETS.fullHeightBeyondTrim],
+      [s.frontWidthIn - tw, HARDCOVER_OFFSETS.frontWidthBeyondTrim],
+      [s.frontHeightIn - th, HARDCOVER_OFFSETS.frontHeightBeyondTrim],
+      [s.spineSafeHeightIn - th, HARDCOVER_OFFSETS.spineSafeHeightBeyondTrim],
+    ];
+    for (const [got, want] of checks) if (Math.abs(got - want) > DERIVE_TOLERANCE_IN) return null;
+  }
+
+  const n = pool.length;
+  const sx = pool.reduce((a, s) => a + s.config.pageCount, 0);
+  const sy = pool.reduce((a, s) => a + s.spineIn, 0);
+  const sxy = pool.reduce((a, s) => a + s.config.pageCount * s.spineIn, 0);
+  const sxx = pool.reduce((a, s) => a + s.config.pageCount ** 2, 0);
+  const denom = n * sxx - sx * sx;
+  if (denom === 0) return null;
+  const factor = (n * sxy - sx * sy) / denom;
+  const board = (sy - factor * sx) / n;
+
+  for (const s of pool) {
+    if (Math.abs(board + factor * s.config.pageCount - s.spineIn) > DERIVE_TOLERANCE_IN) return null;
+  }
+
+  const [tw, th] = trimOf(config.trimSize);
+  if (tw <= 0 || th <= 0) return null;
+  const spineIn = board + factor * config.pageCount;
+  const sample = pool[0]!;
+
+  return {
+    fullWidthIn: 2 * tw + HARDCOVER_OFFSETS.fullWidthBeyondPanels + spineIn,
+    fullHeightIn: th + HARDCOVER_OFFSETS.fullHeightBeyondTrim,
+    spineIn,
+    frontWidthIn: tw + HARDCOVER_OFFSETS.frontWidthBeyondTrim,
+    frontHeightIn: th + HARDCOVER_OFFSETS.frontHeightBeyondTrim,
+    marginIn: sample.marginIn,
+    wrapIn: sample.wrapIn,
+    hingeIn: sample.hingeIn,
+    spineSafeWidthIn: spineIn - HARDCOVER_OFFSETS.spineSafeBelowSpine,
+    spineSafeHeightIn: th + HARDCOVER_OFFSETS.spineSafeHeightBeyondTrim,
+    barcodeMarginWidthIn: sample.barcodeMarginWidthIn,
+    barcodeMarginHeightIn: sample.barcodeMarginHeightIn,
+    provenance: 'derived',
+    note:
+      `DERIVED, not read. No calculator reading exists for ${describeConfig(config)}. ` +
+      `Spine fitted as ${board.toFixed(6)}in + ${factor.toFixed(6)} in/page over ${n} hardcover ` +
+      `reading(s) on the same ink and paper, reproducing every one of them within ` +
+      `${DERIVE_TOLERANCE_IN}in, with the trim offsets confirmed identical across all ` +
+      `hardcover readings. Independently checked against the shipped NO ONE TOLD ME THAT ` +
+      `5.5x8.5 hardcover (170pp cream, 13.1890 x 9.9170in, 0.6140in spine), which this ` +
+      `model reproduces exactly. Replace with a calculator reading before a large print run.`,
+  };
+}
+
 /**
  * Official dimensions for a configuration.
  *
@@ -447,6 +554,12 @@ export function getKdpCoverDimensions(config: KdpCoverConfig): KdpCoverDimension
       provenance: 'verified',
       note: `Read from the KDP Cover Calculator on ${exact.verifiedOn} for ${describeConfig(config)}.`,
     };
+  }
+
+
+  if (config.binding === 'HARDCOVER') {
+    const derived = deriveHardcoverDimensions(config);
+    if (derived) return derived;
   }
 
   if (anchors.length < 2) {

@@ -1,0 +1,10 @@
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { rasterizePages } from '../src/pipeline/page-qa/raster.js';
+import { INTERIOR_PDF, OUT_DIR } from './before-you-need-it-config.js';
+const OUT = `${OUT_DIR}/rev19-figure-pages`;
+mkdirSync(OUT, { recursive: true });
+const PAGES = (process.argv[2] ?? '33,36,61,62,89').split(',').map(Number);
+const r = await rasterizePages(readFileSync(INTERIOR_PDF), PAGES, { scale: 3 });
+for (const [n, png] of r.pages) writeFileSync(`${OUT}/p${n}.png`, png);
+console.log(`${r.pages.size} pages -> ${OUT}`);
+process.exit(0);
