@@ -62,7 +62,8 @@ four children and called Sivi *Lyra*; these individual sheets are correct and su
 
 Packs: Nico and Sivi already carry backpacks on their sheets. Bram and Tessa carry crossbody
 satchels and are being reissued by the owner so they read as backpacks. Zinumi is a fairy, not one
-of the four Pack-carrying children, so her small pouch is a separate question.
+of the four Pack-carrying children, so the backpack rule does not apply to her — her pouch stays
+as drawn, settled by the owner.
 
 ## Not kept here, on purpose
 

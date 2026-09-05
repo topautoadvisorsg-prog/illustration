@@ -212,6 +212,6 @@ Confirmed against the sheets, and the owner is reissuing the two that are wrong:
 | Nico | turtle-shell **backpack** | correct |
 | Bram | crossbody satchel, captioned "SATCHEL DETAIL" | being reissued as a backpack |
 | Tessa | crossbody satchel bag | being reissued as a backpack |
-| Zinumi | small side pouch | she is a fairy, not one of the four Pack-carrying children — separate question |
+| Zinumi | small side pouch | **settled: leave as-is.** She is a fairy, not one of the four Pack-carrying children, so the backpack rule does not apply to her |
 
 Until the reissued sheets land, do not write prompts that describe Bram's or Tessa's pack.
