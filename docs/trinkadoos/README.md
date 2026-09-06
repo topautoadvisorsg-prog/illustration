@@ -16,10 +16,13 @@ Production scripts live with every other book's, in `backend/scripts/`:
 
 ```
 source/      the approved text and the authoritative art direction
-prompts/     image prompts for review, and the video prompt rules
-references/  approved character reference crops
+prompts/     image prompts for review, the master style prompt, video prompt rules
 notes/       production records
 ```
+
+**There is no `references/` folder right now.** The whole character and style reference library was
+cleared on 2026-09-05 to start fresh; the owner is supplying a new set. Until it lands, no prompt
+can be rendered — every prompt's reference lock points at sheets that do not exist yet.
 
 ### `source/`
 
@@ -42,27 +45,6 @@ notes/       production records
 - `BOOK-01-IMAGE-PROMPTS.md` — 16 image prompts for Book 1, awaiting owner review. Nothing rendered.
 - `VIDEO-PROMPT-RULES.md` — owner-supplied rules from real image-to-video attempts that failed.
   Read before writing any video prompt.
-
-### `references/`
-
-The approved visual bible.
-
-- `characters/` — five full character sheets: `bram-bear`, `tessa-unicorn`, `nico-turtle`,
-  `sivi-butterfly`, `zinumi-fairy`. Each carries front/side/back/3-4 views, detail callouts and an
-  expression row. These are the identity anchor — characters are never redesigned from them.
-**There is no approved style reference yet.** A rendered cave scene briefly sat here as one; it
-was a test image, not owner-supplied and not final, and it has been removed. The character sheets
-carry the look in the meantime, but a real style anchor is still outstanding and rendering waits
-on it.
-
-The earlier crops taken from the old four-up sheet are gone. That sheet mislabelled three of the
-four children and called Sivi *Lyra*; these individual sheets are correct and supersede it.
-
-**`prompts/STYLE-MASTER-PROMPT.md` is the standing instruction for every image prompt.**
-
-Packs: all four children carry a backpack on their own sheet — Bram's teddy-bear pack, Tessa's
-star pack, Nico's turtle shell, Sivi's butterfly pack. Zinumi is a fairy, not one of the four
-Pack-carrying children, so the backpack rule does not reach her; her pouch stays as drawn.
 
 ## Not kept here, on purpose
 

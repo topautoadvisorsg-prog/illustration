@@ -5,11 +5,12 @@
 This is the locked visual identity. It does not change unless the owner explicitly changes it.
 Read it before writing any prompt; it overrides habit and overrides anything earlier in a thread.
 
-Approved assets it refers to:
+**No approved reference images exist right now.** The character and style library was cleared on
+2026-09-05 to start fresh, and the owner is supplying a replacement set — some the same, some
+updated. Nothing renders until it lands.
 
-- **Character sheets:** `references/characters/` — `bram-bear`, `tessa-unicorn`, `nico-turtle`,
-  `sivi-butterfly`, `zinumi-fairy`
-- **Style anchor: none yet.** Outstanding. Do not substitute a test render for it.
+When the new sheets arrive they go in `references/`, and the wardrobe map below says which to
+attach per scene.
 
 ---
 
