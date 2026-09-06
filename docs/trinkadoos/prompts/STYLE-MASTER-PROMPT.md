@@ -12,9 +12,13 @@ Approved reference set, reissued 2026-09-05:
 - `references/characters/magical/` — `bram-bear-magical`, `tessa-unicorn-magical`,
   `nico-turtle-magical`, `sivi-butterfly-magical`, `four-children-magical`
 
-**Zinumi is not in this set and has no sheet.** Six Book 1 scenes need her.
+- `references/characters/zinumi-fairy.png` — one sheet, one state.
 
-**There is still no style reference image.** The character sheets carry the look for now.
+**The cast is complete.** Every character in Book 1 has an approved reference.
+
+**There is no separate style plate.** All eleven sheets are in one consistent look, so they carry
+the style as well as the identity. Where a prompt says "the approved STYLE REFERENCE", attach the
+sheets for that scene and they serve both jobs — unless the owner supplies a dedicated plate.
 
 ---
 

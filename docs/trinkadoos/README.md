@@ -25,16 +25,16 @@ notes/       production records
 The approved visual bible, reissued 2026-09-05.
 
 ```
-everyday/   bram · tessa · nico · sivi, plus a four-friends group sheet
-magical/    bram-bear · tessa-unicorn · nico-turtle · sivi-butterfly, plus a group sheet
+everyday/         bram · tessa · nico · sivi, plus a four-friends group sheet
+magical/          bram-bear · tessa-unicorn · nico-turtle · sivi-butterfly, plus a group sheet
+zinumi-fairy.png  one sheet, one state — she never changes clothes
 ```
 
 Every child now has both wardrobe states as its own sheet, and each state also has a group sheet
 for scenes where all four are in frame. `prompts/STYLE-MASTER-PROMPT.md` says which to attach per
 scene — Book 1 changes wardrobe once, at Spread 8, and back on page 32.
 
-**Zinumi has no sheet in this set.** She appears in six of Book 1's sixteen scenes, so those six
-cannot be rendered until she is supplied.
+The cast is complete. Every character in Book 1 has an approved reference.
 
 ## Not kept here, on purpose
 
