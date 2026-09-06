@@ -5,12 +5,16 @@
 This is the locked visual identity. It does not change unless the owner explicitly changes it.
 Read it before writing any prompt; it overrides habit and overrides anything earlier in a thread.
 
-**No approved reference images exist right now.** The character and style library was cleared on
-2026-09-05 to start fresh, and the owner is supplying a replacement set — some the same, some
-updated. Nothing renders until it lands.
+Approved reference set, reissued 2026-09-05:
 
-When the new sheets arrive they go in `references/`, and the wardrobe map below says which to
-attach per scene.
+- `references/characters/everyday/` — `bram-everyday`, `tessa-everyday`, `nico-everyday`,
+  `sivi-everyday`, `four-children-everyday`
+- `references/characters/magical/` — `bram-bear-magical`, `tessa-unicorn-magical`,
+  `nico-turtle-magical`, `sivi-butterfly-magical`, `four-children-magical`
+
+**Zinumi is not in this set and has no sheet.** Six Book 1 scenes need her.
+
+**There is still no style reference image.** The character sheets carry the look for now.
 
 ---
 
@@ -207,19 +211,19 @@ For every scene, output:
 
 There are two wardrobe states and the wrong sheet puts the children in the wrong clothes.
 
-- `characters/four-children-everyday.png` — Bram, Tessa, Nico and Sivi as ordinary kids: hoodies,
-  cardigans, jeans, sneakers. **No costumes, no Packs.**
-- `characters/<name>.png` — the adventure form: hood, ears/horn/shell/wings, and that child's
-  backpack.
+- `characters/everyday/` — ordinary kids: hoodies, cardigans, jeans, sneakers. **No costumes, no
+  Packs.** Individual sheets plus a four-friends group sheet.
+- `characters/magical/` — the adventure form: hood, ears/horn/shell/wings, and that child's
+  backpack. Individual sheets plus a group sheet.
 
 Book 1 changes wardrobe exactly once, at Spread 8, and changes back on page 32:
 
 | Units | State | Attach |
 | --- | --- | --- |
-| Page 3, Spreads 1–7 | ordinary clothes — they have not dressed yet | everyday sheet |
-| Spread 8 | the dressing itself, clothes half on | **both** — everyday and the four adventure sheets |
-| Spreads 9–14 | in adventure form | the four adventure sheets |
-| Page 32 | back in ordinary clothes, Packs stored | everyday sheet |
+| Page 3, Spreads 1–7 | ordinary clothes — they have not dressed yet | `everyday/` |
+| Spread 8 | the dressing itself, clothes half on | **both** — `everyday/` and `magical/` |
+| Spreads 9–14 | in adventure form | `magical/` |
+| Page 32 | back in ordinary clothes, Packs stored | `everyday/` |
 
 The Packs are found at Spread 5 and worn from Spread 8. Before Spread 8 no child wears a Pack,
 so a prompt for those pages must not attach a sheet that shows one.

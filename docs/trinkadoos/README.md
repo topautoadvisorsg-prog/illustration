@@ -20,31 +20,21 @@ prompts/     image prompts for review, the master style prompt, video prompt rul
 notes/       production records
 ```
 
-**There is no `references/` folder right now.** The whole character and style reference library was
-cleared on 2026-09-05 to start fresh; the owner is supplying a new set. Until it lands, no prompt
-can be rendered — every prompt's reference lock points at sheets that do not exist yet.
+### `references/characters/`
 
-### `source/`
+The approved visual bible, reissued 2026-09-05.
 
-- **`TRINKADOOS_LAYOUT_AND_ILLUSTRATION_BRIEF.md`** — the authoritative art direction. 160 ART
-  blocks, one per page unit. **This is the only durable copy.** It was recovered from a browser
-  cache after being opened and never saved; see `notes/ART-BRIEF-RECOVERY.md`. The condensed image
-  cues in the manuscript are **not** a substitute — they carried 20.8% of the art direction.
-  sha256 `b204e9e1b43e3dbb19cc50d9f842af3cbf43433d044b5d2a58e4c3a40e3f457c`
-- `TRINKADOOS_MANUSCRIPT.md` — the signed-off compiled reading edition, byte-exact baseline.
-  sha256 `1e3926bd20a63b16fd1033b402fd1901bce2e3993eb484d9189f7737d70ebf8f`
-- `TRINKADOOS_BIBLE_SUPPLEMENT.md` — series canon.
-- `BASELINE-MANIFEST.md` — hashes and per-title word counts.
-- `layout-manuscripts/` — one production text file per title, apparatus stripped, 6,238 approved
-  story words total. These are what type is set from.
+```
+everyday/   bram · tessa · nico · sivi, plus a four-friends group sheet
+magical/    bram-bear · tessa-unicorn · nico-turtle · sivi-butterfly, plus a group sheet
+```
 
-**None of it is authorised for change.** Raise a problem; do not edit it.
+Every child now has both wardrobe states as its own sheet, and each state also has a group sheet
+for scenes where all four are in frame. `prompts/STYLE-MASTER-PROMPT.md` says which to attach per
+scene — Book 1 changes wardrobe once, at Spread 8, and back on page 32.
 
-### `prompts/`
-
-- `BOOK-01-IMAGE-PROMPTS.md` — 16 image prompts for Book 1, awaiting owner review. Nothing rendered.
-- `VIDEO-PROMPT-RULES.md` — owner-supplied rules from real image-to-video attempts that failed.
-  Read before writing any video prompt.
+**Zinumi has no sheet in this set.** She appears in six of Book 1's sixteen scenes, so those six
+cannot be rendered until she is supplied.
 
 ## Not kept here, on purpose
 
