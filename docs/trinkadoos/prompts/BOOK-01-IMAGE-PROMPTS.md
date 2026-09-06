@@ -18,7 +18,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 1 — 1Page 3 · Opener
+## Scene 1 — Page 3 · Opener
 
 **Characters:** Bram, Tessa, Nico, Sivi
 
@@ -37,7 +37,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 2 — 2Spread 1 (pp. 4–5) · First sight of Zinumi
+## Scene 2 — Spread 1 (pp. 4–5) · First sight of Zinumi
 
 **Characters:** Bram, Tessa, Nico, Sivi, Zinumi
 
@@ -58,7 +58,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 3 — 3Spread 2 (pp. 6–7) · The hidden entrance
+## Scene 3 — Spread 2 (pp. 6–7) · The hidden entrance
 
 **Characters:** Bram, Tessa, Nico, Sivi, Zinumi
 
@@ -79,7 +79,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 4 — 4Spread 3 (pp. 8–9) · The glowing passage
+## Scene 4 — Spread 3 (pp. 8–9) · The glowing passage
 
 **Characters:** Bram, Tessa, Nico, Sivi, Zinumi
 
@@ -100,7 +100,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 5 — 5Spread 4 (pp. 10–11) · The clubhouse chamber
+## Scene 5 — Spread 4 (pp. 10–11) · The clubhouse chamber
 
 **Characters:** Bram, Tessa, Nico, Sivi, Zinumi
 
@@ -121,13 +121,13 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 6 — 6Spread 5 (pp. 12–13) · The Pack Chamber
+## Scene 6 — Spread 5 (pp. 12–13) · The Pack Chamber
 
 **Characters:** Bram, Tessa, Nico, Sivi
 
 **Final image prompt**
 
-> Use the approved Trinkadoos STYLE REFERENCE for the visual style. Use ONLY the approved EVERYDAY CHARACTER REFERENCE sheet for Bram, Tessa, Nico and Sivi — ordinary clothes, no costumes and no Packs; they have not found them yet. These control identity, clothing, hair, proportions and style. Do not redesign the characters.
+> Use the approved Trinkadoos STYLE REFERENCE for the visual style. Use ONLY the approved EVERYDAY CHARACTER REFERENCE sheet for Bram, Tessa, Nico and Sivi — ordinary clothes and no costumes. The children are not wearing Trinkadoos Packs; the Packs themselves appear and behave exactly as this scene describes. These control identity, clothing, hair, proportions and style. Do not redesign the characters.
 > An older, quieter, more ancient room than the last. Four backpacks rest in four carved hollows in the stone wall — one brown, one cream, one green, one purple — each in its own niche, clearly designed and clearly waiting. Hero treatment: the Packs are the subject of the picture. On the left of the frame they sit dark and still; toward the right, the first faint glow is beginning inside one of them. The four children hang back at a respectful distance, hands to themselves, not touching anything. Hushed, reverent, a little nervous. Keep the ancient stone wall above the niches broad and plain — real carved rock, calm and unlit. Compose as a two-page spread, 2:1 landscape. Keep faces, hands, important props and story action clear of the central vertical fold; background scenery may cross it naturally, and there must be no empty stripe down the middle. No text, letters, numbers or signage anywhere in the illustration.
 
 **Geometry:** TWO-PAGE SPREAD · 17 × 8.5 in trim (17.25 × 8.75 with bleed) · render landscape, 2:1
@@ -142,13 +142,13 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 7 — 7Spread 6 (pp. 14–15) · The Packs choose
+## Scene 7 — Spread 6 (pp. 14–15) · The Packs choose
 
 **Characters:** Bram, Tessa, Nico, Sivi
 
 **Final image prompt**
 
-> Use the approved Trinkadoos STYLE REFERENCE for the visual style. Use ONLY the approved EVERYDAY CHARACTER REFERENCE sheet for Bram, Tessa, Nico and Sivi — ordinary clothes, no costumes and no Packs; they have not found them yet. These control identity, clothing, hair, proportions and style. Do not redesign the characters.
+> Use the approved Trinkadoos STYLE REFERENCE for the visual style. Use ONLY the approved EVERYDAY CHARACTER REFERENCE sheet for Bram, Tessa, Nico and Sivi — ordinary clothes and no costumes. The children are not wearing Trinkadoos Packs; the Packs themselves appear and behave exactly as this scene describes. These control identity, clothing, hair, proportions and style. Do not redesign the characters.
 > Four moments happening at once across one stone chamber. The brown Pack glows warm and Bram lifts it into his arms. The cream Pack has lit before Tessa's hand even reaches it. The green Pack hums low as Nico leans in close to listen. And the purple Pack has risen right off the stone and bumped into Sivi's chest — she is laughing out loud, arms half up in surprise. Joy, wonder, comedy. The Packs carry a subtle bear, unicorn, turtle and butterfly visual language in their design and stitching without being literal animals. Keep the upper stone wall above the children broad and dim — natural rock, quiet and free of glow. Compose as a two-page spread, 2:1 landscape. Keep faces, hands, important props and story action clear of the central vertical fold; background scenery may cross it naturally, and there must be no empty stripe down the middle. No text, letters, numbers or signage anywhere in the illustration.
 
 **Geometry:** TWO-PAGE SPREAD · 17 × 8.5 in trim (17.25 × 8.75 with bleed) · render landscape, 2:1
@@ -163,13 +163,13 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 8 — 8Spread 7 (pp. 16–17) · The dimensional-storage reveal
+## Scene 8 — Spread 7 (pp. 16–17) · The dimensional-storage reveal
 
 **Characters:** Nico, Sivi
 
 **Final image prompt**
 
-> Use the approved Trinkadoos STYLE REFERENCE for the visual style. Use ONLY the approved EVERYDAY CHARACTER REFERENCE sheet for Nico and Sivi — ordinary clothes, no costumes and no Packs; they have not found them yet. These control identity, clothing, hair, proportions and style. Do not redesign the characters. Only Nico and Sivi appear in this frame.
+> Use the approved Trinkadoos STYLE REFERENCE for the visual style. Use ONLY the approved EVERYDAY CHARACTER REFERENCE sheet for Nico and Sivi — ordinary clothes and no costumes. The children are not wearing Trinkadoos Packs; the Packs themselves appear and behave exactly as this scene describes. These control identity, clothing, hair, proportions and style. Do not redesign the characters. Only Nico and Sivi appear in this frame.
 > Nico holds his open Pack and peers down into it with his careful, thinking face — and the inside is impossibly deep and softly lit from within, receding far further than the Pack could possibly hold. It must read as depth and warm light, never as a dark hole. Beside him, Sivi has gone in head-first: her whole upper body has disappeared into her own Pack and only her legs and boots are left kicking in the air. Folded clothes are just visible far down inside the soft light. Curious, astonished, funny. This is the picture that has to sell the magic. Keep the stone wall on the upper left calm and simply lit — real rock, no glow, nothing happening in it. Compose as a two-page spread, 2:1 landscape. Keep faces, hands, important props and story action clear of the central vertical fold; background scenery may cross it naturally, and there must be no empty stripe down the middle. No text, letters, numbers or signage anywhere in the illustration.
 
 **Geometry:** TWO-PAGE SPREAD · 17 × 8.5 in trim (17.25 × 8.75 with bleed) · render landscape, 2:1
@@ -184,7 +184,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 9 — 9Spread 8 (pp. 18–19) · The costume reveal
+## Scene 9 — Spread 8 (pp. 18–19) · The costume reveal
 
 **Characters:** Bram, Tessa, Nico, Sivi
 
@@ -205,7 +205,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 10 — 10Spread 9 (pp. 20–21) · The call for help
+## Scene 10 — Spread 9 (pp. 20–21) · The call for help
 
 **Characters:** Bram, Tessa, Nico, Sivi, Zinumi
 
@@ -226,7 +226,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 11 — 11Spread 10 (pp. 22–23) · The glowing night
+## Scene 11 — Spread 10 (pp. 22–23) · The glowing night
 
 **Characters:** Bram, Tessa, Nico, Sivi
 
@@ -247,7 +247,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 12 — 12Spread 11 (pp. 24–25) · Tessa's first REVEAL
+## Scene 12 — Spread 11 (pp. 24–25) · Tessa's first REVEAL
 
 **Characters:** Bram, Tessa, Nico, Sivi
 
@@ -268,7 +268,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 13 — 13Spread 12 (pp. 26–27) · Three powers
+## Scene 13 — Spread 12 (pp. 26–27) · Three powers
 
 **Characters:** Bram, Tessa, Nico, Sivi
 
@@ -289,7 +289,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 14 — 14Spread 13 (pp. 28–29) · Bram and the tree
+## Scene 14 — Spread 13 (pp. 28–29) · Bram and the tree
 
 **Characters:** Bram, Tessa, Nico, Sivi
 
@@ -310,7 +310,7 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 15 — 15Spread 14 (pp. 30–31) · The Lantern Tree shines
+## Scene 15 — Spread 14 (pp. 30–31) · The Lantern Tree shines
 
 **Characters:** Bram, Tessa, Nico, Sivi
 
@@ -331,13 +331,13 @@ and must never be pasted into a video model. See `VIDEO-PROMPT-RULES.md`.
 
 ---
 
-## Scene 16 — 16Page 32 · Closer
+## Scene 16 — Page 32 · Closer
 
 **Characters:** Bram, Tessa, Nico, Sivi, Zinumi
 
 **Final image prompt**
 
-> Use the approved Trinkadoos STYLE REFERENCE for the visual style. Use ONLY the approved EVERYDAY CHARACTER REFERENCE sheet for Bram, Tessa, Nico and Sivi — ordinary clothes, no costumes and no Packs; they have not found them yet. Use Zinumi's own approved sheet for Zinumi. These control identity, clothing, hair, proportions and style. Do not redesign the characters.
+> Use the approved Trinkadoos STYLE REFERENCE for the visual style. Use ONLY the approved EVERYDAY CHARACTER REFERENCE sheet for Bram, Tessa, Nico and Sivi — ordinary clothes and no costumes. This is after the adventure: no child is wearing a Pack, and the Packs are stored in the chamber exactly as this scene describes. Use Zinumi's own approved sheet for Zinumi. These control identity, clothing, hair, proportions and style. Do not redesign the characters.
 > The four children are back outside in the ordinary park in ordinary daylight, in their everyday clothes again, standing close together and all talking at once — mouths open, hands going, everyone interrupting everyone. The picnic tables are still there in the middle distance and nothing about the park has changed. Behind them, in the shaded gap between the tree roots and the stone, the chamber is just visible: the four Packs are back in their stone hollows, sitting still with the glow completely gone, and a folded hood rests on the bench beside them where it was put away by hand — the outfits have been physically taken off and stored, never faded or vanished. Zinumi is barely visible in the leaves above and behind them, a small quiet presence nobody is looking at. Warm, buzzing, happy. Keep the upper sky above the trees broad and calm — real daylight sky and leaf edges. Compose as a single square page, 1:1. No text, letters, numbers or signage anywhere in the illustration.
 
 **Geometry:** SINGLE PAGE · 8.5 × 8.5 in trim (8.625 × 8.75 with bleed) · render square, 1:1
