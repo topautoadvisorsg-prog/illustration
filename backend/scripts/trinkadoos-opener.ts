@@ -24,7 +24,8 @@
  * books. Type, weights, capitalisation, tracking, rules, spacing, colour and
  * placement are locked here.
  *
- * Usage: tsx scripts/trinkadoos-opener.ts [bookNumber]      (default: 1)
+ * Usage: tsx scripts/trinkadoos-opener.ts [bookNumber] [artworkPath]
+ *        artworkPath omitted -> placeholder field, for judging type only.
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -84,12 +85,30 @@ export const OPENER = {
   scrim: 'rgba(28, 20, 10, 0.34)',
 } as const;
 
-function buildHtml(book: number, polyfill: string): string {
+/**
+ * The finished artwork, embedded rather than linked.
+ *
+ * `page.setContent` gives the document no base URL, so a relative src silently
+ * resolves to nothing and the page renders with a blank field -- which looks
+ * like a design decision rather than a missing file. Inlining it fails loudly
+ * instead, at read time.
+ */
+function artLayer(artPath?: string): string {
+  if (!artPath) {
+    return `<div class="art art-placeholder"></div>`;
+  }
+  const ext = artPath.toLowerCase().endsWith('.jpg') || artPath.toLowerCase().endsWith('.jpeg') ? 'jpeg' : 'png';
+  const data = readFileSync(artPath).toString('base64');
+  return `<div class="art" style="background-image:url(data:image/${ext};base64,${data})"></div>`;
+}
+
+function buildHtml(book: number, polyfill: string, artPath?: string): string {
   const [line1, line2] = TITLE_SPLITS[book]!;
   const chapter = `CHAPTER ${CHAPTER_WORD[book]}`;
   const font = readFileSync(FONT).toString('base64');
   const { pageWidthIn: W, pageHeightIn: H } = GEOMETRY;
   const O = OPENER;
+  const art = artLayer(artPath);
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face { font-family: "TrinkTitle"; src: url(data:font/ttf;base64,${font}) format("truetype"); font-weight: 400; }
@@ -98,10 +117,10 @@ function buildHtml(book: number, polyfill: string): string {
 html, body { margin: 0; padding: 0; }
 .page { position: relative; width: ${W}in; height: ${H}in; overflow: hidden; }
 
-/* ART PLACEHOLDER — stands in for the generated Page 3 opener illustration.
-   The real artwork arrives text-free and this lockup composites over it. */
-.art { position: absolute; inset: 0;
-       background:
+/* The finished, text-free opener illustration, full bleed. */
+.art { position: absolute; inset: 0; background-size: cover; background-position: center; }
+/* Placeholder only, used when no artwork has been supplied yet. */
+.art-placeholder { background:
          radial-gradient(120% 70% at 50% 92%, #6E8A52 0%, #55703F 42%, rgba(85,112,63,0) 72%),
          linear-gradient(180deg, #9EC4DC 0%, #BBD8E6 34%, #D8E6D2 62%, #7E9A5E 100%); }
 
@@ -127,7 +146,7 @@ html, body { margin: 0; padding: 0; }
         text-shadow: 0 0.010in 0.024in rgba(24,16,8,.5); }
 </style></head><body>
 <section class="page">
-  <div class="art"></div><div class="scrim"></div>
+  ${art}<div class="scrim"></div>
   <div class="lockup">
     <p class="t" id="l1">${line1}</p>
     <div class="chapline"><span class="rule"></span><span class="chap">${chapter}</span><span class="rule"></span></div>
@@ -168,9 +187,11 @@ async function main() {
   const dir = `${OUT_DIR.replace('07-INTERIORS', '09-OPENERS')}`;
   mkdirSync(dir, { recursive: true });
 
-  const html = buildHtml(book, await loadPagedPolyfill());
+  const artPath = process.argv[3];
+  const html = buildHtml(book, await loadPagedPolyfill(), artPath);
   const { buffer } = await renderHtmlToPdf(html, GEOMETRY);
-  const out = `${dir}/OPENER-${String(book).padStart(2, '0')}_TYPE-PROOF_placeholder-art.pdf`;
+  const suffix = artPath ? 'FINAL' : 'TYPE-PROOF_placeholder-art';
+  const out = `${dir}/OPENER-${String(book).padStart(2, '0')}_${suffix}.pdf`;
   writeFileSync(out, buffer);
 
   console.log(`book ${book}  ${spec.title}`);
@@ -178,7 +199,7 @@ async function main() {
   console.log(`  page    : ${GEOMETRY.pageWidthIn} x ${GEOMETRY.pageHeightIn} in  (trim ${TRIM.widthIn} x ${TRIM.heightIn})`);
   console.log(`  type    : EB Garamond (SIL OFL, vendored)`);
   console.log(`  proof   : ${out}`);
-  console.log('  artwork : PLACEHOLDER — the real opener illustration is generated text-free and composited under this lockup');
+  console.log(`  artwork : ${artPath ?? 'PLACEHOLDER — supply the text-free Page 3 render as argv[3]'}`);
 }
 
 await main();
