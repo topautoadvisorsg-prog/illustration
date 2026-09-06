@@ -211,6 +211,39 @@ For every scene, output:
 
 ---
 
+## Geometry and the composition blueprint
+
+Dimensions come from `backend/scripts/trinkadoos-config.ts`, which is the production source of
+truth. Nothing here invents a measurement.
+
+| Unit | Trim | With bleed | Render at |
+| --- | --- | --- | --- |
+| Single page (p. 3 opener, p. 32 closer) | 8.5 × 8.5 in | 8.625 × 8.75 | **1:1 square** |
+| Two-page spread (Spreads 1–14) | 17 × 8.5 in | 17.25 × 8.75 | **2:1 landscape** |
+
+The prompt uses the closest appropriate aspect ratio; the layout layer keeps the exact trim, bleed
+and gutter. Fourteen of the sixteen units in a book are spreads, so 2:1 is the normal case.
+
+**Every scene declares four fields before it is rendered:**
+
+- **Geometry** — single page or spread, and the ratio to render at.
+- **Important art region** — where the characters and the story action belong.
+- **Text / parchment safe region** — where the parchment and story text will be placed afterwards,
+  with an approximate usable size. No face, hand, important prop or story action sits behind it.
+- **Fold protection** — spreads only.
+
+**The safe region is deliberately not the same place in every scene.** What is consistent is the
+system, not the coordinate: each composition reserves the area its own staging can spare — upper
+left in one, upper right in another, a full-width band in a third. Forcing one universal location
+would fight the picture instead of serving it.
+
+**Fold protection, on spreads.** The centre of the image falls into the binding. Keep faces, hands,
+important props and story action clear of the central vertical fold. Background scenery — a trunk,
+a wall, a canopy, a stream — **may cross it naturally, and should.** Do not leave an empty stripe
+down the middle; that is a worse defect than the one it avoids.
+
+---
+
 ## Which character reference to attach — wardrobe state
 
 There are two wardrobe states and the wrong sheet puts the children in the wrong clothes.
