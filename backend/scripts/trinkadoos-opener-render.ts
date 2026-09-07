@@ -61,21 +61,28 @@ const SCENE =
   'upper 38% of the frame. Compose as a single square page, 1:1.';
 
 /**
- * A small CARVED WOODEN SIGN, not cloth.
+ * A small PLAIN carved wooden sign, not cloth and not decorated.
  *
- * The first pass came back as a sagging fabric banner on a rope. Fabric reads
- * as bunting -- a party decoration -- and it drifts in the wind of whatever the
+ * The first pass came back as a sagging fabric banner on a rope. Fabric reads as
+ * bunting -- a party decoration -- and it drifts in the wind of whatever the
  * model feels like. Wood is an object: it holds an edge, takes carved lettering,
- * and sits in a forest without explanation. Every negative here is a mistake the
- * model has already made once.
+ * and sits in a forest without explanation.
+ *
+ * The second pass added carved scrollwork at both ends, and it looked good --
+ * once. Generated ornament is different every render, so across ten books it
+ * would be ten different signs wearing the same name. The surface is now
+ * deliberately bare: a plain plank is the only version of this that repeats.
+ * Every negative below names something a render has actually produced.
  */
 const BANNER_ART =
-  'At the very top of the illustration, painted as a real object in the scene: a SMALL CARVED ' +
-  'WOODEN SIGN — a hand-made storybook plaque of warm honey-toned wood with visible grain, softly ' +
-  'rounded and slightly worn edges, a simple carved border, and small iron hooks or short ropes ' +
-  'holding it from a branch above. Solid wood, not cloth, NOT fabric, NOT a ribbon, NOT canvas, ' +
-  'NOT a hanging parchment banner and NOT bunting. It catches the same warm daylight as the ' +
-  'canopy, casts a soft shadow, and sits naturally among the leaves as part of the painting.';
+  'At the very top of the illustration, painted as a real object in the scene: a SMALL PLAIN ' +
+  'CARVED WOODEN SIGN — a hand-made storybook plaque of warm honey-toned wood with visible grain, ' +
+  'softly rounded and slightly worn edges, hung from a branch above on two short ropes. Solid ' +
+  'wood, not cloth, NOT fabric, NOT a ribbon, NOT canvas, NOT a hanging parchment banner and NOT ' +
+  'bunting. The wood surface is PLAIN: no scrollwork, no flourishes, no filigree, no decorative ' +
+  'carving, no burned-in ornament, no corner motifs and no border pattern of any kind. Nothing is ' +
+  'on the wood except the chapter words. It catches the same warm daylight as the canopy, casts a ' +
+  'soft shadow, and sits naturally among the leaves as part of the painting.';
 
 /**
  * Lettering, not type.
