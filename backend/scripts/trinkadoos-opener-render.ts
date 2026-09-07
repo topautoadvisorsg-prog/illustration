@@ -60,14 +60,36 @@ const SCENE =
   'focus, no clear faces. No magic anywhere in the scene. Keep the children\u2019s heads below the ' +
   'upper 38% of the frame. Compose as a single square page, 1:1.';
 
-/** The banner as a painted object, not an overlay. Shared by both variants. */
+/**
+ * A small CARVED WOODEN SIGN, not cloth.
+ *
+ * The first pass came back as a sagging fabric banner on a rope. Fabric reads
+ * as bunting -- a party decoration -- and it drifts in the wind of whatever the
+ * model feels like. Wood is an object: it holds an edge, takes carved lettering,
+ * and sits in a forest without explanation. Every negative here is a mistake the
+ * model has already made once.
+ */
 const BANNER_ART =
-  'At the top of the illustration, painted as a real object in the scene and not as a flat ' +
-  'graphic overlay: an elegant hand-crafted storybook banner — aged parchment or soft cloth with ' +
-  'gently curled swallowtail ends and a fine gold-brown border — hanging in the open sky between ' +
-  'the tree canopy. It must be part of the painting: lit by the same warm daylight, with soft ' +
-  'shadow, subtle texture and a little natural sag, so it belongs in the world rather than sitting ' +
-  'on top of it.';
+  'At the very top of the illustration, painted as a real object in the scene: a SMALL CARVED ' +
+  'WOODEN SIGN — a hand-made storybook plaque of warm honey-toned wood with visible grain, softly ' +
+  'rounded and slightly worn edges, a simple carved border, and small iron hooks or short ropes ' +
+  'holding it from a branch above. Solid wood, not cloth, NOT fabric, NOT a ribbon, NOT canvas, ' +
+  'NOT a hanging parchment banner and NOT bunting. It catches the same warm daylight as the ' +
+  'canopy, casts a soft shadow, and sits naturally among the leaves as part of the painting.';
+
+/**
+ * Lettering, not type.
+ *
+ * The second thing that went wrong: the title read as a font dropped on the page.
+ * What a premium picture book actually has is lettering the illustrator drew --
+ * warm, slightly irregular, with weight and light on it.
+ */
+const LETTERING =
+  'All lettering must look HAND-LETTERED BY THE ILLUSTRATOR — custom storybook display lettering ' +
+  'with soft rounded serifs, gentle organic variation in the stroke weights, and a little warmth ' +
+  'and irregularity in the letterforms. Elegant, whimsical, child-friendly and highly readable. ' +
+  'It must NOT look like a plain system font, a typewriter face, flat digital text or clip-art ' +
+  'lettering pasted over the picture.';
 
 function prompt(variant: 'painted' | 'blank', book: number): string {
   const [l1, l2] = TITLE_SPLITS[book]!;
@@ -76,11 +98,13 @@ function prompt(variant: 'painted' | 'blank', book: number): string {
     return [
       SCENE,
       BANNER_ART,
-      `Lettered on the banner, centred, in an elegant classical serif with generous letter spacing: ` +
-        `"${chapter}". Below the banner, across the open sky and clear of the children, the book ` +
-        `title in the same elegant classical serif, warm ivory with a soft shadow, on exactly two ` +
-        `centred lines: "${l1}" on the first line and "${l2}" on the second. Spell every word ` +
-        `exactly as given. No other text, letters or numbers anywhere in the illustration.`,
+      LETTERING,
+      `Carved or hand-painted into the wooden sign, centred, in a warm dark brown: "${chapter}". ` +
+        `Below the sign, across the open sky and clear of the children, the book title on exactly ` +
+        `two centred lines — "${l1}" on the first line and "${l2}" on the second — in creamy ivory ` +
+        `hand-lettering with a soft darker outline and a gentle glow so it reads clearly against ` +
+        `the sky and feels painted into the scene. Spell every word exactly as given. No other ` +
+        `text, letters or numbers anywhere in the illustration.`,
     ].join(' ');
   }
   return [
