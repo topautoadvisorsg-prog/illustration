@@ -16,16 +16,48 @@
  * Usage: tsx scripts/trinkadoos-render.ts <sceneNumber>
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { generateImageFromBlueprint, type ImageSize } from '../src/services/openai/openai.js';
+import { existsSync } from 'node:fs';
+import { generateImageFromBlueprint, assertRenderableSize, type ImageSize } from '../src/services/openai/openai.js';
 import { BOOK } from './trinkadoos-config.js';
 
 const PROMPTS = `${BOOK}/08-VIDEO-LAYER/BOOK-01-IMAGE-PROMPTS.md`;
 const REFS = 'C:/Users/jovan/Downloads/wildlands agents platform/docs/trinkadoos/references/characters';
 const OUT = `${BOOK}/10-ARTWORK`;
 
-/** Which sheet each scene attaches. Single page renders square; spreads render 2:1. */
+/**
+ * Reference sheets and output size per scene.
+ *
+ * Single pages render 1024x1024; spreads render 2048x1024, which is a TRUE 2:1 --
+ * both edges multiples of 16, ratio well inside the 3:1 limit. gpt-image-2 takes
+ * custom resolutions, so there is no reason to render 1.5:1 and crop away a third
+ * of the height of a composition that was designed for the full width.
+ *
+ * Scenes carrying two sheets send two. They are never merged into one composite
+ * first: a stitched sheet is a picture of neither character.
+ */
+const E = `${REFS}/everyday`;
+const M = `${REFS}/magical`;
+const Z = `${REFS}/zinumi-fairy.png`;
+const SQUARE: ImageSize = '1024x1024';
+const SPREAD: ImageSize = '2048x1024';
+
 const SCENE_REFS: Record<number, { refs: string[]; size: ImageSize }> = {
-  1: { refs: [`${REFS}/everyday/four-children-everyday.png`], size: '1024x1024' },
+  1:  { refs: [`${E}/four-children-everyday.png`], size: SQUARE },
+  2:  { refs: [`${E}/four-children-everyday.png`, Z], size: SPREAD },
+  3:  { refs: [`${E}/four-children-everyday.png`, Z], size: SPREAD },
+  4:  { refs: [`${E}/four-children-everyday.png`, Z], size: SPREAD },
+  5:  { refs: [`${E}/four-children-everyday.png`, Z], size: SPREAD },
+  6:  { refs: [`${E}/four-children-everyday.png`], size: SPREAD },
+  7:  { refs: [`${E}/four-children-everyday.png`], size: SPREAD },
+  8:  { refs: [`${E}/nico-everyday.png`, `${E}/sivi-everyday.png`], size: SPREAD },
+  9:  { refs: [`${E}/four-children-everyday.png`, `${M}/four-children-magical.png`], size: SPREAD },
+  10: { refs: [`${M}/four-children-magical.png`, Z], size: SPREAD },
+  11: { refs: [`${M}/four-children-magical.png`], size: SPREAD },
+  12: { refs: [`${M}/four-children-magical.png`], size: SPREAD },
+  13: { refs: [`${M}/four-children-magical.png`], size: SPREAD },
+  14: { refs: [`${M}/four-children-magical.png`], size: SPREAD },
+  15: { refs: [`${M}/four-children-magical.png`], size: SPREAD },
+  16: { refs: [`${E}/four-children-everyday.png`, Z], size: SQUARE },
 };
 
 /** Pulls the reviewed prompt for a scene straight out of the committed file. */
@@ -45,21 +77,21 @@ function promptForScene(scene: number): { title: string; prompt: string } {
 async function main() {
   const scene = Number(process.argv[2]);
   const cfg = SCENE_REFS[scene];
-  if (!cfg) throw new Error(`Scene ${scene} has no reference mapping yet. Only Scene 1 is wired.`);
+  if (!cfg) throw new Error(`Scene ${scene} has no reference mapping`);
 
   const { title, prompt } = promptForScene(scene);
-  // The edit endpoint takes one image. All four children are on the group sheet,
-  // which is why the checklist prefers it wherever the whole cast is in frame.
-  if (cfg.refs.length !== 1) throw new Error('the edit endpoint takes exactly one reference image');
-  const reference = readFileSync(cfg.refs[0]!);
+  assertRenderableSize(cfg.size);
+  const missing = cfg.refs.filter((r) => !existsSync(r));
+  if (missing.length) throw new Error(`missing reference(s): ${missing.join(', ')}`);
+  const references = cfg.refs.map((r) => readFileSync(r));
 
   console.log(`scene ${scene} — ${title}`);
-  console.log(`  reference : ${cfg.refs[0]!.split('/').pop()}`);
+  console.log(`  reference : ${cfg.refs.map((r) => r.split('/').pop()).join(' + ')}`);
   console.log(`  size      : ${cfg.size}`);
   console.log(`  prompt    : ${prompt.length} chars, read from the committed prompt set`);
   console.log('  calling gpt-image-2 ...');
 
-  const image = await generateImageFromBlueprint({ prompt, blueprintPng: reference, size: cfg.size });
+  const image = await generateImageFromBlueprint({ prompt, blueprintPng: references, size: cfg.size });
 
   mkdirSync(OUT, { recursive: true });
   const out = `${OUT}/scene-${String(scene).padStart(2, '0')}_artwork-textfree.png`;

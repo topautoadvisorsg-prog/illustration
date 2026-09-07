@@ -30,7 +30,15 @@ function getClient(): OpenAI {
 }
 
 /** gpt-image-2 sizes. Book pages are portrait, so 1024x1536 is the default. */
-export type ImageSize = '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+/**
+ * Named sizes the SDK's type union knows about, plus any exact `WxH` the endpoint
+ * accepts. gpt-image-2 takes custom resolutions -- both edges a multiple of 16,
+ * long:short no wider than 3:1 -- and the installed SDK types (4.104.0) predate
+ * that, listing only the fixed union. The call site already casts its params, so
+ * a custom size reaches the endpoint unchanged; widening here just stops the
+ * type system from being the thing that forbids it.
+ */
+export type ImageSize = '1024x1024' | '1024x1536' | '1536x1024' | 'auto' | (string & {});
 export type ImageQuality = 'low' | 'medium' | 'high' | 'auto';
 
 export interface GenerateImageInput {
@@ -53,10 +61,23 @@ function sizeToPixels(size: ImageSize): { widthPx: number; heightPx: number } {
   return { widthPx: w ?? 1024, heightPx: h ?? 1536 };
 }
 
+/** Fails before spending rather than after: both edges /16, ratio within 3:1. */
+export function assertRenderableSize(size: ImageSize): void {
+  if (size === 'auto') return;
+  const m = /^(\d+)x(\d+)$/.exec(size);
+  if (!m) throw new Error(`size must be "WxH" or "auto", got "${size}"`);
+  const w = Number(m[1]);
+  const h = Number(m[2]);
+  if (w % 16 || h % 16) throw new Error(`both edges must be multiples of 16: ${size}`);
+  const ratio = Math.max(w, h) / Math.min(w, h);
+  if (ratio > 3) throw new Error(`long:short must not exceed 3:1, got ${ratio.toFixed(2)}:1`);
+}
+
 export async function generateImage(input: GenerateImageInput): Promise<GeneratedImage> {
   const env = getEnv();
   const openai = getClient();
   const size: ImageSize = input.size ?? '1024x1536';
+  assertRenderableSize(size);
   const quality: ImageQuality = input.quality ?? 'high';
 
   // gpt-image-2 sizes/quality differ from the DALL-E type union; cast the params.
@@ -80,8 +101,15 @@ export async function generateImage(input: GenerateImageInput): Promise<Generate
 
 export interface GenerateFromBlueprintInput {
   prompt: string;
-  /** PNG of the layout blueprint (composition map) handed to the model as a reference. */
-  blueprintPng: Buffer;
+  /**
+   * Reference PNG(s) handed to the model.
+   *
+   * An array is passed straight through: the edits endpoint takes up to 16 images
+   * for gpt-image models, and a scene that needs the group sheet AND Zinumi has to
+   * send both. Merging them into one composite sheet first would hand the model a
+   * picture that is not what either character looks like.
+   */
+  blueprintPng: Buffer | Buffer[];
   size?: ImageSize;
   /**
    * Optional PNG mask, same dimensions as the reference image. TRANSPARENT pixels
@@ -106,7 +134,14 @@ export async function generateImageFromBlueprint(input: GenerateFromBlueprintInp
   const env = getEnv();
   const openai = getClient();
   const size: ImageSize = input.size ?? '1024x1536';
-  const imageFile = await toFile(input.blueprintPng, 'blueprint.png', { type: 'image/png' });
+  assertRenderableSize(size);
+  const buffers = Array.isArray(input.blueprintPng) ? input.blueprintPng : [input.blueprintPng];
+  if (buffers.length === 0) throw new Error('at least one reference image is required');
+  if (buffers.length > 16) throw new Error(`the edits endpoint takes at most 16 images, got ${buffers.length}`);
+  const files = await Promise.all(
+    buffers.map((b, i) => toFile(b, `reference-${i + 1}.png`, { type: 'image/png' })),
+  );
+  const imageFile = files.length === 1 ? files[0]! : files;
   const maskFile = input.maskPng
     ? await toFile(input.maskPng, 'mask.png', { type: 'image/png' })
     : undefined;
