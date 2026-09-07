@@ -13,20 +13,25 @@ This changes nothing about normal story prose or the other fifteen scenes.
 ## The structure — this is the template
 
 ```
-        TITLE LINE 1
-    ——  CHAPTER <NUMBER>  ——
-        TITLE LINE 2
+      [ banner ribbon:  Chapter <Number> ]
+
+              TITLE LINE 1
+              TITLE LINE 2
+
+      ( illustration, full bleed, behind all of it )
 ```
 
-One title line above, the chapter label between, one title line below. **Never** two above and one
-below, never one above and two below, never three title lines, never a different hierarchy.
+The chapter label lives in a **decorative banner at the top and nowhere else**. It is never placed
+between the title lines. The title sits below the banner, centred, **exactly one line above and one
+line below** — never three lines, never a different hierarchy.
 
 ## Book 1
 
 ```
-THE LANTERN TREE
-—— CHAPTER ONE ——
-WENT DARK
+[ Chapter One ]
+
+The Lantern Tree
+Went Dark
 ```
 
 ## Locked type
@@ -35,16 +40,15 @@ WENT DARK
 | --- | --- |
 | Face | **EB Garamond**, static TTF vendored at `backend/assets/fonts/ttf/eb-garamond-normal.ttf` |
 | Licence | SIL Open Font Licence — safe for commercial print |
-| Title lines | all caps, tracking **0.055 em**, line-height 1.06 |
+| Title lines | title case, tracking **0.055 em**, line-height 1.14 |
 | Title size | largest whole point in **30–44 pt** at which **both** lines clear the measure; both lines always share one size |
-| Chapter label | all caps, **13 pt**, tracking **0.34 em** |
-| Rules | hairline, **0.85 in** each side of the label, 55% opacity |
-| Gap, title to rule line | **0.30 in** above and below |
-| Ink | `#F7EFDF` warm ivory, with a soft drop shadow |
-| Scrim | feathered radial `rgba(28,20,10,0.34)` → transparent behind the lockup |
+| Chapter label | title case, **13 pt**, tracking **0.22 em**, ink `#4A2E14` |
+| Banner | swallowtail ribbon, **3.6 × 0.62 in**, parchment `#F3E6CB`, gold-brown edge `#B0854A`, a small diamond either side of the label |
+| Title ink | `#F9F2E2` warm ivory, with a soft drop shadow |
+| Wash | vertical gradient over the top **42%** only, `rgba(26,18,9,.42)` → transparent |
 
-**Why the scrim is part of the treatment, not a patch.** One ink colour has to stay legible over a
-bright daylight sky in Book 1 and a night forest in Book 4. The scrim is what makes a single locked
+**Why the wash is part of the treatment, not a patch.** One ink colour has to stay legible over a
+bright daylight sky in Book 1 and a night forest in Book 4. The wash is what makes a single locked
 colour possible; without it, colour would have to change per book and the series would stop looking
 like one series.
 
@@ -54,11 +58,12 @@ like one series.
 | --- | --- |
 | Page | single page, 8.5 × 8.5 in trim · 8.625 × 8.75 with bleed |
 | Measure | **6.5 in** — the widest a title line may run |
-| Lockup centre | **33%** of trim height, horizontally centred |
-| Art below | the opener illustration occupies the rest of the page, staged as the Page 3 blueprint already describes |
+| Banner centre | **10.5%** of trim height, horizontally centred |
+| Title block centre | **25%** of trim height, horizontally centred |
+| Art | full bleed, running behind the entire opener including the banner |
 
-The Page 3 blueprint already reserves its upper band as the text-safe region, so **no scene change
-was needed** — that reserved area is exactly where this lockup lands.
+The banner and title occupy roughly the top third, which is exactly the region the Page 3 blueprint
+already reserves, so **no scene change was needed**.
 
 ## Declared title splits — never auto-wrapped
 
@@ -66,18 +71,18 @@ Automatic wrapping is what turns one line into two on a longer title and silentl
 hierarchy. Every split is declared in `TITLE_SPLITS` in `trinkadoos-opener.ts` and each break falls
 at a grammatical joint so the line reads as a phrase, not a truncation.
 
-| Book | Line 1 | Line 2 | Fits at |
-| --- | --- | --- | --- |
-| 1 | THE LANTERN TREE | WENT DARK | 43 pt |
-| 2 | THE BABY DRAGON | OF CLOUDSTONE | 44 pt |
-| 3 | THE FOREST THAT | LOST ITS COLORS | 44 pt |
-| 4 | THE MOON FOX | WHO LOST HIS WAY | 44 pt |
-| 5 | THE VALLEY OF | GIANT FLOWERS | 44 pt |
-| 6 | THE BRIDGE THAT FORGOT | HOW TO BUILD ITSELF | 32 pt |
-| 7 | THE FIREFLY FESTIVAL | THAT LOST ITS SPARK | 39 pt |
-| 8 | THE CREATURE WHO | DIDN'T WANT TO BE SEEN | 34 pt |
-| 9 | THE DOOR BENEATH | THE GLOWING WATERFALL | 32 pt |
-| 10 | THE CITY BENEATH | THE GIANT LEAF | 44 pt |
+| Book | Line 1 | Line 2 |
+| --- | --- | --- |
+| 1 | The Lantern Tree | Went Dark |
+| 2 | The Baby Dragon | of Cloudstone |
+| 3 | The Forest That | Lost Its Colors |
+| 4 | The Moon Fox | Who Lost His Way |
+| 5 | The Valley of | Giant Flowers |
+| 6 | The Bridge That Forgot | How to Build Itself |
+| 7 | The Firefly Festival | That Lost Its Spark |
+| 8 | The Creature Who | Didn't Want to Be Seen |
+| 9 | The Door Beneath | The Glowing Waterfall |
+| 10 | The City Beneath | The Giant Leaf |
 
 Measured from the real font metrics against the 6.5 in measure. **All ten fit**; the tightest are
 Books 6 and 9 at 32 pt, against a floor of 30 pt — two points of headroom.
@@ -91,12 +96,15 @@ Books 6 and 9 at 32 pt, against a floor of 30 pt — two points of headroom.
 **May not change:** face, weight, capitalisation, tracking, the chapter-label style, the rules,
 alignment, line spacing, the gaps, ink colour, shadow, scrim, measure, or lockup placement.
 
-## One open decision
+## Size rule — decided, do not revisit
 
-Title size currently **fits to the measure**, so it varies 32–44 pt across the series. That is what
-keeps the two-line structure intact on long titles, and it is what you authorised — *"adjust the
-size of both title lines within the approved allowable range so the structure survives."*
+Title size **fits to the measure**, varying within **30–44 pt** so the declared two-line split always
+survives. Both lines of a given opener always share one size. Owner-approved 2026-09-06.
 
-The alternative is locking **one** size for all ten — 32 pt, the size Books 6 and 9 force — so every
-opener is literally identical in scale. The cost is that short titles like *WENT DARK* sit small on
-the page. Fit-to-measure is built; say the word if you want the fixed size instead.
+## What the approved reference still has to settle
+
+The structure above is locked by written direction. The **decorative treatment of the banner** —
+its exact shape, ornament and colour — is drawn here from the franchise's own visual language: the
+parchment field, gold-brown rule and small diamond ornament used on the approved character sheets.
+The approved opener reference did not arrive with the brief, so **treat the ribbon artwork as a
+first pass to be corrected**, not as locked. Structure, type, placement and the size rule are locked.

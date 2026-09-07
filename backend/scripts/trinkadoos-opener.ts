@@ -10,12 +10,13 @@
  *
  * THE STRUCTURE IS THE TEMPLATE. Every opener in the series is:
  *
- *     TITLE LINE 1
- *     — CHAPTER <NUMBER> —
- *     TITLE LINE 2
+ *     [ banner ribbon:  Chapter <Number> ]
+ *          TITLE LINE 1
+ *          TITLE LINE 2
  *
- * One line above, the chapter label between, one line below. Never two above
- * and one below, never three title lines. The split is DECLARED per book in
+ * The chapter label lives in a decorative banner at the TOP and never between
+ * the title lines. The title sits below it, two lines, and the illustration
+ * runs full bleed behind the whole opener area. The split is DECLARED per book in
  * TITLE_SPLITS below and never left to automatic wrapping, because a wrap that
  * reflows on a longer title silently changes the hierarchy and the series stops
  * looking like one series.
@@ -45,7 +46,7 @@ import { GEOMETRY, OUT_DIR, TITLES, TRIM } from './trinkadoos-config.js';
 const FONT = resolve('assets/fonts/ttf/eb-garamond-normal.ttf');
 
 /** Roman numeral-free, spelled out, because it is read aloud to a four-year-old. */
-const CHAPTER_WORD = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN'];
+const CHAPTER_WORD = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 
 /**
  * The declared split for every title. Two lines, always.
@@ -55,33 +56,39 @@ const CHAPTER_WORD = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN',
  * and not yet approved — nothing renders them until they are.
  */
 export const TITLE_SPLITS: Record<number, [string, string]> = {
-  1: ['THE LANTERN TREE', 'WENT DARK'],
-  2: ['THE BABY DRAGON', 'OF CLOUDSTONE'],
-  3: ['THE FOREST THAT', 'LOST ITS COLORS'],
-  4: ['THE MOON FOX', 'WHO LOST HIS WAY'],
-  5: ['THE VALLEY OF', 'GIANT FLOWERS'],
-  6: ['THE BRIDGE THAT FORGOT', 'HOW TO BUILD ITSELF'],
-  7: ['THE FIREFLY FESTIVAL', 'THAT LOST ITS SPARK'],
-  8: ['THE CREATURE WHO', "DIDN'T WANT TO BE SEEN"],
-  9: ['THE DOOR BENEATH', 'THE GLOWING WATERFALL'],
-  10: ['THE CITY BENEATH', 'THE GIANT LEAF'],
+  1: ['The Lantern Tree', 'Went Dark'],
+  2: ['The Baby Dragon', 'of Cloudstone'],
+  3: ['The Forest That', 'Lost Its Colors'],
+  4: ['The Moon Fox', 'Who Lost His Way'],
+  5: ['The Valley of', 'Giant Flowers'],
+  6: ['The Bridge That Forgot', 'How to Build Itself'],
+  7: ['The Firefly Festival', 'That Lost Its Spark'],
+  8: ['The Creature Who', "Didn't Want to Be Seen"],
+  9: ['The Door Beneath', 'The Glowing Waterfall'],
+  10: ['The City Beneath', 'The Giant Leaf'],
 };
 
 /** Locked measurements. Inches unless stated. */
 export const OPENER = {
   /** Widest the title may run. Leaves generous air inside the 8.5 in trim. */
   measureIn: 6.5,
-  /** Vertical centre of the lockup, as a fraction of trim height. */
-  centreY: 0.33,
+  /** Vertical centre of the BANNER, as a fraction of trim height. */
+  bannerCentreY: 0.105,
+  bannerWIn: 3.6,
+  bannerHIn: 0.62,
+  /** Vertical centre of the two-line title block. */
+  titleCentreY: 0.25,
   /** Both title lines share one size: the largest in this range that fits BOTH. */
   titlePtRange: [30, 44] as const,
   titleTracking: 0.055,
   chapterPt: 13,
-  chapterTracking: 0.34,
-  /** Hairline rules either side of the chapter label. */
-  ruleIn: 0.85,
-  gapTitleToRuleIn: 0.3,
-  ink: '#F7EFDF',
+  chapterTracking: 0.22,
+  /** Line gap inside the two-line title block. */
+  titleLeading: 1.14,
+  ink: '#F9F2E2',
+  bannerFill: '#F3E6CB',
+  bannerEdge: '#B0854A',
+  bannerInk: '#4A2E14',
   scrim: 'rgba(28, 20, 10, 0.34)',
 } as const;
 
@@ -104,7 +111,7 @@ function artLayer(artPath?: string): string {
 
 function buildHtml(book: number, polyfill: string, artPath?: string): string {
   const [line1, line2] = TITLE_SPLITS[book]!;
-  const chapter = `CHAPTER ${CHAPTER_WORD[book]}`;
+  const chapter = `Chapter ${CHAPTER_WORD[book]}`;
   const font = readFileSync(FONT).toString('base64');
   const { pageWidthIn: W, pageHeightIn: H } = GEOMETRY;
   const O = OPENER;
@@ -115,51 +122,68 @@ function buildHtml(book: number, polyfill: string, artPath?: string): string {
 @page { size: ${W}in ${H}in; margin: 0; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-.page { position: relative; width: ${W}in; height: ${H}in; overflow: hidden; }
+.page { position: relative; width: ${W}in; height: ${H}in; overflow: hidden;
+        font-family: "TrinkTitle", Garamond, serif; }
 
-/* The finished, text-free opener illustration, full bleed. */
+/* The finished, text-free opener illustration, full bleed behind everything. */
 .art { position: absolute; inset: 0; background-size: cover; background-position: center; }
-/* Placeholder only, used when no artwork has been supplied yet. */
 .art-placeholder { background:
          radial-gradient(120% 70% at 50% 92%, #6E8A52 0%, #55703F 42%, rgba(85,112,63,0) 72%),
          linear-gradient(180deg, #9EC4DC 0%, #BBD8E6 34%, #D8E6D2 62%, #7E9A5E 100%); }
 
-/* Soft feathered scrim, part of the locked treatment: it is what lets one ink
-   colour stay legible over a bright daylight sky and a night forest alike. */
-.scrim { position: absolute; left: 50%; top: ${(O.centreY * 100).toFixed(2)}%;
-         transform: translate(-50%, -50%);
-         width: ${O.measureIn + 1.6}in; height: 3.1in;
-         background: radial-gradient(ellipse at center, ${O.scrim} 0%, rgba(28,20,10,0.18) 46%, rgba(28,20,10,0) 74%); }
+/* A soft wash across the opener text area only. It is what lets one ink colour
+   stay legible over a bright daylight sky and a night forest alike, so the
+   colour treatment can stay locked across the series. */
+.wash { position: absolute; left: 0; right: 0; top: 0; height: 42%;
+        background: linear-gradient(180deg, rgba(26,18,9,.42) 0%, rgba(26,18,9,.26) 52%, rgba(26,18,9,0) 100%); }
 
-.lockup { position: absolute; left: 50%; top: ${(O.centreY * 100).toFixed(2)}%;
-          transform: translate(-50%, -50%);
-          width: ${O.measureIn}in; text-align: center;
-          font-family: "TrinkTitle", Garamond, serif; color: ${O.ink}; }
-.t { margin: 0; white-space: nowrap; text-transform: uppercase;
-     letter-spacing: ${O.titleTracking}em; line-height: 1.06;
-     text-shadow: 0 0.012in 0.03in rgba(24,16,8,.55); }
-.chapline { display: flex; align-items: center; justify-content: center; gap: .16in;
-            margin: ${O.gapTitleToRuleIn}in 0; }
-.rule { width: ${O.ruleIn}in; height: 1px; background: ${O.ink}; opacity: .55; }
-.chap { font-size: ${O.chapterPt}pt; letter-spacing: ${O.chapterTracking}em;
-        text-transform: uppercase; white-space: nowrap; text-indent: ${O.chapterTracking}em;
-        text-shadow: 0 0.010in 0.024in rgba(24,16,8,.5); }
+/* Banner: the chapter label lives here and only here. */
+.banner { position: absolute; left: 50%; top: ${(O.bannerCentreY * 100).toFixed(2)}%;
+          transform: translate(-50%, -50%); width: ${O.bannerWIn}in; height: ${O.bannerHIn}in; }
+.banner svg { display: block; width: 100%; height: 100%; }
+.banner .label { font-family: "TrinkTitle", Garamond, serif; font-size: ${O.chapterPt}pt;
+                 letter-spacing: ${O.chapterTracking}em; fill: ${O.bannerInk}; }
+
+/* Two-line title, below the banner. Both lines always share one size. */
+.title { position: absolute; left: 50%; top: ${(O.titleCentreY * 100).toFixed(2)}%;
+         transform: translate(-50%, -50%); width: ${O.measureIn}in;
+         text-align: center; color: ${O.ink}; }
+.t { margin: 0; white-space: nowrap; letter-spacing: ${O.titleTracking}em;
+     line-height: ${O.titleLeading}; text-shadow: 0 0.014in 0.036in rgba(22,14,6,.62); }
 </style></head><body>
 <section class="page">
-  ${art}<div class="scrim"></div>
-  <div class="lockup">
+  ${art}
+  <div class="wash"></div>
+
+  <div class="banner">
+    <svg viewBox="0 0 720 124" xmlns="http://www.w3.org/2000/svg">
+      <!-- swallowtail ribbon: notched ends, soft parchment field, thin gold edge -->
+      <path d="M0 18 L84 18 L64 62 L84 106 L0 106 Z" fill="${O.bannerEdge}" opacity=".72"/>
+      <path d="M720 18 L636 18 L656 62 L636 106 L720 106 Z" fill="${O.bannerEdge}" opacity=".72"/>
+      <rect x="62" y="6" width="596" height="112" rx="12" fill="${O.bannerFill}"/>
+      <rect x="62" y="6" width="596" height="112" rx="12" fill="none"
+            stroke="${O.bannerEdge}" stroke-width="3"/>
+      <rect x="72" y="16" width="576" height="92" rx="8" fill="none"
+            stroke="${O.bannerEdge}" stroke-width="1" opacity=".55"/>
+      <text class="label" x="360" y="72" text-anchor="middle">${chapter}</text>
+      <g fill="${O.bannerEdge}" opacity=".85">
+        <path d="M126 62 l7-7 7 7 -7 7 z"/>
+        <path d="M580 62 l7-7 7 7 -7 7 z"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="title">
     <p class="t" id="l1">${line1}</p>
-    <div class="chapline"><span class="rule"></span><span class="chap">${chapter}</span><span class="rule"></span></div>
     <p class="t" id="l2">${line2}</p>
   </div>
 </section>
 <script>
 /* Deterministic fit: the largest whole point size in the approved range at
    which BOTH title lines clear the measure. Both lines always share it, so the
-   hierarchy never drifts between a short title and a long one. Book 6 is the
-   long one that sets the floor. */
+   hierarchy never drifts between a short title and a long one. */
 (function () {
-  var box = document.querySelector('.lockup');
+  var box = document.querySelector('.title');
   var l1 = document.getElementById('l1'), l2 = document.getElementById('l2');
   var max = box.clientWidth, chosen = ${O.titlePtRange[0]};
   for (var pt = ${O.titlePtRange[1]}; pt >= ${O.titlePtRange[0]}; pt--) {
@@ -167,7 +191,6 @@ html, body { margin: 0; padding: 0; }
     if (l1.scrollWidth <= max && l2.scrollWidth <= max) { chosen = pt; break; }
   }
   l1.style.fontSize = l2.style.fontSize = chosen + 'pt';
-  document.title = 'fit:' + chosen;
 })();
 </script>
 <script>${polyfill}</script>
@@ -195,7 +218,7 @@ async function main() {
   writeFileSync(out, buffer);
 
   console.log(`book ${book}  ${spec.title}`);
-  console.log(`  split   : "${l1}" / CHAPTER ${CHAPTER_WORD[book]} / "${l2}"`);
+  console.log(`  split   : "${l1}" / Chapter ${CHAPTER_WORD[book]} / "${l2}"`);
   console.log(`  page    : ${GEOMETRY.pageWidthIn} x ${GEOMETRY.pageHeightIn} in  (trim ${TRIM.widthIn} x ${TRIM.heightIn})`);
   console.log(`  type    : EB Garamond (SIL OFL, vendored)`);
   console.log(`  proof   : ${out}`);
